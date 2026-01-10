@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developer.doordash.com)",
+      "Bash(move src frontend )",
+      "Bash(move index.html frontend )",
+      "Bash(move vite.config.ts frontend )",
+      "Bash(move tailwind.config.js frontend )",
+      "Bash(move postcss.config.js frontend )",
+      "Bash(move eslint.config.js frontend)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git push)",
+      "Bash(gh api:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run rerun:*)",
+      "WebFetch(domain:pizzadao.github.io)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 60 bash:*)",
+      "Bash(node setup-db.js:*)",
+      "Bash(nslookup:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
