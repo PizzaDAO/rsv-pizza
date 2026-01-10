@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2 } from 'lucide-react';
-import { getPartyByInviteCode, addGuestToParty } from '../contexts/PizzaContext';
-import { Party } from '../types';
+import { getPartyByInviteCode, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
   'Vegetarian',
@@ -35,7 +34,7 @@ export function RSVPPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [party, setParty] = useState<Party | null>(null);
+  const [party, setParty] = useState<DbParty | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   // Form state
@@ -45,15 +44,18 @@ export function RSVPPage() {
   const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
 
   useEffect(() => {
-    if (inviteCode) {
-      const foundParty = getPartyByInviteCode(inviteCode);
-      if (foundParty) {
-        setParty(foundParty);
-      } else {
-        setError('Party not found. The invite link may be invalid or expired.');
+    async function loadParty() {
+      if (inviteCode) {
+        const foundParty = await getPartyByInviteCode(inviteCode);
+        if (foundParty) {
+          setParty(foundParty);
+        } else {
+          setError('Party not found. The invite link may be invalid or expired.');
+        }
       }
+      setLoading(false);
     }
-    setLoading(false);
+    loadParty();
   }, [inviteCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,17 +74,22 @@ export function RSVPPage() {
     setSubmitting(true);
     setError(null);
 
-    // Add guest to party in localStorage
-    const guest = addGuestToParty(inviteCode, {
-      name: name.trim(),
-      dietaryRestrictions,
-      toppings: likedToppings,
-      dislikedToppings,
-    });
+    try {
+      // Add guest to party in Supabase
+      const guest = await addGuestToParty(
+        party!.id,
+        name.trim(),
+        dietaryRestrictions,
+        likedToppings,
+        dislikedToppings
+      );
 
-    if (guest) {
-      setSubmitted(true);
-    } else {
+      if (guest) {
+        setSubmitted(true);
+      } else {
+        setError('Failed to submit. Please try again.');
+      }
+    } catch (err) {
       setError('Failed to submit. The party may no longer exist.');
     }
 
@@ -155,7 +162,7 @@ export function RSVPPage() {
     );
   }
 
-  if (party?.rsvpClosedAt) {
+  if (party?.rsvp_closed_at) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
@@ -179,8 +186,8 @@ export function RSVPPage() {
               className="h-10 mx-auto mb-3"
             />
             <h1 className="text-2xl font-bold text-white">{party?.name}</h1>
-            {party?.hostName && (
-              <p className="text-white/80">Hosted by {party.hostName}</p>
+            {party?.host_name && (
+              <p className="text-white/80">Hosted by {party.host_name}</p>
             )}
             {party?.date && (
               <p className="text-white/70 text-sm mt-1">

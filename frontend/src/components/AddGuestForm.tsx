@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Loader2 } from 'lucide-react';
 
 export const AddGuestForm: React.FC = () => {
   const { availableToppings, addGuest, dietaryOptions } = usePizza();
@@ -10,6 +10,7 @@ export const AddGuestForm: React.FC = () => {
   const [toppings, setToppings] = useState<string[]>([]);
   const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setName('');
@@ -18,21 +19,21 @@ export const AddGuestForm: React.FC = () => {
     setDislikedToppings([]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
       return;
     }
 
-    const guest: Guest = {
+    setIsSubmitting(true);
+    await addGuest({
       name,
       dietaryRestrictions,
       toppings,
       dislikedToppings
-    };
-
-    addGuest(guest);
+    });
+    setIsSubmitting(false);
     resetForm();
     setIsFormVisible(false);
   };
@@ -158,8 +159,19 @@ export const AddGuestForm: React.FC = () => {
           </div>
 
           <div className="flex space-x-3 pt-2">
-            <button type="submit" className="btn-primary">
-              Add Guest
+            <button
+              type="submit"
+              className="btn-primary flex items-center gap-2"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add Guest'
+              )}
             </button>
             <button
               type="button"
@@ -168,6 +180,7 @@ export const AddGuestForm: React.FC = () => {
                 setIsFormVisible(false);
               }}
               className="btn-secondary"
+              disabled={isSubmitting}
             >
               Cancel
             </button>

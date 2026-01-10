@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2 } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink } = usePizza();
@@ -13,10 +13,14 @@ export const PartyHeader: React.FC = () => {
   const [hostName, setHostName] = useState('');
   const [partyDate, setPartyDate] = useState('');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partyName.trim()) return;
-    createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined);
+    setCreating(true);
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined);
+    setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
     // Reset form
@@ -156,14 +160,23 @@ export const PartyHeader: React.FC = () => {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="btn-secondary flex-1"
+                  disabled={creating}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary flex-1"
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  disabled={creating}
                 >
-                  Create Party
+                  {creating ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Party'
+                  )}
                 </button>
               </div>
             </form>

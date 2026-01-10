@@ -12,5 +12,8 @@
     "dev:all": "npm run dev --workspace=frontend & npm run dev --workspace=backend",
     "build": "npm run build --workspace=frontend",
     "build:backend": "npm run build --workspace=backend"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
   }
 }
