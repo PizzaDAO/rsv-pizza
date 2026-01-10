@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String   @id @default(cuid())
+  email                      String   @unique
+  name                       String?
+  defaultDietaryRestrictions String[]
+  defaultLikedToppings       String[]
+  defaultDislikedToppings    String[]
+  defaultAddress             String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  parties    Party[]
+  orders     Order[]
+  magicLinks MagicLink[]
+}
+
+model Party {
+  id           String    @id @default(cuid())
+  name         String
+  inviteCode   String    @unique @default(cuid())
+  date         DateTime?
+  pizzaSize    String
+  pizzaStyle   String
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  maxGuests    Int?
+  rsvpClosedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  guests Guest[]
+  orders Order[]
+}
+
+model Guest {
+  id                  String   @id @default(cuid())
+  name                String
+  dietaryRestrictions String[]
+  likedToppings       String[]
+  dislikedToppings    String[]
+  submittedAt         DateTime @default(now())
+  submittedVia        String   @default("link")
+
+  partyId String
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  provider        String
+  externalOrderId String?
+  pizzas          Json
+  totalAmount     Decimal  @db.Decimal(10, 2)
+  status          String   @default("pending")
+  pizzeriaName    String
+  pizzeriaAddress String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  partyId String
+  party   Party  @relation(fields: [partyId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

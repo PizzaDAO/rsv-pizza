@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developer.doordash.com)",
+      "Bash(move src frontend )",
+      "Bash(move index.html frontend )",
+      "Bash(move vite.config.ts frontend )",
+      "Bash(move tailwind.config.js frontend )",
+      "Bash(move postcss.config.js frontend )",
+      "Bash(move eslint.config.js frontend)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

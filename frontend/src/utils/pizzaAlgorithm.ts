@@ -1,0 +1,213 @@
+import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize } from '../types';
+import { availableToppings, pizzaSizes } from '../contexts/PizzaContext';
+
+// Maximum guests per pizza (largest size serves 6)
+const MAX_GUESTS_PER_PIZZA = 6;
+
+// Find the optimal pizza size for a given number of guests
+function getOptimalSize(guestCount: number): PizzaSize {
+  // Find the smallest pizza that can serve this many guests
+  const size = pizzaSizes.find(s => s.servings >= guestCount);
+  // If no size is big enough, use the largest
+  return size || pizzaSizes[pizzaSizes.length - 1];
+}
+
+// Helper function to find compatible guests based on toppings and dietary restrictions
+function findCompatibleGuests(guests: Guest[]): Guest[][] {
+  if (guests.length === 0) return [];
+  if (guests.length === 1) return [guests];
+
+  // Group guests with similar dietary restrictions first
+  const dietaryGroups: Record<string, Guest[]> = {};
+
+  guests.forEach(guest => {
+    // Create a key based on dietary restrictions (sorted for consistency)
+    const key = [...guest.dietaryRestrictions].sort().join(',') || 'none';
+    if (!dietaryGroups[key]) {
+      dietaryGroups[key] = [];
+    }
+    dietaryGroups[key].push(guest);
+  });
+
+  // For each dietary group, split by topping preferences if needed
+  const result: Guest[][] = [];
+
+  Object.values(dietaryGroups).forEach(groupGuests => {
+    if (groupGuests.length <= MAX_GUESTS_PER_PIZZA) {
+      result.push(groupGuests);
+    } else {
+      // Split larger groups based on topping preferences
+      const subgroups = splitByToppingPreferences(groupGuests);
+      result.push(...subgroups);
+    }
+  });
+
+  return result;
+}
+
+// Helper function to split guests based on topping preferences
+function splitByToppingPreferences(guests: Guest[]): Guest[][] {
+  if (guests.length <= MAX_GUESTS_PER_PIZZA) return [guests];
+
+  // Create compatibility matrix
+  const compatibilityMatrix: number[][] = [];
+
+  for (let i = 0; i < guests.length; i++) {
+    compatibilityMatrix[i] = [];
+    for (let j = 0; j < guests.length; j++) {
+      if (i === j) {
+        compatibilityMatrix[i][j] = 1;
+        continue;
+      }
+
+      const guestA = guests[i];
+      const guestB = guests[j];
+
+      // Calculate compatibility score
+      let score = 0;
+
+      // Shared liked toppings (+2 each)
+      const sharedLiked = guestA.toppings.filter(topping =>
+        guestB.toppings.includes(topping)
+      ).length;
+
+      // Conflicts between likes and dislikes (-1 each)
+      const conflicts = guestA.toppings.filter(topping =>
+        guestB.dislikedToppings.includes(topping)
+      ).length + guestB.toppings.filter(topping =>
+        guestA.dislikedToppings.includes(topping)
+      ).length;
+
+      score = (sharedLiked * 2) - conflicts;
+      compatibilityMatrix[i][j] = score;
+    }
+  }
+
+  // Greedy algorithm to form optimal groups
+  const groups: Guest[][] = [];
+  const assigned = new Set<number>();
+
+  for (let i = 0; i < guests.length; i++) {
+    if (assigned.has(i)) continue;
+
+    const group: Guest[] = [guests[i]];
+    assigned.add(i);
+
+    // Find most compatible guests for this group
+    const compatibilityScores: [number, number][] = [];
+
+    for (let j = 0; j < guests.length; j++) {
+      if (assigned.has(j)) continue;
+
+      // Calculate total compatibility with all current group members
+      const totalScore = group.reduce((sum, _, groupIdx) => {
+        const memberIndex = guests.indexOf(group[groupIdx]);
+        return sum + compatibilityMatrix[memberIndex][j];
+      }, 0);
+
+      compatibilityScores.push([j, totalScore]);
+    }
+
+    // Sort by compatibility score (highest first)
+    compatibilityScores.sort((a, b) => b[1] - a[1]);
+
+    // Add compatible guests up to max pizza size
+    for (const [idx] of compatibilityScores) {
+      if (group.length >= MAX_GUESTS_PER_PIZZA) break;
+      group.push(guests[idx]);
+      assigned.add(idx);
+    }
+
+    groups.push(group);
+  }
+
+  return groups;
+}
+
+// Dietary restriction topping exclusions
+const DIETARY_EXCLUSIONS: Record<string, string[]> = {
+  'Vegetarian': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken'],
+  'Vegan': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'extra-cheese', 'feta'],
+  'Dairy-Free': ['extra-cheese', 'feta'],
+  'Gluten-Free': [], // Handled at crust level, not toppings
+};
+
+// Generate optimal toppings for a group of guests
+function generateOptimalToppings(guests: Guest[]): Topping[] {
+  // Collect all dietary restrictions from the group
+  const allRestrictions = new Set<string>();
+  guests.forEach(guest => {
+    guest.dietaryRestrictions.forEach(r => allRestrictions.add(r));
+  });
+
+  // Get all excluded toppings based on dietary restrictions
+  const excludedToppings = new Set<string>();
+  allRestrictions.forEach(restriction => {
+    const exclusions = DIETARY_EXCLUSIONS[restriction] || [];
+    exclusions.forEach(t => excludedToppings.add(t));
+  });
+
+  // Collect liked toppings with counts
+  const toppingCounts: Record<string, number> = {};
+
+  guests.forEach(guest => {
+    guest.toppings.forEach(topping => {
+      toppingCounts[topping] = (toppingCounts[topping] || 0) + 1;
+    });
+  });
+
+  // Remove disliked toppings (if anyone dislikes it, remove it)
+  guests.forEach(guest => {
+    guest.dislikedToppings.forEach(topping => {
+      delete toppingCounts[topping];
+    });
+  });
+
+  // Remove toppings excluded by dietary restrictions
+  excludedToppings.forEach(toppingId => {
+    delete toppingCounts[toppingId];
+  });
+
+  // Sort toppings by popularity and take top 5
+  const sortedToppings = Object.entries(toppingCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id]) => availableToppings.find(t => t.id === id))
+    .filter((t): t is Topping => t !== undefined);
+
+  // Add cheese if not excluded and no cheese already selected
+  const cheeseExcluded = excludedToppings.has('extra-cheese');
+  if (!cheeseExcluded && !sortedToppings.some(t => t.category === 'cheese')) {
+    const cheeseTopping = availableToppings.find(t => t.id === 'extra-cheese');
+    if (cheeseTopping && !guests.every(g => g.dislikedToppings.includes('extra-cheese'))) {
+      sortedToppings.push(cheeseTopping);
+    }
+  }
+
+  return sortedToppings;
+}
+
+// Main function to generate pizza recommendations
+export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle): PizzaRecommendation[] {
+  const guestGroups = findCompatibleGuests(guests);
+
+  return guestGroups.map((groupGuests, index) => {
+    // Get all dietary restrictions from the group
+    const allDietaryRestrictions = Array.from(
+      new Set(groupGuests.flatMap(guest => guest.dietaryRestrictions))
+    ).filter(r => r !== 'None');
+
+    const optimalToppings = generateOptimalToppings(groupGuests);
+    const optimalSize = getOptimalSize(groupGuests.length);
+
+    return {
+      id: `pizza-${index + 1}`,
+      toppings: optimalToppings,
+      guestCount: groupGuests.length,
+      guests: groupGuests,
+      dietaryRestrictions: allDietaryRestrictions,
+      size: optimalSize,
+      style: style,
+    };
+  });
+}
