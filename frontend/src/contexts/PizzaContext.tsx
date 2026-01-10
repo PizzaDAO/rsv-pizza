@@ -1,14 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings } from '../types';
+import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings, Party } from '../types';
 import { generatePizzaRecommendations } from '../utils/pizzaAlgorithm';
 
 interface PizzaContextType {
+  // Party management
+  party: Party | null;
+  createParty: (name: string, hostName?: string, date?: string) => void;
+  clearParty: () => void;
+  getInviteLink: () => string;
+  // Guest management
   guests: Guest[];
   addGuest: (guest: Guest) => void;
   removeGuest: (id: string) => void;
   updateGuest: (id: string, guest: Guest) => void;
+  // Recommendations
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
+  // Static data
   availableToppings: Topping[];
   dietaryOptions: string[];
   pizzaStyles: PizzaStyle[];
@@ -72,40 +80,140 @@ export const pizzaSizes: PizzaSize[] = [
   { diameter: 20, name: 'Family', servings: 6 }
 ];
 
+// Generate a short invite code
+function generateInviteCode(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Get all parties from localStorage
+function getStoredParties(): Record<string, Party> {
+  const stored = localStorage.getItem('rsvpizza_parties');
+  return stored ? JSON.parse(stored) : {};
+}
+
+// Save parties to localStorage
+function saveParties(parties: Record<string, Party>) {
+  localStorage.setItem('rsvpizza_parties', JSON.stringify(parties));
+}
+
+// Get party by invite code
+export function getPartyByInviteCode(inviteCode: string): Party | null {
+  const parties = getStoredParties();
+  return Object.values(parties).find(p => p.inviteCode === inviteCode) || null;
+}
+
+// Add guest to party by invite code
+export function addGuestToParty(inviteCode: string, guest: Omit<Guest, 'id'>): Guest | null {
+  const parties = getStoredParties();
+  const party = Object.values(parties).find(p => p.inviteCode === inviteCode);
+
+  if (!party) return null;
+
+  const newGuest: Guest = {
+    ...guest,
+    id: crypto.randomUUID(),
+  };
+
+  party.guests.push(newGuest);
+  parties[party.id] = party;
+  saveParties(parties);
+
+  return newGuest;
+}
+
 export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [party, setParty] = useState<Party | null>(() => {
+    const savedPartyId = localStorage.getItem('rsvpizza_currentParty');
+    if (savedPartyId) {
+      const parties = getStoredParties();
+      return parties[savedPartyId] || null;
+    }
+    return null;
+  });
+
   const [guests, setGuests] = useState<Guest[]>(() => {
+    if (party) return party.guests;
     const savedGuests = localStorage.getItem('pizzaPartyGuests');
     return savedGuests ? JSON.parse(savedGuests) : [];
   });
-  
+
   const [recommendations, setRecommendations] = useState<PizzaRecommendation[]>([]);
-  
+
   const [pizzaSettings, setPizzaSettings] = useState<PizzaSettings>(() => {
     const savedSettings = localStorage.getItem('pizzaPartySettings');
     return savedSettings ? JSON.parse(savedSettings) : {
-      size: pizzaSizes[3], // Default to Large (16")
-      style: pizzaStyles[1] // Default to New York
+      size: pizzaSizes[3],
+      style: pizzaStyles[1]
     };
   });
 
+  // Sync guests with party
   useEffect(() => {
-    localStorage.setItem('pizzaPartyGuests', JSON.stringify(guests));
+    if (party) {
+      const parties = getStoredParties();
+      if (parties[party.id]) {
+        parties[party.id].guests = guests;
+        saveParties(parties);
+        setParty({ ...party, guests });
+      }
+    } else {
+      localStorage.setItem('pizzaPartyGuests', JSON.stringify(guests));
+    }
   }, [guests]);
 
   useEffect(() => {
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
+  const createParty = (name: string, hostName?: string, date?: string) => {
+    const newParty: Party = {
+      id: crypto.randomUUID(),
+      name,
+      inviteCode: generateInviteCode(),
+      date: date || null,
+      hostName: hostName || null,
+      pizzaStyle: pizzaSettings.style.id,
+      maxGuests: null,
+      rsvpClosedAt: null,
+      createdAt: new Date().toISOString(),
+      guests: guests, // Keep existing guests
+    };
+
+    const parties = getStoredParties();
+    parties[newParty.id] = newParty;
+    saveParties(parties);
+
+    localStorage.setItem('rsvpizza_currentParty', newParty.id);
+    setParty(newParty);
+  };
+
+  const clearParty = () => {
+    localStorage.removeItem('rsvpizza_currentParty');
+    setParty(null);
+  };
+
+  const getInviteLink = (): string => {
+    if (!party) return '';
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}#/rsvp/${party.inviteCode}`;
+  };
+
   const addGuest = (guest: Guest) => {
-    setGuests([...guests, { ...guest, id: crypto.randomUUID() }]);
+    const newGuest = { ...guest, id: crypto.randomUUID() };
+    setGuests(prev => [...prev, newGuest]);
   };
 
   const removeGuest = (id: string) => {
-    setGuests(guests.filter(guest => guest.id !== id));
+    setGuests(prev => prev.filter(guest => guest.id !== id));
   };
 
   const updateGuest = (id: string, updatedGuest: Guest) => {
-    setGuests(guests.map(guest => guest.id === id ? { ...updatedGuest, id } : guest));
+    setGuests(prev => prev.map(guest => guest.id === id ? { ...updatedGuest, id } : guest));
   };
 
   const updatePizzaSettings = (settings: PizzaSettings) => {
@@ -119,6 +227,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <PizzaContext.Provider value={{
+      party,
+      createParty,
+      clearParty,
+      getInviteLink,
       guests,
       addGuest,
       removeGuest,

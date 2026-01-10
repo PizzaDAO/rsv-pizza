@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2 } from 'lucide-react';
-
-interface PartyInfo {
-  name: string;
-  date: string | null;
-  hostName: string | null;
-  guestCount?: number;
-  maxGuests?: number | null;
-}
+import { getPartyByInviteCode, addGuestToParty } from '../contexts/PizzaContext';
+import { Party } from '../types';
 
 const DIETARY_OPTIONS = [
   'Vegetarian',
@@ -35,17 +29,13 @@ const TOPPINGS = [
   { id: 'pineapple', name: 'Pineapple', category: 'fruit' },
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
-
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [party, setParty] = useState<PartyInfo | null>(null);
-  const [rsvpClosed, setRsvpClosed] = useState(false);
-  const [closedMessage, setClosedMessage] = useState<string | null>(null);
+  const [party, setParty] = useState<Party | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   // Form state
@@ -55,27 +45,16 @@ export function RSVPPage() {
   const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchPartyInfo();
-  }, [inviteCode]);
-
-  const fetchPartyInfo = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Party not found');
+    if (inviteCode) {
+      const foundParty = getPartyByInviteCode(inviteCode);
+      if (foundParty) {
+        setParty(foundParty);
+      } else {
+        setError('Party not found. The invite link may be invalid or expired.');
       }
-
-      setParty(data.party);
-      setRsvpClosed(data.rsvpClosed);
-      setClosedMessage(data.message || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load party');
-    } finally {
-      setLoading(false);
     }
-  };
+    setLoading(false);
+  }, [inviteCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,33 +64,29 @@ export function RSVPPage() {
       return;
     }
 
+    if (!inviteCode) {
+      setError('Invalid invite code');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
-    try {
-      const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          dietaryRestrictions,
-          likedToppings,
-          dislikedToppings,
-        }),
-      });
+    // Add guest to party in localStorage
+    const guest = addGuestToParty(inviteCode, {
+      name: name.trim(),
+      dietaryRestrictions,
+      toppings: likedToppings,
+      dislikedToppings,
+    });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Failed to submit');
-      }
-
+    if (guest) {
       setSubmitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
-    } finally {
-      setSubmitting(false);
+    } else {
+      setError('Failed to submit. The party may no longer exist.');
     }
+
+    setSubmitting(false);
   };
 
   const toggleDietary = (option: string) => {
@@ -150,7 +125,10 @@ export function RSVPPage() {
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Party Not Found</h1>
-          <p className="text-white/60">{error}</p>
+          <p className="text-white/60 mb-6">{error}</p>
+          <a href="#/" className="btn-primary inline-block">
+            Go to Home
+          </a>
         </div>
       </div>
     );
@@ -177,13 +155,13 @@ export function RSVPPage() {
     );
   }
 
-  if (rsvpClosed) {
+  if (party?.rsvpClosedAt) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <Pizza className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">{party?.name}</h1>
-          <p className="text-white/60">{closedMessage || 'RSVPs are closed'}</p>
+          <h1 className="text-2xl font-bold text-white mb-2">{party.name}</h1>
+          <p className="text-white/60">RSVPs are closed for this party.</p>
         </div>
       </div>
     );

@@ -38,3 +38,16 @@ export interface PizzaSettings {
   size: PizzaSize;
   style: PizzaStyle;
 }
+
+export interface Party {
+  id: string;
+  name: string;
+  inviteCode: string;
+  date: string | null;
+  hostName: string | null;
+  pizzaStyle: string;
+  maxGuests: number | null;
+  rsvpClosedAt: string | null;
+  createdAt: string;
+  guests: Guest[];
+}

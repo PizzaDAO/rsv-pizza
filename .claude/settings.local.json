@@ -22,7 +22,9 @@
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(gh run rerun:*)",
-      "WebFetch(domain:pizzadao.github.io)"
+      "WebFetch(domain:pizzadao.github.io)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)"
     ]
   }
 }
