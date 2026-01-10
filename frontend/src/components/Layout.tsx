@@ -44,7 +44,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Corner Links */}
       <div className="corner-links">
         <a
-          href="https://docs.google.com/spreadsheets/d/101pcNQxJN6BoUUrocgVkFnFJW-OylkI/edit?gid=0#gid=0"
+          href="https://docs.google.com/spreadsheets/d/1F4FYDgK0nfcQ8RbwrR__0n38iJqpOKyCqVk4_3CwhsY/edit?gid=0#gid=0"
           target="_blank"
           rel="noopener noreferrer"
           className="corner-link"
