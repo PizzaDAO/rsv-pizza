@@ -3,10 +3,10 @@ import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
-  const { party, createParty, clearParty, getInviteLink } = usePizza();
+  const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'guest' | 'host' | null>(null);
 
   // Form state
   const [partyName, setPartyName] = useState('');
@@ -32,15 +32,16 @@ export const PartyHeader: React.FC = () => {
     setExpectedGuests('');
   };
 
-  const handleCopyLink = () => {
-    const link = getInviteLink();
+  const handleCopyLink = (type: 'guest' | 'host') => {
+    const link = type === 'guest' ? getInviteLink() : getHostLink();
     navigator.clipboard.writeText(link).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(type);
+      setTimeout(() => setCopied(null), 2000);
     });
   };
 
   const inviteLink = getInviteLink();
+  const hostLink = getHostLink();
 
   return (
     <>
@@ -226,31 +227,59 @@ export const PartyHeader: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-white/60 mb-4">
-              Share this link with your guests so they can submit their pizza preferences:
-            </p>
-
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 overflow-hidden">
-                  <code className="text-sm text-[#ff393a] break-all">{inviteLink}</code>
+            <div className="space-y-4 mb-6">
+              {/* Guest Link */}
+              <div>
+                <p className="text-white/60 mb-2 text-sm font-medium">
+                  Guest RSVP Link (share with guests):
+                </p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 overflow-hidden">
+                      <code className="text-sm text-[#ff393a] break-all">{inviteLink}</code>
+                    </div>
+                    <button
+                      onClick={() => handleCopyLink('guest')}
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                        copied === 'guest'
+                          ? 'bg-[#39d98a] text-white'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {copied === 'guest' ? <Check size={20} /> : <Copy size={20} />}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={handleCopyLink}
-                  className={`flex-shrink-0 p-2 rounded-lg transition-all ${
-                    copied
-                      ? 'bg-[#39d98a] text-white'
-                      : 'bg-white/10 text-white hover:bg-white/20'
-                  }`}
-                >
-                  {copied ? <Check size={20} /> : <Copy size={20} />}
-                </button>
+              </div>
+
+              {/* Host Link */}
+              <div>
+                <p className="text-white/60 mb-2 text-sm font-medium">
+                  Host Dashboard Link (bookmark this):
+                </p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 overflow-hidden">
+                      <code className="text-sm text-[#39d98a] break-all">{hostLink}</code>
+                    </div>
+                    <button
+                      onClick={() => handleCopyLink('host')}
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                        copied === 'host'
+                          ? 'bg-[#39d98a] text-white'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {copied === 'host' ? <Check size={20} /> : <Copy size={20} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl p-4 mb-6">
               <p className="text-sm text-[#ffb347]">
-                When guests open this link, they'll see a form to enter their name, dietary restrictions, and topping preferences. Their responses will appear in your guest list automatically.
+                Share the <strong>Guest RSVP Link</strong> with your guests. Bookmark the <strong>Host Dashboard Link</strong> to access your party from any device.
               </p>
             </div>
 

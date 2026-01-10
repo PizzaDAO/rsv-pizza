@@ -11,6 +11,7 @@ interface PizzaContextType {
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
+  getHostLink: () => string;
   // Guest management
   guests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
@@ -184,6 +185,12 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return `${baseUrl}#/rsvp/${party.inviteCode}`;
   };
 
+  const getHostLink = (): string => {
+    if (!party) return '';
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}#/party/${party.inviteCode}`;
+  };
+
   const addGuest = async (guest: Omit<Guest, 'id'>) => {
     if (!party) return;
 
@@ -227,6 +234,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       loadParty,
       clearParty,
       getInviteLink,
+      getHostLink,
       guests,
       addGuest,
       removeGuest,
