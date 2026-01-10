@@ -61,13 +61,15 @@ export const pizzaStyles: PizzaStyle[] = [
   { id: 'detroit', name: 'Detroit', description: 'Square, thick crust, crispy edges' }
 ];
 
+// Servings based on surface area: 18" feeds 4 people (2 slices each, 1/4 surface area per person)
+// Formula: (diameter/2)² * π / (9² * π / 4) = (diameter/18)² * 4
 export const pizzaSizes: PizzaSize[] = [
-  { diameter: 10, name: 'Personal', servings: 1 },
-  { diameter: 12, name: 'Small', servings: 2 },
-  { diameter: 14, name: 'Medium', servings: 3 },
-  { diameter: 16, name: 'Large', servings: 4 },
-  { diameter: 18, name: 'Extra Large', servings: 5 },
-  { diameter: 20, name: 'Family', servings: 6 }
+  { diameter: 10, name: 'Personal', servings: 1.2 },  // (10/18)² * 4 = 1.23
+  { diameter: 12, name: 'Small', servings: 1.8 },     // (12/18)² * 4 = 1.78
+  { diameter: 14, name: 'Medium', servings: 2.4 },    // (14/18)² * 4 = 2.42
+  { diameter: 16, name: 'Large', servings: 3.2 },     // (16/18)² * 4 = 3.16
+  { diameter: 18, name: 'Extra Large', servings: 4 }, // baseline
+  { diameter: 20, name: 'Family', servings: 4.9 }     // (20/18)² * 4 = 4.94
 ];
 
 // Convert database guest to app guest

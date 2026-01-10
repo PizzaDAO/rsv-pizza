@@ -1,11 +1,36 @@
 import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize } from '../types';
 import { availableToppings, pizzaSizes } from '../contexts/PizzaContext';
 
-// Maximum guests per pizza (largest size serves 6)
-const MAX_GUESTS_PER_PIZZA = 6;
+// Style-specific serving adjustments
+// - Neapolitan: 1 pizza per 1.5 people (personal-sized, wood-fired)
+// - Detroit: 2 slices per person (similar to NY-style serving)
+// - NY/default: based on surface area (18" feeds 4)
 
-// Find the optimal pizza size for a given number of guests
-function getOptimalSize(guestCount: number): PizzaSize {
+function getServingsForStyle(size: PizzaSize, style: PizzaStyle): number {
+  if (style.id === 'neapolitan') {
+    // Neapolitan pizzas are personal-sized, 1 pizza per 1.5 people regardless of size
+    return 1.5;
+  }
+  // Detroit and NY use surface-area based servings
+  return size.servings;
+}
+
+function getMaxGuestsPerPizza(style: PizzaStyle): number {
+  if (style.id === 'neapolitan') {
+    // Neapolitan is personal-sized, max ~2 people sharing one
+    return 2;
+  }
+  // For Detroit/NY, largest pizza serves ~5 people
+  return 5;
+}
+
+// Find the optimal pizza size for a given number of guests and style
+function getOptimalSize(guestCount: number, style?: PizzaStyle): PizzaSize {
+  if (style?.id === 'neapolitan') {
+    // Neapolitan typically comes in one size (personal), use smallest
+    return pizzaSizes[0];
+  }
+
   // Find the smallest pizza that can serve this many guests
   const size = pizzaSizes.find(s => s.servings >= guestCount);
   // If no size is big enough, use the largest
@@ -13,9 +38,11 @@ function getOptimalSize(guestCount: number): PizzaSize {
 }
 
 // Helper function to find compatible guests based on toppings and dietary restrictions
-function findCompatibleGuests(guests: Guest[]): Guest[][] {
+function findCompatibleGuests(guests: Guest[], style: PizzaStyle): Guest[][] {
   if (guests.length === 0) return [];
   if (guests.length === 1) return [guests];
+
+  const maxPerPizza = getMaxGuestsPerPizza(style);
 
   // Group guests with similar dietary restrictions first
   const dietaryGroups: Record<string, Guest[]> = {};
@@ -33,11 +60,11 @@ function findCompatibleGuests(guests: Guest[]): Guest[][] {
   const result: Guest[][] = [];
 
   Object.values(dietaryGroups).forEach(groupGuests => {
-    if (groupGuests.length <= MAX_GUESTS_PER_PIZZA) {
+    if (groupGuests.length <= maxPerPizza) {
       result.push(groupGuests);
     } else {
       // Split larger groups based on topping preferences
-      const subgroups = splitByToppingPreferences(groupGuests);
+      const subgroups = splitByToppingPreferences(groupGuests, maxPerPizza);
       result.push(...subgroups);
     }
   });
@@ -46,8 +73,8 @@ function findCompatibleGuests(guests: Guest[]): Guest[][] {
 }
 
 // Helper function to split guests based on topping preferences
-function splitByToppingPreferences(guests: Guest[]): Guest[][] {
-  if (guests.length <= MAX_GUESTS_PER_PIZZA) return [guests];
+function splitByToppingPreferences(guests: Guest[], maxPerPizza: number): Guest[][] {
+  if (guests.length <= maxPerPizza) return [guests];
 
   // Create compatibility matrix
   const compatibilityMatrix: number[][] = [];
@@ -113,7 +140,7 @@ function splitByToppingPreferences(guests: Guest[]): Guest[][] {
 
     // Add compatible guests up to max pizza size
     for (const [idx] of compatibilityScores) {
-      if (group.length >= MAX_GUESTS_PER_PIZZA) break;
+      if (group.length >= maxPerPizza) break;
       group.push(guests[idx]);
       assigned.add(idx);
     }
@@ -207,7 +234,12 @@ const DEFAULT_PIZZA_TYPES: DefaultPizzaType[] = [
 function generateDefaultPizzas(nonRespondents: number, style: PizzaStyle): PizzaRecommendation[] {
   if (nonRespondents <= 0) return [];
 
-  const pizzasNeeded = Math.ceil(nonRespondents / MAX_GUESTS_PER_PIZZA);
+  const maxPerPizza = getMaxGuestsPerPizza(style);
+
+  // For Neapolitan, each pizza serves 1.5 people
+  // For others, use the largest size servings (~5 people)
+  const servingsPerPizza = style.id === 'neapolitan' ? 1.5 : maxPerPizza;
+  const pizzasNeeded = Math.ceil(nonRespondents / servingsPerPizza);
   const defaultPizzas: PizzaRecommendation[] = [];
 
   // Calculate special dietary pizzas (1 per 10 guests)
@@ -244,7 +276,7 @@ function generateDefaultPizzas(nonRespondents: number, style: PizzaStyle): Pizza
 
     // Calculate guests per pizza for this type
     const guestsForType = Math.min(
-      count * MAX_GUESTS_PER_PIZZA,
+      count * servingsPerPizza,
       nonRespondents - guestsAssigned
     );
     const guestsPerPizza = Math.ceil(guestsForType / count);
@@ -252,10 +284,10 @@ function generateDefaultPizzas(nonRespondents: number, style: PizzaStyle): Pizza
     defaultPizzas.push({
       id: `default-${type.label.toLowerCase().replace(/\s+/g, '-')}`,
       toppings,
-      guestCount: guestsPerPizza * count,
+      guestCount: Math.round(guestsPerPizza * count),
       guests: [],
       dietaryRestrictions: type.dietaryRestrictions,
-      size: getOptimalSize(guestsPerPizza),
+      size: getOptimalSize(guestsPerPizza, style),
       style,
       isForNonRespondents: true,
       quantity: count,
@@ -305,7 +337,7 @@ function groupIdenticalPizzas(pizzas: PizzaRecommendation[]): PizzaRecommendatio
 
 // Main function to generate pizza recommendations
 export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle, expectedGuestCount?: number | null): PizzaRecommendation[] {
-  const guestGroups = findCompatibleGuests(guests);
+  const guestGroups = findCompatibleGuests(guests, style);
 
   const recommendations = guestGroups.map((groupGuests, index) => {
     // Get all dietary restrictions from the group
@@ -314,7 +346,7 @@ export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle,
     ).filter(r => r !== 'None');
 
     const optimalToppings = generateOptimalToppings(groupGuests);
-    const optimalSize = getOptimalSize(groupGuests.length);
+    const optimalSize = getOptimalSize(groupGuests.length, style);
 
     return {
       id: `pizza-${index + 1}`,
