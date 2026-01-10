@@ -25,11 +25,16 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index }) => {
     fruit: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
   };
 
+  const quantity = pizza.quantity || 1;
+  const displayTitle = pizza.label
+    ? `${quantity > 1 ? `${quantity}x ` : ''}${pizza.label}`
+    : `${quantity > 1 ? `${quantity}x ` : ''}Pizza #${index + 1}`;
+
   return (
     <div className="border border-white/10 rounded-xl overflow-hidden bg-white/5 hover:bg-white/[0.07] transition-all">
-      <div className="bg-gradient-to-r from-[#ff393a] to-[#ff6b35] py-3 px-4">
+      <div className={`py-3 px-4 ${pizza.isForNonRespondents ? 'bg-gradient-to-r from-[#6b7280] to-[#9ca3af]' : 'bg-gradient-to-r from-[#ff393a] to-[#ff6b35]'}`}>
         <div className="flex justify-between items-center">
-          <h3 className="text-white font-bold">Pizza #{index + 1}</h3>
+          <h3 className="text-white font-bold">{displayTitle}</h3>
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-1 bg-white/20 rounded-full px-2.5 py-1">
               <Ruler size={14} className="text-white" />
@@ -40,7 +45,7 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index }) => {
             <div className="flex items-center space-x-1 bg-white/20 rounded-full px-2.5 py-1">
               <Users size={14} className="text-white" />
               <span className="text-white text-xs">
-                {pizza.guests.length}
+                {pizza.guestCount}
               </span>
             </div>
           </div>

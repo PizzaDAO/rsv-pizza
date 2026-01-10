@@ -33,6 +33,8 @@ export interface PizzaRecommendation {
   size: PizzaSize;
   style: PizzaStyle;
   isForNonRespondents?: boolean;
+  quantity?: number;
+  label?: string; // e.g., "Cheese", "Pepperoni", "Veggie", "Vegan", "Gluten-Free"
 }
 
 export interface PizzaSettings {

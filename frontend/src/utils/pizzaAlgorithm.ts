@@ -187,6 +187,122 @@ function generateOptimalToppings(guests: Guest[]): Topping[] {
   return sortedToppings;
 }
 
+// Default pizza types for non-respondents
+interface DefaultPizzaType {
+  label: string;
+  toppingIds: string[];
+  dietaryRestrictions: string[];
+}
+
+const DEFAULT_PIZZA_TYPES: DefaultPizzaType[] = [
+  { label: 'Cheese', toppingIds: ['extra-cheese'], dietaryRestrictions: [] },
+  { label: 'Pepperoni', toppingIds: ['pepperoni', 'extra-cheese'], dietaryRestrictions: [] },
+  { label: 'Mushroom', toppingIds: ['mushrooms', 'extra-cheese'], dietaryRestrictions: ['Vegetarian'] },
+  { label: 'Veggie', toppingIds: ['mushrooms', 'bell-peppers', 'onions', 'olives'], dietaryRestrictions: ['Vegetarian'] },
+  { label: 'Vegan', toppingIds: ['mushrooms', 'bell-peppers', 'onions', 'tomatoes'], dietaryRestrictions: ['Vegan'] },
+  { label: 'Gluten-Free Cheese', toppingIds: ['extra-cheese'], dietaryRestrictions: ['Gluten-Free'] },
+];
+
+// Generate default pizza distribution for non-respondents
+function generateDefaultPizzas(nonRespondents: number, style: PizzaStyle): PizzaRecommendation[] {
+  if (nonRespondents <= 0) return [];
+
+  const pizzasNeeded = Math.ceil(nonRespondents / MAX_GUESTS_PER_PIZZA);
+  const defaultPizzas: PizzaRecommendation[] = [];
+
+  // Calculate special dietary pizzas (1 per 10 guests)
+  const veganPizzas = Math.max(1, Math.floor(nonRespondents / 10));
+  const glutenFreePizzas = Math.max(1, Math.floor(nonRespondents / 10));
+
+  // Remaining pizzas split between cheese, pepperoni, mushroom, veggie
+  const specialPizzas = veganPizzas + glutenFreePizzas;
+  const regularPizzas = Math.max(0, pizzasNeeded - specialPizzas);
+
+  // Distribution: ~40% cheese, ~40% pepperoni, ~10% mushroom, ~10% veggie
+  const cheesePizzas = Math.ceil(regularPizzas * 0.4);
+  const pepperoniPizzas = Math.ceil(regularPizzas * 0.4);
+  const mushroomPizzas = Math.ceil(regularPizzas * 0.1);
+  const veggiePizzas = Math.max(0, regularPizzas - cheesePizzas - pepperoniPizzas - mushroomPizzas);
+
+  const distribution = [
+    { type: DEFAULT_PIZZA_TYPES[0], count: cheesePizzas },      // Cheese
+    { type: DEFAULT_PIZZA_TYPES[1], count: pepperoniPizzas },   // Pepperoni
+    { type: DEFAULT_PIZZA_TYPES[2], count: mushroomPizzas },    // Mushroom
+    { type: DEFAULT_PIZZA_TYPES[3], count: veggiePizzas },      // Veggie
+    { type: DEFAULT_PIZZA_TYPES[4], count: veganPizzas },       // Vegan
+    { type: DEFAULT_PIZZA_TYPES[5], count: glutenFreePizzas },  // Gluten-Free
+  ];
+
+  let guestsAssigned = 0;
+
+  for (const { type, count } of distribution) {
+    if (count <= 0) continue;
+
+    const toppings = type.toppingIds
+      .map(id => availableToppings.find(t => t.id === id))
+      .filter((t): t is typeof availableToppings[0] => t !== undefined);
+
+    // Calculate guests per pizza for this type
+    const guestsForType = Math.min(
+      count * MAX_GUESTS_PER_PIZZA,
+      nonRespondents - guestsAssigned
+    );
+    const guestsPerPizza = Math.ceil(guestsForType / count);
+
+    defaultPizzas.push({
+      id: `default-${type.label.toLowerCase().replace(/\s+/g, '-')}`,
+      toppings,
+      guestCount: guestsPerPizza * count,
+      guests: [],
+      dietaryRestrictions: type.dietaryRestrictions,
+      size: getOptimalSize(guestsPerPizza),
+      style,
+      isForNonRespondents: true,
+      quantity: count,
+      label: type.label,
+    });
+
+    guestsAssigned += guestsForType;
+  }
+
+  return defaultPizzas.filter(p => p.quantity && p.quantity > 0);
+}
+
+// Group identical pizzas together
+function groupIdenticalPizzas(pizzas: PizzaRecommendation[]): PizzaRecommendation[] {
+  const grouped: PizzaRecommendation[] = [];
+  const seen = new Map<string, number>(); // key -> index in grouped
+
+  for (const pizza of pizzas) {
+    // Skip already-grouped default pizzas
+    if (pizza.isForNonRespondents && pizza.quantity) {
+      grouped.push(pizza);
+      continue;
+    }
+
+    // Create a key based on toppings and dietary restrictions
+    const toppingKey = pizza.toppings.map(t => t.id).sort().join(',');
+    const dietaryKey = pizza.dietaryRestrictions.sort().join(',');
+    const sizeKey = pizza.size.diameter;
+    const key = `${toppingKey}|${dietaryKey}|${sizeKey}`;
+
+    if (seen.has(key)) {
+      // Merge with existing
+      const existingIdx = seen.get(key)!;
+      const existing = grouped[existingIdx];
+      existing.quantity = (existing.quantity || 1) + 1;
+      existing.guestCount += pizza.guestCount;
+      existing.guests = [...existing.guests, ...pizza.guests];
+    } else {
+      // Add new
+      seen.set(key, grouped.length);
+      grouped.push({ ...pizza, quantity: 1 });
+    }
+  }
+
+  return grouped;
+}
+
 // Main function to generate pizza recommendations
 export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle, expectedGuestCount?: number | null): PizzaRecommendation[] {
   const guestGroups = findCompatibleGuests(guests);
@@ -211,30 +327,19 @@ export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle,
     };
   });
 
-  // Add cheese pizzas for guests who didn't RSVP
+  // Group identical custom pizzas
+  const groupedRecommendations = groupIdenticalPizzas(recommendations);
+
+  // Add default pizzas for guests who didn't RSVP
   if (expectedGuestCount && expectedGuestCount > guests.length) {
     const nonRespondents = expectedGuestCount - guests.length;
-    const cheesePizzasNeeded = Math.ceil(nonRespondents / MAX_GUESTS_PER_PIZZA);
-
-    for (let i = 0; i < cheesePizzasNeeded; i++) {
-      const guestsForThisPizza = Math.min(
-        nonRespondents - (i * MAX_GUESTS_PER_PIZZA),
-        MAX_GUESTS_PER_PIZZA
-      );
-      const optimalSize = getOptimalSize(guestsForThisPizza);
-
-      recommendations.push({
-        id: `pizza-${recommendations.length + 1}`,
-        toppings: [availableToppings.find(t => t.id === 'extra-cheese')!].filter(Boolean),
-        guestCount: guestsForThisPizza,
-        guests: [], // No specific guests assigned
-        dietaryRestrictions: [],
-        size: optimalSize,
-        style: style,
-        isForNonRespondents: true, // Mark as cheese pizza for non-respondents
-      } as PizzaRecommendation);
-    }
+    const defaultPizzas = generateDefaultPizzas(nonRespondents, style);
+    groupedRecommendations.push(...defaultPizzas);
   }
 
-  return recommendations;
+  // Reassign IDs
+  return groupedRecommendations.map((pizza, index) => ({
+    ...pizza,
+    id: `pizza-${index + 1}`,
+  }));
 }
