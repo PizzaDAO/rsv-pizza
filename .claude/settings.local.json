@@ -28,7 +28,24 @@
       "Bash(timeout 60 bash:*)",
       "Bash(node setup-db.js:*)",
       "Bash(nslookup:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(node test-scenarios.js:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:developer.uber.com)",
+      "WebFetch(domain:developer.squareup.com)",
+      "Bash(supabase secrets set:*)",
+      "Bash(npx supabase secrets set:*)",
+      "Bash(npx supabase login)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase secrets set:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase functions deploy:*)",
+      "Bash(npx gh-pages -d dist)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(node migrate-address.js:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(git fetch:*)",
+      "Bash(npm run deploy:*)"
     ]
   }
 }

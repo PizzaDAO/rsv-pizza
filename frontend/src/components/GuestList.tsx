@@ -27,7 +27,7 @@ export const GuestList: React.FC = () => {
         </span>
       </div>
 
-      <div className="space-y-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
         {guests.map(guest => (
           <GuestCard key={guest.id} guest={guest} />
         ))}

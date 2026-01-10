@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
@@ -13,6 +13,7 @@ export const PartyHeader: React.FC = () => {
   const [hostName, setHostName] = useState('');
   const [partyDate, setPartyDate] = useState('');
   const [expectedGuests, setExpectedGuests] = useState('');
+  const [partyAddress, setPartyAddress] = useState('');
 
   const [creating, setCreating] = useState(false);
 
@@ -21,7 +22,7 @@ export const PartyHeader: React.FC = () => {
     if (!partyName.trim()) return;
     setCreating(true);
     const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount);
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined);
     setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
@@ -30,6 +31,7 @@ export const PartyHeader: React.FC = () => {
     setHostName('');
     setPartyDate('');
     setExpectedGuests('');
+    setPartyAddress('');
   };
 
   const handleCopyLink = (type: 'guest' | 'host') => {
@@ -181,6 +183,23 @@ export const PartyHeader: React.FC = () => {
                 />
                 <p className="text-xs text-white/50 mt-1">
                   Total people attending (we'll calculate extra pizza for those who don't RSVP)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <MapPin size={14} className="inline mr-1" />
+                  Party Address
+                </label>
+                <input
+                  type="text"
+                  value={partyAddress}
+                  onChange={(e) => setPartyAddress(e.target.value)}
+                  placeholder="e.g., 123 Main St, New York, NY"
+                  className="w-full"
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Used to find nearby pizzerias for ordering
                 </p>
               </div>
 

@@ -9,6 +9,7 @@ CREATE TABLE parties (
   date TIMESTAMPTZ,
   pizza_style TEXT NOT NULL DEFAULT 'new-york',
   max_guests INTEGER,
+  address TEXT,
   rsvp_closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

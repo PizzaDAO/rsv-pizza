@@ -195,23 +195,23 @@ function generateOptimalToppings(guests: Guest[]): Topping[] {
     delete toppingCounts[toppingId];
   });
 
-  // Sort toppings by popularity and take top 5
+  // Sort toppings by popularity and take top 3
   const sortedToppings = Object.entries(toppingCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 3)
     .map(([id]) => availableToppings.find(t => t.id === id))
     .filter((t): t is Topping => t !== undefined);
 
-  // Add cheese if not excluded and no cheese already selected
+  // Add cheese if not excluded, no cheese already selected, and we have room (max 3 toppings)
   const cheeseExcluded = excludedToppings.has('extra-cheese');
-  if (!cheeseExcluded && !sortedToppings.some(t => t.category === 'cheese')) {
+  if (sortedToppings.length < 3 && !cheeseExcluded && !sortedToppings.some(t => t.category === 'cheese')) {
     const cheeseTopping = availableToppings.find(t => t.id === 'extra-cheese');
     if (cheeseTopping && !guests.every(g => g.dislikedToppings.includes('extra-cheese'))) {
       sortedToppings.push(cheeseTopping);
     }
   }
 
-  return sortedToppings;
+  return sortedToppings.slice(0, 3);
 }
 
 // Default pizza types for non-respondents
@@ -225,8 +225,8 @@ const DEFAULT_PIZZA_TYPES: DefaultPizzaType[] = [
   { label: 'Cheese', toppingIds: ['extra-cheese'], dietaryRestrictions: [] },
   { label: 'Pepperoni', toppingIds: ['pepperoni', 'extra-cheese'], dietaryRestrictions: [] },
   { label: 'Mushroom', toppingIds: ['mushrooms', 'extra-cheese'], dietaryRestrictions: ['Vegetarian'] },
-  { label: 'Veggie', toppingIds: ['mushrooms', 'bell-peppers', 'onions', 'olives'], dietaryRestrictions: ['Vegetarian'] },
-  { label: 'Vegan', toppingIds: ['mushrooms', 'bell-peppers', 'onions', 'tomatoes'], dietaryRestrictions: ['Vegan'] },
+  { label: 'Veggie', toppingIds: ['mushrooms', 'bell-peppers', 'onions'], dietaryRestrictions: ['Vegetarian'] },
+  { label: 'Vegan', toppingIds: ['mushrooms', 'bell-peppers', 'onions'], dietaryRestrictions: ['Vegan'] },
   { label: 'Gluten-Free Cheese', toppingIds: ['extra-cheese'], dietaryRestrictions: ['Gluten-Free'] },
 ];
 
@@ -348,12 +348,12 @@ export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle,
       new Set(groupGuests.flatMap(guest => guest.dietaryRestrictions))
     ).filter(r => r !== 'None');
 
-    const optimalToppings = generateOptimalToppings(groupGuests);
+    const optimalToppings = generateOptimalToppings(groupGuests).slice(0, 3);
     const optimalSize = getOptimalSize(groupGuests.length, style);
 
     return {
       id: `pizza-${index + 1}`,
-      toppings: optimalToppings,
+      toppings: optimalToppings.slice(0, 3), // Enforce max 3 toppings
       guestCount: groupGuests.length,
       guests: groupGuests,
       dietaryRestrictions: allDietaryRestrictions,
