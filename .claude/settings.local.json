@@ -24,7 +24,11 @@
       "Bash(gh run rerun:*)",
       "WebFetch(domain:pizzadao.github.io)",
       "Bash(npm run build:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(timeout 60 bash:*)",
+      "Bash(node setup-db.js:*)",
+      "Bash(nslookup:*)",
+      "Bash(git push:*)"
     ]
   }
 }

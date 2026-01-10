@@ -30,7 +30,7 @@ export interface DbGuest {
 }
 
 // Party operations
-export async function createParty(name: string, hostName?: string, date?: string, pizzaStyle: string = 'new-york'): Promise<DbParty | null> {
+export async function createParty(name: string, hostName?: string, date?: string, pizzaStyle: string = 'new-york', expectedGuests?: number): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
     .insert({
@@ -38,6 +38,7 @@ export async function createParty(name: string, hostName?: string, date?: string
       host_name: hostName || null,
       date: date || null,
       pizza_style: pizzaStyle,
+      max_guests: expectedGuests || null,
     })
     .select()
     .single();

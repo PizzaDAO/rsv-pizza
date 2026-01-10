@@ -188,10 +188,10 @@ function generateOptimalToppings(guests: Guest[]): Topping[] {
 }
 
 // Main function to generate pizza recommendations
-export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle): PizzaRecommendation[] {
+export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle, expectedGuestCount?: number | null): PizzaRecommendation[] {
   const guestGroups = findCompatibleGuests(guests);
 
-  return guestGroups.map((groupGuests, index) => {
+  const recommendations = guestGroups.map((groupGuests, index) => {
     // Get all dietary restrictions from the group
     const allDietaryRestrictions = Array.from(
       new Set(groupGuests.flatMap(guest => guest.dietaryRestrictions))
@@ -210,4 +210,31 @@ export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle)
       style: style,
     };
   });
+
+  // Add cheese pizzas for guests who didn't RSVP
+  if (expectedGuestCount && expectedGuestCount > guests.length) {
+    const nonRespondents = expectedGuestCount - guests.length;
+    const cheesePizzasNeeded = Math.ceil(nonRespondents / MAX_GUESTS_PER_PIZZA);
+
+    for (let i = 0; i < cheesePizzasNeeded; i++) {
+      const guestsForThisPizza = Math.min(
+        nonRespondents - (i * MAX_GUESTS_PER_PIZZA),
+        MAX_GUESTS_PER_PIZZA
+      );
+      const optimalSize = getOptimalSize(guestsForThisPizza);
+
+      recommendations.push({
+        id: `pizza-${recommendations.length + 1}`,
+        toppings: [availableToppings.find(t => t.id === 'extra-cheese')!].filter(Boolean),
+        guestCount: guestsForThisPizza,
+        guests: [], // No specific guests assigned
+        dietaryRestrictions: [],
+        size: optimalSize,
+        style: style,
+        isForNonRespondents: true, // Mark as cheese pizza for non-respondents
+      } as PizzaRecommendation);
+    }
+  }
+
+  return recommendations;
 }

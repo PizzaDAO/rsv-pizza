@@ -7,7 +7,7 @@ interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
-  createParty: (name: string, hostName?: string, date?: string) => Promise<void>;
+  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number) => Promise<void>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
@@ -136,10 +136,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
-  const createParty = async (name: string, hostName?: string, date?: string) => {
+  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number) => {
     setPartyLoading(true);
     try {
-      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id);
+      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests);
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);
@@ -213,7 +213,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const generateRecommendations = () => {
-    const newRecommendations = generatePizzaRecommendations(guests, pizzaSettings.style);
+    const newRecommendations = generatePizzaRecommendations(guests, pizzaSettings.style, party?.maxGuests);
     setRecommendations(newRecommendations);
   };
 

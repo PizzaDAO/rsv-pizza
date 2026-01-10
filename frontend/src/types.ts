@@ -32,6 +32,7 @@ export interface PizzaRecommendation {
   dietaryRestrictions: string[];
   size: PizzaSize;
   style: PizzaStyle;
+  isForNonRespondents?: boolean;
 }
 
 export interface PizzaSettings {

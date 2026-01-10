@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2 } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink } = usePizza();
@@ -12,6 +12,7 @@ export const PartyHeader: React.FC = () => {
   const [partyName, setPartyName] = useState('');
   const [hostName, setHostName] = useState('');
   const [partyDate, setPartyDate] = useState('');
+  const [expectedGuests, setExpectedGuests] = useState('');
 
   const [creating, setCreating] = useState(false);
 
@@ -19,7 +20,8 @@ export const PartyHeader: React.FC = () => {
     e.preventDefault();
     if (!partyName.trim()) return;
     setCreating(true);
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined);
+    const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount);
     setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
@@ -27,6 +29,7 @@ export const PartyHeader: React.FC = () => {
     setPartyName('');
     setHostName('');
     setPartyDate('');
+    setExpectedGuests('');
   };
 
   const handleCopyLink = () => {
@@ -53,7 +56,13 @@ export const PartyHeader: React.FC = () => {
                 <h3 className="font-semibold text-white">{party.name}</h3>
                 <p className="text-sm text-white/50">
                   {party.hostName && `Hosted by ${party.hostName} • `}
-                  {party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}
+                  {party.maxGuests ? (
+                    <span>
+                      {party.guests.length} of {party.maxGuests} guests responded
+                    </span>
+                  ) : (
+                    <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -153,6 +162,25 @@ export const PartyHeader: React.FC = () => {
                   onChange={(e) => setPartyDate(e.target.value)}
                   className="w-full"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <Users size={14} className="inline mr-1" />
+                  Expected Guests *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={expectedGuests}
+                  onChange={(e) => setExpectedGuests(e.target.value)}
+                  placeholder="e.g., 12"
+                  className="w-full"
+                  required
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Total people attending (we'll calculate extra pizza for those who don't RSVP)
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">

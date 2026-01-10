@@ -83,11 +83,17 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index }) => {
         <div className="pt-3 border-t border-white/10">
           <h4 className="text-sm font-medium text-white/70 mb-2">Guests</h4>
           <div className="flex flex-wrap gap-1.5">
-            {pizza.guests.map(guest => (
-              <span key={guest.id} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/30">
-                {guest.name}
+            {pizza.isForNonRespondents ? (
+              <span className="px-2 py-0.5 bg-white/10 text-white/50 text-xs rounded-full border border-white/20 italic">
+                For {pizza.guestCount} guest{pizza.guestCount !== 1 ? 's' : ''} who didn't RSVP
               </span>
-            ))}
+            ) : (
+              pizza.guests.map(guest => (
+                <span key={guest.id} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/30">
+                  {guest.name}
+                </span>
+              ))
+            )}
           </div>
         </div>
       </div>
