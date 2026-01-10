@@ -4,18 +4,26 @@ import { PizzaCard } from './PizzaCard';
 import { ClipboardList, Share2, Check } from 'lucide-react';
 
 export const PizzaOrderSummary: React.FC = () => {
-  const { recommendations } = usePizza();
+  const { recommendations, party, guests } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
+
+  // Calculate totals
+  const totalPizzas = recommendations.reduce((acc, pizza) => acc + (pizza.quantity || 1), 0);
+  const respondedGuests = guests.length;
+  const expectedGuests = party?.maxGuests || respondedGuests;
+  const totalGuestsServed = recommendations.reduce((acc, pizza) => acc + pizza.guestCount, 0);
 
   const handleCopyOrder = () => {
     if (recommendations.length === 0) return;
 
     const orderText = recommendations.map(pizza => {
+      const qty = pizza.quantity || 1;
       const toppingsText = pizza.toppings.map(t => t.name).join(', ');
-      return `Pizza #${pizza.id}: ${toppingsText} (for ${pizza.guestCount} guests)`;
-    }).join('\n\n');
+      const label = pizza.label || toppingsText;
+      return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name}) - serves ${pizza.guestCount}`;
+    }).join('\n');
 
-    const fullText = `PIZZA PARTY ORDER\n\nTotal pizzas: ${recommendations.length}\n\n${orderText}`;
+    const fullText = `PIZZA PARTY ORDER\n\nExpected guests: ${expectedGuests}\nResponded: ${respondedGuests}\nTotal pizzas: ${totalPizzas}\n\n${orderText}`;
 
     navigator.clipboard.writeText(fullText)
       .then(() => {
@@ -40,11 +48,24 @@ export const PizzaOrderSummary: React.FC = () => {
       ) : (
         <>
           <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
-            <h3 className="font-medium text-[#ffb347] mb-1">Order Summary</h3>
-            <p className="text-white/80">
-              <span className="font-semibold text-white">{recommendations.length}</span> pizzas for{' '}
-              <span className="font-semibold text-white">{recommendations.reduce((acc, pizza) => acc + pizza.guests.length, 0)}</span> guests
-            </p>
+            <h3 className="font-medium text-[#ffb347] mb-2">Order Summary</h3>
+            <div className="space-y-1 text-sm">
+              <p className="text-white/80">
+                <span className="text-white/60">Expected guests:</span>{' '}
+                <span className="font-semibold text-white">{expectedGuests}</span>
+              </p>
+              <p className="text-white/80">
+                <span className="text-white/60">Responded:</span>{' '}
+                <span className="font-semibold text-white">{respondedGuests}</span>
+                {expectedGuests > respondedGuests && (
+                  <span className="text-white/50"> ({expectedGuests - respondedGuests} pending)</span>
+                )}
+              </p>
+              <p className="text-white/80 pt-1 border-t border-white/10 mt-2">
+                <span className="text-white/60">Total pizzas:</span>{' '}
+                <span className="font-semibold text-white text-base">{totalPizzas}</span>
+              </p>
+            </div>
           </div>
 
           <div className="space-y-4 mb-6">

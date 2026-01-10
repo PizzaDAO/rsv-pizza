@@ -237,14 +237,17 @@ function generateDefaultPizzas(nonRespondents: number, style: PizzaStyle): Pizza
   const maxPerPizza = getMaxGuestsPerPizza(style);
 
   // For Neapolitan, each pizza serves 1.5 people
-  // For others, use the largest size servings (~5 people)
+  // For others, use the largest size servings (~4-5 people)
   const servingsPerPizza = style.id === 'neapolitan' ? 1.5 : maxPerPizza;
   const pizzasNeeded = Math.ceil(nonRespondents / servingsPerPizza);
   const defaultPizzas: PizzaRecommendation[] = [];
 
-  // Calculate special dietary pizzas (1 per 10 guests)
-  const veganPizzas = Math.max(1, Math.floor(nonRespondents / 10));
-  const glutenFreePizzas = Math.max(1, Math.floor(nonRespondents / 10));
+  // Calculate special dietary needs: 1 SERVING per 10 guests (not 1 pizza)
+  // A serving is roughly 1 person's worth, so divide by servingsPerPizza to get pizzas
+  const veganServings = Math.ceil(nonRespondents / 10); // 1 serving per 10 guests
+  const glutenFreeServings = Math.ceil(nonRespondents / 10);
+  const veganPizzas = Math.max(0, Math.ceil(veganServings / servingsPerPizza));
+  const glutenFreePizzas = Math.max(0, Math.ceil(glutenFreeServings / servingsPerPizza));
 
   // Remaining pizzas split between cheese, pepperoni, mushroom, veggie
   const specialPizzas = veganPizzas + glutenFreePizzas;
