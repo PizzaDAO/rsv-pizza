@@ -174,6 +174,20 @@ export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
   return data || [];
 }
 
+// Get all parties
+export async function getAllParties(): Promise<DbParty[]> {
+  const { data, error } = await supabase
+    .from('parties')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching parties:', error);
+    return [];
+  }
+  return data || [];
+}
+
 // Subscribe to guest changes (real-time)
 export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[]) => void) {
   const channel = supabase
