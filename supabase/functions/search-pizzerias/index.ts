@@ -195,8 +195,14 @@ serve(async (req) => {
       pizzeria.orderingOptions.push(...deepLinkOptions);
     }
 
-    // Sort by distance
-    pizzerias.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    // Sort by weighted score: rating * log10(reviewCount + 1)
+    // This balances quality (rating) with credibility (review count)
+    const getScore = (p: Pizzeria) => {
+      const rating = p.rating || 0;
+      const reviews = p.reviewCount || 0;
+      return rating * Math.log10(reviews + 1);
+    };
+    pizzerias.sort((a, b) => getScore(b) - getScore(a));
 
     return new Response(
       JSON.stringify({ pizzerias }),
