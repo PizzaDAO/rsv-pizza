@@ -111,6 +111,38 @@ export async function createSquareOrder(
   return response.json();
 }
 
+// Place an order via AI phone call (Bland AI)
+export async function createAIPhoneOrder(
+  pizzeriaName: string,
+  pizzeriaPhone: string,
+  items: OrderItem[],
+  customerName: string,
+  customerPhone: string,
+  fulfillmentType: 'pickup' | 'delivery' = 'pickup',
+  deliveryAddress?: string,
+  scheduledTime?: string
+): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      pizzeriaName,
+      pizzeriaPhone,
+      items,
+      customerName,
+      customerPhone,
+      fulfillmentType,
+      deliveryAddress,
+      scheduledTime,
+    }),
+  });
+
+  return response.json();
+}
+
 // Generate a phone order script
 export function generatePhoneOrderScript(
   pizzeriaName: string,
@@ -169,6 +201,7 @@ export function getProviderName(provider: OrderingProvider): string {
     ubereats: 'Uber Eats',
     slice: 'Slice',
     phone: 'Call to Order',
+    ai_phone: 'AI Order Call',
   };
   return names[provider];
 }
@@ -183,11 +216,12 @@ export function getProviderColor(provider: OrderingProvider): string {
     ubereats: '#000000',
     slice: '#f15a29',
     phone: '#6b7280',
+    ai_phone: '#8b5cf6', // Purple for AI
   };
   return colors[provider];
 }
 
 // Check if provider supports direct API ordering
 export function supportsDirectOrdering(provider: OrderingProvider): boolean {
-  return ['square', 'toast', 'chownow'].includes(provider);
+  return ['square', 'toast', 'chownow', 'ai_phone'].includes(provider);
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pizzeria, OrderingOption, PizzaRecommendation, OrderItem } from '../types';
 import {
   createSquareOrder,
+  createAIPhoneOrder,
   generatePhoneOrderScript,
   getProviderName,
   getProviderColor,
@@ -20,6 +21,7 @@ import {
   ShoppingCart,
   Truck,
   Store,
+  Bot,
 } from 'lucide-react';
 
 interface OrderCheckoutProps {
@@ -94,7 +96,55 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     }
   };
 
-  // Handle phone order
+  // Handle AI phone order
+  const handleAIPhoneOrder = async () => {
+    if (!customerName.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
+    if (!customerPhone.trim()) {
+      setError('Please enter your phone number so the pizzeria can reach you');
+      return;
+    }
+
+    if (fulfillmentType === 'DELIVERY' && !deliveryAddress.trim()) {
+      setError('Please enter a delivery address');
+      return;
+    }
+
+    if (!pizzeria.phone) {
+      setError('This pizzeria does not have a phone number on file');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await createAIPhoneOrder(
+        pizzeria.name,
+        pizzeria.phone,
+        orderItems,
+        customerName,
+        customerPhone,
+        fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
+        deliveryAddress || undefined
+      );
+
+      if (result.success && result.callId) {
+        onOrderComplete(result.callId, undefined);
+      } else {
+        setError(result.error || 'Failed to initiate AI call');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate AI call');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle manual phone order
   const handlePhoneOrder = () => {
     const script = generatePhoneOrderScript(
       pizzeria.name,
@@ -110,7 +160,8 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     });
   };
 
-  const isDirectOrder = supportsDirectOrdering(orderingOption.provider);
+  const isAIPhoneOrder = orderingOption.provider === 'ai_phone';
+  const isDirectOrder = supportsDirectOrdering(orderingOption.provider) && !isAIPhoneOrder;
   const isPhoneOrder = orderingOption.provider === 'phone';
 
   return (
@@ -259,6 +310,27 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
         {/* Action Buttons */}
         <div className="space-y-3">
+          {isAIPhoneOrder && (
+            <button
+              onClick={handleAIPhoneOrder}
+              disabled={loading}
+              className="w-full btn-primary flex items-center justify-center gap-2"
+              style={{ backgroundColor: getProviderColor(orderingOption.provider) }}
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  AI is Calling...
+                </>
+              ) : (
+                <>
+                  <Bot size={18} />
+                  Have AI Call & Order
+                </>
+              )}
+            </button>
+          )}
+
           {isDirectOrder && (
             <button
               onClick={handleDirectOrder}

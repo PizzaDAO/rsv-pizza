@@ -3,6 +3,7 @@ import { Pizzeria, OrderingOption } from '../_shared/types.ts';
 
 const GOOGLE_PLACES_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY') || '';
 const SQUARE_ACCESS_TOKEN = Deno.env.get('SQUARE_ACCESS_TOKEN') || '';
+const BLAND_API_KEY = Deno.env.get('BLAND_API_KEY') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,38 +120,25 @@ async function checkSquareAvailability(pizzeria: Pizzeria): Promise<OrderingOpti
   }
 }
 
-// Generate deep links for delivery platforms
-function generateDeepLinks(pizzeria: Pizzeria): OrderingOption[] {
+// Generate ordering options for a pizzeria
+function generateOrderingOptions(pizzeria: Pizzeria): OrderingOption[] {
   const options: OrderingOption[] = [];
-  const encodedName = encodeURIComponent(pizzeria.name);
-  const encodedAddress = encodeURIComponent(pizzeria.address);
 
-  // DoorDash deep link
-  options.push({
-    provider: 'doordash',
-    available: true, // Optimistic - user will see if available when they click
-    deepLink: `https://www.doordash.com/search/store/${encodedName}/`,
-  });
+  // AI phone ordering (if Bland API key is configured and pizzeria has phone)
+  if (BLAND_API_KEY && pizzeria.phone) {
+    options.push({
+      provider: 'ai_phone' as any,
+      available: true,
+    });
+  }
 
-  // Uber Eats deep link
-  options.push({
-    provider: 'ubereats',
-    available: true,
-    deepLink: `https://www.ubereats.com/search?q=${encodedName}`,
-  });
-
-  // Slice deep link
-  options.push({
-    provider: 'slice',
-    available: true,
-    deepLink: `https://slicelife.com/search?query=${encodedName}&location=${encodedAddress}`,
-  });
-
-  // Phone ordering is always available
-  options.push({
-    provider: 'phone',
-    available: true,
-  });
+  // Manual phone ordering is always available if they have a phone
+  if (pizzeria.phone) {
+    options.push({
+      provider: 'phone',
+      available: true,
+    });
+  }
 
   return options;
 }
@@ -190,9 +178,9 @@ serve(async (req) => {
         pizzeria.orderingOptions.push(squareOption);
       }
 
-      // Add deep links for other platforms
-      const deepLinkOptions = generateDeepLinks(pizzeria);
-      pizzeria.orderingOptions.push(...deepLinkOptions);
+      // Add other ordering options (phone)
+      const otherOptions = generateOrderingOptions(pizzeria);
+      pizzeria.orderingOptions.push(...otherOptions);
     }
 
     // Sort by weighted score: rating * log10(reviewCount + 1)

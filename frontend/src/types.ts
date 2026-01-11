@@ -57,7 +57,7 @@ export interface Party {
 }
 
 // Ordering types
-export type OrderingProvider = 'square' | 'toast' | 'chownow' | 'doordash' | 'ubereats' | 'slice' | 'phone';
+export type OrderingProvider = 'square' | 'toast' | 'chownow' | 'doordash' | 'ubereats' | 'slice' | 'phone' | 'ai_phone';
 
 export interface Pizzeria {
   id: string;
