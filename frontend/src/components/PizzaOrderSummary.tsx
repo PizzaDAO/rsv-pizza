@@ -92,7 +92,7 @@ export const PizzaOrderSummary: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-1.5 mb-6">
+            <div className="grid grid-cols-3 gap-1.5 mb-6">
               {[...recommendations]
                 .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                 .map((pizza, index) => (

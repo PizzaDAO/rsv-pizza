@@ -22,34 +22,30 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
     ? `${quantity > 1 ? `${quantity}x ` : ''}${pizza.label}`
     : `${quantity > 1 ? `${quantity}x ` : ''}Pizza #${index + 1}`;
 
-  // Compact version for order summary
+  // Compact version for order summary (3-column grid)
   if (compact) {
     return (
-      <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
-        <div className={`flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
-          {quantity}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-white text-xs font-medium truncate">
-              {pizza.label || pizza.toppings.map(t => t.name).join(', ') || 'Cheese'}
-            </span>
-            <span className="text-white/40 text-[10px] flex-shrink-0">
-              {pizza.size.diameter}"
-            </span>
+      <div className={`p-2 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
+            {quantity}
           </div>
-          {pizza.dietaryRestrictions.length > 0 && (
-            <div className="flex gap-1 mt-0.5">
-              {pizza.dietaryRestrictions.map(r => (
-                <span key={r} className="text-[9px] text-purple-300 bg-purple-500/20 px-1 rounded">
-                  {r}
-                </span>
-              ))}
-            </div>
-          )}
+          <span className="text-white/40 text-[10px]">{pizza.size.diameter}"</span>
         </div>
-        <div className="flex items-center gap-0.5 text-white/50 text-[10px] flex-shrink-0">
-          <Users size={10} />
+        <div className="text-white text-[11px] font-medium leading-tight line-clamp-2">
+          {pizza.label || pizza.toppings.map(t => t.name).join(', ') || 'Cheese'}
+        </div>
+        {pizza.dietaryRestrictions.length > 0 && (
+          <div className="flex flex-wrap gap-0.5 mt-1">
+            {pizza.dietaryRestrictions.map(r => (
+              <span key={r} className="text-[8px] text-purple-300 bg-purple-500/20 px-1 rounded">
+                {r}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-0.5 text-white/40 text-[9px] mt-1">
+          <Users size={8} />
           <span>{pizza.guestCount}</span>
         </div>
       </div>
