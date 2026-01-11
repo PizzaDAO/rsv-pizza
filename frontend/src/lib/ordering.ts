@@ -120,7 +120,7 @@ export async function createAIPhoneOrder(
   customerPhone: string,
   fulfillmentType: 'pickup' | 'delivery' = 'pickup',
   deliveryAddress?: string,
-  scheduledTime?: string
+  partySize?: number
 ): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
   const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
     method: 'POST',
@@ -136,7 +136,7 @@ export async function createAIPhoneOrder(
       customerPhone,
       fulfillmentType,
       deliveryAddress,
-      scheduledTime,
+      partySize,
     }),
   });
 

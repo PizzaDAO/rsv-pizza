@@ -121,6 +121,9 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     setLoading(true);
     setError(null);
 
+    // Calculate total party size from recommendations
+    const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
+
     try {
       const result = await createAIPhoneOrder(
         pizzeria.name,
@@ -129,7 +132,8 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         customerName,
         customerPhone,
         fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
-        deliveryAddress || undefined
+        deliveryAddress || undefined,
+        partySize
       );
 
       if (result.success && result.callId) {

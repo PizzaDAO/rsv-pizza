@@ -24,36 +24,69 @@ interface PhoneOrderRequest {
   fulfillmentType: 'pickup' | 'delivery';
   deliveryAddress?: string;
   scheduledTime?: string;
+  partySize?: number;
 }
 
-// Generate the order script for the AI
-function generateOrderScript(request: PhoneOrderRequest): string {
-  const { pizzeriaName, items, customerName, fulfillmentType, deliveryAddress, scheduledTime } = request;
+// Build the AI agent prompt for ordering
+function buildAgentPrompt(request: PhoneOrderRequest): string {
+  const { items, customerName, customerPhone, fulfillmentType, deliveryAddress, partySize } = request;
 
-  let itemsDescription = items.map(item => {
-    let desc = `${item.quantity} ${item.size} ${item.name}`;
+  // Calculate totals
+  const totalPizzas = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalGuests = partySize || items.reduce((sum, item) => sum + item.quantity * 2, 0); // Estimate 2 people per pizza
+
+  // Build the base order description
+  const orderDescription = items.map(item => {
+    let desc = `${item.quantity}x ${item.size} pizza`;
     if (item.toppings.length > 0) {
       desc += ` with ${item.toppings.join(', ')}`;
     }
     if (item.dietaryNotes.length > 0) {
-      desc += `. Please note: ${item.dietaryNotes.join(', ')}`;
+      desc += ` (${item.dietaryNotes.join(', ')})`;
     }
     return desc;
-  }).join('. ');
+  }).join('\n- ');
 
-  let script = `Hi, I'd like to place an order for ${fulfillmentType}. `;
-  script += `The order is: ${itemsDescription}. `;
-  script += `The name for the order is ${customerName}. `;
+  return `You are a friendly assistant placing a pizza order for a party. You're ordering for ${totalGuests} people.
 
-  if (fulfillmentType === 'delivery' && deliveryAddress) {
-    script += `The delivery address is ${deliveryAddress}. `;
-  }
+## Your Goal
+Place a pizza order while being open to the pizzeria's suggestions and specials. You want to get the best value and variety for the party.
 
-  if (scheduledTime) {
-    script += `I'd like this for ${scheduledTime}. `;
-  }
+## Customer Information
+- Name: ${customerName}
+- Phone: ${customerPhone}
+- Order Type: ${fulfillmentType}${fulfillmentType === 'delivery' && deliveryAddress ? `\n- Delivery Address: ${deliveryAddress}` : ''}
 
-  return script;
+## Base Order (${totalPizzas} pizzas)
+- ${orderDescription}
+
+## Instructions
+
+1. **Start by greeting and asking about specials**: "Hi, I'd like to place a large order for a party. Before I give you the details, do you have any specials or deals for large orders?"
+
+2. **Be flexible with the order**: If they have good specials (like "buy 2 get 1 free" or a "party pack"), adjust the order to take advantage of them. The base order is a guide, not a strict requirement.
+
+3. **Dietary restrictions are firm**: If an item has dietary notes (vegetarian, vegan, gluten-free), those MUST be respected. Don't substitute those items with non-compliant options.
+
+4. **Ask about popular items**: "What's your most popular pizza?" or "Any house specialties you'd recommend?" - Consider swapping 1-2 of the basic pizzas for their recommendations.
+
+5. **Confirm sizes**: If they don't have the exact size, accept their closest equivalent.
+
+6. **Handle unavailable toppings gracefully**: If a topping isn't available, ask for a similar substitute or just skip it.
+
+7. **Get the total and confirm**: Always confirm the final order and total price before completing.
+
+8. **Provide contact info**: Give the customer phone number (${customerPhone}) for order confirmation.
+
+## Example Conversation Flow
+- "Hi, I'd like to place a large order for pickup. Do you have any specials for big orders?"
+- [Listen to specials]
+- "That sounds great! I'll take [adjusted order based on specials]. I also need [dietary-specific items]."
+- "What's your most popular specialty pizza? I'd like to add one of those too."
+- "Great, can I confirm the order? [repeat back]. The name is ${customerName}, phone ${customerPhone}."
+- "What's the total and how long will it be ready?"
+
+Remember: You're trying to get good value and variety. Don't be afraid to deviate from the base order if the pizzeria has better suggestions!`;
 }
 
 serve(async (req) => {
@@ -79,11 +112,21 @@ serve(async (req) => {
       );
     }
 
+    if (!request.customerName || !request.customerPhone) {
+      return new Response(
+        JSON.stringify({ error: 'customerName and customerPhone are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Clean phone number (remove non-digits except leading +)
     const cleanPhone = request.pizzeriaPhone.replace(/[^\d+]/g, '');
 
-    // Generate the task/script for the AI
-    const orderScript = generateOrderScript(request);
+    // Build the AI agent prompt
+    const agentPrompt = buildAgentPrompt(request);
+
+    // Calculate total pizzas for the greeting
+    const totalPizzas = request.items.reduce((sum, item) => sum + item.quantity, 0);
 
     // Call Bland AI to initiate the phone call
     const blandResponse = await fetch('https://api.bland.ai/v1/calls', {
@@ -94,22 +137,24 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         phone_number: cleanPhone,
-        task: orderScript,
+        task: agentPrompt,
         voice: 'maya', // Natural female voice
-        first_sentence: `Hi, I'd like to place an order for ${request.fulfillmentType} please.`,
+        first_sentence: `Hi there! I'd like to place a large order for ${request.fulfillmentType} - about ${totalPizzas} pizzas for a party. Do you have any specials or deals for large orders?`,
         wait_for_greeting: true,
         record: true,
-        max_duration: 5, // 5 minutes max
+        max_duration: 8, // 8 minutes max for larger orders with back-and-forth
         model: 'enhanced',
         language: 'en',
         answered_by_enabled: true,
-        // Webhook for status updates (optional)
-        // webhook: 'https://your-webhook-url.com/bland-callback',
+        temperature: 0.7, // Allow some creativity in responses
+        interruption_threshold: 150, // Be polite, don't interrupt too quickly
         metadata: {
           customerName: request.customerName,
           customerPhone: request.customerPhone,
           pizzeriaName: request.pizzeriaName,
-          itemCount: request.items.length,
+          totalPizzas: totalPizzas,
+          fulfillmentType: request.fulfillmentType,
+          hasDeliveryAddress: !!request.deliveryAddress,
         },
       }),
     });
@@ -129,7 +174,7 @@ serve(async (req) => {
         success: true,
         callId: blandData.call_id,
         status: blandData.status,
-        message: `AI is calling ${request.pizzeriaName} to place your order. You'll receive a confirmation when complete.`,
+        message: `AI is calling ${request.pizzeriaName} to place your order for ${totalPizzas} pizzas. The AI will ask about specials and finalize the best order for your party. You'll receive a text confirmation at ${request.customerPhone} when complete.`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
