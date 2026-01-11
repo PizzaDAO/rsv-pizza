@@ -115,13 +115,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   });
 
-  // Load party from localStorage on mount
-  useEffect(() => {
-    const savedInviteCode = localStorage.getItem('rsvpizza_currentPartyCode');
-    if (savedInviteCode) {
-      loadParty(savedInviteCode);
-    }
-  }, []);
+  // Note: Party loading is now handled by the page components (HostPage, RSVPPage)
+  // based on the URL parameters. localStorage is only used to remember the last
+  // party for the home page redirect.
 
   // Subscribe to real-time guest updates when party exists
   useEffect(() => {
@@ -155,7 +151,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  const loadParty = async (inviteCode: string): Promise<boolean> => {
+  const loadParty = useCallback(async (inviteCode: string): Promise<boolean> => {
+    // Clear existing state before loading new party
+    setRecommendations([]);
     setPartyLoading(true);
     try {
       const result = await db.getPartyWithGuests(inviteCode);
@@ -171,7 +169,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     } finally {
       setPartyLoading(false);
     }
-  };
+  }, []);
 
   const clearParty = () => {
     localStorage.removeItem('rsvpizza_currentPartyCode');

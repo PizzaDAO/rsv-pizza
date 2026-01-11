@@ -54,7 +54,8 @@
       "Bash(node -e \"\nconst https = require\\(''https''\\);\nconst data = JSON.stringify\\({address: ''1325 S Broad Street Philadelphia''}\\);\nconst options = {\n  hostname: ''znpiwdvvsqaxuskpfleo.supabase.co'',\n  port: 443,\n  path: ''/functions/v1/search-pizzerias'',\n  method: ''POST'',\n  headers: {\n    ''Content-Type'': ''application/json'',\n    ''Authorization'': ''Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw'',\n    ''Content-Length'': data.length\n  }\n};\nconst req = https.request\\(options, res => {\n  let body = '''';\n  res.on\\(''data'', d => body += d\\);\n  res.on\\(''end'', \\(\\) => console.log\\(''Status:'', res.statusCode, ''\\\\nBody:'', body\\)\\);\n}\\);\nreq.on\\(''error'', e => console.error\\(''Error:'', e.message\\)\\);\nreq.write\\(data\\);\nreq.end\\(\\);\n\")",
       "Bash(node -e:*)",
       "WebFetch(domain:www.rain.xyz)",
-      "WebFetch(domain:docs.rain.xyz)"
+      "WebFetch(domain:docs.rain.xyz)",
+      "Bash(node:*)"
     ]
   }
 }

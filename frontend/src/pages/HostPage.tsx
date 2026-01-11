@@ -14,12 +14,13 @@ function HostPageContent() {
   const navigate = useNavigate();
   const { loadParty, party, partyLoading } = usePizza();
   const [error, setError] = useState<string | null>(null);
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [loadedCode, setLoadedCode] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      if (inviteCode && initialLoad) {
-        setInitialLoad(false);
+      if (inviteCode && inviteCode !== loadedCode) {
+        setError(null);
+        setLoadedCode(inviteCode);
         const success = await loadParty(inviteCode);
         if (!success) {
           setError('Party not found. The link may be invalid or expired.');
@@ -27,9 +28,9 @@ function HostPageContent() {
       }
     }
     load();
-  }, [inviteCode, loadParty, initialLoad]);
+  }, [inviteCode, loadParty, loadedCode]);
 
-  if (partyLoading || initialLoad) {
+  if (partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
         <div className="min-h-[60vh] flex items-center justify-center">
