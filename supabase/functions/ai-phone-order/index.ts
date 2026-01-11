@@ -15,6 +15,13 @@ interface OrderItem {
   dietaryNotes: string[];
 }
 
+interface PaymentCard {
+  number: string;
+  cvc: string;
+  expMonth: number;
+  expYear: number;
+}
+
 interface PhoneOrderRequest {
   pizzeriaName: string;
   pizzeriaPhone: string;
@@ -25,15 +32,28 @@ interface PhoneOrderRequest {
   deliveryAddress?: string;
   scheduledTime?: string;
   partySize?: number;
+  paymentCard?: PaymentCard;
+}
+
+// Format card number for speaking (groups of 4)
+function formatCardForSpeech(number: string): string {
+  return number.replace(/(\d{4})/g, '$1 ').trim();
+}
+
+// Format expiration for speaking
+function formatExpForSpeech(month: number, year: number): string {
+  const monthStr = month.toString().padStart(2, '0');
+  const yearStr = year.toString().slice(-2);
+  return `${monthStr} slash ${yearStr}`;
 }
 
 // Build the AI agent prompt for ordering
 function buildAgentPrompt(request: PhoneOrderRequest): string {
-  const { items, customerName, customerPhone, fulfillmentType, deliveryAddress, partySize } = request;
+  const { items, customerName, customerPhone, fulfillmentType, deliveryAddress, partySize, paymentCard } = request;
 
   // Calculate totals
   const totalPizzas = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalGuests = partySize || items.reduce((sum, item) => sum + item.quantity * 2, 0); // Estimate 2 people per pizza
+  const totalGuests = partySize || items.reduce((sum, item) => sum + item.quantity * 2, 0);
 
   // Build the base order description
   const orderDescription = items.map(item => {
@@ -46,6 +66,37 @@ function buildAgentPrompt(request: PhoneOrderRequest): string {
     }
     return desc;
   }).join('\n- ');
+
+  // Payment instructions
+  let paymentInstructions = '';
+  if (paymentCard) {
+    const cardNumber = formatCardForSpeech(paymentCard.number);
+    const expiration = formatExpForSpeech(paymentCard.expMonth, paymentCard.expYear);
+
+    paymentInstructions = `
+
+## Payment Instructions
+You have a credit card to pay for this order. After confirming the order and getting the total:
+
+1. **Ask to pay by card**: "I'd like to pay by credit card now, is that okay?"
+2. **If they accept card payment over phone**:
+   - Card number: ${cardNumber}
+   - Expiration: ${expiration}
+   - CVC/Security code: ${paymentCard.cvc}
+   - Name on card: ${customerName}
+   - Billing zip: Ask the customer or say "I'll need to check on that" if they require it
+
+3. **If they don't accept card over phone**: Say "That's fine, we'll pay when we pick up" and continue with the order.
+
+4. **IMPORTANT**: Read the card number slowly and clearly, pausing between each group of four digits. Be patient if they need you to repeat.
+
+5. **Confirm payment**: Make sure they confirm the payment went through before ending the call.`;
+  } else {
+    paymentInstructions = `
+
+## Payment
+- Tell them you'll pay at ${fulfillmentType === 'pickup' ? 'pickup' : 'delivery'}.`;
+  }
 
   return `You are a friendly assistant placing a pizza order for a party. You're ordering for ${totalGuests} people.
 
@@ -77,14 +128,16 @@ Place a pizza order while being open to the pizzeria's suggestions and specials.
 7. **Get the total and confirm**: Always confirm the final order and total price before completing.
 
 8. **Provide contact info**: Give the customer phone number (${customerPhone}) for order confirmation.
+${paymentInstructions}
 
 ## Example Conversation Flow
-- "Hi, I'd like to place a large order for pickup. Do you have any specials for big orders?"
+- "Hi, I'd like to place a large order for ${fulfillmentType}. Do you have any specials for big orders?"
 - [Listen to specials]
 - "That sounds great! I'll take [adjusted order based on specials]. I also need [dietary-specific items]."
 - "What's your most popular specialty pizza? I'd like to add one of those too."
 - "Great, can I confirm the order? [repeat back]. The name is ${customerName}, phone ${customerPhone}."
-- "What's the total and how long will it be ready?"
+- "What's the total?"${paymentCard ? '\n- "I\'d like to pay by card now if possible."' : ''}
+- "How long will it be ready?"
 
 Remember: You're trying to get good value and variety. Don't be afraid to deviate from the base order if the pizzeria has better suggestions!`;
 }
@@ -142,7 +195,7 @@ serve(async (req) => {
         first_sentence: `Hi there! I'd like to place a large order for ${request.fulfillmentType} - about ${totalPizzas} pizzas for a party. Do you have any specials or deals for large orders?`,
         wait_for_greeting: true,
         record: true,
-        max_duration: 8, // 8 minutes max for larger orders with back-and-forth
+        max_duration: 10, // 10 minutes max for orders with payment
         model: 'enhanced',
         language: 'en',
         answered_by_enabled: true,
@@ -155,6 +208,7 @@ serve(async (req) => {
           totalPizzas: totalPizzas,
           fulfillmentType: request.fulfillmentType,
           hasDeliveryAddress: !!request.deliveryAddress,
+          hasPaymentCard: !!request.paymentCard,
         },
       }),
     });
@@ -169,12 +223,16 @@ serve(async (req) => {
       );
     }
 
+    const paymentNote = request.paymentCard
+      ? ' The AI will also attempt to pay with your card.'
+      : ' You\'ll pay at pickup.';
+
     return new Response(
       JSON.stringify({
         success: true,
         callId: blandData.call_id,
         status: blandData.status,
-        message: `AI is calling ${request.pizzeriaName} to place your order for ${totalPizzas} pizzas. The AI will ask about specials and finalize the best order for your party. You'll receive a text confirmation at ${request.customerPhone} when complete.`,
+        message: `AI is calling ${request.pizzeriaName} to place your order for ${totalPizzas} pizzas. The AI will ask about specials and finalize the best order for your party.${paymentNote} You'll receive confirmation at ${request.customerPhone} when complete.`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

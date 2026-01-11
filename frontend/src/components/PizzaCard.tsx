@@ -5,9 +5,10 @@ import { Users } from 'lucide-react';
 interface PizzaCardProps {
   pizza: PizzaRecommendation;
   index: number;
+  compact?: boolean;
 }
 
-export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index }) => {
+export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = false }) => {
   // Colors for different topping categories
   const categoryColors: Record<string, string> = {
     meat: 'bg-red-500/20 text-red-300',
@@ -21,6 +22,41 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index }) => {
     ? `${quantity > 1 ? `${quantity}x ` : ''}${pizza.label}`
     : `${quantity > 1 ? `${quantity}x ` : ''}Pizza #${index + 1}`;
 
+  // Compact version for order summary
+  if (compact) {
+    return (
+      <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
+        <div className={`flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
+          {quantity}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-white text-xs font-medium truncate">
+              {pizza.label || pizza.toppings.map(t => t.name).join(', ') || 'Cheese'}
+            </span>
+            <span className="text-white/40 text-[10px] flex-shrink-0">
+              {pizza.size.diameter}"
+            </span>
+          </div>
+          {pizza.dietaryRestrictions.length > 0 && (
+            <div className="flex gap-1 mt-0.5">
+              {pizza.dietaryRestrictions.map(r => (
+                <span key={r} className="text-[9px] text-purple-300 bg-purple-500/20 px-1 rounded">
+                  {r}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-0.5 text-white/50 text-[10px] flex-shrink-0">
+          <Users size={10} />
+          <span>{pizza.guestCount}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Full version
   return (
     <div className="border border-white/10 rounded-lg overflow-hidden bg-white/5 hover:bg-white/[0.07] transition-all">
       <div className={`py-2 px-3 ${pizza.isForNonRespondents ? 'bg-gradient-to-r from-[#6b7280] to-[#9ca3af]' : 'bg-gradient-to-r from-[#ff393a] to-[#ff6b35]'}`}>

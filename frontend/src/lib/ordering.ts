@@ -111,6 +111,16 @@ export async function createSquareOrder(
   return response.json();
 }
 
+// Virtual card details for AI payment
+export interface VirtualCardDetails {
+  cardId: string;
+  number: string;
+  cvc: string;
+  expMonth: number;
+  expYear: number;
+  last4: string;
+}
+
 // Place an order via AI phone call (Bland AI)
 export async function createAIPhoneOrder(
   pizzeriaName: string,
@@ -120,7 +130,8 @@ export async function createAIPhoneOrder(
   customerPhone: string,
   fulfillmentType: 'pickup' | 'delivery' = 'pickup',
   deliveryAddress?: string,
-  partySize?: number
+  partySize?: number,
+  paymentCard?: VirtualCardDetails
 ): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
   const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
     method: 'POST',
@@ -137,6 +148,7 @@ export async function createAIPhoneOrder(
       fulfillmentType,
       deliveryAddress,
       partySize,
+      paymentCard,
     }),
   });
 

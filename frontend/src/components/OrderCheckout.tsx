@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pizzeria, OrderingOption, PizzaRecommendation, OrderItem } from '../types';
 import {
   createSquareOrder,
@@ -8,6 +8,17 @@ import {
   getProviderColor,
   supportsDirectOrdering,
 } from '../lib/ordering';
+import {
+  hasStoredPaymentMethod,
+  estimateOrderTotal,
+  formatCurrency,
+  createVirtualCard,
+  getVirtualCardDetails,
+  createPaymentIntent,
+  getStoredCustomerId,
+  getStoredCustomerEmail,
+} from '../lib/stripe';
+import { PaymentForm } from './PaymentForm';
 import {
   X,
   Loader2,
@@ -22,6 +33,9 @@ import {
   Truck,
   Store,
   Bot,
+  CreditCard,
+  DollarSign,
+  ChevronRight,
 } from 'lucide-react';
 
 interface OrderCheckoutProps {
@@ -32,6 +46,8 @@ interface OrderCheckoutProps {
   onOrderComplete: (orderId: string, checkoutUrl?: string) => void;
 }
 
+type CheckoutStep = 'details' | 'payment' | 'confirm';
+
 export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   pizzeria,
   orderingOption,
@@ -41,12 +57,17 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerEmail, setCustomerEmail] = useState(getStoredCustomerEmail() || '');
   const [fulfillmentType, setFulfillmentType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Payment state
+  const [step, setStep] = useState<CheckoutStep>('details');
+  const [hasPaymentMethod, setHasPaymentMethod] = useState(hasStoredPaymentMethod());
+  const [payWithCard, setPayWithCard] = useState(false);
 
   // Convert recommendations to order items
   const orderItems: OrderItem[] = recommendations.map((pizza) => ({
@@ -57,6 +78,13 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     toppings: pizza.toppings.map(t => t.name),
     dietaryNotes: pizza.dietaryRestrictions,
   }));
+
+  const totalPizzas = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const estimatedTotal = estimateOrderTotal(totalPizzas);
+
+  const isAIPhoneOrder = orderingOption.provider === 'ai_phone';
+  const isDirectOrder = supportsDirectOrdering(orderingOption.provider) && !isAIPhoneOrder;
+  const isPhoneOrder = orderingOption.provider === 'phone';
 
   // Handle direct API order (Square, etc.)
   const handleDirectOrder = async () => {
@@ -96,7 +124,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     }
   };
 
-  // Handle AI phone order
+  // Handle AI phone order with payment
   const handleAIPhoneOrder = async () => {
     if (!customerName.trim()) {
       setError('Please enter your name');
@@ -118,13 +146,56 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
       return;
     }
 
+    // If paying with card but no payment method, go to payment step
+    if (payWithCard && !hasPaymentMethod) {
+      setStep('payment');
+      return;
+    }
+
+    // If paying with card, go to confirm step
+    if (payWithCard && step === 'details') {
+      setStep('confirm');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    // Calculate total party size from recommendations
     const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
 
     try {
+      let virtualCardDetails = undefined;
+
+      // If paying with card, create virtual card
+      if (payWithCard && hasPaymentMethod) {
+        const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Create pre-authorization on customer's card
+        const customerId = getStoredCustomerId();
+        if (customerId) {
+          await createPaymentIntent(
+            estimatedTotal,
+            customerId,
+            customerEmail,
+            {
+              orderId,
+              pizzeriaName: pizzeria.name,
+              pizzeriaPhone: pizzeria.phone,
+            }
+          );
+        }
+
+        // Create virtual card for this order
+        const card = await createVirtualCard(
+          estimatedTotal,
+          orderId,
+          pizzeria.name
+        );
+
+        // Get full card details for AI
+        virtualCardDetails = await getVirtualCardDetails(card.cardId);
+      }
+
       const result = await createAIPhoneOrder(
         pizzeria.name,
         pizzeria.phone,
@@ -133,7 +204,8 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         customerPhone,
         fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
         deliveryAddress || undefined,
-        partySize
+        partySize,
+        virtualCardDetails
       );
 
       if (result.success && result.callId) {
@@ -164,10 +236,163 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     });
   };
 
-  const isAIPhoneOrder = orderingOption.provider === 'ai_phone';
-  const isDirectOrder = supportsDirectOrdering(orderingOption.provider) && !isAIPhoneOrder;
-  const isPhoneOrder = orderingOption.provider === 'phone';
+  // Handle payment method saved
+  const handlePaymentMethodSaved = () => {
+    setHasPaymentMethod(true);
+    setStep('confirm');
+  };
 
+  // Render payment step
+  if (step === 'payment') {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Add Payment Method</h2>
+              <p className="text-sm text-white/60 mt-1">
+                Your card will be charged after the order is confirmed
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white p-1"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <PaymentForm
+            customerEmail={customerEmail}
+            customerName={customerName}
+            onPaymentMethodSaved={handlePaymentMethodSaved}
+            onCancel={() => setStep('details')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Render confirmation step
+  if (step === 'confirm') {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Confirm Order</h2>
+              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white p-1"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Order Summary */}
+          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+            <h3 className="font-medium text-white mb-3">Order Summary</h3>
+            <div className="space-y-2">
+              {orderItems.map((item, index) => (
+                <div key={index} className="flex justify-between text-sm">
+                  <span className="text-white/80">
+                    {item.quantity}x {item.size} {item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-white/10 mt-3 pt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Total pizzas:</span>
+                <span className="text-white font-medium">{totalPizzas}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-white/60">Estimated total:</span>
+                <span className="text-white font-medium">{formatCurrency(estimatedTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Method */}
+          <div className="mb-6 p-4 bg-[#8b5cf6]/10 rounded-xl border border-[#8b5cf6]/30">
+            <div className="flex items-center gap-3">
+              <CreditCard size={20} className="text-[#8b5cf6]" />
+              <div>
+                <p className="text-white font-medium">Card on file</p>
+                <p className="text-white/60 text-sm">
+                  Your card will be pre-authorized for {formatCurrency(estimatedTotal)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* How it works */}
+          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+            <h4 className="font-medium text-white mb-2">How it works</h4>
+            <ol className="space-y-2 text-sm text-white/70">
+              <li className="flex items-start gap-2">
+                <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">1</span>
+                <span>AI calls the pizzeria and places your order</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">2</span>
+                <span>AI pays with a secure virtual card</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">3</span>
+                <span>Your card is charged for the actual order total</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">4</span>
+                <span>Pick up your pizza (or wait for delivery)!</span>
+              </li>
+            </ol>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button
+              onClick={handleAIPhoneOrder}
+              disabled={loading}
+              className="w-full btn-primary flex items-center justify-center gap-2"
+              style={{ backgroundColor: '#8b5cf6' }}
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  AI is Calling...
+                </>
+              ) : (
+                <>
+                  <Bot size={18} />
+                  Confirm & Place Order
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => setStep('details')}
+              className="w-full btn-secondary"
+              disabled={loading}
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render details step (main form)
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -200,10 +425,14 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           <div className="border-t border-white/10 mt-3 pt-3">
             <div className="flex justify-between text-sm">
               <span className="text-white/60">Total pizzas:</span>
-              <span className="text-white font-medium">
-                {orderItems.reduce((sum, item) => sum + item.quantity, 0)}
-              </span>
+              <span className="text-white font-medium">{totalPizzas}</span>
             </div>
+            {isAIPhoneOrder && (
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-white/60">Estimated total:</span>
+                <span className="text-white font-medium">~{formatCurrency(estimatedTotal)}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -260,7 +489,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           <div>
             <label className="block text-sm font-medium text-white/80 mb-2">
               <Phone size={14} className="inline mr-1" />
-              Phone Number
+              Phone Number {isAIPhoneOrder && '*'}
             </label>
             <input
               type="tel"
@@ -271,11 +500,11 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             />
           </div>
 
-          {isDirectOrder && (
+          {(isDirectOrder || isAIPhoneOrder) && (
             <div>
               <label className="block text-sm font-medium text-white/80 mb-2">
                 <Mail size={14} className="inline mr-1" />
-                Email
+                Email {isAIPhoneOrder && payWithCard && '*'}
               </label>
               <input
                 type="email"
@@ -305,6 +534,51 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           )}
         </div>
 
+        {/* Payment Option for AI Orders */}
+        {isAIPhoneOrder && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-white/80 mb-2">
+              <DollarSign size={14} className="inline mr-1" />
+              Payment Method
+            </label>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setPayWithCard(false)}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                  !payWithCard
+                    ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
+                    : 'border-white/10 text-white/60 hover:border-white/20'
+                }`}
+              >
+                <Store size={18} />
+                <div className="text-left">
+                  <p className="font-medium">Pay at pickup</p>
+                  <p className="text-xs text-white/50">Pay when you collect your order</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayWithCard(true)}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                  payWithCard
+                    ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-white'
+                    : 'border-white/10 text-white/60 hover:border-white/20'
+                }`}
+              >
+                <CreditCard size={18} />
+                <div className="text-left flex-1">
+                  <p className="font-medium">Pay with card</p>
+                  <p className="text-xs text-white/50">AI pays over phone with secure virtual card</p>
+                </div>
+                {hasPaymentMethod && (
+                  <Check size={16} className="text-[#39d98a]" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mb-4 p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
@@ -319,12 +593,18 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               onClick={handleAIPhoneOrder}
               disabled={loading}
               className="w-full btn-primary flex items-center justify-center gap-2"
-              style={{ backgroundColor: getProviderColor(orderingOption.provider) }}
+              style={{ backgroundColor: payWithCard ? '#8b5cf6' : getProviderColor(orderingOption.provider) }}
             >
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  AI is Calling...
+                  {payWithCard ? 'Processing...' : 'AI is Calling...'}
+                </>
+              ) : payWithCard ? (
+                <>
+                  <CreditCard size={18} />
+                  Continue to Payment
+                  <ChevronRight size={18} />
                 </>
               ) : (
                 <>
@@ -391,7 +671,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             </>
           )}
 
-          {!isDirectOrder && !isPhoneOrder && orderingOption.deepLink && (
+          {!isDirectOrder && !isPhoneOrder && !isAIPhoneOrder && orderingOption.deepLink && (
             <a
               href={orderingOption.deepLink}
               target="_blank"
