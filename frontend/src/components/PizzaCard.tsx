@@ -1,73 +1,13 @@
 import React from 'react';
 import { PizzaRecommendation } from '../types';
 import { Users } from 'lucide-react';
+import { getToppingEmoji } from '../utils/toppingEmojis';
 
 interface PizzaCardProps {
   pizza: PizzaRecommendation;
   index: number;
   compact?: boolean;
 }
-
-// Emoji mappings for toppings
-const toppingEmojis: Record<string, string> = {
-  // Meats
-  'pepperoni': '🔴',
-  'sausage': '🌭',
-  'bacon': '🥓',
-  'ham': '🍖',
-  'chicken': '🍗',
-  'beef': '🥩',
-  'meatball': '🧆',
-  'salami': '🔴',
-  'prosciutto': '🥓',
-  'anchovies': '🐟',
-  // Vegetables
-  'mushrooms': '🍄',
-  'onions': '🧅',
-  'peppers': '🫑',
-  'bell peppers': '🫑',
-  'green peppers': '🫑',
-  'olives': '🫒',
-  'black olives': '🫒',
-  'tomatoes': '🍅',
-  'spinach': '🥬',
-  'basil': '🌿',
-  'garlic': '🧄',
-  'jalapeños': '🌶️',
-  'jalapenos': '🌶️',
-  'hot peppers': '🌶️',
-  'artichokes': '🥬',
-  'broccoli': '🥦',
-  'corn': '🌽',
-  'arugula': '🥬',
-  'zucchini': '🥒',
-  'eggplant': '🍆',
-  'sun-dried tomatoes': '🍅',
-  // Cheese
-  'extra cheese': '🧀',
-  'mozzarella': '🧀',
-  'parmesan': '🧀',
-  'feta': '🧀',
-  'ricotta': '🧀',
-  'goat cheese': '🧀',
-  'gorgonzola': '🧀',
-  'cheddar': '🧀',
-  // Fruits
-  'pineapple': '🍍',
-  'banana peppers': '🍌',
-  // Other
-  'bbq sauce': '🍯',
-  'ranch': '🥛',
-  'buffalo': '🔥',
-  'truffle': '🟤',
-  'egg': '🥚',
-};
-
-// Get emoji for a topping (case-insensitive)
-const getToppingEmoji = (toppingName: string): string => {
-  const lower = toppingName.toLowerCase();
-  return toppingEmojis[lower] || '•';
-};
 
 export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = false }) => {
   // Colors for different topping categories
@@ -89,35 +29,35 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
     const guestNames = pizza.guests.map(g => g.name.split(' ')[0]); // First names only
 
     return (
-      <div className={`p-2 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
-        <div className="flex items-center justify-between gap-1 mb-1">
-          <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
+      <div className={`p-2.5 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
+        <div className="flex items-center justify-between gap-1 mb-1.5">
+          <div className={`w-7 h-7 rounded flex items-center justify-center text-sm font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
             {quantity}
           </div>
-          <span className="text-[12px]" title={pizza.toppings.map(t => t.name).join(', ')}>
+          <span className="text-base" title={pizza.toppings.map(t => t.name).join(', ')}>
             {toppingEmojisDisplay || '🧀'}
           </span>
         </div>
-        <div className="text-white text-[10px] leading-tight line-clamp-2 mb-1">
+        <div className="text-white text-xs font-medium leading-tight line-clamp-2 mb-1.5">
           {pizza.label || pizza.toppings.map(t => t.name).join(', ') || 'Cheese'}
         </div>
         {pizza.dietaryRestrictions.length > 0 && (
-          <div className="flex flex-wrap gap-0.5 mb-1">
+          <div className="flex flex-wrap gap-0.5 mb-1.5">
             {pizza.dietaryRestrictions.map(r => (
-              <span key={r} className="text-[8px] text-purple-300 bg-purple-500/20 px-1 rounded">
+              <span key={r} className="text-[9px] text-purple-300 bg-purple-500/20 px-1 rounded">
                 {r}
               </span>
             ))}
           </div>
         )}
         {!pizza.isForNonRespondents && guestNames.length > 0 && (
-          <div className="text-[9px] text-blue-300/80 leading-tight">
+          <div className="text-[10px] text-blue-300/80 leading-tight">
             {guestNames.slice(0, 3).join(', ')}
             {guestNames.length > 3 && ` +${guestNames.length - 3}`}
           </div>
         )}
         {pizza.isForNonRespondents && (
-          <div className="text-[9px] text-white/40 italic">
+          <div className="text-[10px] text-white/40 italic">
             For non-RSVPs
           </div>
         )}

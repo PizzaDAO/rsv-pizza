@@ -2,6 +2,7 @@ import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
 import { Trash2 } from 'lucide-react';
+import { getToppingEmoji } from '../utils/toppingEmojis';
 
 interface GuestCardProps {
   guest: Guest;
@@ -27,21 +28,27 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
             ))}
           </div>
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {guest.toppings.slice(0, 4).map(toppingId => (
-              <span key={toppingId} className="px-1.5 py-0.5 bg-[#39d98a]/20 text-[#39d98a] text-[10px] rounded">
-                {toppingNameById(toppingId)}
-              </span>
-            ))}
+            {guest.toppings.slice(0, 4).map(toppingId => {
+              const name = toppingNameById(toppingId);
+              return (
+                <span key={toppingId} className="px-1.5 py-0.5 bg-[#39d98a]/20 text-[#39d98a] text-[10px] rounded">
+                  {getToppingEmoji(name)} {name}
+                </span>
+              );
+            })}
             {guest.toppings.length > 4 && (
               <span className="px-1.5 py-0.5 text-white/40 text-[10px]">
                 +{guest.toppings.length - 4}
               </span>
             )}
-            {guest.dislikedToppings.slice(0, 2).map(toppingId => (
-              <span key={toppingId} className="px-1.5 py-0.5 bg-[#ff393a]/20 text-[#ff393a] text-[10px] rounded line-through">
-                {toppingNameById(toppingId)}
-              </span>
-            ))}
+            {guest.dislikedToppings.slice(0, 2).map(toppingId => {
+              const name = toppingNameById(toppingId);
+              return (
+                <span key={toppingId} className="px-1.5 py-0.5 bg-[#ff393a]/20 text-[#ff393a] text-[10px] rounded line-through">
+                  {getToppingEmoji(name)} {name}
+                </span>
+              );
+            })}
             {guest.dislikedToppings.length > 2 && (
               <span className="px-1.5 py-0.5 text-white/40 text-[10px]">
                 +{guest.dislikedToppings.length - 2}

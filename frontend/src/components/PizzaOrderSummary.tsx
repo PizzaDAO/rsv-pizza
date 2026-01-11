@@ -22,7 +22,9 @@ export const PizzaOrderSummary: React.FC = () => {
   const handleCopyOrder = () => {
     if (recommendations.length === 0) return;
 
-    const orderText = recommendations.map(pizza => {
+    const orderText = [...recommendations]
+      .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+      .map(pizza => {
       const qty = pizza.quantity || 1;
       const toppingsText = pizza.toppings.map(t => t.name).join(', ');
       const label = pizza.label || toppingsText;
