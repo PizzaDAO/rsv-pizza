@@ -211,7 +211,7 @@ function generateOptimalToppings(guests: Guest[]): Topping[] {
     }
   }
 
-  return sortedToppings.slice(0, 3);
+  return sortedToppings;
 }
 
 // Default pizza types for non-respondents
@@ -348,12 +348,12 @@ export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle,
       new Set(groupGuests.flatMap(guest => guest.dietaryRestrictions))
     ).filter(r => r !== 'None');
 
-    const optimalToppings = generateOptimalToppings(groupGuests).slice(0, 3);
+    const optimalToppings = generateOptimalToppings(groupGuests);
     const optimalSize = getOptimalSize(groupGuests.length, style);
 
     return {
       id: `pizza-${index + 1}`,
-      toppings: optimalToppings.slice(0, 3), // Enforce max 3 toppings
+      toppings: optimalToppings,
       guestCount: groupGuests.length,
       guests: groupGuests,
       dietaryRestrictions: allDietaryRestrictions,
