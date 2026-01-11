@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { Pizzeria, OrderItem, OrderingProvider } from '../types';
 
 const SUPABASE_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw';
 
 // Search for nearby pizzerias
 export async function searchPizzerias(lat: number, lng: number, radius: number = 5000): Promise<Pizzeria[]> {
@@ -9,7 +10,7 @@ export async function searchPizzerias(lat: number, lng: number, radius: number =
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify({ lat, lng, radius }),
   });
@@ -93,7 +94,7 @@ export async function createSquareOrder(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify({
       locationId,

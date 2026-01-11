@@ -15,48 +15,70 @@ interface SearchRequest {
   radius?: number; // meters, default 5000
 }
 
-// Search Google Places for nearby pizzerias
+// Search Google Places for nearby pizzerias using Places API (New)
 async function searchGooglePlaces(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
-  const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json');
-  url.searchParams.set('location', `${lat},${lng}`);
-  url.searchParams.set('radius', radius.toString());
-  url.searchParams.set('type', 'restaurant');
-  url.searchParams.set('keyword', 'pizza');
-  url.searchParams.set('key', GOOGLE_PLACES_API_KEY);
+  const url = 'https://places.googleapis.com/v1/places:searchNearby';
 
-  const response = await fetch(url.toString());
+  const requestBody = {
+    includedTypes: ['pizza_restaurant', 'italian_restaurant'],
+    maxResultCount: 20,
+    locationRestriction: {
+      circle: {
+        center: { latitude: lat, longitude: lng },
+        radius: radius
+      }
+    }
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
   const data = await response.json();
 
-  if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-    console.error('Google Places API error:', data.status, data.error_message);
-    throw new Error(`Google Places API error: ${data.status}`);
+  if (data.error) {
+    console.error('Google Places API error:', data.error);
+    throw new Error(`Google Places API error: ${data.error.message || data.error.status}`);
   }
 
-  const pizzerias: Pizzeria[] = (data.results || []).map((place: any) => {
+  const pizzerias: Pizzeria[] = (data.places || []).map((place: any) => {
     // Calculate distance from search point
     const distance = calculateDistance(
       lat, lng,
-      place.geometry.location.lat,
-      place.geometry.location.lng
+      place.location.latitude,
+      place.location.longitude
     );
 
+    // Map price level from new API format
+    const priceLevelMap: Record<string, number> = {
+      'PRICE_LEVEL_FREE': 0,
+      'PRICE_LEVEL_INEXPENSIVE': 1,
+      'PRICE_LEVEL_MODERATE': 2,
+      'PRICE_LEVEL_EXPENSIVE': 3,
+      'PRICE_LEVEL_VERY_EXPENSIVE': 4,
+    };
+
     return {
-      id: place.place_id,
-      placeId: place.place_id,
-      name: place.name,
-      address: place.vicinity || place.formatted_address || '',
+      id: place.id,
+      placeId: place.id,
+      name: place.displayName?.text || 'Unknown',
+      address: place.formattedAddress || '',
+      phone: place.nationalPhoneNumber,
       rating: place.rating,
-      reviewCount: place.user_ratings_total,
-      priceLevel: place.price_level,
-      isOpen: place.opening_hours?.open_now,
+      reviewCount: place.userRatingCount,
+      priceLevel: priceLevelMap[place.priceLevel] || undefined,
+      isOpen: place.currentOpeningHours?.openNow,
       distance: Math.round(distance),
       location: {
-        lat: place.geometry.location.lat,
-        lng: place.geometry.location.lng,
+        lat: place.location.latitude,
+        lng: place.location.longitude,
       },
-      photos: place.photos?.slice(0, 3).map((photo: any) =>
-        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photo.photo_reference}&key=${GOOGLE_PLACES_API_KEY}`
-      ),
       orderingOptions: [], // Will be populated by checkOrderingOptions
     };
   });
