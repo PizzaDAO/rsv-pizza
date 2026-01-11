@@ -8,6 +8,67 @@ interface PizzaCardProps {
   compact?: boolean;
 }
 
+// Emoji mappings for toppings
+const toppingEmojis: Record<string, string> = {
+  // Meats
+  'pepperoni': '🔴',
+  'sausage': '🌭',
+  'bacon': '🥓',
+  'ham': '🍖',
+  'chicken': '🍗',
+  'beef': '🥩',
+  'meatball': '🧆',
+  'salami': '🔴',
+  'prosciutto': '🥓',
+  'anchovies': '🐟',
+  // Vegetables
+  'mushrooms': '🍄',
+  'onions': '🧅',
+  'peppers': '🫑',
+  'bell peppers': '🫑',
+  'green peppers': '🫑',
+  'olives': '🫒',
+  'black olives': '🫒',
+  'tomatoes': '🍅',
+  'spinach': '🥬',
+  'basil': '🌿',
+  'garlic': '🧄',
+  'jalapeños': '🌶️',
+  'jalapenos': '🌶️',
+  'hot peppers': '🌶️',
+  'artichokes': '🥬',
+  'broccoli': '🥦',
+  'corn': '🌽',
+  'arugula': '🥬',
+  'zucchini': '🥒',
+  'eggplant': '🍆',
+  'sun-dried tomatoes': '🍅',
+  // Cheese
+  'extra cheese': '🧀',
+  'mozzarella': '🧀',
+  'parmesan': '🧀',
+  'feta': '🧀',
+  'ricotta': '🧀',
+  'goat cheese': '🧀',
+  'gorgonzola': '🧀',
+  'cheddar': '🧀',
+  // Fruits
+  'pineapple': '🍍',
+  'banana peppers': '🍌',
+  // Other
+  'bbq sauce': '🍯',
+  'ranch': '🥛',
+  'buffalo': '🔥',
+  'truffle': '🟤',
+  'egg': '🥚',
+};
+
+// Get emoji for a topping (case-insensitive)
+const getToppingEmoji = (toppingName: string): string => {
+  const lower = toppingName.toLowerCase();
+  return toppingEmojis[lower] || '•';
+};
+
 export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = false }) => {
   // Colors for different topping categories
   const categoryColors: Record<string, string> = {
@@ -24,19 +85,24 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
 
   // Compact version for order summary (3-column grid)
   if (compact) {
+    const toppingEmojisDisplay = pizza.toppings.map(t => getToppingEmoji(t.name)).join('');
+    const guestNames = pizza.guests.map(g => g.name.split(' ')[0]); // First names only
+
     return (
       <div className={`p-2 rounded-lg ${pizza.isForNonRespondents ? 'bg-[#6b7280]/20' : 'bg-white/5'} border border-white/10`}>
         <div className="flex items-center justify-between gap-1 mb-1">
           <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${pizza.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} text-white`}>
             {quantity}
           </div>
-          <span className="text-white/40 text-[10px]">{pizza.size.diameter}"</span>
+          <span className="text-[12px]" title={pizza.toppings.map(t => t.name).join(', ')}>
+            {toppingEmojisDisplay || '🧀'}
+          </span>
         </div>
-        <div className="text-white text-[11px] font-medium leading-tight line-clamp-2">
+        <div className="text-white text-[10px] leading-tight line-clamp-2 mb-1">
           {pizza.label || pizza.toppings.map(t => t.name).join(', ') || 'Cheese'}
         </div>
         {pizza.dietaryRestrictions.length > 0 && (
-          <div className="flex flex-wrap gap-0.5 mt-1">
+          <div className="flex flex-wrap gap-0.5 mb-1">
             {pizza.dietaryRestrictions.map(r => (
               <span key={r} className="text-[8px] text-purple-300 bg-purple-500/20 px-1 rounded">
                 {r}
@@ -44,10 +110,17 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
             ))}
           </div>
         )}
-        <div className="flex items-center gap-0.5 text-white/40 text-[9px] mt-1">
-          <Users size={8} />
-          <span>{pizza.guestCount}</span>
-        </div>
+        {!pizza.isForNonRespondents && guestNames.length > 0 && (
+          <div className="text-[9px] text-blue-300/80 leading-tight">
+            {guestNames.slice(0, 3).join(', ')}
+            {guestNames.length > 3 && ` +${guestNames.length - 3}`}
+          </div>
+        )}
+        {pizza.isForNonRespondents && (
+          <div className="text-[9px] text-white/40 italic">
+            For non-RSVPs
+          </div>
+        )}
       </div>
     );
   }
@@ -77,7 +150,7 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
               key={topping.id}
               className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[topping.category] || 'bg-white/10 text-white/70'}`}
             >
-              {topping.name}
+              {getToppingEmoji(topping.name)} {topping.name}
             </span>
           ))}
           {pizza.dietaryRestrictions.map(restriction => (
