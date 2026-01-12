@@ -24,19 +24,26 @@ import {
 interface PizzeriaSearchProps {
   onSelectPizzeria: (pizzeria: Pizzeria, option: OrderingOption) => void;
   partyAddress?: string | null;
+  initialPizzerias?: Pizzeria[];
+  initialSearchAddress?: string;
 }
 
-export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({ onSelectPizzeria, partyAddress }) => {
-  const [pizzerias, setPizzerias] = useState<Pizzeria[]>([]);
+export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
+  onSelectPizzeria,
+  partyAddress,
+  initialPizzerias,
+  initialSearchAddress
+}) => {
+  const [pizzerias, setPizzerias] = useState<Pizzeria[]>(initialPizzerias || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchAddress, setSearchAddress] = useState(partyAddress || '');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [autoSearched, setAutoSearched] = useState(false);
+  const [searchAddress, setSearchAddress] = useState(initialSearchAddress || partyAddress || '');
+  const [hasSearched, setHasSearched] = useState(!!initialPizzerias?.length);
+  const [autoSearched, setAutoSearched] = useState(!!initialPizzerias?.length);
 
-  // Auto-search if party address is provided
+  // Auto-search if party address is provided and no initial pizzerias
   React.useEffect(() => {
-    if (partyAddress && !autoSearched) {
+    if (partyAddress && !autoSearched && !initialPizzerias?.length) {
       setAutoSearched(true);
       handleAddressSearchAuto(partyAddress);
     }

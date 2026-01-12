@@ -56,6 +56,8 @@ model Guest {
 
   partyId String
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  pizzaMappings GuestPizzaMapping[]
 }
 
 model Order {
@@ -70,11 +72,57 @@ model Order {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // ML training metadata
+  totalPizzas       Int?
+  avgGuestsPerPizza Float?
+
   partyId String
   party   Party  @relation(fields: [partyId], references: [id])
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
+
+  orderItems    OrderItem[]
+  guestMappings GuestPizzaMapping[]
+}
+
+// Individual pizza items in an order (for ML training)
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  pizzaIndex    Int       // Position in the order (1st pizza, 2nd pizza, etc.)
+  size          String
+  toppings      String[]
+  isHalfAndHalf Boolean   @default(false)
+  leftToppings  String[]
+  rightToppings String[]
+  priceEstimate Decimal?  @db.Decimal(10, 2)
+
+  guestMappings GuestPizzaMapping[]
+  createdAt     DateTime @default(now())
+}
+
+// Maps guests to their assigned pizzas (for ML training)
+model GuestPizzaMapping {
+  id String @id @default(cuid())
+
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  whichHalf          String? // 'left', 'right', or null for whole pizza
+  satisfactionRating Int?    // 1-5 rating (optional feedback)
+
+  createdAt DateTime @default(now())
+
+  @@unique([guestId, orderItemId])
 }
 
 model MagicLink {

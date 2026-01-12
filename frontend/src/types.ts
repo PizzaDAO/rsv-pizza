@@ -24,6 +24,13 @@ export interface PizzaSize {
   servings: number;
 }
 
+// Half of a split pizza (for half-and-half pizzas)
+export interface PizzaHalf {
+  toppings: Topping[];
+  guests: Guest[];
+  dietaryRestrictions: string[];
+}
+
 export interface PizzaRecommendation {
   id: string;
   toppings: Topping[];
@@ -35,6 +42,10 @@ export interface PizzaRecommendation {
   isForNonRespondents?: boolean;
   quantity?: number;
   label?: string; // e.g., "Cheese", "Pepperoni", "Veggie", "Vegan", "Gluten-Free"
+  // Half-and-half support
+  isHalfAndHalf?: boolean;
+  leftHalf?: PizzaHalf;
+  rightHalf?: PizzaHalf;
 }
 
 export interface PizzaSettings {

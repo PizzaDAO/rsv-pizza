@@ -1,18 +1,152 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { PizzaCard } from './PizzaCard';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
 import { Pizzeria, OrderingOption } from '../types';
-import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink } from 'lucide-react';
+import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, MapPin, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  searchPizzerias,
+  getCurrentLocation,
+  geocodeAddress,
+  formatDistance,
+  getProviderName,
+  getProviderColor,
+  supportsDirectOrdering,
+} from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
   const { recommendations, party, guests } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
+  const [showCallScript, setShowCallScript] = useState(false);
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
   const [selectedPizzeria, setSelectedPizzeria] = useState<Pizzeria | null>(null);
   const [selectedOption, setSelectedOption] = useState<OrderingOption | null>(null);
   const [orderComplete, setOrderComplete] = useState<{ orderId: string; checkoutUrl?: string } | null>(null);
+
+  // Inline pizzeria search state
+  const [pizzerias, setPizzerias] = useState<Pizzeria[]>([]);
+  const [pizzeriaLoading, setPizzeriaLoading] = useState(false);
+  const [pizzeriaError, setPizzeriaError] = useState<string | null>(null);
+  const [searchAddress, setSearchAddress] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  const [autoSearched, setAutoSearched] = useState(false);
+
+  // Auto-search if party address is provided
+  useEffect(() => {
+    if (party?.address && !autoSearched && recommendations.length > 0) {
+      setAutoSearched(true);
+      setSearchAddress(party.address);
+      handleAddressSearchAuto(party.address);
+    }
+  }, [party?.address, recommendations.length]);
+
+  const handleAddressSearchAuto = async (address: string) => {
+    setPizzeriaLoading(true);
+    setPizzeriaError(null);
+    try {
+      const location = await geocodeAddress(address);
+      if (!location) {
+        setPizzeriaError('Could not find that address. Please try a different one.');
+        return;
+      }
+      const results = await searchPizzerias(location.lat, location.lng);
+      setPizzerias(results);
+      setHasSearched(true);
+    } catch (err) {
+      setPizzeriaError(err instanceof Error ? err.message : 'Failed to search');
+    } finally {
+      setPizzeriaLoading(false);
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setPizzeriaLoading(true);
+    setPizzeriaError(null);
+    try {
+      const location = await getCurrentLocation();
+      const results = await searchPizzerias(location.lat, location.lng);
+      setPizzerias(results);
+      setHasSearched(true);
+    } catch (err) {
+      setPizzeriaError(err instanceof Error ? err.message : 'Failed to get location');
+    } finally {
+      setPizzeriaLoading(false);
+    }
+  };
+
+  const handleAddressSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchAddress.trim()) return;
+
+    setPizzeriaLoading(true);
+    setPizzeriaError(null);
+    try {
+      const location = await geocodeAddress(searchAddress);
+      if (!location) {
+        setPizzeriaError('Could not find that address. Please try a different one.');
+        return;
+      }
+      const results = await searchPizzerias(location.lat, location.lng);
+      setPizzerias(results);
+      setHasSearched(true);
+    } catch (err) {
+      setPizzeriaError(err instanceof Error ? err.message : 'Failed to search');
+    } finally {
+      setPizzeriaLoading(false);
+    }
+  };
+
+  const renderStars = (rating: number | undefined) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center gap-1">
+        <Star size={12} className="text-yellow-400 fill-yellow-400" />
+        <span className="text-white text-xs font-medium">{rating.toFixed(1)}</span>
+      </div>
+    );
+  };
+
+  const handleInlineSelectPizzeria = (pizzeria: Pizzeria, option: OrderingOption) => {
+    setSelectedPizzeria(pizzeria);
+    setSelectedOption(option);
+  };
+
+  // Generate call script for phone ordering
+  const generateCallScript = () => {
+    if (recommendations.length === 0) return '';
+
+    const sortedPizzas = [...recommendations].sort((a, b) => (b.quantity || 1) - (a.quantity || 1));
+
+    const pizzaLines = sortedPizzas.map(pizza => {
+      const qty = pizza.quantity || 1;
+      const size = pizza.size.name;
+      const dietary = pizza.dietaryRestrictions?.length > 0
+        ? ` (${pizza.dietaryRestrictions.join(', ')})`
+        : '';
+
+      // Handle half-and-half pizzas
+      if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
+        const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+        const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+        return `  - ${qty}x ${size} pizza, half ${leftToppings} and half ${rightToppings}${dietary}`;
+      }
+
+      const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+      return `  - ${qty}x ${size} pizza with ${toppingsText || 'cheese'}${dietary}`;
+    }).join('\n');
+
+    const deliveryAddress = party?.address || '[YOUR ADDRESS]';
+
+    return `Hi, I'd like to place an order for delivery.
+
+I need ${totalPizzas} pizza${totalPizzas !== 1 ? 's' : ''}:
+${pizzaLines}
+
+Delivery address: ${deliveryAddress}
+
+Can you give me the total and estimated delivery time?`;
+  };
 
   // Calculate totals
   const totalPizzas = recommendations.reduce((acc, pizza) => acc + (pizza.quantity || 1), 0);
@@ -94,7 +228,7 @@ export const PizzaOrderSummary: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5 mb-6">
+            <div className="grid grid-cols-3 gap-1.5 mb-4">
               {[...recommendations]
                 .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                 .map((pizza, index) => (
@@ -102,20 +236,12 @@ export const PizzaOrderSummary: React.FC = () => {
               ))}
             </div>
 
-            {/* Order buttons */}
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowPizzeriaSearch(true)}
-                className="w-full btn-primary flex items-center justify-center gap-2"
-              >
-                <ShoppingCart size={18} />
-                Order Now
-              </button>
-
+            {/* Copy Order & Call Script buttons */}
+            <div className="flex gap-2 mb-4">
               <button
                 onClick={handleCopyOrder}
                 disabled={recommendations.length === 0}
-                className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm transition-all ${
                   isCopied
                     ? 'bg-[#39d98a] text-white'
                     : 'btn-secondary'
@@ -123,17 +249,186 @@ export const PizzaOrderSummary: React.FC = () => {
               >
                 {isCopied ? (
                   <>
-                    <Check size={18} />
+                    <Check size={16} />
                     <span>Copied!</span>
                   </>
                 ) : (
                   <>
-                    <Share2 size={18} />
+                    <Share2 size={16} />
                     <span>Copy Order</span>
                   </>
                 )}
               </button>
+
+              <button
+                onClick={() => setShowCallScript(!showCallScript)}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm btn-secondary"
+              >
+                <Phone size={16} />
+                <span>Call Script</span>
+                {showCallScript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
+
+            {/* Expandable Call Script */}
+            {showCallScript && (
+              <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-white text-sm">Phone Order Script</h3>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateCallScript());
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                  >
+                    Copy script
+                  </button>
+                </div>
+                <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
+                  {generateCallScript()}
+                </pre>
+              </div>
+            )}
+
+            {/* Inline Pizzeria Search/Results */}
+            <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+              {!hasSearched || pizzerias.length === 0 ? (
+                // Show search form if no results yet
+                <div className="space-y-3">
+                  <h3 className="font-medium text-white text-sm mb-3">Find a Pizzeria</h3>
+
+                  <button
+                    onClick={handleUseCurrentLocation}
+                    disabled={pizzeriaLoading}
+                    className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2"
+                  >
+                    {pizzeriaLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Navigation size={16} />
+                    )}
+                    Use My Location
+                  </button>
+
+                  <div className="flex items-center gap-2 text-white/40">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-xs">or</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+
+                  <form onSubmit={handleAddressSearch} className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <MapPin size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
+                      <input
+                        type="text"
+                        value={searchAddress}
+                        onChange={(e) => setSearchAddress(e.target.value)}
+                        placeholder="Enter delivery address..."
+                        className="w-full pl-8 py-2 text-sm"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={pizzeriaLoading || !searchAddress.trim()}
+                      className="btn-secondary px-3"
+                    >
+                      <Search size={16} />
+                    </button>
+                  </form>
+
+                  {pizzeriaError && (
+                    <p className="text-xs text-[#ff393a]">{pizzeriaError}</p>
+                  )}
+                </div>
+              ) : (
+                // Show top 3 pizzerias
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-white text-sm">Top Pizzerias Nearby</h3>
+                    <button
+                      onClick={() => setShowPizzeriaSearch(true)}
+                      className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                    >
+                      View all
+                    </button>
+                  </div>
+
+                  {pizzerias.slice(0, 3).map((pizzeria) => {
+                    const directOption = pizzeria.orderingOptions.find(o => supportsDirectOrdering(o.provider) && o.available);
+                    const phoneOption = pizzeria.orderingOptions.find(o => o.provider === 'phone');
+                    const primaryOption = directOption || phoneOption || pizzeria.orderingOptions[0];
+
+                    return (
+                      <div
+                        key={pizzeria.id}
+                        className="p-3 bg-white/5 border border-white/10 rounded-lg"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-white text-sm truncate">{pizzeria.name}</h4>
+                              {renderStars(pizzeria.rating)}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-white/50">
+                              {pizzeria.distance && (
+                                <span>{formatDistance(pizzeria.distance)}</span>
+                              )}
+                              {pizzeria.isOpen !== undefined && (
+                                <span className={pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}>
+                                  {pizzeria.isOpen ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {primaryOption && (
+                            primaryOption.provider === 'phone' && pizzeria.phone ? (
+                              <a
+                                href={`tel:${pizzeria.phone}`}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                              >
+                                <Phone size={12} />
+                                Call
+                              </a>
+                            ) : supportsDirectOrdering(primaryOption.provider) ? (
+                              <button
+                                onClick={() => handleInlineSelectPizzeria(pizzeria, primaryOption)}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white"
+                                style={{ backgroundColor: getProviderColor(primaryOption.provider) }}
+                              >
+                                <ShoppingCart size={12} />
+                                Order
+                              </button>
+                            ) : primaryOption.deepLink ? (
+                              <a
+                                href={primaryOption.deepLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                              >
+                                <ExternalLink size={12} />
+                                Order
+                              </a>
+                            ) : null
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* View All Pizzerias button */}
+            <button
+              onClick={() => setShowPizzeriaSearch(true)}
+              className="w-full btn-secondary flex items-center justify-center gap-2"
+            >
+              <ShoppingCart size={18} />
+              {pizzerias.length > 0 ? 'View All Pizzerias' : 'Order Now'}
+            </button>
           </>
         )}
       </div>
@@ -150,7 +445,12 @@ export const PizzaOrderSummary: React.FC = () => {
                 <X size={20} />
               </button>
             </div>
-            <PizzeriaSearch onSelectPizzeria={handleSelectPizzeria} partyAddress={party?.address} />
+            <PizzeriaSearch
+              onSelectPizzeria={handleSelectPizzeria}
+              partyAddress={party?.address}
+              initialPizzerias={pizzerias}
+              initialSearchAddress={searchAddress}
+            />
           </div>
         </div>
       )}
