@@ -28,7 +28,7 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
             ))}
           </div>
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {guest.toppings.slice(0, 4).map(toppingId => {
+            {guest.toppings.map(toppingId => {
               const name = toppingNameById(toppingId);
               return (
                 <span key={toppingId} className="px-1.5 py-0.5 bg-[#39d98a]/20 text-[#39d98a] text-[10px] rounded">
@@ -36,12 +36,7 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
                 </span>
               );
             })}
-            {guest.toppings.length > 4 && (
-              <span className="px-1.5 py-0.5 text-white/40 text-[10px]">
-                +{guest.toppings.length - 4}
-              </span>
-            )}
-            {guest.dislikedToppings.slice(0, 2).map(toppingId => {
+            {guest.dislikedToppings.map(toppingId => {
               const name = toppingNameById(toppingId);
               return (
                 <span key={toppingId} className="px-1.5 py-0.5 bg-[#ff393a]/20 text-[#ff393a] text-[10px] rounded line-through">
@@ -49,11 +44,6 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
                 </span>
               );
             })}
-            {guest.dislikedToppings.length > 2 && (
-              <span className="px-1.5 py-0.5 text-white/40 text-[10px]">
-                +{guest.dislikedToppings.length - 2}
-              </span>
-            )}
           </div>
         </div>
         <button
