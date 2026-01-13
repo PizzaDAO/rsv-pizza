@@ -209,7 +209,7 @@ export function RSVPPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-[#ff393a] to-[#ff6b35] p-6 text-center">
             <img
-              src="/logo.png"
+              src="/rsv-pizza/logo.png"
               alt="RSVPizza"
               className="h-10 mx-auto mb-3"
             />
