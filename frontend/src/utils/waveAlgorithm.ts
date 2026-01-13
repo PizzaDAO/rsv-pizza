@@ -3,7 +3,7 @@ import { generatePizzaRecommendations } from './pizzaAlgorithm';
 
 // Constants
 const FIRST_WAVE_OFFSET_MINUTES = -5;      // Arrive 5 min before party
-const FIRST_WAVE_WEIGHT = 1.25;            // 25% more pizza in first wave
+const FIRST_WAVE_WEIGHT = 1.5;             // 50% more pizza in first wave
 const MIN_TIME_BEFORE_END_MINUTES = 45;    // No pizza less than 45 min before end
 const WAVE_SPACING_MIN = 45;               // Minimum spacing between waves
 const WAVE_SPACING_MAX = 60;               // Maximum spacing between waves
