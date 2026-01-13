@@ -4,12 +4,20 @@ export interface Topping {
   category: 'meat' | 'vegetable' | 'cheese' | 'fruit';
 }
 
+export interface Beverage {
+  id: string;
+  name: string;
+  category: 'soda' | 'juice' | 'water' | 'other';
+}
+
 export interface Guest {
   id?: string;
   name: string;
   dietaryRestrictions: string[];
   toppings: string[];
   dislikedToppings: string[];
+  likedBeverages?: string[];
+  dislikedBeverages?: string[];
 }
 
 export interface PizzaStyle {
@@ -48,6 +56,15 @@ export interface PizzaRecommendation {
   rightHalf?: PizzaHalf;
 }
 
+export interface BeverageRecommendation {
+  id: string;
+  beverage: Beverage;
+  quantity: number;
+  guestCount: number;
+  isForNonRespondents?: boolean;
+  label?: string;
+}
+
 export interface PizzaSettings {
   size: PizzaSize;
   style: PizzaStyle;
@@ -60,6 +77,7 @@ export interface Party {
   date: string | null;
   hostName: string | null;
   pizzaStyle: string;
+  availableBeverages?: string[];
   maxGuests: number | null;
   address: string | null;
   rsvpClosedAt: string | null;

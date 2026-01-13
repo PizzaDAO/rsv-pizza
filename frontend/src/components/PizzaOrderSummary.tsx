@@ -4,7 +4,7 @@ import { PizzaCard } from './PizzaCard';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
 import { Pizzeria, OrderingOption } from '../types';
-import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, MapPin, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, MapPin, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
 import {
   searchPizzerias,
   getCurrentLocation,
@@ -16,7 +16,7 @@ import {
 } from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
-  const { recommendations, party, guests } = usePizza();
+  const { recommendations, beverageRecommendations, party, guests } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
@@ -235,6 +235,47 @@ Can you give me the total and estimated delivery time?`;
                 <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
               ))}
             </div>
+
+            {/* Beverage Order Section */}
+            {beverageRecommendations.length > 0 && (
+              <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
+                  <Beer size={16} />
+                  Beverage Order
+                </h3>
+                <div className="space-y-1 text-sm mb-3">
+                  <p className="text-white/80">
+                    <span className="text-white/60">Total beverages:</span>{' '}
+                    <span className="font-semibold text-white text-base">
+                      {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
+                    </span>
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {beverageRecommendations.map(rec => (
+                    <div
+                      key={rec.id}
+                      className="p-2 bg-white/5 border border-white/10 rounded-lg"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
+                          <span className="text-white/50 text-xs ml-2">
+                            ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
+                          </span>
+                        </div>
+                        <span className="text-blue-400 font-bold text-sm">
+                          {rec.quantity}x
+                        </span>
+                      </div>
+                      {rec.isForNonRespondents && (
+                        <p className="text-xs text-white/40 mt-1">For non-respondents</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Copy Order & Call Script buttons */}
             <div className="flex gap-2 mb-4">

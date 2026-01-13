@@ -28,7 +28,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 // POST /api/parties - Create new party
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, date, pizzaSize, pizzaStyle, address, maxGuests } = req.body;
+    const { name, date, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages } = req.body;
 
     if (!name || !pizzaSize || !pizzaStyle) {
       throw new AppError('Name, pizza size, and pizza style are required', 400, 'VALIDATION_ERROR');
@@ -40,6 +40,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         date: date ? new Date(date) : null,
         pizzaSize,
         pizzaStyle,
+        availableBeverages: availableBeverages || [],
         address,
         maxGuests,
         userId: req.userId!,
@@ -80,7 +81,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, date, pizzaSize, pizzaStyle, address, maxGuests } = req.body;
+    const { name, date, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages } = req.body;
 
     // Verify ownership
     const existing = await prisma.party.findFirst({
@@ -100,6 +101,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(pizzaStyle && { pizzaStyle }),
         ...(address !== undefined && { address }),
         ...(maxGuests !== undefined && { maxGuests }),
+        ...(availableBeverages !== undefined && { availableBeverages }),
       },
     });
 
@@ -198,7 +200,7 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
 router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, dietaryRestrictions, likedToppings, dislikedToppings } = req.body;
+    const { name, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
 
     // Verify ownership
     const party = await prisma.party.findFirst({
@@ -219,6 +221,8 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
         dietaryRestrictions: dietaryRestrictions || [],
         likedToppings: likedToppings || [],
         dislikedToppings: dislikedToppings || [],
+        likedBeverages: likedBeverages || [],
+        dislikedBeverages: dislikedBeverages || [],
         submittedVia: 'host',
         partyId: id,
       },

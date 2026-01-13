@@ -15,6 +15,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         id: true,
         name: true,
         date: true,
+        availableBeverages: true,
         rsvpClosedAt: true,
         maxGuests: true,
         user: {
@@ -61,6 +62,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         name: party.name,
         date: party.date,
         hostName: party.user.name,
+        availableBeverages: party.availableBeverages,
         guestCount: party._count.guests,
         maxGuests: party.maxGuests,
       },
@@ -75,7 +77,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
 router.post('/:inviteCode/guest', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
-    const { name, dietaryRestrictions, likedToppings, dislikedToppings } = req.body;
+    const { name, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -114,6 +116,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         dietaryRestrictions: dietaryRestrictions || [],
         likedToppings: likedToppings || [],
         dislikedToppings: dislikedToppings || [],
+        likedBeverages: likedBeverages || [],
+        dislikedBeverages: dislikedBeverages || [],
         submittedVia: 'link',
         partyId: party.id,
       },

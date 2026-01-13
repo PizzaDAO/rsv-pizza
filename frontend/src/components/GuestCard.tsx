@@ -9,10 +9,14 @@ interface GuestCardProps {
 }
 
 export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
-  const { removeGuest, availableToppings } = usePizza();
+  const { removeGuest, availableToppings, availableBeverages } = usePizza();
 
   const toppingNameById = (id: string) => {
     return availableToppings.find(t => t.id === id)?.name || id;
+  };
+
+  const beverageNameById = (id: string) => {
+    return availableBeverages.find(b => b.id === id)?.name || id;
   };
 
   return (
@@ -45,6 +49,28 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
               );
             })}
           </div>
+          {/* Beverage Preferences */}
+          {((guest.likedBeverages && guest.likedBeverages.length > 0) ||
+            (guest.dislikedBeverages && guest.dislikedBeverages.length > 0)) && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {guest.likedBeverages?.map(beverageId => {
+                const name = beverageNameById(beverageId);
+                return (
+                  <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded">
+                    {name}
+                  </span>
+                );
+              })}
+              {guest.dislikedBeverages?.map(beverageId => {
+                const name = beverageNameById(beverageId);
+                return (
+                  <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded line-through">
+                    {name}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         <button
           onClick={() => guest.id && removeGuest(guest.id)}

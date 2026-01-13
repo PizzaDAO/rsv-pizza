@@ -13,6 +13,7 @@ export interface DbParty {
   host_name: string | null;
   date: string | null;
   pizza_style: string;
+  available_beverages: string[];
   max_guests: number | null;
   address: string | null;
   rsvp_closed_at: string | null;
@@ -26,12 +27,14 @@ export interface DbGuest {
   dietary_restrictions: string[];
   liked_toppings: string[];
   disliked_toppings: string[];
+  liked_beverages: string[];
+  disliked_beverages: string[];
   submitted_at: string;
   submitted_via: string;
 }
 
 // Party operations
-export async function createParty(name: string, hostName?: string, date?: string, pizzaStyle: string = 'new-york', expectedGuests?: number, address?: string): Promise<DbParty | null> {
+export async function createParty(name: string, hostName?: string, date?: string, pizzaStyle: string = 'new-york', expectedGuests?: number, address?: string, availableBeverages?: string[]): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
     .insert({
@@ -39,6 +42,7 @@ export async function createParty(name: string, hostName?: string, date?: string
       host_name: hostName || null,
       date: date || null,
       pizza_style: pizzaStyle,
+      available_beverages: availableBeverages || [],
       max_guests: expectedGuests || null,
       address: address || null,
     })
@@ -92,13 +96,30 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
   return { party, guests: guests || [] };
 }
 
+export async function updatePartyBeverages(partyId: string, availableBeverages: string[]): Promise<DbParty | null> {
+  const { data, error } = await supabase
+    .from('parties')
+    .update({ available_beverages: availableBeverages })
+    .eq('id', partyId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating party beverages:', error);
+    return null;
+  }
+  return data;
+}
+
 // Guest operations
 export async function addGuestToParty(
   partyId: string,
   name: string,
   dietaryRestrictions: string[],
   likedToppings: string[],
-  dislikedToppings: string[]
+  dislikedToppings: string[],
+  likedBeverages: string[],
+  dislikedBeverages: string[]
 ): Promise<DbGuest | null> {
   const { data, error } = await supabase
     .from('guests')
@@ -108,6 +129,8 @@ export async function addGuestToParty(
       dietary_restrictions: dietaryRestrictions,
       liked_toppings: likedToppings,
       disliked_toppings: dislikedToppings,
+      liked_beverages: likedBeverages,
+      disliked_beverages: dislikedBeverages,
       submitted_via: 'link',
     })
     .select()
@@ -125,9 +148,11 @@ export async function addGuestByHost(
   name: string,
   dietaryRestrictions: string[],
   likedToppings: string[],
-  dislikedToppings: string[]
+  dislikedToppings: string[],
+  likedBeverages: string[],
+  dislikedBeverages: string[]
 ): Promise<DbGuest | null> {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('guests')
     .insert({
       party_id: partyId,
@@ -135,6 +160,8 @@ export async function addGuestByHost(
       dietary_restrictions: dietaryRestrictions,
       liked_toppings: likedToppings,
       disliked_toppings: dislikedToppings,
+      liked_beverages: likedBeverages,
+      disliked_beverages: dislikedBeverages,
       submitted_via: 'host',
     })
     .select()

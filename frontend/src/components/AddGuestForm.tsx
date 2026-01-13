@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { UserPlus, Loader2 } from 'lucide-react';
+import { UserPlus, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 export const AddGuestForm: React.FC = () => {
-  const { availableToppings, addGuest, dietaryOptions } = usePizza();
+  const { availableToppings, availableBeverages, addGuest, dietaryOptions, party } = usePizza();
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
   const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
+  const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
+  const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,6 +19,8 @@ export const AddGuestForm: React.FC = () => {
     setDietaryRestrictions([]);
     setToppings([]);
     setDislikedToppings([]);
+    setLikedBeverages([]);
+    setDislikedBeverages([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,7 +35,9 @@ export const AddGuestForm: React.FC = () => {
       name,
       dietaryRestrictions,
       toppings,
-      dislikedToppings
+      dislikedToppings,
+      likedBeverages,
+      dislikedBeverages
     });
     setIsSubmitting(false);
     resetForm();
@@ -46,26 +52,24 @@ export const AddGuestForm: React.FC = () => {
     );
   };
 
-  const handleToppingChange = (toppingId: string, list: 'liked' | 'disliked') => {
-    if (list === 'liked') {
-      if (dislikedToppings.includes(toppingId)) {
-        setDislikedToppings(prev => prev.filter(id => id !== toppingId));
-      }
-      setToppings(prev =>
-        prev.includes(toppingId)
-          ? prev.filter(id => id !== toppingId)
-          : [...prev, toppingId]
-      );
-    } else {
-      if (toppings.includes(toppingId)) {
-        setToppings(prev => prev.filter(id => id !== toppingId));
-      }
-      setDislikedToppings(prev =>
-        prev.includes(toppingId)
-          ? prev.filter(id => id !== toppingId)
-          : [...prev, toppingId]
-      );
-    }
+  const handleToppingLike = (toppingId: string) => {
+    setDislikedToppings(prev => prev.filter(id => id !== toppingId));
+    setToppings(prev => prev.includes(toppingId) ? prev.filter(id => id !== toppingId) : [...prev, toppingId]);
+  };
+
+  const handleToppingDislike = (toppingId: string) => {
+    setToppings(prev => prev.filter(id => id !== toppingId));
+    setDislikedToppings(prev => prev.includes(toppingId) ? prev.filter(id => id !== toppingId) : [...prev, toppingId]);
+  };
+
+  const handleBeverageLike = (beverageId: string) => {
+    setDislikedBeverages(prev => prev.filter(id => id !== beverageId));
+    setLikedBeverages(prev => prev.includes(beverageId) ? prev.filter(id => id !== beverageId) : [...prev, beverageId]);
+  };
+
+  const handleBeverageDislike = (beverageId: string) => {
+    setLikedBeverages(prev => prev.filter(id => id !== beverageId));
+    setDislikedBeverages(prev => prev.includes(beverageId) ? prev.filter(id => id !== beverageId) : [...prev, beverageId]);
   };
 
   return (
@@ -122,41 +126,106 @@ export const AddGuestForm: React.FC = () => {
             <label className="block text-white/80 font-medium mb-3">
               Topping Preferences
             </label>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-medium text-white/60 mb-2">Liked Toppings</h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableToppings.map(topping => (
+            <div className="flex flex-wrap gap-2">
+              {availableToppings.map(topping => {
+                const isLiked = toppings.includes(topping.id);
+                const isDisliked = dislikedToppings.includes(topping.id);
+                return (
+                  <div
+                    key={topping.id}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                      isLiked
+                        ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                        : isDisliked
+                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                        : 'bg-white/5 border-white/10'
+                    }`}
+                  >
                     <button
                       type="button"
-                      key={`like-${topping.id}`}
-                      onClick={() => handleToppingChange(topping.id, 'liked')}
-                      className={`chip ${toppings.includes(topping.id) ? 'liked' : ''}`}
+                      onClick={() => handleToppingLike(topping.id)}
+                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
                     >
-                      {topping.name}
+                      <ThumbsUp
+                        size={12}
+                        className={`transition-all ${
+                          isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                        }`}
+                      />
+                      <span className="text-white text-xs">{topping.name}</span>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-white/60 mb-2">Disliked Toppings</h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableToppings.map(topping => (
                     <button
                       type="button"
-                      key={`dislike-${topping.id}`}
-                      onClick={() => handleToppingChange(topping.id, 'disliked')}
-                      className={`chip ${dislikedToppings.includes(topping.id) ? 'disliked' : ''}`}
+                      onClick={() => handleToppingDislike(topping.id)}
+                      className="p-0.5 hover:opacity-70 transition-opacity"
                     >
-                      {topping.name}
+                      <ThumbsDown
+                        size={12}
+                        className={`transition-all ${
+                          isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                        }`}
+                      />
                     </button>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+
+          {/* Beverage Preferences - Only show if party has beverages configured */}
+          {party?.availableBeverages && party.availableBeverages.length > 0 && (
+            <div>
+              <label className="block text-white/80 font-medium mb-3">
+                Beverage Preferences
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableBeverages
+                  .filter(bev => party.availableBeverages?.includes(bev.id))
+                  .map(beverage => {
+                    const isLiked = likedBeverages.includes(beverage.id);
+                    const isDisliked = dislikedBeverages.includes(beverage.id);
+                    return (
+                      <div
+                        key={beverage.id}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                          isLiked
+                            ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                            : isDisliked
+                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                            : 'bg-white/5 border-white/10'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleBeverageLike(beverage.id)}
+                          className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsUp
+                            size={12}
+                            className={`transition-all ${
+                              isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                            }`}
+                          />
+                          <span className="text-white text-xs">{beverage.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBeverageDislike(beverage.id)}
+                          className="p-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsDown
+                            size={12}
+                            className={`transition-all ${
+                              isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           <div className="flex space-x-3 pt-2">
             <button

@@ -8,6 +8,7 @@ import { GuestList } from '../components/GuestList';
 import { AddGuestForm } from '../components/AddGuestForm';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { PizzaSettings } from '../components/PizzaSettings';
+import { BeverageSettings } from '../components/BeverageSettings';
 
 function HostPageContent() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -74,10 +75,11 @@ function HostPageContent() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             <PizzaSettings />
+            <BeverageSettings />
             <AddGuestForm />
             <GuestList />
           </div>
-          <div className="xl:col-span-1">
+          <div className="xl:col-span-1 space-y-6">
             <PizzaOrderSummary />
           </div>
         </div>
