@@ -1,7 +1,5 @@
 import { Wave, WaveRecommendation, Party, Guest, PizzaStyle } from '../types';
 import { generatePizzaRecommendations } from './pizzaAlgorithm';
-import { generateBeverageRecommendations } from './beverageAlgorithm';
-import { availableBeverages } from '../contexts/PizzaContext';
 
 // Constants
 const FIRST_WAVE_OFFSET_MINUTES = -5;      // Arrive 5 min before party
@@ -82,14 +80,6 @@ export function generateWaveRecommendations(
   // Backward compatibility: no date/duration → single wave
   if (!party.date || !party.duration) {
     const pizzas = generatePizzaRecommendations(guests, style, party.maxGuests);
-    const beverages = party.availableBeverages && party.availableBeverages.length > 0
-      ? generateBeverageRecommendations(
-          guests,
-          party.availableBeverages,
-          availableBeverages,
-          party.maxGuests
-        )
-      : [];
 
     return [{
       wave: {
@@ -100,9 +90,9 @@ export function generateWaveRecommendations(
         label: 'All Pizzas'
       },
       pizzas,
-      beverages,
+      beverages: [],  // No beverages in waves
       totalPizzas: pizzas.reduce((sum, p) => sum + (p.quantity || 1), 0),
-      totalBeverages: beverages.reduce((sum, b) => sum + b.quantity, 0)
+      totalBeverages: 0
     }];
   }
 
@@ -125,22 +115,12 @@ export function generateWaveRecommendations(
       wave.guestAllocation
     );
 
-    // Generate beverage recommendations for this wave
-    const waveBeverages = party.availableBeverages && party.availableBeverages.length > 0
-      ? generateBeverageRecommendations(
-          guests,
-          party.availableBeverages,
-          availableBeverages,
-          wave.guestAllocation
-        )
-      : [];
-
     waveRecommendations.push({
       wave,
       pizzas: wavePizzas,
-      beverages: waveBeverages,
+      beverages: [],  // No beverages in waves - order once for whole party
       totalPizzas: wavePizzas.reduce((sum, p) => sum + (p.quantity || 1), 0),
-      totalBeverages: waveBeverages.reduce((sum, b) => sum + b.quantity, 0)
+      totalBeverages: 0
     });
   }
 

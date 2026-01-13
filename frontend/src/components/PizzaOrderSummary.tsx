@@ -219,12 +219,8 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       })
       .join('\n');
 
-    const beverageText = waveRec.beverages.length > 0
-      ? '\n\nBEVERAGES:\n' + waveRec.beverages.map(b => `${b.quantity}x ${b.beverage.name}`).join('\n')
-      : '';
-
     const arrivalTime = format(waveRec.wave.arrivalTime, 'MMMM d, yyyy \'at\' h:mm a');
-    const fullText = `${waveRec.wave.label.toUpperCase()}\nArrival: ${arrivalTime}\nGuests: ${waveRec.wave.guestAllocation}\n\nPIZZAS:\n${pizzaText}${beverageText}`;
+    const fullText = `${waveRec.wave.label.toUpperCase()}\nArrival: ${arrivalTime}\nGuests: ${waveRec.wave.guestAllocation}\n\nPIZZAS:\n${pizzaText}`;
 
     navigator.clipboard.writeText(fullText)
       .then(() => {
@@ -246,17 +242,18 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
         })
         .join('\n');
 
-      const beverageText = waveRec.beverages.length > 0
-        ? '\n  BEVERAGES:\n' + waveRec.beverages.map(b => `  ${b.quantity}x ${b.beverage.name}`).join('\n')
-        : '';
-
       const arrivalTime = format(waveRec.wave.arrivalTime, 'h:mm a');
-      return `=== ${waveRec.wave.label} (${arrivalTime}) ===\nGuests: ${waveRec.wave.guestAllocation}\n${pizzaText}${beverageText}`;
+      return `=== ${waveRec.wave.label} (${arrivalTime}) ===\nGuests: ${waveRec.wave.guestAllocation}\n${pizzaText}`;
     }).join('\n\n');
+
+    // Add beverages as separate section (not per wave)
+    const beverageText = beverageRecommendations.length > 0
+      ? '\n\n=== BEVERAGES (Order Once) ===\n' + beverageRecommendations.map(b => `${b.quantity}x ${b.beverage.name}`).join('\n')
+      : '';
 
     const header = `MULTI-WAVE PIZZA ORDER\nParty: ${party?.name || 'Pizza Party'}\nTotal Guests: ${party?.maxGuests || guests.length}\n\n`;
 
-    navigator.clipboard.writeText(header + allWavesText)
+    navigator.clipboard.writeText(header + allWavesText + beverageText)
       .then(() => {
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
@@ -347,36 +344,59 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     </div>
 
                     {/* Pizza Grid */}
-                    <div className="grid grid-cols-3 gap-1.5 mb-3">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {waveRec.pizzas.map((pizza, pizzaIndex) => (
                         <PizzaCard key={pizza.id} pizza={pizza} index={pizzaIndex} compact />
                       ))}
                     </div>
-
-                    {/* Beverage Section */}
-                    {waveRec.beverages.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-white/10">
-                        <h4 className="text-sm font-medium text-blue-400 mb-2 flex items-center gap-1">
-                          <Beer size={14} />
-                          Beverages ({waveRec.totalBeverages})
-                        </h4>
-                        <div className="space-y-1">
-                          {waveRec.beverages.map(bev => (
-                            <div key={bev.id} className="flex justify-between text-xs text-white/70">
-                              <span>{bev.beverage.name}</span>
-                              <span className="font-semibold text-blue-400">{bev.quantity}x</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
+
+                {/* Beverage Order Section - Separate from waves */}
+                {beverageRecommendations.length > 0 && (
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                    <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
+                      <Beer size={16} />
+                      Beverage Order (Order Once)
+                    </h3>
+                    <div className="space-y-1 text-sm mb-3">
+                      <p className="text-white/80">
+                        <span className="text-white/60">Total beverages:</span>{' '}
+                        <span className="font-semibold text-white text-base">
+                          {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {beverageRecommendations.map(rec => (
+                        <div
+                          key={rec.id}
+                          className="p-2 bg-white/5 border border-white/10 rounded-lg"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
+                              <span className="text-white/50 text-xs ml-2">
+                                ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
+                              </span>
+                            </div>
+                            <span className="text-blue-400 font-bold text-sm">
+                              {rec.quantity}x
+                            </span>
+                          </div>
+                          {rec.isForNonRespondents && (
+                            <p className="text-xs text-white/40 mt-1">For non-respondents</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Copy All Waves Button */}
                 <button
                   onClick={handleCopyAllWaves}
-                  className="w-full btn-secondary flex items-center justify-center gap-2"
+                  className="w-full btn-secondary flex items-center justify-center gap-2 mt-4"
                 >
                   <Share2 size={16} />
                   Copy All Waves
