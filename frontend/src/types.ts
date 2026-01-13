@@ -65,6 +65,22 @@ export interface BeverageRecommendation {
   label?: string;
 }
 
+export interface Wave {
+  id: string;
+  arrivalTime: Date;
+  guestAllocation: number;
+  weight: number;
+  label: string;
+}
+
+export interface WaveRecommendation {
+  wave: Wave;
+  pizzas: PizzaRecommendation[];
+  beverages: BeverageRecommendation[];
+  totalPizzas: number;
+  totalBeverages: number;
+}
+
 export interface PizzaSettings {
   size: PizzaSize;
   style: PizzaStyle;
@@ -75,6 +91,7 @@ export interface Party {
   name: string;
   inviteCode: string;
   date: string | null;
+  duration: number | null;
   hostName: string | null;
   pizzaStyle: string;
   availableBeverages?: string[];

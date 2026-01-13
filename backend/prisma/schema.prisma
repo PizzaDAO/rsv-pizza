@@ -30,6 +30,7 @@ model Party {
   name               String
   inviteCode         String    @unique @default(cuid())
   date               DateTime?
+  duration           Float?
   pizzaSize          String
   pizzaStyle         String
   availableBeverages String[]

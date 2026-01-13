@@ -5,6 +5,7 @@ import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
 import { Pizzeria, OrderingOption } from '../types';
 import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, MapPin, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
+import { format } from 'date-fns';
 import {
   searchPizzerias,
   getCurrentLocation,
@@ -16,7 +17,7 @@ import {
 } from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
-  const { recommendations, beverageRecommendations, party, guests } = usePizza();
+  const { recommendations, beverageRecommendations, waveRecommendations, party, guests } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
@@ -114,31 +115,32 @@ export const PizzaOrderSummary: React.FC = () => {
 
   // Generate call script for phone ordering
   const generateCallScript = () => {
-    if (recommendations.length === 0) return '';
+    if (waveRecommendations.length === 0) return '';
 
-    const sortedPizzas = [...recommendations].sort((a, b) => (b.quantity || 1) - (a.quantity || 1));
+    // Single wave mode
+    if (waveRecommendations.length === 1) {
+      const sortedPizzas = [...waveRecommendations[0].pizzas].sort((a, b) => (b.quantity || 1) - (a.quantity || 1));
+      const pizzaLines = sortedPizzas.map(pizza => {
+        const qty = pizza.quantity || 1;
+        const size = pizza.size.name;
+        const dietary = pizza.dietaryRestrictions?.length > 0
+          ? ` (${pizza.dietaryRestrictions.join(', ')})`
+          : '';
 
-    const pizzaLines = sortedPizzas.map(pizza => {
-      const qty = pizza.quantity || 1;
-      const size = pizza.size.name;
-      const dietary = pizza.dietaryRestrictions?.length > 0
-        ? ` (${pizza.dietaryRestrictions.join(', ')})`
-        : '';
+        if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
+          const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          return `  - ${qty}x ${size} pizza, half ${leftToppings} and half ${rightToppings}${dietary}`;
+        }
 
-      // Handle half-and-half pizzas
-      if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
-        const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
-        const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
-        return `  - ${qty}x ${size} pizza, half ${leftToppings} and half ${rightToppings}${dietary}`;
-      }
+        const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+        return `  - ${qty}x ${size} pizza with ${toppingsText || 'cheese'}${dietary}`;
+      }).join('\n');
 
-      const toppingsText = pizza.toppings.map(t => t.name).join(', ');
-      return `  - ${qty}x ${size} pizza with ${toppingsText || 'cheese'}${dietary}`;
-    }).join('\n');
+      const totalPizzas = waveRecommendations[0].totalPizzas;
+      const deliveryAddress = party?.address || '[YOUR ADDRESS]';
 
-    const deliveryAddress = party?.address || '[YOUR ADDRESS]';
-
-    return `Hi, I'd like to place an order for delivery.
+      return `Hi, I'd like to place an order for delivery.
 
 I need ${totalPizzas} pizza${totalPizzas !== 1 ? 's' : ''}:
 ${pizzaLines}
@@ -146,6 +148,34 @@ ${pizzaLines}
 Delivery address: ${deliveryAddress}
 
 Can you give me the total and estimated delivery time?`;
+    }
+
+    // Multi-wave mode
+    const waveScripts = waveRecommendations.map(waveRec => {
+      const arrivalTime = format(waveRec.wave.arrivalTime, 'h:mm a');
+      const pizzaLines = waveRec.pizzas
+        .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+        .map(pizza => {
+          const qty = pizza.quantity || 1;
+          const size = pizza.size.name;
+          const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+          const label = pizza.label || toppingsText;
+          return `  - ${qty}x ${size} ${label}`;
+        })
+        .join('\n');
+
+      return `${waveRec.wave.label} (arrive at ${arrivalTime}):\n${pizzaLines}`;
+    }).join('\n\n');
+
+    const deliveryAddress = party?.address || '[YOUR ADDRESS]';
+
+    return `Hi, I'd like to place a multi-wave delivery order:
+
+${waveScripts}
+
+Delivery address: ${deliveryAddress}
+
+Can you accommodate these delivery times? Please confirm total and timing.`;
   };
 
   // Calculate totals
@@ -173,6 +203,65 @@ Can you give me the total and estimated delivery time?`;
         setTimeout(() => setIsCopied(false), 2000);
       })
       .catch(err => console.error('Failed to copy order:', err));
+  };
+
+  const handleCopyWave = (waveIndex: number) => {
+    const waveRec = waveRecommendations[waveIndex];
+    if (!waveRec) return;
+
+    const pizzaText = waveRec.pizzas
+      .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+      .map(pizza => {
+        const qty = pizza.quantity || 1;
+        const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+        const label = pizza.label || toppingsText;
+        return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name})`;
+      })
+      .join('\n');
+
+    const beverageText = waveRec.beverages.length > 0
+      ? '\n\nBEVERAGES:\n' + waveRec.beverages.map(b => `${b.quantity}x ${b.beverage.name}`).join('\n')
+      : '';
+
+    const arrivalTime = format(waveRec.wave.arrivalTime, 'MMMM d, yyyy \'at\' h:mm a');
+    const fullText = `${waveRec.wave.label.toUpperCase()}\nArrival: ${arrivalTime}\nGuests: ${waveRec.wave.guestAllocation}\n\nPIZZAS:\n${pizzaText}${beverageText}`;
+
+    navigator.clipboard.writeText(fullText)
+      .then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      })
+      .catch(err => console.error('Failed to copy:', err));
+  };
+
+  const handleCopyAllWaves = () => {
+    const allWavesText = waveRecommendations.map((waveRec, index) => {
+      const pizzaText = waveRec.pizzas
+        .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+        .map(pizza => {
+          const qty = pizza.quantity || 1;
+          const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+          const label = pizza.label || toppingsText;
+          return `  ${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name})`;
+        })
+        .join('\n');
+
+      const beverageText = waveRec.beverages.length > 0
+        ? '\n  BEVERAGES:\n' + waveRec.beverages.map(b => `  ${b.quantity}x ${b.beverage.name}`).join('\n')
+        : '';
+
+      const arrivalTime = format(waveRec.wave.arrivalTime, 'h:mm a');
+      return `=== ${waveRec.wave.label} (${arrivalTime}) ===\nGuests: ${waveRec.wave.guestAllocation}\n${pizzaText}${beverageText}`;
+    }).join('\n\n');
+
+    const header = `MULTI-WAVE PIZZA ORDER\nParty: ${party?.name || 'Pizza Party'}\nTotal Guests: ${party?.maxGuests || guests.length}\n\n`;
+
+    navigator.clipboard.writeText(header + allWavesText)
+      .then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      })
+      .catch(err => console.error('Failed to copy:', err));
   };
 
   const handleSelectPizzeria = (pizzeria: Pizzeria, option: OrderingOption) => {
@@ -228,53 +317,123 @@ Can you give me the total and estimated delivery time?`;
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5 mb-4">
-              {[...recommendations]
-                .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
-                .map((pizza, index) => (
-                <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
-              ))}
-            </div>
-
-            {/* Beverage Order Section */}
-            {beverageRecommendations.length > 0 && (
-              <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
-                  <Beer size={16} />
-                  Beverage Order
-                </h3>
-                <div className="space-y-1 text-sm mb-3">
-                  <p className="text-white/80">
-                    <span className="text-white/60">Total beverages:</span>{' '}
-                    <span className="font-semibold text-white text-base">
-                      {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
-                    </span>
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {beverageRecommendations.map(rec => (
-                    <div
-                      key={rec.id}
-                      className="p-2 bg-white/5 border border-white/10 rounded-lg"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
-                          <span className="text-white/50 text-xs ml-2">
-                            ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
-                          </span>
-                        </div>
-                        <span className="text-blue-400 font-bold text-sm">
-                          {rec.quantity}x
-                        </span>
+            {waveRecommendations.length > 1 ? (
+              // Multi-wave display
+              <div className="space-y-4 mb-4">
+                {waveRecommendations.map((waveRec, waveIndex) => (
+                  <div
+                    key={waveRec.wave.id}
+                    className="border border-white/20 rounded-xl p-4 bg-white/5"
+                  >
+                    {/* Wave Header */}
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                      <div>
+                        <h3 className="font-semibold text-white flex items-center gap-2">
+                          <Clock size={16} />
+                          {waveRec.wave.label}
+                        </h3>
+                        <p className="text-sm text-white/60 mt-1">
+                          Arrive at {format(waveRec.wave.arrivalTime, 'h:mm a')} •{' '}
+                          {waveRec.totalPizzas} pizza{waveRec.totalPizzas !== 1 ? 's' : ''} for ~{waveRec.wave.guestAllocation} guest{waveRec.wave.guestAllocation !== 1 ? 's' : ''}
+                        </p>
                       </div>
-                      {rec.isForNonRespondents && (
-                        <p className="text-xs text-white/40 mt-1">For non-respondents</p>
-                      )}
+                      <button
+                        onClick={() => handleCopyWave(waveIndex)}
+                        className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
+                      >
+                        <Share2 size={14} />
+                        Copy Wave
+                      </button>
                     </div>
+
+                    {/* Pizza Grid */}
+                    <div className="grid grid-cols-3 gap-1.5 mb-3">
+                      {waveRec.pizzas.map((pizza, pizzaIndex) => (
+                        <PizzaCard key={pizza.id} pizza={pizza} index={pizzaIndex} compact />
+                      ))}
+                    </div>
+
+                    {/* Beverage Section */}
+                    {waveRec.beverages.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <h4 className="text-sm font-medium text-blue-400 mb-2 flex items-center gap-1">
+                          <Beer size={14} />
+                          Beverages ({waveRec.totalBeverages})
+                        </h4>
+                        <div className="space-y-1">
+                          {waveRec.beverages.map(bev => (
+                            <div key={bev.id} className="flex justify-between text-xs text-white/70">
+                              <span>{bev.beverage.name}</span>
+                              <span className="font-semibold text-blue-400">{bev.quantity}x</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Copy All Waves Button */}
+                <button
+                  onClick={handleCopyAllWaves}
+                  className="w-full btn-secondary flex items-center justify-center gap-2"
+                >
+                  <Share2 size={16} />
+                  Copy All Waves
+                </button>
+              </div>
+            ) : (
+              // Single wave display (existing grid)
+              <>
+                <div className="grid grid-cols-3 gap-1.5 mb-4">
+                  {[...recommendations]
+                    .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+                    .map((pizza, index) => (
+                    <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
                   ))}
                 </div>
-              </div>
+
+                {/* Beverage Order Section */}
+                {beverageRecommendations.length > 0 && (
+                  <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                    <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
+                      <Beer size={16} />
+                      Beverage Order
+                    </h3>
+                    <div className="space-y-1 text-sm mb-3">
+                      <p className="text-white/80">
+                        <span className="text-white/60">Total beverages:</span>{' '}
+                        <span className="font-semibold text-white text-base">
+                          {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {beverageRecommendations.map(rec => (
+                        <div
+                          key={rec.id}
+                          className="p-2 bg-white/5 border border-white/10 rounded-lg"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
+                              <span className="text-white/50 text-xs ml-2">
+                                ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
+                              </span>
+                            </div>
+                            <span className="text-blue-400 font-bold text-sm">
+                              {rec.quantity}x
+                            </span>
+                          </div>
+                          {rec.isForNonRespondents && (
+                            <p className="text-xs text-white/40 mt-1">For non-respondents</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Copy Order & Call Script buttons */}

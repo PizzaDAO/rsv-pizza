@@ -12,6 +12,7 @@ export const PartyHeader: React.FC = () => {
   const [partyName, setPartyName] = useState('');
   const [hostName, setHostName] = useState('');
   const [partyDate, setPartyDate] = useState('');
+  const [partyDuration, setPartyDuration] = useState('');
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
 
@@ -22,7 +23,8 @@ export const PartyHeader: React.FC = () => {
     if (!partyName.trim()) return;
     setCreating(true);
     const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined);
+    const duration = partyDuration ? parseFloat(partyDuration) : undefined;
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration);
     setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
@@ -30,6 +32,7 @@ export const PartyHeader: React.FC = () => {
     setPartyName('');
     setHostName('');
     setPartyDate('');
+    setPartyDuration('');
     setExpectedGuests('');
     setPartyAddress('');
   };
@@ -165,6 +168,26 @@ export const PartyHeader: React.FC = () => {
                   onChange={(e) => setPartyDate(e.target.value)}
                   className="w-full"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <Calendar size={14} className="inline mr-1" />
+                  Party Duration (hours)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="12"
+                  value={partyDuration}
+                  onChange={(e) => setPartyDuration(e.target.value)}
+                  placeholder="e.g., 2.5"
+                  className="w-full"
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Duration in decimal hours (0.5 = 30 min, 2.5 = 2½ hours). For multi-wave ordering.
+                </p>
               </div>
 
               <div>

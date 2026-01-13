@@ -1,14 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings, Party, Beverage, BeverageRecommendation } from '../types';
+import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings, Party, Beverage, BeverageRecommendation, WaveRecommendation } from '../types';
 import { generatePizzaRecommendations } from '../utils/pizzaAlgorithm';
 import { generateBeverageRecommendations } from '../utils/beverageAlgorithm';
+import { generateWaveRecommendations } from '../utils/waveAlgorithm';
 import * as db from '../lib/supabase';
 
 interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
-  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[]) => Promise<void>;
+  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number) => Promise<void>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
@@ -22,6 +23,7 @@ interface PizzaContextType {
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
   beverageRecommendations: BeverageRecommendation[];
+  waveRecommendations: WaveRecommendation[];
   // Static data
   availableToppings: Topping[];
   availableBeverages: Beverage[];
@@ -113,6 +115,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     name: dbParty.name,
     inviteCode: dbParty.invite_code,
     date: dbParty.date,
+    duration: dbParty.duration,
     hostName: dbParty.host_name,
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
@@ -130,6 +133,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [guests, setGuests] = useState<Guest[]>([]);
   const [recommendations, setRecommendations] = useState<PizzaRecommendation[]>([]);
   const [beverageRecommendations, setBeverageRecommendations] = useState<BeverageRecommendation[]>([]);
+  const [waveRecommendations, setWaveRecommendations] = useState<WaveRecommendation[]>([]);
 
   const [pizzaSettings, setPizzaSettings] = useState<PizzaSettings>(() => {
     const savedSettings = localStorage.getItem('pizzaPartySettings');
@@ -160,10 +164,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
-  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[]) => {
+  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number) => {
     setPartyLoading(true);
     try {
-      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages);
+      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration);
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);
@@ -179,6 +183,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // Clear existing state before loading new party
     setRecommendations([]);
     setBeverageRecommendations([]);
+    setWaveRecommendations([]);
     setPartyLoading(true);
     try {
       const result = await db.getPartyWithGuests(inviteCode);
@@ -202,6 +207,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setGuests([]);
     setRecommendations([]);
     setBeverageRecommendations([]);
+    setWaveRecommendations([]);
   };
 
   const getInviteLink = (): string => {
@@ -271,22 +277,15 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const generateRecommendations = () => {
-    // Generate pizza recommendations
-    const newRecommendations = generatePizzaRecommendations(guests, pizzaSettings.style, party?.maxGuests);
-    setRecommendations(newRecommendations);
+    if (!party) return;
 
-    // Generate beverage recommendations
-    if (party?.availableBeverages && party.availableBeverages.length > 0) {
-      const newBeverageRecs = generateBeverageRecommendations(
-        guests,
-        party.availableBeverages,
-        availableBeverages,
-        party.maxGuests
-      );
-      setBeverageRecommendations(newBeverageRecs);
-    } else {
-      setBeverageRecommendations([]);
-    }
+    // Generate wave-based recommendations (handles both single and multi-wave)
+    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party);
+    setWaveRecommendations(waves);
+
+    // Also update single recommendations for backward compatibility
+    setRecommendations(waves[0]?.pizzas || []);
+    setBeverageRecommendations(waves[0]?.beverages || []);
   };
 
   return (
@@ -305,6 +304,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       recommendations,
       generateRecommendations,
       beverageRecommendations,
+      waveRecommendations,
       availableToppings,
       availableBeverages,
       dietaryOptions,
