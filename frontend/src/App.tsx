@@ -14,9 +14,18 @@ function RedirectHandler() {
     // Check if we were redirected from a 404
     const redirectPath = sessionStorage.getItem('redirectPath');
     if (redirectPath) {
+      console.log('Restoring path from 404 redirect:', redirectPath);
       sessionStorage.removeItem('redirectPath');
       // Extract the path relative to /rsv-pizza/
-      const path = redirectPath.replace('/rsv-pizza', '') || '/';
+      // For /rsv-pizza/b4fae265, we want /b4fae265
+      // For /rsv-pizza/rsvp/b4fae265, we want /rsvp/b4fae265
+      let path = redirectPath;
+      if (path.startsWith('/rsv-pizza/')) {
+        path = path.substring('/rsv-pizza'.length); // Keep the leading slash after /rsv-pizza
+      } else if (path === '/rsv-pizza') {
+        path = '/';
+      }
+      console.log('Navigating to:', path);
       navigate(path, { replace: true });
     }
   }, [navigate]);
