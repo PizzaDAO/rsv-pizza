@@ -179,7 +179,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
   };
 
   // Calculate totals
-  const totalPizzas = recommendations.reduce((acc, pizza) => acc + (pizza.quantity || 1), 0);
+  const totalPizzas = waveRecommendations.length > 1
+    ? waveRecommendations.reduce((acc, wave) => acc + wave.totalPizzas, 0)
+    : recommendations.reduce((acc, pizza) => acc + (pizza.quantity || 1), 0);
   const respondedGuests = guests.length;
   const expectedGuests = party?.maxGuests || respondedGuests;
 
