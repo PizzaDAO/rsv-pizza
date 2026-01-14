@@ -349,6 +349,36 @@ export const PartyHeader: React.FC = () => {
                   Event Flyer (Optional - Square Image)
                 </label>
 
+                {/* Image URL Input */}
+                <div className="mb-3">
+                  <input
+                    type="url"
+                    value={eventImageUrl}
+                    onChange={(e) => {
+                      setEventImageUrl(e.target.value);
+                      // Clear file if URL is entered
+                      if (e.target.value.trim()) {
+                        setEventImageFile(null);
+                        setImagePreview(null);
+                        setImageError(null);
+                      }
+                    }}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-white/50 mt-1">
+                    Enter an image URL, or upload a file below
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex-1 h-px bg-white/10"></div>
+                  <span className="text-xs text-white/40">OR</span>
+                  <div className="flex-1 h-px bg-white/10"></div>
+                </div>
+
+                {/* File Upload */}
                 {imagePreview ? (
                   <div className="space-y-3">
                     <div className="relative w-full max-w-xs mx-auto">
@@ -374,10 +404,13 @@ export const PartyHeader: React.FC = () => {
                       accept="image/*"
                       onChange={handleImageChange}
                       className="hidden"
+                      disabled={!!eventImageUrl.trim()}
                     />
                     <label
                       htmlFor="eventImage"
-                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
+                      className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
+                        eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       <Upload className="w-8 h-8 text-white/40 mb-2" />
                       <span className="text-sm text-white/60">Click to upload square image</span>
@@ -389,10 +422,6 @@ export const PartyHeader: React.FC = () => {
                 {imageError && (
                   <p className="text-xs text-red-400 mt-2">{imageError}</p>
                 )}
-
-                <p className="text-xs text-white/50 mt-2">
-                  Upload a square flyer image for your event page (1:1 aspect ratio)
-                </p>
               </div>
 
               <div>
