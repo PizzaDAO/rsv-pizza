@@ -216,14 +216,14 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const getInviteLink = (): string => {
     if (!party) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}#/rsvp/${party.inviteCode}`;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/rsv-pizza/rsvp/${party.inviteCode}`;
   };
 
   const getHostLink = (): string => {
     if (!party) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}#/party/${party.inviteCode}`;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/rsv-pizza/party/${party.inviteCode}`;
   };
 
   const addGuest = async (guest: Omit<Guest, 'id'>) => {

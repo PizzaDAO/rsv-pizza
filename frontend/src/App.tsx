@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
@@ -8,7 +8,7 @@ import { EventPage } from './pages/EventPage';
 
 function App() {
   return (
-    <HashRouter>
+    <BrowserRouter basename="/rsv-pizza">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/parties" element={<PartiesListPage />} />
@@ -17,7 +17,7 @@ function App() {
         {/* Catch-all route for custom URLs - must be last */}
         <Route path="/:slug" element={<EventPage />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 

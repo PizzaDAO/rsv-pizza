@@ -65,8 +65,8 @@ export function EventPage() {
 
   const handleRSVP = () => {
     const rsvpUrl = party?.custom_url
-      ? `#/rsvp/${party.custom_url}`
-      : `#/rsvp/${party?.invite_code}`;
+      ? `/rsvp/${party.custom_url}`
+      : `/rsvp/${party?.invite_code}`;
     navigate(rsvpUrl);
   };
 
@@ -85,7 +85,7 @@ export function EventPage() {
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Event Not Found</h1>
           <p className="text-white/60 mb-6">{error}</p>
-          <a href="#/" className="btn-primary inline-block">
+          <a href="/rsv-pizza/" className="btn-primary inline-block">
             Go to Home
           </a>
         </div>

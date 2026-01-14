@@ -63,9 +63,9 @@ export const PartyHeader: React.FC = () => {
 
   const getEventLink = (): string => {
     if (!party) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
+    const baseUrl = window.location.origin;
     const slug = party.customUrl || party.inviteCode;
-    return `${baseUrl}#/${slug}`;
+    return `${baseUrl}/rsv-pizza/${slug}`;
   };
 
   const inviteLink = getInviteLink();
