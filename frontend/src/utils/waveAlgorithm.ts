@@ -109,8 +109,9 @@ export function generateWaveRecommendations(
 
   for (const wave of waves) {
     // Generate pizza recommendations for this wave's guest count
+    // Pass empty guest array to treat all as non-respondents for proportional distribution
     const wavePizzas = generatePizzaRecommendations(
-      guests,
+      [],  // Empty array so pizzas are distributed proportionally to wave allocation
       style,
       wave.guestAllocation
     );
