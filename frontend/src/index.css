@@ -73,6 +73,11 @@ body {
 input[type="text"],
 input[type="email"],
 input[type="number"],
+input[type="password"],
+input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
+textarea,
 select {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--stroke);
@@ -83,14 +88,23 @@ select {
 }
 
 input:focus,
+textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.08);
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* Textarea specific */
+textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
 }
 
 /* Chip/tag styling */
