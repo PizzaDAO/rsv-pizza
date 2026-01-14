@@ -1,5 +1,6 @@
-import { Wave, WaveRecommendation, Party, Guest, PizzaStyle } from '../types';
+import { Wave, WaveRecommendation, Party, Guest, PizzaStyle, Beverage } from '../types';
 import { generatePizzaRecommendations } from './pizzaAlgorithm';
+import { generateBeverageRecommendations } from './beverageAlgorithm';
 
 // Constants
 const FIRST_WAVE_OFFSET_MINUTES = -5;      // Arrive 5 min before party
@@ -75,11 +76,20 @@ export function calculateWaves(params: WaveCalculationParams): Wave[] {
 export function generateWaveRecommendations(
   guests: Guest[],
   style: PizzaStyle,
-  party: Party
+  party: Party,
+  allBeverages: Beverage[]
 ): WaveRecommendation[] {
   // Backward compatibility: no date/duration → single wave
   if (!party.date || !party.duration) {
     const pizzas = generatePizzaRecommendations(guests, style, party.maxGuests);
+    const beverages = party.availableBeverages && party.availableBeverages.length > 0
+      ? generateBeverageRecommendations(
+          guests,
+          party.availableBeverages,
+          allBeverages,
+          party.maxGuests
+        )
+      : [];
 
     return [{
       wave: {
@@ -90,9 +100,9 @@ export function generateWaveRecommendations(
         label: 'All Pizzas'
       },
       pizzas,
-      beverages: [],  // No beverages in waves
+      beverages,
       totalPizzas: pizzas.reduce((sum, p) => sum + (p.quantity || 1), 0),
-      totalBeverages: 0
+      totalBeverages: beverages.reduce((sum, b) => sum + b.quantity, 0)
     }];
   }
 
@@ -105,23 +115,40 @@ export function generateWaveRecommendations(
     totalGuests
   });
 
+  // Distribute guests proportionally across waves based on weights
   const waveRecommendations: WaveRecommendation[] = [];
+  let guestIndex = 0;
 
   for (const wave of waves) {
-    // Generate pizza recommendations for this wave's guest count
-    // Pass empty guest array to treat all as non-respondents for proportional distribution
+    // Calculate how many actual RSVPed guests this wave gets
+    const waveGuestCount = Math.min(wave.guestAllocation, guests.length - guestIndex);
+    const waveGuests = guests.slice(guestIndex, guestIndex + waveGuestCount);
+    guestIndex += waveGuestCount;
+
+    // Generate pizza recommendations for this wave's guests
+    // If wave has fewer RSVPed guests than allocation, the algorithm will generate default pizzas
     const wavePizzas = generatePizzaRecommendations(
-      [],  // Empty array so pizzas are distributed proportionally to wave allocation
+      waveGuests,
       style,
       wave.guestAllocation
     );
 
+    // Generate beverage recommendations for this wave's guests
+    const waveBeverages = party.availableBeverages && party.availableBeverages.length > 0
+      ? generateBeverageRecommendations(
+          waveGuests,
+          party.availableBeverages,
+          allBeverages,
+          wave.guestAllocation
+        )
+      : [];
+
     waveRecommendations.push({
       wave,
       pizzas: wavePizzas,
-      beverages: [],  // No beverages in waves - order once for whole party
+      beverages: waveBeverages,
       totalPizzas: wavePizzas.reduce((sum, p) => sum + (p.quantity || 1), 0),
-      totalBeverages: 0
+      totalBeverages: waveBeverages.reduce((sum, b) => sum + b.quantity, 0)
     });
   }
 

@@ -284,7 +284,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!party) return;
 
     // Generate wave-based recommendations (handles both single and multi-wave)
-    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party);
+    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party, availableBeverages);
     setWaveRecommendations(waves);
 
     // Also update single recommendations for backward compatibility
