@@ -142,110 +142,94 @@ export function EventPage() {
 
   return (
     <div className="min-h-screen py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="card overflow-hidden">
-          {/* Event Image */}
-          {party.event_image_url && (
-            <div
-              className="w-full h-64 bg-cover bg-center"
-              style={{ backgroundImage: `url(${party.event_image_url})` }}
-            />
-          )}
-
-          {/* Event Header */}
-          <div className="bg-gradient-to-r from-[#ff393a] to-[#ff6b35] p-6 text-center">
-            <img
-              src="/rsv-pizza/logo.png"
-              alt="RSVPizza"
-              className="h-10 mx-auto mb-3"
-            />
-            <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
-            {party.host_name && (
-              <p className="text-white/90 text-lg">Hosted by {party.host_name}</p>
+          <div className="grid md:grid-cols-[400px,1fr] gap-0">
+            {/* Left Column - Square Image */}
+            {party.event_image_url ? (
+              <div className="relative aspect-square bg-white/5">
+                <img
+                  src={party.event_image_url}
+                  alt={party.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
+                <Pizza className="w-32 h-32 text-white/30" />
+              </div>
             )}
-          </div>
 
-          {/* Event Details */}
-          <div className="p-6 space-y-6">
-            {/* Date & Time */}
-            {party.date && (
-              <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-white">
-                    {new Date(party.date).toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+            {/* Right Column - Event Details */}
+            <div className="flex flex-col">
+              {/* Event Header */}
+              <div className="p-6 border-b border-white/10">
+                <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
+                {party.host_name && (
+                  <p className="text-white/60 text-sm">Hosted by {party.host_name}</p>
+                )}
+              </div>
+
+              {/* Event Details */}
+              <div className="p-6 space-y-4 flex-1">
+                {/* Date & Time */}
+                {party.date && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-white">
+                        {new Date(party.date).toLocaleDateString(undefined, {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-sm text-white/60">
+                        {new Date(party.date).toLocaleTimeString(undefined, {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                        {party.duration && ` • ${party.duration} hour${party.duration !== 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Location */}
+                {party.address && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-white">{party.address}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                {party.description && (
+                  <div className="border-t border-white/10 pt-4 mt-4">
+                    <h3 className="font-semibold text-white mb-2">About This Event</h3>
+                    <p className="text-white/70 text-sm whitespace-pre-wrap leading-relaxed">{party.description}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* RSVP Button - Fixed at bottom */}
+              <div className="p-6 border-t border-white/10 bg-white/5">
+                <button
+                  onClick={handleRSVP}
+                  className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                >
+                  <Pizza size={20} />
+                  RSVP for Pizza
+                </button>
+                {party.rsvp_closed_at && (
+                  <p className="text-center text-white/50 text-sm mt-3">
+                    RSVPs are closed for this event
                   </p>
-                  <p className="text-sm text-white/60">
-                    {new Date(party.date).toLocaleTimeString(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
+                )}
               </div>
-            )}
-
-            {/* Duration */}
-            {party.duration && (
-              <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-white">
-                    {party.duration} hour{party.duration !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Location */}
-            {party.address && (
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-white">{party.address}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Expected Guests */}
-            {party.max_guests && (
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-white">
-                    {party.max_guests} expected guest{party.max_guests !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Description */}
-            {party.description && (
-              <div className="border-t border-white/10 pt-6">
-                <h3 className="font-semibold text-white mb-3">About This Event</h3>
-                <p className="text-white/80 whitespace-pre-wrap">{party.description}</p>
-              </div>
-            )}
-
-            {/* RSVP Button */}
-            <div className="border-t border-white/10 pt-6">
-              <button
-                onClick={handleRSVP}
-                className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
-              >
-                <Pizza size={20} />
-                RSVP for Pizza
-              </button>
-              {party.rsvp_closed_at && (
-                <p className="text-center text-white/50 text-sm mt-3">
-                  RSVPs are closed for this event
-                </p>
-              )}
             </div>
           </div>
         </div>
