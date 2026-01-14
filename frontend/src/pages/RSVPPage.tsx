@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
 import { getPartyByInviteCode, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
@@ -53,6 +53,11 @@ export function RSVPPage() {
   const [party, setParty] = useState<DbParty | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
+  // Password protection state
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   // Form state
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -69,6 +74,19 @@ export function RSVPPage() {
         if (foundParty) {
           setParty(foundParty);
           setAvailableBeverages(foundParty.available_beverages || []);
+
+          // Check if party has password protection
+          if (foundParty.password) {
+            // Check if already authenticated in this session
+            const authKey = `rsvpizza_auth_${inviteCode}`;
+            const storedAuth = sessionStorage.getItem(authKey);
+            if (storedAuth === foundParty.password) {
+              setIsAuthenticated(true);
+            }
+          } else {
+            // No password, automatically authenticated
+            setIsAuthenticated(true);
+          }
         } else {
           setError('Party not found. The invite link may be invalid or expired.');
         }
@@ -77,6 +95,25 @@ export function RSVPPage() {
     }
     loadParty();
   }, [inviteCode]);
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!party?.password) return;
+
+    if (passwordInput === party.password) {
+      // Correct password
+      setIsAuthenticated(true);
+      setPasswordError(null);
+      // Store in session storage to avoid re-prompting
+      const authKey = `rsvpizza_auth_${inviteCode}`;
+      sessionStorage.setItem(authKey, party.password);
+    } else {
+      // Wrong password
+      setPasswordError('Incorrect password. Please try again.');
+      setPasswordInput('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +201,53 @@ export function RSVPPage() {
           <a href="#/" className="btn-primary inline-block">
             Go to Home
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Show password prompt if party is password-protected and not authenticated
+  if (party && party.password && !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="card p-8 max-w-md">
+          <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
+            <Lock className="w-8 h-8 text-[#ff393a]" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
+          <p className="text-white/60 mb-6 text-center">
+            This party is password-protected. Please enter the password to continue.
+          </p>
+
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            {passwordError && (
+              <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
+                {passwordError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Party Password
+              </label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Enter password"
+                className="w-full"
+                required
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full btn-primary"
+            >
+              Continue
+            </button>
+          </form>
         </div>
       </div>
     );

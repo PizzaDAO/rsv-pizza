@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
@@ -15,6 +15,7 @@ export const PartyHeader: React.FC = () => {
   const [partyDuration, setPartyDuration] = useState('');
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
+  const [partyPassword, setPartyPassword] = useState('');
 
   const [creating, setCreating] = useState(false);
 
@@ -24,7 +25,8 @@ export const PartyHeader: React.FC = () => {
     setCreating(true);
     const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
     const duration = partyDuration ? parseFloat(partyDuration) : undefined;
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration);
+    const password = partyPassword.trim() || undefined;
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password);
     setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
@@ -35,6 +37,7 @@ export const PartyHeader: React.FC = () => {
     setPartyDuration('');
     setExpectedGuests('');
     setPartyAddress('');
+    setPartyPassword('');
   };
 
   const handleCopyLink = (type: 'guest' | 'host') => {
@@ -223,6 +226,23 @@ export const PartyHeader: React.FC = () => {
                 />
                 <p className="text-xs text-white/50 mt-1">
                   Used to find nearby pizzerias for ordering
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <Lock size={14} className="inline mr-1" />
+                  RSVP Password (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={partyPassword}
+                  onChange={(e) => setPartyPassword(e.target.value)}
+                  placeholder="Enter a password to protect RSVP page"
+                  className="w-full"
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Guests will need this password to access the RSVP page
                 </p>
               </div>
 

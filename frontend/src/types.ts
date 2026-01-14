@@ -96,6 +96,7 @@ export interface Party {
   pizzaStyle: string;
   availableBeverages?: string[];
   maxGuests: number | null;
+  password: string | null;
   address: string | null;
   rsvpClosedAt: string | null;
   createdAt: string;

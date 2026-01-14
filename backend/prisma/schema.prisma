@@ -38,6 +38,7 @@ model Party {
   latitude           Float?
   longitude          Float?
   maxGuests          Int?
+  password           String?
   rsvpClosedAt       DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

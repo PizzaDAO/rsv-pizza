@@ -9,7 +9,7 @@ interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
-  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number) => Promise<void>;
+  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string) => Promise<void>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
@@ -120,6 +120,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
     maxGuests: dbParty.max_guests,
+    password: dbParty.password,
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     createdAt: dbParty.created_at,
@@ -164,10 +165,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
-  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number) => {
+  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string) => {
     setPartyLoading(true);
     try {
-      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration);
+      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration, password);
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);

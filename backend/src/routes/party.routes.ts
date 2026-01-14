@@ -28,7 +28,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 // POST /api/parties - Create new party
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages } = req.body;
+    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password } = req.body;
 
     if (!name || !pizzaSize || !pizzaStyle) {
       throw new AppError('Name, pizza size, and pizza style are required', 400, 'VALIDATION_ERROR');
@@ -44,6 +44,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         availableBeverages: availableBeverages || [],
         address,
         maxGuests,
+        password: password || null,
         userId: req.userId!,
       },
     });
@@ -82,7 +83,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages } = req.body;
+    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password } = req.body;
 
     // Verify ownership
     const existing = await prisma.party.findFirst({
@@ -104,6 +105,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(address !== undefined && { address }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(availableBeverages !== undefined && { availableBeverages }),
+        ...(password !== undefined && { password: password || null }),
       },
     });
 
