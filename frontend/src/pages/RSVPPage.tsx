@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
-import { getPartyByInviteCode, addGuestToParty, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
   'Vegetarian',
@@ -70,7 +70,7 @@ export function RSVPPage() {
   useEffect(() => {
     async function loadParty() {
       if (inviteCode) {
-        const foundParty = await getPartyByInviteCode(inviteCode);
+        const foundParty = await getPartyByInviteCodeOrCustomUrl(inviteCode);
         if (foundParty) {
           setParty(foundParty);
           setAvailableBeverages(foundParty.available_beverages || []);

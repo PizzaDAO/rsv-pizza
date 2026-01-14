@@ -6,7 +6,7 @@ export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [copied, setCopied] = useState<'guest' | 'host' | null>(null);
+  const [copied, setCopied] = useState<'guest' | 'host' | 'event' | null>(null);
 
   // Form state
   const [partyName, setPartyName] = useState('');
@@ -49,16 +49,28 @@ export const PartyHeader: React.FC = () => {
     setCustomUrl('');
   };
 
-  const handleCopyLink = (type: 'guest' | 'host') => {
-    const link = type === 'guest' ? getInviteLink() : getHostLink();
+  const handleCopyLink = (type: 'guest' | 'host' | 'event') => {
+    let link = '';
+    if (type === 'guest') link = getInviteLink();
+    else if (type === 'host') link = getHostLink();
+    else if (type === 'event') link = getEventLink();
+
     navigator.clipboard.writeText(link).then(() => {
       setCopied(type);
       setTimeout(() => setCopied(null), 2000);
     });
   };
 
+  const getEventLink = (): string => {
+    if (!party) return '';
+    const baseUrl = window.location.origin + window.location.pathname;
+    const slug = party.customUrl || party.inviteCode;
+    return `${baseUrl}#/${slug}`;
+  };
+
   const inviteLink = getInviteLink();
   const hostLink = getHostLink();
+  const eventLink = getEventLink();
 
   return (
     <>
@@ -353,10 +365,34 @@ export const PartyHeader: React.FC = () => {
             </div>
 
             <div className="space-y-4 mb-6">
+              {/* Event Page Link */}
+              <div>
+                <p className="text-white/60 mb-2 text-sm font-medium">
+                  Event Page Link (share event details):
+                </p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 overflow-hidden">
+                      <code className="text-sm text-[#ffb347] break-all">{eventLink}</code>
+                    </div>
+                    <button
+                      onClick={() => handleCopyLink('event')}
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                        copied === 'event'
+                          ? 'bg-[#39d98a] text-white'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {copied === 'event' ? <Check size={20} /> : <Copy size={20} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Guest Link */}
               <div>
                 <p className="text-white/60 mb-2 text-sm font-medium">
-                  Guest RSVP Link (share with guests):
+                  Guest RSVP Link (direct to RSVP form):
                 </p>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                   <div className="flex items-center gap-3">
@@ -404,7 +440,7 @@ export const PartyHeader: React.FC = () => {
 
             <div className="bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl p-4 mb-6">
               <p className="text-sm text-[#ffb347]">
-                Share the <strong>Guest RSVP Link</strong> with your guests. Bookmark the <strong>Host Dashboard Link</strong> to access your party from any device.
+                Share the <strong>Event Page Link</strong> to show event details with an RSVP button. Use the <strong>RSVP Link</strong> for direct RSVP access. Bookmark the <strong>Host Dashboard Link</strong> to manage your party.
               </p>
             </div>
 
