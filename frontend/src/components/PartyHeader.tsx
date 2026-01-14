@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon } from 'lucide-react';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
@@ -16,6 +16,9 @@ export const PartyHeader: React.FC = () => {
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
   const [partyPassword, setPartyPassword] = useState('');
+  const [eventImageUrl, setEventImageUrl] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
+  const [customUrl, setCustomUrl] = useState('');
 
   const [creating, setCreating] = useState(false);
 
@@ -26,7 +29,10 @@ export const PartyHeader: React.FC = () => {
     const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
     const duration = partyDuration ? parseFloat(partyDuration) : undefined;
     const password = partyPassword.trim() || undefined;
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password);
+    const imageUrl = eventImageUrl.trim() || undefined;
+    const description = eventDescription.trim() || undefined;
+    const urlSlug = customUrl.trim() || undefined;
+    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password, imageUrl, description, urlSlug);
     setCreating(false);
     setShowCreateModal(false);
     setShowShareModal(true);
@@ -38,6 +44,9 @@ export const PartyHeader: React.FC = () => {
     setExpectedGuests('');
     setPartyAddress('');
     setPartyPassword('');
+    setEventImageUrl('');
+    setEventDescription('');
+    setCustomUrl('');
   };
 
   const handleCopyLink = (type: 'guest' | 'host') => {
@@ -232,17 +241,71 @@ export const PartyHeader: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
                   <Lock size={14} className="inline mr-1" />
-                  RSVP Password (Optional)
+                  Event Password (Optional)
                 </label>
                 <input
                   type="password"
                   value={partyPassword}
                   onChange={(e) => setPartyPassword(e.target.value)}
-                  placeholder="Enter a password to protect RSVP page"
+                  placeholder="Password to protect event page"
                   className="w-full"
                 />
                 <p className="text-xs text-white/50 mt-1">
-                  Guests will need this password to access the RSVP page
+                  Guests will need this password to view event details
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <Image size={14} className="inline mr-1" />
+                  Event Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={eventImageUrl}
+                  onChange={(e) => setEventImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full"
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Add a banner image for your event page
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <FileText size={14} className="inline mr-1" />
+                  Event Description (Optional)
+                </label>
+                <textarea
+                  value={eventDescription}
+                  onChange={(e) => setEventDescription(e.target.value)}
+                  placeholder="Tell guests about your event..."
+                  className="w-full"
+                  rows={3}
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Describe your event for the event page
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  <LinkIcon size={14} className="inline mr-1" />
+                  Custom URL (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="my-awesome-party"
+                  className="w-full font-mono"
+                  pattern="[a-z0-9-]+"
+                  minLength={3}
+                  maxLength={50}
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Your event will be at: /{customUrl || 'custom-url'}
                 </p>
               </div>
 

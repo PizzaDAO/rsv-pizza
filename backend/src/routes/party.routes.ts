@@ -28,10 +28,21 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 // POST /api/parties - Create new party
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password } = req.body;
+    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password, eventImageUrl, description, customUrl } = req.body;
 
     if (!name || !pizzaSize || !pizzaStyle) {
       throw new AppError('Name, pizza size, and pizza style are required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate custom URL if provided
+    if (customUrl) {
+      // Only allow lowercase letters, numbers, and hyphens
+      if (!/^[a-z0-9-]+$/.test(customUrl)) {
+        throw new AppError('Custom URL can only contain lowercase letters, numbers, and hyphens', 400, 'VALIDATION_ERROR');
+      }
+      if (customUrl.length < 3 || customUrl.length > 50) {
+        throw new AppError('Custom URL must be between 3 and 50 characters', 400, 'VALIDATION_ERROR');
+      }
     }
 
     const party = await prisma.party.create({
@@ -45,6 +56,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         address,
         maxGuests,
         password: password || null,
+        eventImageUrl: eventImageUrl || null,
+        description: description || null,
+        customUrl: customUrl || null,
         userId: req.userId!,
       },
     });
@@ -83,7 +97,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password } = req.body;
+    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password, eventImageUrl, description, customUrl } = req.body;
 
     // Verify ownership
     const existing = await prisma.party.findFirst({
@@ -92,6 +106,16 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
 
     if (!existing) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Validate custom URL if provided
+    if (customUrl !== undefined && customUrl !== null && customUrl !== '') {
+      if (!/^[a-z0-9-]+$/.test(customUrl)) {
+        throw new AppError('Custom URL can only contain lowercase letters, numbers, and hyphens', 400, 'VALIDATION_ERROR');
+      }
+      if (customUrl.length < 3 || customUrl.length > 50) {
+        throw new AppError('Custom URL must be between 3 and 50 characters', 400, 'VALIDATION_ERROR');
+      }
     }
 
     const party = await prisma.party.update({
@@ -106,6 +130,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(maxGuests !== undefined && { maxGuests }),
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(password !== undefined && { password: password || null }),
+        ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
+        ...(description !== undefined && { description: description || null }),
+        ...(customUrl !== undefined && { customUrl: customUrl || null }),
       },
     });
 

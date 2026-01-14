@@ -90,6 +90,7 @@ export interface Party {
   id: string;
   name: string;
   inviteCode: string;
+  customUrl: string | null;
   date: string | null;
   duration: number | null;
   hostName: string | null;
@@ -97,6 +98,8 @@ export interface Party {
   availableBeverages?: string[];
   maxGuests: number | null;
   password: string | null;
+  eventImageUrl: string | null;
+  description: string | null;
   address: string | null;
   rsvpClosedAt: string | null;
   createdAt: string;

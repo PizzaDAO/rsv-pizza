@@ -10,6 +10,7 @@ export interface DbParty {
   id: string;
   name: string;
   invite_code: string;
+  custom_url: string | null;
   host_name: string | null;
   date: string | null;
   duration: number | null;
@@ -17,6 +18,8 @@ export interface DbParty {
   available_beverages: string[];
   max_guests: number | null;
   password: string | null;
+  event_image_url: string | null;
+  description: string | null;
   address: string | null;
   rsvp_closed_at: string | null;
   created_at: string;
@@ -36,7 +39,20 @@ export interface DbGuest {
 }
 
 // Party operations
-export async function createParty(name: string, hostName?: string, date?: string, pizzaStyle: string = 'new-york', expectedGuests?: number, address?: string, availableBeverages?: string[], duration?: number, password?: string): Promise<DbParty | null> {
+export async function createParty(
+  name: string,
+  hostName?: string,
+  date?: string,
+  pizzaStyle: string = 'new-york',
+  expectedGuests?: number,
+  address?: string,
+  availableBeverages?: string[],
+  duration?: number,
+  password?: string,
+  eventImageUrl?: string,
+  description?: string,
+  customUrl?: string
+): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
     .insert({
@@ -48,6 +64,9 @@ export async function createParty(name: string, hostName?: string, date?: string
       available_beverages: availableBeverages || [],
       max_guests: expectedGuests || null,
       password: password || null,
+      event_image_url: eventImageUrl || null,
+      description: description || null,
+      custom_url: customUrl || null,
       address: address || null,
     })
     .select()
@@ -61,10 +80,39 @@ export async function createParty(name: string, hostName?: string, date?: string
 }
 
 export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty | null> {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('parties')
     .select('*')
     .eq('invite_code', inviteCode)
+    .single();
+
+  if (error) {
+    console.error('Error fetching party:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | null> {
+  const { data, error } = await supabase
+    .from('parties')
+    .select('*')
+    .eq('custom_url', customUrl)
+    .single();
+
+  if (error) {
+    console.error('Error fetching party by custom URL:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
+  // Try custom URL first, then invite code
+  const { data, error } = await supabase
+    .from('parties')
+    .select('*')
+    .or(`custom_url.eq.${slug},invite_code.eq.${slug}`)
     .single();
 
   if (error) {

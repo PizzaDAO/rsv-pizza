@@ -9,7 +9,7 @@ interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
-  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string) => Promise<void>;
+  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => Promise<void>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
@@ -114,6 +114,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     id: dbParty.id,
     name: dbParty.name,
     inviteCode: dbParty.invite_code,
+    customUrl: dbParty.custom_url,
     date: dbParty.date,
     duration: dbParty.duration,
     hostName: dbParty.host_name,
@@ -121,6 +122,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableBeverages: dbParty.available_beverages || [],
     maxGuests: dbParty.max_guests,
     password: dbParty.password,
+    eventImageUrl: dbParty.event_image_url,
+    description: dbParty.description,
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     createdAt: dbParty.created_at,
@@ -165,10 +168,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
-  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string) => {
+  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => {
     setPartyLoading(true);
     try {
-      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration, password);
+      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration, password, eventImageUrl, description, customUrl);
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);

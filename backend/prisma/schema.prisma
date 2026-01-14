@@ -29,6 +29,7 @@ model Party {
   id                 String    @id @default(cuid())
   name               String
   inviteCode         String    @unique @default(cuid())
+  customUrl          String?   @unique
   date               DateTime?
   duration           Float?
   pizzaSize          String
@@ -39,6 +40,8 @@ model Party {
   longitude          Float?
   maxGuests          Int?
   password           String?
+  eventImageUrl      String?
+  description        String?
   rsvpClosedAt       DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
