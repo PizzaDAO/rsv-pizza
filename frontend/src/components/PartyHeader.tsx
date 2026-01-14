@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { uploadEventImage } from '../lib/supabase';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
+  const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState<'guest' | 'host' | 'event' | null>(null);
@@ -87,43 +89,57 @@ export const PartyHeader: React.FC = () => {
     if (!partyName.trim()) return;
     setCreating(true);
 
-    const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
-    const duration = partyDuration ? parseFloat(partyDuration) : undefined;
-    const password = partyPassword.trim() || undefined;
-    const description = eventDescription.trim() || undefined;
-    const urlSlug = customUrl.trim() || undefined;
+    try {
+      const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
+      const duration = partyDuration ? parseFloat(partyDuration) : undefined;
+      const password = partyPassword.trim() || undefined;
+      const description = eventDescription.trim() || undefined;
+      const urlSlug = customUrl.trim() || undefined;
 
-    // Upload image if file is selected
-    let imageUrl = eventImageUrl.trim() || undefined;
-    if (eventImageFile) {
-      const uploadedUrl = await uploadEventImage(eventImageFile);
-      if (uploadedUrl) {
-        imageUrl = uploadedUrl;
-      } else {
-        setImageError('Failed to upload image. Please try again.');
-        setCreating(false);
-        return;
+      // Upload image if file is selected
+      let imageUrl = eventImageUrl.trim() || undefined;
+      if (eventImageFile) {
+        const uploadedUrl = await uploadEventImage(eventImageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          setImageError('Failed to upload image. Please try again.');
+          setCreating(false);
+          return;
+        }
       }
-    }
 
-    await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password, imageUrl, description, urlSlug);
-    setCreating(false);
-    setShowCreateModal(false);
-    setShowShareModal(true);
-    // Reset form
-    setPartyName('');
-    setHostName('');
-    setPartyDate('');
-    setPartyDuration('');
-    setExpectedGuests('');
-    setPartyAddress('');
-    setPartyPassword('');
-    setEventImageUrl('');
-    setEventImageFile(null);
-    setImagePreview(null);
-    setImageError(null);
-    setEventDescription('');
-    setCustomUrl('');
+      const inviteCode = await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password, imageUrl, description, urlSlug);
+
+      setCreating(false);
+      setShowCreateModal(false);
+
+      // Reset form
+      setPartyName('');
+      setHostName('');
+      setPartyDate('');
+      setPartyDuration('');
+      setExpectedGuests('');
+      setPartyAddress('');
+      setPartyPassword('');
+      setEventImageUrl('');
+      setEventImageFile(null);
+      setImagePreview(null);
+      setImageError(null);
+      setEventDescription('');
+      setCustomUrl('');
+
+      // Navigate to host page
+      if (inviteCode) {
+        navigate(`/party/${inviteCode}`);
+      } else {
+        setImageError('Failed to create party. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating party:', error);
+      setImageError('Failed to create party. Please try again.');
+      setCreating(false);
+    }
   };
 
   const handleCopyLink = (type: 'guest' | 'host' | 'event') => {

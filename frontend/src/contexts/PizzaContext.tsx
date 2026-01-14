@@ -9,7 +9,7 @@ interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
-  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => Promise<void>;
+  createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => Promise<string | null>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   clearParty: () => void;
   getInviteLink: () => string;
@@ -168,7 +168,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
   }, [pizzaSettings]);
 
-  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => {
+  const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string): Promise<string | null> => {
     setPartyLoading(true);
     try {
       const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration, password, eventImageUrl, description, customUrl);
@@ -177,7 +177,12 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setParty(newParty);
         setGuests([]);
         localStorage.setItem('rsvpizza_currentPartyCode', dbParty.invite_code);
+        return dbParty.invite_code;
       }
+      return null;
+    } catch (error) {
+      console.error('Error creating party in context:', error);
+      return null;
     } finally {
       setPartyLoading(false);
     }
