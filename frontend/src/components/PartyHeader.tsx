@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2 } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { uploadEventImage } from '../lib/supabase';
 
 export const PartyHeader: React.FC = () => {
@@ -23,6 +23,7 @@ export const PartyHeader: React.FC = () => {
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [creating, setCreating] = useState(false);
 
@@ -215,8 +216,8 @@ export const PartyHeader: React.FC = () => {
 
       {/* Create Party Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="card p-6 w-full max-w-md my-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">Create Pizza Party</h2>
               <button
@@ -227,7 +228,7 @@ export const PartyHeader: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleCreate} className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
                   Party Name *
@@ -243,51 +244,36 @@ export const PartyHeader: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <User size={14} className="inline mr-1" />
-                  Your Name (Host)
-                </label>
-                <input
-                  type="text"
-                  value={hostName}
-                  onChange={(e) => setHostName(e.target.value)}
-                  placeholder="e.g., John"
-                  className="w-full"
-                />
-              </div>
+              {/* Date and Duration on same line */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    <Calendar size={14} className="inline mr-1" />
+                    Party Date
+                  </label>
+                  <input
+                    type="date"
+                    value={partyDate}
+                    onChange={(e) => setPartyDate(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <Calendar size={14} className="inline mr-1" />
-                  Party Date
-                </label>
-                <input
-                  type="date"
-                  value={partyDate}
-                  onChange={(e) => setPartyDate(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <Calendar size={14} className="inline mr-1" />
-                  Party Duration (hours)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  max="12"
-                  value={partyDuration}
-                  onChange={(e) => setPartyDuration(e.target.value)}
-                  placeholder="e.g., 2.5"
-                  className="w-full"
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  Duration in decimal hours (0.5 = 30 min, 2.5 = 2½ hours). For multi-wave ordering.
-                </p>
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    Duration (hrs)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="12"
+                    value={partyDuration}
+                    onChange={(e) => setPartyDuration(e.target.value)}
+                    placeholder="2.5"
+                    className="w-full"
+                  />
+                </div>
               </div>
 
               <div>
@@ -309,11 +295,44 @@ export const PartyHeader: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <MapPin size={14} className="inline mr-1" />
-                  Party Address
-                </label>
+              {/* Optional Fields Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowOptionalFields(!showOptionalFields)}
+                className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+              >
+                <span className="text-sm font-medium text-white/80">
+                  Optional Details
+                </span>
+                {showOptionalFields ? (
+                  <ChevronUp size={18} className="text-white/60" />
+                ) : (
+                  <ChevronDown size={18} className="text-white/60" />
+                )}
+              </button>
+
+              {/* Collapsible Optional Fields */}
+              {showOptionalFields && (
+                <div className="space-y-4 border-l-2 border-white/10 pl-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <User size={14} className="inline mr-1" />
+                      Your Name (Host)
+                    </label>
+                    <input
+                      type="text"
+                      value={hostName}
+                      onChange={(e) => setHostName(e.target.value)}
+                      placeholder="e.g., John"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <MapPin size={14} className="inline mr-1" />
+                      Party Address
+                    </label>
                 <input
                   type="text"
                   value={partyAddress}
@@ -321,39 +340,39 @@ export const PartyHeader: React.FC = () => {
                   placeholder="e.g., 123 Main St, New York, NY"
                   className="w-full"
                 />
-                <p className="text-xs text-white/50 mt-1">
-                  Used to find nearby pizzerias for ordering
-                </p>
-              </div>
+                    <p className="text-xs text-white/50 mt-1">
+                      Used to find nearby pizzerias for ordering
+                    </p>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <Lock size={14} className="inline mr-1" />
-                  Event Password (Optional)
-                </label>
-                <input
-                  type="password"
-                  value={partyPassword}
-                  onChange={(e) => setPartyPassword(e.target.value)}
-                  placeholder="Password to protect event page"
-                  className="w-full"
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  Guests will need this password to view event details
-                </p>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <Lock size={14} className="inline mr-1" />
+                      Event Password
+                    </label>
+                    <input
+                      type="password"
+                      value={partyPassword}
+                      onChange={(e) => setPartyPassword(e.target.value)}
+                      placeholder="Password to protect event page"
+                      className="w-full"
+                    />
+                    <p className="text-xs text-white/50 mt-1">
+                      Guests will need this password to view event details
+                    </p>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <Image size={14} className="inline mr-1" />
-                  Event Flyer (Optional - Square Image)
-                </label>
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <Image size={14} className="inline mr-1" />
+                      Event Flyer (Square Image)
+                    </label>
 
-                {/* Image URL Input */}
-                <div className="mb-3">
-                  <input
-                    type="url"
-                    value={eventImageUrl}
+                    {/* Image URL Input */}
+                    <div className="mb-3">
+                      <input
+                        type="url"
+                        value={eventImageUrl}
                     onChange={(e) => {
                       setEventImageUrl(e.target.value);
                       // Clear file if URL is entered
@@ -441,25 +460,27 @@ export const PartyHeader: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <LinkIcon size={14} className="inline mr-1" />
-                  Custom URL (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  placeholder="my-awesome-party"
-                  className="w-full font-mono"
-                  pattern="[a-z0-9-]+"
-                  minLength={3}
-                  maxLength={50}
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  Your event will be at: /{customUrl || 'custom-url'}
-                </p>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <LinkIcon size={14} className="inline mr-1" />
+                      Custom URL
+                    </label>
+                    <input
+                      type="text"
+                      value={customUrl}
+                      onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder="my-awesome-party"
+                      className="w-full font-mono"
+                      pattern="[a-z0-9-]+"
+                      minLength={3}
+                      maxLength={50}
+                    />
+                    <p className="text-xs text-white/50 mt-1">
+                      Your event will be at: /{customUrl || 'custom-url'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
