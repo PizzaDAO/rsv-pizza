@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2 } from 'lucide-react';
+import { uploadEventImage } from '../lib/supabase';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
@@ -17,21 +18,93 @@ export const PartyHeader: React.FC = () => {
   const [partyAddress, setPartyAddress] = useState('');
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
 
   const [creating, setCreating] = useState(false);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageError(null);
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setImageError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image must be less than 5MB');
+      return;
+    }
+
+    // Validate square aspect ratio
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const aspectRatio = img.width / img.height;
+
+      // Allow some tolerance (0.9 to 1.1 is considered square)
+      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
+        setImageError('Image must be square (1:1 aspect ratio)');
+        setEventImageFile(null);
+        setImagePreview(null);
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      // Image is valid
+      setEventImageFile(file);
+      setImagePreview(objectUrl);
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    img.onerror = () => {
+      setImageError('Failed to load image');
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    img.src = objectUrl;
+  };
+
+  const removeImage = () => {
+    setEventImageFile(null);
+    setImagePreview(null);
+    setImageError(null);
+    setEventImageUrl('');
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partyName.trim()) return;
     setCreating(true);
+
     const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
     const duration = partyDuration ? parseFloat(partyDuration) : undefined;
     const password = partyPassword.trim() || undefined;
-    const imageUrl = eventImageUrl.trim() || undefined;
     const description = eventDescription.trim() || undefined;
     const urlSlug = customUrl.trim() || undefined;
+
+    // Upload image if file is selected
+    let imageUrl = eventImageUrl.trim() || undefined;
+    if (eventImageFile) {
+      const uploadedUrl = await uploadEventImage(eventImageFile);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        setImageError('Failed to upload image. Please try again.');
+        setCreating(false);
+        return;
+      }
+    }
+
     await createParty(partyName.trim(), hostName.trim() || undefined, partyDate || undefined, guestCount, partyAddress.trim() || undefined, [], duration, password, imageUrl, description, urlSlug);
     setCreating(false);
     setShowCreateModal(false);
@@ -45,6 +118,9 @@ export const PartyHeader: React.FC = () => {
     setPartyAddress('');
     setPartyPassword('');
     setEventImageUrl('');
+    setEventImageFile(null);
+    setImagePreview(null);
+    setImageError(null);
     setEventDescription('');
     setCustomUrl('');
   };
@@ -270,17 +346,52 @@ export const PartyHeader: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
                   <Image size={14} className="inline mr-1" />
-                  Event Image URL (Optional)
+                  Event Flyer (Optional - Square Image)
                 </label>
-                <input
-                  type="url"
-                  value={eventImageUrl}
-                  onChange={(e) => setEventImageUrl(e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  className="w-full"
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  Add a banner image for your event page
+
+                {imagePreview ? (
+                  <div className="space-y-3">
+                    <div className="relative w-full max-w-xs mx-auto">
+                      <img
+                        src={imagePreview}
+                        alt="Event flyer preview"
+                        className="w-full h-auto rounded-xl border-2 border-white/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="file"
+                      id="eventImage"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="eventImage"
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
+                    >
+                      <Upload className="w-8 h-8 text-white/40 mb-2" />
+                      <span className="text-sm text-white/60">Click to upload square image</span>
+                      <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                    </label>
+                  </div>
+                )}
+
+                {imageError && (
+                  <p className="text-xs text-red-400 mt-2">{imageError}</p>
+                )}
+
+                <p className="text-xs text-white/50 mt-2">
+                  Upload a square flyer image for your event page (1:1 aspect ratio)
                 </p>
               </div>
 

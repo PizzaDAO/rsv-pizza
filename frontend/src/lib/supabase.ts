@@ -5,6 +5,44 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+/**
+ * Upload an image to Supabase Storage and return the public URL
+ * @param file The image file to upload
+ * @param bucket The storage bucket name (default: 'event-images')
+ * @returns The public URL of the uploaded image, or null if upload failed
+ */
+export async function uploadEventImage(file: File, bucket: string = 'event-images'): Promise<string | null> {
+  try {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = fileName;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    return null;
+  }
+}
+
 // Types for database tables
 export interface DbParty {
   id: string;
