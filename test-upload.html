@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Image Upload</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Test Image Upload to Supabase</h1>
+  <input type="file" id="fileInput" accept="image/*">
+  <button onclick="testUpload()">Upload Test Image</button>
+  <div id="result" style="margin-top: 20px; padding: 10px; background: #f0f0f0;"></div>
+
+  <script>
+    const supabase = window.supabase.createClient(
+      'https://znpiwdvvsqaxuskpfleo.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw'
+    );
+
+    async function testUpload() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      const resultDiv = document.getElementById('result');
+
+      if (!file) {
+        resultDiv.innerHTML = '<p style="color: red;">Please select a file</p>';
+        return;
+      }
+
+      resultDiv.innerHTML = '<p>Uploading...</p>';
+
+      const fileName = 'test-' + Date.now() + '.' + file.name.split('.').pop();
+
+      console.log('Uploading file:', fileName);
+
+      const { data, error } = await supabase.storage
+        .from('event-images')
+        .upload(fileName, file);
+
+      if (error) {
+        resultDiv.innerHTML = '<h3 style="color: red;">Upload Failed</h3><pre>' + JSON.stringify(error, null, 2) + '</pre>';
+        console.error('Upload error:', error);
+      } else {
+        const { data: urlData } = supabase.storage
+          .from('event-images')
+          .getPublicUrl(fileName);
+
+        resultDiv.innerHTML = `
+          <h3 style="color: green;">Upload Success!</h3>
+          <p><strong>Path:</strong> ${data.path}</p>
+          <p><strong>URL:</strong> <a href="${urlData.publicUrl}" target="_blank">${urlData.publicUrl}</a></p>
+          <img src="${urlData.publicUrl}" style="max-width: 300px; margin-top: 10px; border: 1px solid #ccc;">
+        `;
+        console.log('Upload successful:', data);
+      }
+    }
+  </script>
+</body>
+</html>

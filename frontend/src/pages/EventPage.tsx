@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Calendar, Clock, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, User, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
 
 export function EventPage() {
@@ -318,29 +318,55 @@ export function EventPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
-            {/* Left Column - Square Image */}
-            {party.event_image_url ? (
-              <div className="relative aspect-square bg-black/30">
-                <img
-                  src={party.event_image_url}
-                  alt={party.name}
-                  className="w-full h-full object-contain"
-                />
+            {/* Left Column - Image and Host Info */}
+            <div className="flex flex-col">
+              {/* Square Image */}
+              {party.event_image_url ? (
+                <div className="relative aspect-square bg-black/30">
+                  <img
+                    src={party.event_image_url}
+                    alt={party.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
+                  <Pizza className="w-32 h-32 text-white/30" />
+                </div>
+              )}
+
+              {/* Host and Guest Info */}
+              <div className="p-6 border-t border-white/10">
+                {party.host_name && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-white/60 mb-2">Hosted By</h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-[#ff393a]" />
+                      </div>
+                      <span className="text-white font-medium">{party.host_name}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Guest Count */}
+                <div className="pt-4 border-t border-white/10">
+                  <div className="flex items-center gap-2 text-white/60 text-sm">
+                    <Users className="w-4 h-4" />
+                    <span>
+                      {party.guests?.length || 0} {party.guests?.length === 1 ? 'guest' : 'guests'}
+                      {party.max_guests && ` • ${party.max_guests} expected`}
+                    </span>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
-                <Pizza className="w-32 h-32 text-white/30" />
-              </div>
-            )}
+            </div>
 
             {/* Right Column - Event Details */}
             <div className="flex flex-col">
               {/* Event Header */}
               <div className="p-6 border-b border-white/10">
                 <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
-                {party.host_name && (
-                  <p className="text-white/60 text-sm">Hosted by {party.host_name}</p>
-                )}
               </div>
 
               {/* Event Details */}
