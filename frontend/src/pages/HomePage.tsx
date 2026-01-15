@@ -26,6 +26,7 @@ export function HomePage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
+  const [requireApproval, setRequireApproval] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -243,8 +244,42 @@ export function HomePage() {
 
             <div>
               <label className="block text-sm font-medium text-white/80 mb-2">
+                <MapPin size={14} className="inline mr-1" />
+                Location
+              </label>
+              <input
+                type="text"
+                value={partyAddress}
+                onChange={(e) => setPartyAddress(e.target.value)}
+                placeholder="e.g., 123 Main St, New York, NY"
+                className="w-full"
+              />
+              <p className="text-xs text-white/50 mt-1">
+                Used to find nearby pizzerias for ordering
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                <FileText size={14} className="inline mr-1" />
+                Event Description
+              </label>
+              <textarea
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+                placeholder="Tell guests about your event..."
+                className="w-full"
+                rows={3}
+              />
+              <p className="text-xs text-white/50 mt-1">
+                Describe your event for the event page
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
                 <Users size={14} className="inline mr-1" />
-                Expected Guests *
+                Capacity *
               </label>
               <input
                 type="number"
@@ -272,23 +307,6 @@ export function HomePage() {
                 placeholder="e.g., John"
                 className="w-full"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <MapPin size={14} className="inline mr-1" />
-                Party Address
-              </label>
-              <input
-                type="text"
-                value={partyAddress}
-                onChange={(e) => setPartyAddress(e.target.value)}
-                placeholder="e.g., 123 Main St, New York, NY"
-                className="w-full"
-              />
-              <p className="text-xs text-white/50 mt-1">
-                Used to find nearby pizzerias for ordering
-              </p>
             </div>
 
             <div>
@@ -372,23 +390,6 @@ export function HomePage() {
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <FileText size={14} className="inline mr-1" />
-                Event Description
-              </label>
-              <textarea
-                value={eventDescription}
-                onChange={(e) => setEventDescription(e.target.value)}
-                placeholder="Tell guests about your event..."
-                className="w-full"
-                rows={3}
-              />
-              <p className="text-xs text-white/50 mt-1">
-                Describe your event for the event page
-              </p>
-            </div>
-
             {/* Options Toggle */}
             <button
               type="button"
@@ -408,6 +409,23 @@ export function HomePage() {
             {/* Collapsible Options */}
             {showOptionalFields && (
               <div className="space-y-4 border-l-2 border-white/10 pl-4">
+                <div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requireApproval}
+                      onChange={(e) => setRequireApproval(e.target.checked)}
+                      className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-white/80">Require Approval</span>
+                      <p className="text-xs text-white/50 mt-0.5">
+                        Guests must be approved by admin before appearing in the guest list
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
                     <Lock size={14} className="inline mr-1" />
