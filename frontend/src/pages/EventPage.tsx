@@ -456,12 +456,12 @@ export function EventPage() {
               </div>
 
               {/* Event Title */}
-              <div className="p-6 border-b border-white/10">
+              <div className="p-6 md:border-b md:border-white/10">
                 <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
-              <div className="md:hidden p-6 border-b border-white/10">
+              <div className="md:hidden px-6 pt-3 pb-2">
                 <div className="flex items-center gap-3">
                   {/* Overlapping avatars */}
                   <div className="flex items-center" style={{ marginLeft: '8px' }}>
@@ -527,9 +527,9 @@ export function EventPage() {
                   </div>
                 )}
 
-                {/* Location */}
+                {/* Location - Desktop only */}
                 {party.address && (
-                  <div className="flex items-start gap-3">
+                  <div className="hidden md:flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-medium text-white">{party.address}</p>
@@ -615,6 +615,104 @@ export function EventPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Mobile: Location Section */}
+                {party.address && (
+                  <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                    <h3 className="font-semibold text-white mb-4">Location</h3>
+                    <p className="text-white font-medium mb-3">{party.address}</p>
+                    {/* Google Maps Link */}
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(party.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full h-48 bg-white/5 rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20">
+                        <div className="text-center">
+                          <MapPin className="w-12 h-12 text-white/80 mx-auto mb-2" />
+                          <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                )}
+
+                {/* Mobile: Full Host Section */}
+                <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                  <h3 className="font-semibold text-white mb-4">Hosted By</h3>
+                  <div className="space-y-4">
+                    {/* Primary Host */}
+                    {party.host_name && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                          <User className="w-6 h-6 text-[#ff393a]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-semibold text-lg">{party.host_name}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Co-Hosts */}
+                    {party.co_hosts && party.co_hosts.length > 0 && (
+                      <>
+                        {party.co_hosts.map((coHost) => (
+                          <div key={coHost.id} className="flex items-start gap-3">
+                            {coHost.avatar_url ? (
+                              <img
+                                src={coHost.avatar_url}
+                                alt={coHost.name}
+                                className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                                <User className="w-6 h-6 text-[#ff393a]" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-semibold text-lg">{coHost.name}</p>
+                              {(coHost.website || coHost.twitter || coHost.instagram) && (
+                                <div className="flex items-center gap-3 mt-2">
+                                  {coHost.website && (
+                                    <a
+                                      href={coHost.website}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-white/50 hover:text-white transition-colors"
+                                    >
+                                      <Globe size={18} />
+                                    </a>
+                                  )}
+                                  {coHost.twitter && (
+                                    <a
+                                      href={`https://twitter.com/${coHost.twitter}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-white/50 hover:text-white transition-colors"
+                                    >
+                                      <Twitter size={18} />
+                                    </a>
+                                  )}
+                                  {coHost.instagram && (
+                                    <a
+                                      href={`https://instagram.com/${coHost.instagram}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-white/50 hover:text-white transition-colors"
+                                    >
+                                      <Instagram size={18} />
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
