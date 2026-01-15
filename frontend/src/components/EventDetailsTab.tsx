@@ -106,7 +106,7 @@ export const EventDetailsTab: React.FC = () => {
         if (uploadedUrl) {
           imageUrl = uploadedUrl;
         } else {
-          throw new Error('Failed to upload image');
+          throw new Error('Failed to upload image. Please ensure the storage bucket is configured or use an image URL instead.');
         }
       }
 
