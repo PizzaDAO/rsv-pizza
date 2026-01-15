@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Calendar, Clock, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
 
@@ -171,8 +172,69 @@ export function EventPage() {
     );
   }
 
+  // Generate meta tags for social sharing
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pizzadao.github.io';
+  const pageUrl = `${baseUrl}/rsv-pizza/${slug}`;
+  const ogImageUrl = party.event_image_url?.startsWith('/')
+    ? `${baseUrl}${party.event_image_url}`
+    : party.event_image_url || `${baseUrl}/rsv-pizza/logo.png`;
+
+  const eventDate = party.date ? new Date(party.date) : null;
+  const formattedDate = eventDate?.toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const formattedTime = eventDate?.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  const metaTitle = party.name;
+  const metaDescription = party.description
+    ? party.description.substring(0, 160) + (party.description.length > 160 ? '...' : '')
+    : `Join ${party.host_name || 'us'} for ${party.name}${formattedDate ? ` on ${formattedDate}` : ''}${party.address ? ` at ${party.address}` : ''}. RSVP now!`;
+
   return (
     <div className="min-h-screen">
+      <Helmet>
+        {/* Primary Meta Tags */}
+        <title>{metaTitle} | RSVPizza</title>
+        <meta name="title" content={metaTitle} />
+        <meta name="description" content={metaDescription} />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:image" content={ogImageUrl} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={pageUrl} />
+        <meta property="twitter:title" content={metaTitle} />
+        <meta property="twitter:description" content={metaDescription} />
+        <meta property="twitter:image" content={ogImageUrl} />
+
+        {/* Event specific */}
+        {eventDate && (
+          <>
+            <meta property="event:start_time" content={eventDate.toISOString()} />
+            {party.duration && (
+              <meta
+                property="event:end_time"
+                content={new Date(eventDate.getTime() + party.duration * 3600000).toISOString()}
+              />
+            )}
+          </>
+        )}
+        {party.address && <meta property="event:location" content={party.address} />}
+      </Helmet>
+
       {/* Header with Logo */}
       <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
