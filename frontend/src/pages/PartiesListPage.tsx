@@ -70,7 +70,7 @@ export const PartiesListPage: React.FC = () => {
             {parties.map((party) => (
               <Link
                 key={party.id}
-                to={`/party/${party.invite_code}`}
+                to={`/manage/${party.invite_code}`}
                 className="block card p-4 hover:bg-white/[0.07] transition-all group"
               >
                 <div className="flex items-center justify-between">

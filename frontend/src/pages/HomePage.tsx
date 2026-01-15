@@ -190,7 +190,7 @@ export function HomePage() {
 
       // Navigate to host page
       if (party?.invite_code) {
-        navigate(`/party/${party.invite_code}`);
+        navigate(`/manage/${party.invite_code}`);
       } else {
         setImageError('Failed to create party. Please try again.');
       }

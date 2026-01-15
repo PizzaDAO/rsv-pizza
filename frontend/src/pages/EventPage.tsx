@@ -81,7 +81,7 @@ export function EventPage() {
 
     // If no password, just navigate to host page
     if (!party.password) {
-      navigate(`/party/${party.invite_code}`);
+      navigate(`/manage/${party.invite_code}`);
       return;
     }
 
@@ -96,7 +96,7 @@ export function EventPage() {
 
     if (editPasswordInput === party.password) {
       // Correct password - navigate to host page
-      navigate(`/party/${party.invite_code}`);
+      navigate(`/manage/${party.invite_code}`);
     } else {
       // Wrong password
       setEditPasswordError('Incorrect password. Please try again.');

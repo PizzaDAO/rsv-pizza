@@ -131,7 +131,7 @@ export const PartyHeader: React.FC = () => {
 
       // Navigate to host page
       if (inviteCode) {
-        navigate(`/party/${inviteCode}`);
+        navigate(`/manage/${inviteCode}`);
       } else {
         setImageError('Failed to create party. Please try again.');
       }
