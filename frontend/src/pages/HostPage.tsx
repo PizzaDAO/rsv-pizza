@@ -10,6 +10,7 @@ import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { PizzaSettings } from '../components/PizzaSettings';
 import { BeverageSettings } from '../components/BeverageSettings';
 import { ToppingsSettings } from '../components/ToppingsSettings';
+import { GuestPreferencesList } from '../components/GuestPreferencesList';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 
 type TabType = 'details' | 'pizza' | 'guests';
@@ -116,6 +117,7 @@ function HostPageContent() {
 
             {activeTab === 'pizza' && (
               <>
+                <GuestPreferencesList />
                 <PizzaSettings />
                 <ToppingsSettings />
                 <BeverageSettings />
