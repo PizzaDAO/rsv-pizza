@@ -27,6 +27,7 @@ export function HomePage() {
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [requireApproval, setRequireApproval] = useState(false);
+  const [limitGuests, setLimitGuests] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
@@ -319,18 +320,6 @@ export function HomePage() {
             </div>
 
             <div className="relative">
-              <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="number"
-                min="1"
-                value={expectedGuests}
-                onChange={(e) => setExpectedGuests(e.target.value)}
-                placeholder="Capacity"
-                className="w-full !pl-14"
-              />
-            </div>
-
-            <div className="relative">
               <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="text"
@@ -445,6 +434,32 @@ export function HomePage() {
                     <span className="text-sm font-medium text-white/80">Require Approval</span>
                   </label>
                 </div>
+
+                <div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={limitGuests}
+                      onChange={(e) => setLimitGuests(e.target.checked)}
+                      className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
+                    />
+                    <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                  </label>
+                </div>
+
+                {limitGuests && (
+                  <div className="relative ml-7">
+                    <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                    <input
+                      type="number"
+                      min="1"
+                      value={expectedGuests}
+                      onChange={(e) => setExpectedGuests(e.target.value)}
+                      placeholder="Capacity"
+                      className="w-full !pl-14"
+                    />
+                  </div>
+                )}
 
                 <div className="relative">
                   <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
