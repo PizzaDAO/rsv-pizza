@@ -339,7 +339,7 @@ export function RSVPPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Your Name *"
+                placeholder="Name"
                 className="w-full !pl-14"
                 required
                 autoFocus
@@ -353,7 +353,7 @@ export function RSVPPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your Email *"
+                placeholder="Email"
                 className="w-full !pl-14"
                 required
               />
@@ -366,7 +366,7 @@ export function RSVPPage() {
                 type="text"
                 value={ethereumAddress}
                 onChange={(e) => setEthereumAddress(e.target.value)}
-                placeholder="Ethereum Address (optional)"
+                placeholder="Wallet Address"
                 className="w-full !pl-14"
               />
             </div>
