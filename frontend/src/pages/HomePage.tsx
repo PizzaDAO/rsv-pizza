@@ -126,7 +126,7 @@ export function HomePage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partyName.trim() || !expectedGuests) return;
+    if (!partyName.trim()) return;
     setCreating(true);
 
     try {
@@ -208,7 +208,7 @@ export function HomePage() {
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
                 placeholder="Party Name *"
-                className="w-full"
+                className="w-full pl-3"
                 required
                 autoFocus
               />
@@ -218,25 +218,22 @@ export function HomePage() {
             <button
               type="button"
               onClick={() => setShowDateTimeModal(true)}
-              className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+              className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors relative"
             >
+              <Calendar size={20} className="absolute left-4 top-4 text-white/40 pointer-events-none" />
               {startDate && startTime && endDate && endTime ? (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar size={16} className="text-white/60" />
-                    <span className="text-sm text-white/60">Event Time</span>
-                  </div>
+                <div className="pl-7">
                   <div className="text-white font-medium">
                     {formatDateDisplay(startDate)}
                   </div>
-                  <div className="text-white/80 text-sm mt-1">
+                  <div className="text-white/60 text-sm mt-1">
                     {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-white/60" />
-                  <span className="text-white/60">Set Event Time</span>
+                <div className="pl-7">
+                  <span className="text-white/60">Thursday, January 15</span>
+                  <div className="text-white/40 text-sm mt-1">2:00 PM — 3:00 PM EST</div>
                 </div>
               )}
             </button>
@@ -296,51 +293,58 @@ export function HomePage() {
               </div>
             </div>
 
-            <div>
+            <div className="relative">
+              <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="text"
                 value={partyAddress}
                 onChange={(e) => setPartyAddress(e.target.value)}
-                placeholder="Location"
-                className="w-full"
+                placeholder="Add Event Location"
+                className="w-full pl-11"
               />
+              {partyAddress && (
+                <p className="text-xs text-white/50 mt-1 ml-11">Offline location or virtual link</p>
+              )}
             </div>
 
-            <div>
+            <div className="relative">
+              <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
               <textarea
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Add Description"
-                className="w-full"
+                className="w-full pl-11"
                 rows={3}
               />
             </div>
 
-            <div>
+            <div className="relative">
+              <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="number"
                 min="1"
                 value={expectedGuests}
                 onChange={(e) => setExpectedGuests(e.target.value)}
-                placeholder="Capacity *"
-                className="w-full"
-                required
+                placeholder="Capacity"
+                className="w-full pl-11"
               />
             </div>
 
-            <div>
+            <div className="relative">
+              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="text"
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
                 placeholder="Your Name (Host)"
-                className="w-full"
+                className="w-full pl-11"
               />
             </div>
 
             <div>
               {/* Image URL Input */}
-              <div className="mb-3">
+              <div className="mb-3 relative">
+                <Image size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="url"
                   value={eventImageUrl}
@@ -354,7 +358,7 @@ export function HomePage() {
                     }
                   }}
                   placeholder="Event Flyer URL (Square Image)"
-                  className="w-full"
+                  className="w-full pl-11"
                 />
               </div>
 
@@ -438,42 +442,35 @@ export function HomePage() {
                       onChange={(e) => setRequireApproval(e.target.checked)}
                       className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
                     />
-                    <div>
-                      <span className="text-sm font-medium text-white/80">Require Approval</span>
-                      <p className="text-xs text-white/50 mt-0.5">
-                        Guests must be approved by admin before appearing in the guest list
-                      </p>
-                    </div>
+                    <span className="text-sm font-medium text-white/80">Require Approval</span>
                   </label>
                 </div>
 
-                <div>
+                <div className="relative">
+                  <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                   <input
                     type="password"
                     value={partyPassword}
                     onChange={(e) => setPartyPassword(e.target.value)}
                     placeholder="Event Password"
-                    className="w-full"
+                    className="w-full pl-11"
                   />
-                  <p className="text-xs text-white/50 mt-1">
-                    Guests will need this password to view event details
-                  </p>
                 </div>
 
-                <div>
+                <div className="relative flex items-center">
+                  <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
+                  <span className="absolute left-11 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
                   <input
                     type="text"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="Custom URL"
-                    className="w-full font-mono"
+                    placeholder="custom-url"
+                    className="w-full font-mono text-sm"
+                    style={{ paddingLeft: '125px' }}
                     pattern="[a-z0-9-]+"
                     minLength={3}
                     maxLength={50}
                   />
-                  <p className="text-xs text-white/50 mt-1">
-                    Your event will be at: /{customUrl || 'custom-url'}
-                  </p>
                 </div>
               </div>
             )}
