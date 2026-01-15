@@ -295,7 +295,7 @@ export function RSVPPage() {
           <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
             <Check className="w-8 h-8 text-[#39d98a]" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-6">See you soon!</h1>
+          <h1 className="text-2xl font-bold text-white mb-6">See you at {party?.name}!</h1>
           <button
             onClick={handleClose}
             className="btn-secondary"
