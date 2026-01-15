@@ -300,7 +300,7 @@ export function HomePage() {
                 value={partyAddress}
                 onChange={(e) => setPartyAddress(e.target.value)}
                 placeholder="Add Event Location"
-                className="w-full pl-14"
+                className="w-full !pl-14"
               />
               {partyAddress && (
                 <p className="text-xs text-white/50 mt-1 ml-14">Offline location or virtual link</p>
@@ -313,7 +313,7 @@ export function HomePage() {
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Add Description"
-                className="w-full pl-14"
+                className="w-full !pl-14"
                 rows={3}
               />
             </div>
@@ -326,7 +326,7 @@ export function HomePage() {
                 value={expectedGuests}
                 onChange={(e) => setExpectedGuests(e.target.value)}
                 placeholder="Capacity"
-                className="w-full pl-14"
+                className="w-full !pl-14"
               />
             </div>
 
@@ -337,7 +337,7 @@ export function HomePage() {
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
                 placeholder="Your Name (Host)"
-                className="w-full pl-14"
+                className="w-full !pl-14"
               />
             </div>
 
@@ -358,7 +358,7 @@ export function HomePage() {
                     }
                   }}
                   placeholder="Event Flyer URL (Square Image)"
-                  className="w-full pl-14"
+                  className="w-full !pl-14"
                 />
               </div>
 
@@ -453,7 +453,7 @@ export function HomePage() {
                     value={partyPassword}
                     onChange={(e) => setPartyPassword(e.target.value)}
                     placeholder="Event Password"
-                    className="w-full pl-14"
+                    className="w-full !pl-14"
                   />
                 </div>
 
