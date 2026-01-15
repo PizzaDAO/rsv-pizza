@@ -462,39 +462,42 @@ export function EventPage() {
 
               {/* Mobile: Host Info */}
               <div className="md:hidden p-6 border-b border-white/10">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm text-white/60">Hosted by</span>
-                  <span className="text-white font-medium">
-                    {party.host_name}
-                    {party.co_hosts && party.co_hosts.length > 0 && (
-                      <> & {party.co_hosts.length} other{party.co_hosts.length > 1 ? 's' : ''}</>
+                <div className="flex items-center gap-3">
+                  {/* Overlapping avatars */}
+                  <div className="flex items-center" style={{ marginLeft: '8px' }}>
+                    {/* Primary host avatar */}
+                    {party.host_name && (
+                      <div className="w-8 h-8 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0 border-2 border-black relative" style={{ zIndex: 10, marginLeft: '-8px' }}>
+                        <User className="w-4 h-4 text-[#ff393a]" />
+                      </div>
                     )}
-                  </span>
-                </div>
-                {/* Host avatars row */}
-                <div className="flex items-center gap-2">
-                  {/* Primary host avatar */}
-                  {party.host_name && (
-                    <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                      <User className="w-5 h-5 text-[#ff393a]" />
-                    </div>
-                  )}
-                  {/* Co-host avatars */}
-                  {party.co_hosts && party.co_hosts.slice(0, 6).map((coHost) => (
-                    <div key={coHost.id}>
-                      {coHost.avatar_url ? (
-                        <img
-                          src={coHost.avatar_url}
-                          alt={coHost.name}
-                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                          <User className="w-5 h-5 text-[#ff393a]" />
-                        </div>
+                    {/* Co-host avatars (first 6) */}
+                    {party.co_hosts && party.co_hosts.slice(0, 6).map((coHost, index) => (
+                      <div key={coHost.id} style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
+                        {coHost.avatar_url ? (
+                          <img
+                            src={coHost.avatar_url}
+                            alt={coHost.name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0 border-2 border-black">
+                            <User className="w-4 h-4 text-[#ff393a]" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Host text */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white">
+                      Hosted by <span className="font-medium">{party.host_name}</span>
+                      {party.co_hosts && party.co_hosts.length > 0 && (
+                        <> & {party.co_hosts.length} other{party.co_hosts.length > 1 ? 's' : ''}</>
                       )}
-                    </div>
-                  ))}
+                    </p>
+                  </div>
                 </div>
               </div>
 
