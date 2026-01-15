@@ -15,6 +15,7 @@ interface PizzaContextType {
   getInviteLink: () => string;
   getHostLink: () => string;
   updatePartyBeverages: (beverages: string[]) => Promise<void>;
+  updatePartyToppings: (toppings: string[]) => Promise<void>;
   // Guest management
   guests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
@@ -116,6 +117,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     hostName: dbParty.host_name,
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
+    availableToppings: dbParty.available_toppings || [],
     maxGuests: dbParty.max_guests,
     password: dbParty.password,
     eventImageUrl: dbParty.event_image_url,
@@ -282,6 +284,16 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updatePartyToppings = async (toppings: string[]) => {
+    if (!party) return;
+
+    const dbParty = await db.updatePartyToppings(party.id, toppings);
+    if (dbParty) {
+      const updatedParty = dbPartyToParty(dbParty, guests);
+      setParty(updatedParty);
+    }
+  };
+
   const generateRecommendations = () => {
     if (!party) return;
 
@@ -304,6 +316,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       getInviteLink,
       getHostLink,
       updatePartyBeverages,
+      updatePartyToppings,
       guests,
       addGuest,
       removeGuest,

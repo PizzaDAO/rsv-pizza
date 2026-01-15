@@ -54,6 +54,7 @@ export interface DbParty {
   duration: number | null;
   pizza_style: string;
   available_beverages: string[];
+  available_toppings: string[];
   max_guests: number | null;
   password: string | null;
   event_image_url: string | null;
@@ -215,6 +216,21 @@ export async function updatePartyBeverages(partyId: string, availableBeverages: 
 
   if (error) {
     console.error('Error updating party beverages:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updatePartyToppings(partyId: string, availableToppings: string[]): Promise<DbParty | null> {
+  const { data, error } = await supabase
+    .from('parties')
+    .update({ available_toppings: availableToppings })
+    .eq('id', partyId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating party toppings:', error);
     return null;
   }
   return data;

@@ -109,6 +109,7 @@ export interface Party {
   hostName: string | null;
   pizzaStyle: string;
   availableBeverages?: string[];
+  availableToppings?: string[];
   maxGuests: number | null;
   password: string | null;
   eventImageUrl: string | null;
