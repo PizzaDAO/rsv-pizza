@@ -29,12 +29,45 @@ export function HomePage() {
   const [requireApproval, setRequireApproval] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [showDateTimeModal, setShowDateTimeModal] = useState(false);
 
   // Get user's timezone on mount
   React.useEffect(() => {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setTimezone(userTimezone);
   }, []);
+
+  // Format date for display
+  const formatDateDisplay = (date: string) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // Format time for display (12-hour)
+  const formatTimeDisplay = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Get timezone abbreviation
+  const getTimezoneAbbr = () => {
+    if (!timezone) return '';
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'short'
+      });
+      const parts = formatter.formatToParts(new Date());
+      const tzPart = parts.find(p => p.type === 'timeZoneName');
+      return tzPart?.value || '';
+    } catch {
+      return '';
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,8 +214,35 @@ export function HomePage() {
               />
             </div>
 
-            {/* Start and End Time Picker */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            {/* Mobile: Date/Time Button */}
+            <button
+              type="button"
+              onClick={() => setShowDateTimeModal(true)}
+              className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+            >
+              {startDate && startTime && endDate && endTime ? (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar size={16} className="text-white/60" />
+                    <span className="text-sm text-white/60">Event Time</span>
+                  </div>
+                  <div className="text-white font-medium">
+                    {formatDateDisplay(startDate)}
+                  </div>
+                  <div className="text-white/80 text-sm mt-1">
+                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-white/60" />
+                  <span className="text-white/60">Set Event Time</span>
+                </div>
+              )}
+            </button>
+
+            {/* Desktop: Inline Date/Time Picker */}
+            <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-start gap-4">
                 <div className="flex-1 space-y-3">
                   {/* Start Time */}
@@ -444,6 +504,114 @@ export function HomePage() {
           </p>
         </div>
       </div>
+
+      {/* Mobile Date/Time Modal */}
+      {showDateTimeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowDateTimeModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-black mb-6">Event Time</h2>
+
+            <div className="space-y-3">
+              {/* Start */}
+              <div className="flex items-center gap-3">
+                <span className="text-gray-500 text-base w-20">Start</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (!endDate) setEndDate(e.target.value);
+                  }}
+                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                />
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-32 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                />
+              </div>
+
+              {/* End */}
+              <div className="flex items-center gap-3">
+                <span className="text-gray-500 text-base w-20">End</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                />
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-32 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                />
+              </div>
+
+              {/* Timezone */}
+              <div className="flex items-center gap-3">
+                <span className="text-gray-500 text-base w-20">Timezone</span>
+                <div className="flex-1">
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundSize: '1.5em 1.5em',
+                      paddingRight: '2.5rem'
+                    }}
+                  >
+                    <option value="">Select timezone</option>
+                    <optgroup label="Popular">
+                      <option value="America/Los_Angeles">Los Angeles (GMT-08:00)</option>
+                      <option value="America/Chicago">Chicago (GMT-06:00)</option>
+                      <option value="America/New_York">New York (GMT-05:00)</option>
+                      <option value="Europe/London">London (GMT+00:00)</option>
+                      <option value="Europe/Paris">Paris (GMT+01:00)</option>
+                      <option value="Asia/Tokyo">Tokyo (GMT+09:00)</option>
+                    </optgroup>
+                    <optgroup label="Americas">
+                      <option value="America/Anchorage">Anchorage</option>
+                      <option value="America/Phoenix">Phoenix</option>
+                      <option value="America/Denver">Denver</option>
+                      <option value="America/Toronto">Toronto</option>
+                      <option value="America/Mexico_City">Mexico City</option>
+                      <option value="America/Sao_Paulo">São Paulo</option>
+                    </optgroup>
+                    <optgroup label="Europe">
+                      <option value="Europe/Madrid">Madrid</option>
+                      <option value="Europe/Berlin">Berlin</option>
+                      <option value="Europe/Rome">Rome</option>
+                      <option value="Europe/Moscow">Moscow</option>
+                    </optgroup>
+                    <optgroup label="Asia & Pacific">
+                      <option value="Asia/Dubai">Dubai</option>
+                      <option value="Asia/Kolkata">Kolkata</option>
+                      <option value="Asia/Singapore">Singapore</option>
+                      <option value="Asia/Hong_Kong">Hong Kong</option>
+                      <option value="Asia/Shanghai">Shanghai</option>
+                      <option value="Australia/Sydney">Sydney</option>
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Done Button */}
+            <button
+              type="button"
+              onClick={() => setShowDateTimeModal(false)}
+              className="w-full mt-6 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-3 rounded-xl transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
