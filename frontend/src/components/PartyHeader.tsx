@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { uploadEventImage } from '../lib/supabase';
 
 export const PartyHeader: React.FC = () => {
@@ -161,6 +161,12 @@ export const PartyHeader: React.FC = () => {
     return `${baseUrl}/rsv-pizza/${slug}`;
   };
 
+  const handleViewEventPage = () => {
+    if (!party) return;
+    const slug = party.customUrl || party.inviteCode;
+    navigate(`/${slug}`);
+  };
+
   const inviteLink = getInviteLink();
   const hostLink = getHostLink();
   const eventLink = getEventLink();
@@ -191,11 +197,18 @@ export const PartyHeader: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={handleViewEventPage}
+                className="btn-secondary flex items-center gap-2"
+              >
+                <ExternalLink size={18} />
+                <span className="hidden sm:inline">View Event Page</span>
+              </button>
+              <button
                 onClick={() => setShowShareModal(true)}
                 className="btn-primary flex items-center gap-2"
               >
                 <Link2 size={18} />
-                Share Invite Link
+                <span className="hidden sm:inline">Share Links</span>
               </button>
               <button
                 onClick={clearParty}
