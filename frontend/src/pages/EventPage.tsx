@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Calendar, Clock, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
 
@@ -381,7 +383,51 @@ export function EventPage() {
                 {party.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
                     <h3 className="font-semibold text-white mb-2">About This Event</h3>
-                    <p className="text-white/70 text-sm whitespace-pre-wrap leading-relaxed">{party.description}</p>
+                    <div className="text-white/70 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ node, ...props }) => (
+                            <a {...props} className="text-[#ff393a] hover:text-[#ff5a5b] underline" target="_blank" rel="noopener noreferrer" />
+                          ),
+                          p: ({ node, ...props }) => (
+                            <p {...props} className="mb-3 last:mb-0" />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul {...props} className="list-disc list-inside mb-3 space-y-1" />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
+                          ),
+                          h1: ({ node, ...props }) => (
+                            <h1 {...props} className="text-xl font-bold text-white mt-4 mb-2 first:mt-0" />
+                          ),
+                          h2: ({ node, ...props }) => (
+                            <h2 {...props} className="text-lg font-bold text-white mt-4 mb-2 first:mt-0" />
+                          ),
+                          h3: ({ node, ...props }) => (
+                            <h3 {...props} className="text-base font-semibold text-white mt-3 mb-2 first:mt-0" />
+                          ),
+                          strong: ({ node, ...props }) => (
+                            <strong {...props} className="font-semibold text-white" />
+                          ),
+                          em: ({ node, ...props }) => (
+                            <em {...props} className="italic" />
+                          ),
+                          blockquote: ({ node, ...props }) => (
+                            <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
+                          ),
+                          code: ({ node, inline, ...props }) =>
+                            inline ? (
+                              <code {...props} className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono" />
+                            ) : (
+                              <code {...props} className="block bg-white/10 p-3 rounded text-xs font-mono overflow-x-auto my-3" />
+                            ),
+                        }}
+                      >
+                        {party.description}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 )}
               </div>
