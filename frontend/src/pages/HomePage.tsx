@@ -10,8 +10,11 @@ export function HomePage() {
   // Form state
   const [partyName, setPartyName] = useState('');
   const [hostName, setHostName] = useState('');
-  const [partyDate, setPartyDate] = useState('');
-  const [partyDuration, setPartyDuration] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [timezone, setTimezone] = useState('');
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
   const [partyPassword, setPartyPassword] = useState('');
@@ -23,6 +26,21 @@ export function HomePage() {
   const [customUrl, setCustomUrl] = useState('');
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Get user's timezone on mount
+  React.useEffect(() => {
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setTimezone(userTimezone);
+  }, []);
+
+  // Format timezone for display (e.g., "GMT-05:00 New York")
+  const getTimezoneDisplay = () => {
+    if (!timezone) return '';
+    const now = new Date();
+    const offset = new Date().toLocaleString('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' }).split(' ').pop() || '';
+    const city = timezone.split('/').pop()?.replace(/_/g, ' ') || timezone;
+    return `${offset} ${city}`;
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,10 +104,22 @@ export function HomePage() {
 
     try {
       const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
-      const duration = partyDuration ? parseFloat(partyDuration) : undefined;
       const password = partyPassword.trim() || undefined;
       const description = eventDescription.trim() || undefined;
       const urlSlug = customUrl.trim() || undefined;
+
+      // Calculate duration from start/end times
+      let duration: number | undefined;
+      let startDateTime: string | undefined;
+      if (startDate && startTime && endDate && endTime) {
+        const start = new Date(`${startDate}T${startTime}`);
+        const end = new Date(`${endDate}T${endTime}`);
+        const durationMs = end.getTime() - start.getTime();
+        duration = durationMs / (1000 * 60 * 60); // Convert to hours
+        startDateTime = start.toISOString();
+      } else if (startDate && startTime) {
+        startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      }
 
       // Upload image if file is selected
       let imageUrl = eventImageUrl.trim() || undefined;
@@ -107,7 +137,7 @@ export function HomePage() {
       const party = await createPartyAPI(
         partyName.trim(),
         hostName.trim() || undefined,
-        partyDate || undefined,
+        startDateTime,
         'new-york',
         guestCount,
         partyAddress.trim() || undefined,
@@ -163,35 +193,66 @@ export function HomePage() {
               />
             </div>
 
-            {/* Date and Duration on same line */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <Calendar size={14} className="inline mr-1" />
-                  Party Date
-                </label>
-                <input
-                  type="date"
-                  value={partyDate}
-                  onChange={(e) => setPartyDate(e.target.value)}
-                  className="w-full"
-                />
-              </div>
+            {/* Start and End Time Picker */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <div className="flex items-start gap-4">
+                <div className="flex-1 space-y-3">
+                  {/* Start Time */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 w-12">
+                      <div className="w-3 h-3 rounded-full bg-[#ff393a] border-2 border-white"></div>
+                      <span className="text-sm text-white/60">Start</span>
+                    </div>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        // Auto-populate end date if empty
+                        if (!endDate) setEndDate(e.target.value);
+                      }}
+                      className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                    />
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-28 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  Duration (hrs)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  max="12"
-                  value={partyDuration}
-                  onChange={(e) => setPartyDuration(e.target.value)}
-                  placeholder="2.5"
-                  className="w-full"
-                />
+                  {/* End Time */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 w-12">
+                      <div className="w-3 h-3 rounded-full border-2 border-white/40"></div>
+                      <span className="text-sm text-white/60">End</span>
+                    </div>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                    />
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-28 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                    />
+                  </div>
+                </div>
+
+                {/* Timezone Display */}
+                <div className="flex items-center gap-2 text-xs text-white/50 whitespace-nowrap">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-right">
+                    {getTimezoneDisplay().split(' ').map((part, i) => (
+                      <div key={i} className={i === 0 ? 'font-medium' : ''}>{part}</div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
