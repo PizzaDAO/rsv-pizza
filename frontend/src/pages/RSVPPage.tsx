@@ -324,7 +324,7 @@ export function RSVPPage() {
             <Pizza className="w-10 h-10 text-[#ff393a]" />
             <div>
               <h1 className="text-2xl font-bold text-white">RSVP to {party?.name}</h1>
-              <p className="text-sm text-white/60">Step 1 of 2 - Your Info</p>
+              <p className="text-sm text-white/60">Step 1 of 2</p>
             </div>
           </div>
 
