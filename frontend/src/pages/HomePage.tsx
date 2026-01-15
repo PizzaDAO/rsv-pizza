@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { TimePickerInput } from '../components/TimePickerInput';
 import { TimezonePickerInput } from '../components/TimezonePickerInput';
-import { Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square, CheckSquare2 } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 
 export function HomePage() {
@@ -427,27 +427,33 @@ export function HomePage() {
             {showOptionalFields && (
               <div className="space-y-4 border-l-2 border-white/10 pl-4">
                 <div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={requireApproval}
-                      onChange={(e) => setRequireApproval(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
-                    />
+                  <button
+                    type="button"
+                    onClick={() => setRequireApproval(!requireApproval)}
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {requireApproval ? (
+                      <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                    ) : (
+                      <Square size={18} className="text-white/40 flex-shrink-0" />
+                    )}
                     <span className="text-sm font-medium text-white/80">Require Approval</span>
-                  </label>
+                  </button>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={limitGuests}
-                      onChange={(e) => setLimitGuests(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
-                    />
+                  <button
+                    type="button"
+                    onClick={() => setLimitGuests(!limitGuests)}
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {limitGuests ? (
+                      <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                    ) : (
+                      <Square size={18} className="text-white/40 flex-shrink-0" />
+                    )}
                     <span className="text-sm font-medium text-white/80">Limit Guests</span>
-                  </label>
+                  </button>
                 </div>
 
                 {limitGuests && (

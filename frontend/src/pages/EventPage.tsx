@@ -544,7 +544,7 @@ export function EventPage() {
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
-                    RSVP for Pizza
+                    RSVP
                   </button>
                   {party.rsvp_closed_at && (
                     <p className="text-center text-white/50 text-sm mt-3">

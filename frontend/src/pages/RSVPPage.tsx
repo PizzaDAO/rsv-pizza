@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2 } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
@@ -404,18 +404,20 @@ export function RSVPPage() {
             </div>
 
             {/* Mailing List */}
-            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
-              <input
-                type="checkbox"
-                id="mailingList"
-                checked={mailingListOptIn}
-                onChange={(e) => setMailingListOptIn(e.target.checked)}
-                className="w-5 h-5"
-              />
-              <label htmlFor="mailingList" className="text-sm text-white/80 cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setMailingListOptIn(!mailingListOptIn)}
+              className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors cursor-pointer w-full"
+            >
+              {mailingListOptIn ? (
+                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-white/40 flex-shrink-0" />
+              )}
+              <span className="text-sm text-white/80">
                 Want to join the mailing list?
-              </label>
-            </div>
+              </span>
+            </button>
 
             {error && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
@@ -427,7 +429,7 @@ export function RSVPPage() {
               type="submit"
               className="w-full btn-primary flex items-center justify-center gap-2"
             >
-              Continue to Pizza Preferences
+              Next
               <ChevronRight size={18} />
             </button>
           </form>
@@ -614,7 +616,7 @@ export function RSVPPage() {
               ) : (
                 <>
                   <Pizza size={18} />
-                  Complete RSVP
+                  RSVP
                 </>
               )}
             </button>

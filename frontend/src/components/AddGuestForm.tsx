@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { UserPlus, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User } from 'lucide-react';
 
 export const AddGuestForm: React.FC = () => {
   const { availableToppings, availableBeverages, addGuest, dietaryOptions, party } = usePizza();
@@ -89,25 +89,23 @@ export const AddGuestForm: React.FC = () => {
 
       {isFormVisible && (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="name" className="block text-white/80 font-medium mb-2">
-              Guest Name
-            </label>
+          <div className="relative">
+            <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input
               type="text"
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full"
-              placeholder="Enter guest name"
+              className="w-full !pl-14"
+              placeholder="Guest Name"
               required
             />
           </div>
 
           <div>
-            <label className="block text-white/80 font-medium mb-2">
+            <h3 className="text-sm font-medium text-white/60 mb-2">
               Dietary Restrictions
-            </label>
+            </h3>
             <div className="flex flex-wrap gap-2">
               {dietaryOptions.map(option => (
                 <button
@@ -123,9 +121,9 @@ export const AddGuestForm: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-white/80 font-medium mb-3">
+            <h3 className="text-sm font-medium text-white/60 mb-3">
               Topping Preferences
-            </label>
+            </h3>
             <div className="flex flex-wrap gap-2">
               {availableToppings.map(topping => {
                 const isLiked = toppings.includes(topping.id);
@@ -175,9 +173,9 @@ export const AddGuestForm: React.FC = () => {
           {/* Beverage Preferences - Only show if party has beverages configured */}
           {party?.availableBeverages && party.availableBeverages.length > 0 && (
             <div>
-              <label className="block text-white/80 font-medium mb-3">
+              <h3 className="text-sm font-medium text-white/60 mb-3">
                 Beverage Preferences
-              </label>
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {availableBeverages
                   .filter(bev => party.availableBeverages?.includes(bev.id))
