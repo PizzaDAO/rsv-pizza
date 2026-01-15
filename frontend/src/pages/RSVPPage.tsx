@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2 } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
@@ -333,51 +333,42 @@ export function RSVPPage() {
 
           <form onSubmit={handleStep1Continue} className="space-y-5">
             {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Name *
-              </label>
+            <div className="relative">
+              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Your Name"
-                className="w-full"
+                placeholder="Your Name *"
+                className="w-full !pl-14"
                 required
                 autoFocus
               />
             </div>
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Email *
-              </label>
+            <div className="relative">
+              <Mail size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                className="w-full"
+                placeholder="Your Email *"
+                className="w-full !pl-14"
                 required
               />
             </div>
 
             {/* Ethereum Address */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Your Ethereum Address
-              </label>
+            <div className="relative">
+              <Wallet size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
                 type="text"
                 value={ethereumAddress}
                 onChange={(e) => setEthereumAddress(e.target.value)}
-                placeholder="0x... or vitalik.eth"
-                className="w-full"
+                placeholder="Ethereum Address (optional)"
+                className="w-full !pl-14"
               />
-              <p className="text-xs text-white/50 mt-1">
-                Optional - for on-chain perks
-              </p>
             </div>
 
             {/* What do you do? */}

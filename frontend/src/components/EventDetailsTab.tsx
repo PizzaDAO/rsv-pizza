@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram, GripVertical } from 'lucide-react';
+import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram, GripVertical, Square, CheckSquare2 } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage } from '../lib/supabase';
 import { CoHost } from '../types';
@@ -22,6 +22,7 @@ export const EventDetailsTab: React.FC = () => {
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
+  const [showCoHostsOnEvent, setShowCoHostsOnEvent] = useState(true);
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostWebsite, setNewCoHostWebsite] = useState('');
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
@@ -386,10 +387,24 @@ export const EventDetailsTab: React.FC = () => {
 
         {/* Co-Hosts */}
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <User size={16} className="inline mr-2" />
-            Co-Hosts
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-white/80">
+              <User size={16} className="inline mr-2" />
+              Co-Hosts
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowCoHostsOnEvent(!showCoHostsOnEvent)}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {showCoHostsOnEvent ? (
+                <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
+              ) : (
+                <Square size={16} className="text-white/40 flex-shrink-0" />
+              )}
+              <span className="text-xs font-medium text-white/60">Show on event</span>
+            </button>
+          </div>
 
           {/* Current Co-Hosts List */}
           {coHosts.length > 0 && (
@@ -451,8 +466,6 @@ export const EventDetailsTab: React.FC = () => {
 
           {/* Add New Co-Host Form */}
           <div className="border border-white/20 rounded-xl p-4 space-y-3">
-            <p className="text-sm text-white/60 mb-3">Add a co-host or partner organization</p>
-
             <input
               type="text"
               value={newCoHostName}
@@ -505,10 +518,6 @@ export const EventDetailsTab: React.FC = () => {
               Add Co-Host
             </button>
           </div>
-
-          <p className="text-xs text-white/50 mt-2">
-            Co-hosts will be displayed on the event page with their social links
-          </p>
         </div>
 
         {/* Message */}
