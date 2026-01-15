@@ -64,8 +64,8 @@ function HostPageContent() {
 
   const tabs = [
     { id: 'guests' as TabType, label: 'Guests & RSVPs', icon: Users },
-    { id: 'pizza' as TabType, label: 'Pizza & Beverages', icon: Pizza },
     { id: 'details' as TabType, label: 'Event Details', icon: Settings },
+    { id: 'pizza' as TabType, label: 'Pizza & Beverages', icon: Pizza },
   ];
 
   return (
