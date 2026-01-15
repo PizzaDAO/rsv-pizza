@@ -170,14 +170,11 @@ export function HomePage() {
         <div className="card p-8">
           <form onSubmit={handleCreate} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Party Name *
-              </label>
               <input
                 type="text"
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
-                placeholder="e.g., Friday Night Pizza"
+                placeholder="Party Name *"
                 className="w-full"
                 required
                 autoFocus
@@ -240,69 +237,48 @@ export function HomePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <MapPin size={14} className="inline mr-1" />
-                Location
-              </label>
               <input
                 type="text"
                 value={partyAddress}
                 onChange={(e) => setPartyAddress(e.target.value)}
-                placeholder="e.g., 123 Main St, New York, NY"
+                placeholder="Location"
                 className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <FileText size={14} className="inline mr-1" />
-                Event Description
-              </label>
               <textarea
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
-                placeholder="Tell guests about your event..."
+                placeholder="Add Description"
                 className="w-full"
                 rows={3}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <Users size={14} className="inline mr-1" />
-                Capacity *
-              </label>
               <input
                 type="number"
                 min="1"
                 value={expectedGuests}
                 onChange={(e) => setExpectedGuests(e.target.value)}
-                placeholder="e.g., 12"
+                placeholder="Capacity *"
                 className="w-full"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <User size={14} className="inline mr-1" />
-                Your Name (Host)
-              </label>
               <input
                 type="text"
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
-                placeholder="e.g., John"
+                placeholder="Your Name (Host)"
                 className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <Image size={14} className="inline mr-1" />
-                Event Flyer (Square Image)
-              </label>
-
               {/* Image URL Input */}
               <div className="mb-3">
                 <input
@@ -317,7 +293,7 @@ export function HomePage() {
                       setImageError(null);
                     }
                   }}
-                  placeholder="https://example.com/image.jpg"
+                  placeholder="Event Flyer URL (Square Image)"
                   className="w-full"
                 />
               </div>
@@ -412,15 +388,11 @@ export function HomePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <Lock size={14} className="inline mr-1" />
-                    Event Password
-                  </label>
                   <input
                     type="password"
                     value={partyPassword}
                     onChange={(e) => setPartyPassword(e.target.value)}
-                    placeholder="Password to protect event page"
+                    placeholder="Event Password"
                     className="w-full"
                   />
                   <p className="text-xs text-white/50 mt-1">
@@ -429,15 +401,11 @@ export function HomePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <LinkIcon size={14} className="inline mr-1" />
-                    Custom URL
-                  </label>
                   <input
                     type="text"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="my-awesome-party"
+                    placeholder="Custom URL"
                     className="w-full font-mono"
                     pattern="[a-z0-9-]+"
                     minLength={3}
