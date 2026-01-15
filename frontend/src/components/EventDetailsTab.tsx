@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage } from '../lib/supabase';
+import { CoHost } from '../types';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -18,6 +19,14 @@ export const EventDetailsTab: React.FC = () => {
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [maxGuests, setMaxGuests] = useState('');
+
+  // Co-hosts state
+  const [coHosts, setCoHosts] = useState<CoHost[]>([]);
+  const [newCoHostName, setNewCoHostName] = useState('');
+  const [newCoHostWebsite, setNewCoHostWebsite] = useState('');
+  const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
+  const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
+  const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -37,6 +46,7 @@ export const EventDetailsTab: React.FC = () => {
       setEventImageUrl(party.eventImageUrl || '');
       setImagePreview(party.eventImageUrl || null);
       setMaxGuests(party.maxGuests?.toString() || '');
+      setCoHosts(party.coHosts || []);
     }
   }, [party]);
 
@@ -91,6 +101,32 @@ export const EventDetailsTab: React.FC = () => {
     setEventImageUrl('');
   };
 
+  const addCoHost = () => {
+    if (!newCoHostName.trim()) return;
+
+    const newCoHost: CoHost = {
+      id: crypto.randomUUID(),
+      name: newCoHostName.trim(),
+      website: newCoHostWebsite.trim() || undefined,
+      twitter: newCoHostTwitter.trim() || undefined,
+      instagram: newCoHostInstagram.trim() || undefined,
+      avatar_url: newCoHostAvatarUrl.trim() || undefined,
+    };
+
+    setCoHosts([...coHosts, newCoHost]);
+
+    // Reset form
+    setNewCoHostName('');
+    setNewCoHostWebsite('');
+    setNewCoHostTwitter('');
+    setNewCoHostInstagram('');
+    setNewCoHostAvatarUrl('');
+  };
+
+  const removeCoHost = (id: string) => {
+    setCoHosts(coHosts.filter(h => h.id !== id));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!party) return;
@@ -122,6 +158,7 @@ export const EventDetailsTab: React.FC = () => {
         custom_url: customUrl.trim() || null,
         event_image_url: imageUrl || null,
         max_guests: maxGuests ? parseInt(maxGuests, 10) : null,
+        co_hosts: coHosts,
       });
 
       if (success) {
@@ -355,6 +392,121 @@ export const EventDetailsTab: React.FC = () => {
           />
           <p className="text-xs text-white/50 mt-1">
             Guests will need this password to view the event page
+          </p>
+        </div>
+
+        {/* Co-Hosts */}
+        <div>
+          <label className="block text-sm font-medium text-white/80 mb-2">
+            <User size={16} className="inline mr-2" />
+            Co-Hosts
+          </label>
+
+          {/* Current Co-Hosts List */}
+          {coHosts.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {coHosts.map((coHost) => (
+                <div key={coHost.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
+                  <div className="flex items-center gap-3">
+                    {coHost.avatar_url ? (
+                      <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-[#ff393a]" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white font-medium">{coHost.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {coHost.website && (
+                          <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                            <Globe size={14} />
+                          </a>
+                        )}
+                        {coHost.twitter && (
+                          <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                            <Twitter size={14} />
+                          </a>
+                        )}
+                        {coHost.instagram && (
+                          <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                            <Instagram size={14} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeCoHost(coHost.id)}
+                    className="text-[#ff393a] hover:text-[#ff5a5b]"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add New Co-Host Form */}
+          <div className="border border-white/20 rounded-xl p-4 space-y-3">
+            <p className="text-sm text-white/60 mb-3">Add a co-host or partner organization</p>
+
+            <input
+              type="text"
+              value={newCoHostName}
+              onChange={(e) => setNewCoHostName(e.target.value)}
+              placeholder="Name *"
+              className="w-full"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="url"
+                value={newCoHostWebsite}
+                onChange={(e) => setNewCoHostWebsite(e.target.value)}
+                placeholder="Website"
+                className="w-full"
+              />
+              <input
+                type="url"
+                value={newCoHostAvatarUrl}
+                onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
+                placeholder="Avatar URL"
+                className="w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={newCoHostTwitter}
+                onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                placeholder="Twitter username (no @)"
+                className="w-full"
+              />
+              <input
+                type="text"
+                value={newCoHostInstagram}
+                onChange={(e) => setNewCoHostInstagram(e.target.value)}
+                placeholder="Instagram username (no @)"
+                className="w-full"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={addCoHost}
+              disabled={!newCoHostName.trim()}
+              className="w-full btn-secondary flex items-center justify-center gap-2"
+            >
+              <UserPlus size={16} />
+              Add Co-Host
+            </button>
+          </div>
+
+          <p className="text-xs text-white/50 mt-2">
+            Co-hosts will be displayed on the event page with their social links
           </p>
         </div>
 

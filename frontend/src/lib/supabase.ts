@@ -60,6 +60,7 @@ export interface DbParty {
   description: string | null;
   address: string | null;
   rsvp_closed_at: string | null;
+  co_hosts: any[];
   created_at: string;
 }
 
@@ -67,6 +68,10 @@ export interface DbGuest {
   id: string;
   party_id: string;
   name: string;
+  email?: string;
+  ethereum_address?: string;
+  roles?: string[];
+  mailing_list_opt_in?: boolean;
   dietary_restrictions: string[];
   liked_toppings: string[];
   disliked_toppings: string[];
@@ -223,13 +228,21 @@ export async function addGuestToParty(
   likedToppings: string[],
   dislikedToppings: string[],
   likedBeverages: string[],
-  dislikedBeverages: string[]
+  dislikedBeverages: string[],
+  email?: string,
+  ethereumAddress?: string,
+  roles?: string[],
+  mailingListOptIn?: boolean
 ): Promise<DbGuest | null> {
   const { data, error } = await supabase
     .from('guests')
     .insert({
       party_id: partyId,
       name,
+      email: email || null,
+      ethereum_address: ethereumAddress || null,
+      roles: roles || [],
+      mailing_list_opt_in: mailingListOptIn || false,
       dietary_restrictions: dietaryRestrictions,
       liked_toppings: likedToppings,
       disliked_toppings: dislikedToppings,
@@ -358,6 +371,7 @@ export async function updateParty(
     custom_url?: string | null;
     event_image_url?: string | null;
     max_guests?: number | null;
+    co_hosts?: any[];
   }
 ): Promise<boolean> {
   const { error } = await supabase

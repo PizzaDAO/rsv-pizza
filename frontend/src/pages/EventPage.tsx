@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Calendar, Clock, MapPin, Users, User, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, User, Pizza, Loader2, Lock, AlertCircle, Settings, Globe, Twitter, Instagram } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
 
 export function EventPage() {
@@ -337,20 +337,76 @@ export function EventPage() {
 
               {/* Host and Guest Info */}
               <div className="p-6 border-t border-white/10">
+                <h3 className="text-sm font-semibold text-white/60 mb-3">Hosted By</h3>
+
+                {/* Primary Host */}
                 {party.host_name && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-white/60 mb-2">Hosted By</h3>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
-                        <User className="w-5 h-5 text-[#ff393a]" />
-                      </div>
-                      <span className="text-white font-medium">{party.host_name}</span>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                      <User className="w-5 h-5 text-[#ff393a]" />
                     </div>
+                    <span className="text-white font-medium">{party.host_name}</span>
+                  </div>
+                )}
+
+                {/* Co-Hosts */}
+                {party.coHosts && party.coHosts.length > 0 && (
+                  <div className="space-y-2">
+                    {party.coHosts.map((coHost) => (
+                      <div key={coHost.id} className="flex items-center gap-3">
+                        {coHost.avatar_url ? (
+                          <img
+                            src={coHost.avatar_url}
+                            alt={coHost.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                            <User className="w-5 h-5 text-[#ff393a]" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="text-white font-medium">{coHost.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {coHost.website && (
+                              <a
+                                href={coHost.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white/50 hover:text-white transition-colors"
+                              >
+                                <Globe size={14} />
+                              </a>
+                            )}
+                            {coHost.twitter && (
+                              <a
+                                href={`https://twitter.com/${coHost.twitter}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white/50 hover:text-white transition-colors"
+                              >
+                                <Twitter size={14} />
+                              </a>
+                            )}
+                            {coHost.instagram && (
+                              <a
+                                href={`https://instagram.com/${coHost.instagram}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white/50 hover:text-white transition-colors"
+                              >
+                                <Instagram size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {/* Guest Count */}
-                <div className="pt-4 border-t border-white/10">
+                <div className="pt-4 border-t border-white/10 mt-4">
                   <div className="flex items-center gap-2 text-white/60 text-sm">
                     <Users className="w-4 h-4" />
                     <span>
@@ -405,6 +461,22 @@ export function EventPage() {
                   </div>
                 )}
 
+                {/* RSVP Button */}
+                <div className="pt-4">
+                  <button
+                    onClick={handleRSVP}
+                    className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                  >
+                    <Pizza size={20} />
+                    RSVP for Pizza
+                  </button>
+                  {party.rsvp_closed_at && (
+                    <p className="text-center text-white/50 text-sm mt-3">
+                      RSVPs are closed for this event
+                    </p>
+                  )}
+                </div>
+
                 {/* Description */}
                 {party.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
@@ -455,22 +527,6 @@ export function EventPage() {
                       </ReactMarkdown>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* RSVP Button - Fixed at bottom */}
-              <div className="p-6 border-t border-white/10 bg-white/5">
-                <button
-                  onClick={handleRSVP}
-                  className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
-                >
-                  <Pizza size={20} />
-                  RSVP for Pizza
-                </button>
-                {party.rsvp_closed_at && (
-                  <p className="text-center text-white/50 text-sm mt-3">
-                    RSVPs are closed for this event
-                  </p>
                 )}
               </div>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, DbParty } from '../lib/supabase';
 
 const DIETARY_OPTIONS = [
@@ -8,6 +8,18 @@ const DIETARY_OPTIONS = [
   'Vegan',
   'Gluten-Free',
   'Dairy-Free',
+];
+
+const ROLE_OPTIONS = [
+  'Biz Dev',
+  'Dev',
+  'Artist',
+  'Marketing',
+  'Founder',
+  'Student',
+  'Investor',
+  'Ops',
+  'Designer',
 ];
 
 const TOPPINGS = [
@@ -46,20 +58,28 @@ const BEVERAGES = [
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [party, setParty] = useState<DbParty | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [step, setStep] = useState(1); // 1 or 2
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Form state
+  // Step 1 - Personal Info
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [ethereumAddress, setEthereumAddress] = useState('');
+  const [roles, setRoles] = useState<string[]>([]);
+  const [mailingListOptIn, setMailingListOptIn] = useState(false);
+
+  // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [likedToppings, setLikedToppings] = useState<string[]>([]);
   const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
@@ -77,14 +97,12 @@ export function RSVPPage() {
 
           // Check if party has password protection
           if (foundParty.password) {
-            // Check if already authenticated in this session
             const authKey = `rsvpizza_auth_${inviteCode}`;
             const storedAuth = sessionStorage.getItem(authKey);
             if (storedAuth === foundParty.password) {
               setIsAuthenticated(true);
             }
           } else {
-            // No password, automatically authenticated
             setIsAuthenticated(true);
           }
         } else {
@@ -102,26 +120,30 @@ export function RSVPPage() {
     if (!party?.password) return;
 
     if (passwordInput === party.password) {
-      // Correct password
       setIsAuthenticated(true);
       setPasswordError(null);
-      // Store in session storage to avoid re-prompting
       const authKey = `rsvpizza_auth_${inviteCode}`;
       sessionStorage.setItem(authKey, party.password);
     } else {
-      // Wrong password
       setPasswordError('Incorrect password. Please try again.');
       setPasswordInput('');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStep1Continue = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
       setError('Please enter your name');
       return;
     }
+
+    setError(null);
+    setStep(2);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     if (!inviteCode) {
       setError('Invalid invite code');
@@ -132,7 +154,6 @@ export function RSVPPage() {
     setError(null);
 
     try {
-      // Add guest to party in Supabase
       const guest = await addGuestToParty(
         party!.id,
         name.trim(),
@@ -140,7 +161,11 @@ export function RSVPPage() {
         likedToppings,
         dislikedToppings,
         likedBeverages,
-        dislikedBeverages
+        dislikedBeverages,
+        email.trim() || undefined,
+        ethereumAddress.trim() || undefined,
+        roles,
+        mailingListOptIn
       );
 
       if (guest) {
@@ -153,6 +178,14 @@ export function RSVPPage() {
     }
 
     setSubmitting(false);
+  };
+
+  const toggleRole = (role: string) => {
+    setRoles(prev =>
+      prev.includes(role)
+        ? prev.filter(r => r !== role)
+        : [...prev, role]
+    );
   };
 
   const toggleDietary = (option: string) => {
@@ -183,6 +216,13 @@ export function RSVPPage() {
     setDislikedBeverages(prev => prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]);
   };
 
+  const handleClose = () => {
+    const eventUrl = party?.custom_url
+      ? `/${party.custom_url}`
+      : `/${inviteCode}`;
+    navigate(eventUrl);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -197,26 +237,23 @@ export function RSVPPage() {
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Party Not Found</h1>
-          <p className="text-white/60 mb-6">{error}</p>
-          <a href="/rsv-pizza/" className="btn-primary inline-block">
-            Go to Home
-          </a>
+          <p className="text-white/60">{error}</p>
         </div>
       </div>
     );
   }
 
-  // Show password prompt if party is password-protected and not authenticated
-  if (party && party.password && !isAuthenticated) {
+  // Password protection UI
+  if (!isAuthenticated && party?.password) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="card p-8 max-w-md">
+        <div className="card p-8 max-w-md w-full">
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
           <p className="text-white/60 mb-6 text-center">
-            This party is password-protected. Please enter the password to continue.
+            This event is password-protected. Please enter the password to RSVP.
           </p>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -228,7 +265,7 @@ export function RSVPPage() {
 
             <div>
               <label className="block text-sm font-medium text-white/80 mb-2">
-                Party Password
+                Password
               </label>
               <input
                 type="password"
@@ -241,10 +278,7 @@ export function RSVPPage() {
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full btn-primary"
-            >
+            <button type="submit" className="w-full btn-primary">
               Continue
             </button>
           </form>
@@ -253,6 +287,7 @@ export function RSVPPage() {
     );
   }
 
+  // Success screen
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -261,227 +296,321 @@ export function RSVPPage() {
             <Check className="w-8 h-8 text-[#39d98a]" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">You're In!</h1>
-          <p className="text-white/60 mb-4">
-            Your pizza preferences have been saved for {party?.name}.
+          <p className="text-white/60 mb-6">
+            Thanks for RSVPing to {party?.name}! We'll see you there.
           </p>
-          {party?.date && (
-            <p className="text-sm text-white/40">
-              See you on {new Date(party.date).toLocaleDateString()}!
-            </p>
-          )}
+          <button
+            onClick={handleClose}
+            className="btn-secondary"
+          >
+            Back to Event
+          </button>
         </div>
       </div>
     );
   }
 
-  if (party?.rsvp_closed_at) {
+  // Step 1 - Personal Info
+  if (step === 1) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="card p-8 max-w-md text-center">
-          <Pizza className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">{party.name}</h1>
-          <p className="text-white/60">RSVPs are closed for this party.</p>
-        </div>
-      </div>
-    );
-  }
+        <div className="card p-8 max-w-lg w-full relative">
+          {/* Close button */}
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
 
-  return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="card overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-[#ff393a] to-[#ff6b35] p-6 text-center">
-            <img
-              src="/rsv-pizza/logo.png"
-              alt="RSVPizza"
-              className="h-10 mx-auto mb-3"
-            />
-            <h1 className="text-2xl font-bold text-white">{party?.name}</h1>
-            {party?.host_name && (
-              <p className="text-white/80">Hosted by {party.host_name}</p>
-            )}
-            {party?.date && (
-              <p className="text-white/70 text-sm mt-1">
-                {new Date(party.date).toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
-            )}
+          <div className="flex items-center gap-3 mb-6">
+            <Pizza className="w-10 h-10 text-[#ff393a]" />
+            <div>
+              <h1 className="text-2xl font-bold text-white">RSVP to {party?.name}</h1>
+              <p className="text-sm text-white/60">Step 1 of 2 - Your Info</p>
+            </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleStep1Continue} className="space-y-5">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Name *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your Name"
+                className="w-full"
+                required
+                autoFocus
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Email *
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com"
+                className="w-full"
+                required
+              />
+            </div>
+
+            {/* Ethereum Address */}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Your Ethereum Address
+              </label>
+              <input
+                type="text"
+                value={ethereumAddress}
+                onChange={(e) => setEthereumAddress(e.target.value)}
+                placeholder="0x... or vitalik.eth"
+                className="w-full"
+              />
+              <p className="text-xs text-white/50 mt-1">
+                Optional - for on-chain perks
+              </p>
+            </div>
+
+            {/* What do you do? */}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                What do you do?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {ROLE_OPTIONS.map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleRole(role)}
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      roles.includes(role)
+                        ? 'bg-[#ff393a] text-white'
+                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mailing List */}
+            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
+              <input
+                type="checkbox"
+                id="mailingList"
+                checked={mailingListOptIn}
+                onChange={(e) => setMailingListOptIn(e.target.checked)}
+                className="w-5 h-5"
+              />
+              <label htmlFor="mailingList" className="text-sm text-white/80 cursor-pointer">
+                Want to join the mailing list?
+              </label>
+            </div>
+
             {error && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Your Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full"
-                placeholder="Enter your name"
-                required
-              />
-            </div>
+            <button
+              type="submit"
+              className="w-full btn-primary flex items-center justify-center gap-2"
+            >
+              Continue to Pizza Preferences
+              <ChevronRight size={18} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
-            {/* Dietary Restrictions */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
-                Dietary Restrictions
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {DIETARY_OPTIONS.map(option => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => toggleDietary(option)}
-                    className={`chip ${dietaryRestrictions.includes(option) ? 'active' : ''}`}
+  // Step 2 - Pizza Preferences
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="card p-8 max-w-2xl w-full relative">
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+        >
+          <X size={24} />
+        </button>
+
+        <div className="flex items-center gap-3 mb-6">
+          <Pizza className="w-10 h-10 text-[#ff393a]" />
+          <div>
+            <h1 className="text-2xl font-bold text-white">Pizza Preferences</h1>
+            <p className="text-sm text-white/60">Step 2 of 2 - Help us order the perfect pizzas!</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Dietary Restrictions */}
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-3">
+              Dietary Restrictions (Optional)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {DIETARY_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => toggleDietary(option)}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    dietaryRestrictions.includes(option)
+                      ? 'bg-[#ff393a] text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Toppings */}
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-3">
+              Topping Preferences
+            </label>
+            <p className="text-xs text-white/50 mb-3">
+              Tap <ThumbsUp size={14} className="inline" /> for toppings you love, <ThumbsDown size={14} className="inline" /> for ones you'd rather avoid
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+              {TOPPINGS.map((topping) => {
+                const isLiked = likedToppings.includes(topping.id);
+                const isDisliked = dislikedToppings.includes(topping.id);
+
+                return (
+                  <div
+                    key={topping.id}
+                    className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
                   >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Topping Preferences */}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
-                Topping Preferences
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {TOPPINGS.map(topping => {
-                  const isLiked = likedToppings.includes(topping.id);
-                  const isDisliked = dislikedToppings.includes(topping.id);
-                  return (
-                    <div
-                      key={topping.id}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                        isLiked
-                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                          : isDisliked
-                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                          : 'bg-white/5 border-white/10'
-                      }`}
-                    >
+                    <span className="text-white">{topping.name}</span>
+                    <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => handleToppingLike(topping.id)}
-                        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                        className={`p-2 rounded-lg transition-colors ${
+                          isLiked
+                            ? 'bg-[#39d98a] text-white'
+                            : 'bg-white/10 text-white/50 hover:bg-white/20'
+                        }`}
                       >
-                        <ThumbsUp
-                          size={12}
-                          className={`transition-all ${
-                            isLiked ? 'text-[#39d98a]' : 'text-white/20'
-                          }`}
-                        />
-                        <span className="text-white text-xs">{topping.name}</span>
+                        <ThumbsUp size={18} />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleToppingDislike(topping.id)}
-                        className="p-0.5 hover:opacity-70 transition-opacity"
+                        className={`p-2 rounded-lg transition-colors ${
+                          isDisliked
+                            ? 'bg-[#ff393a] text-white'
+                            : 'bg-white/10 text-white/50 hover:bg-white/20'
+                        }`}
                       >
-                        <ThumbsDown
-                          size={12}
-                          className={`transition-all ${
-                            isDisliked ? 'text-[#ff393a]' : 'text-white/20'
-                          }`}
-                        />
+                        <ThumbsDown size={18} />
                       </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Beverages */}
+          {availableBeverages.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-3">
+                Beverage Preferences
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                {BEVERAGES.filter(b => availableBeverages.includes(b.id)).map((beverage) => {
+                  const isLiked = likedBeverages.includes(beverage.id);
+                  const isDisliked = dislikedBeverages.includes(beverage.id);
+
+                  return (
+                    <div
+                      key={beverage.id}
+                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                    >
+                      <span className="text-white">{beverage.name}</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleBeverageLike(beverage.id)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isLiked
+                              ? 'bg-[#39d98a] text-white'
+                              : 'bg-white/10 text-white/50 hover:bg-white/20'
+                          }`}
+                        >
+                          <ThumbsUp size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBeverageDislike(beverage.id)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isDisliked
+                              ? 'bg-[#ff393a] text-white'
+                              : 'bg-white/10 text-white/50 hover:bg-white/20'
+                          }`}
+                        >
+                          <ThumbsDown size={18} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
 
-            {/* Beverage Preferences - Only show if party has beverages */}
-            {availableBeverages.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-3">
-                  Beverage Preferences
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {BEVERAGES
-                    .filter(bev => availableBeverages.includes(bev.id))
-                    .map(beverage => {
-                      const isLiked = likedBeverages.includes(beverage.id);
-                      const isDisliked = dislikedBeverages.includes(beverage.id);
-                      return (
-                        <div
-                          key={beverage.id}
-                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                            isLiked
-                              ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                              : isDisliked
-                              ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                              : 'bg-white/5 border-white/10'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleBeverageLike(beverage.id)}
-                            className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
-                          >
-                            <ThumbsUp
-                              size={12}
-                              className={`transition-all ${
-                                isLiked ? 'text-[#39d98a]' : 'text-white/20'
-                              }`}
-                            />
-                            <span className="text-white text-xs">{beverage.name}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleBeverageDislike(beverage.id)}
-                            className="p-0.5 hover:opacity-70 transition-opacity"
-                          >
-                            <ThumbsDown
-                              size={12}
-                              className={`transition-all ${
-                                isDisliked ? 'text-[#ff393a]' : 'text-white/20'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
+          {error && (
+            <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
 
-            {/* Submit */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <ChevronLeft size={18} />
+              Back
+            </button>
             <button
               type="submit"
               disabled={submitting}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 btn-primary flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 size={18} className="animate-spin" />
                   Submitting...
                 </>
               ) : (
-                'Submit My Preferences'
+                <>
+                  <Pizza size={18} />
+                  Complete RSVP
+                </>
               )}
             </button>
-          </form>
-        </div>
-
-        <p className="text-center text-white/30 text-sm mt-6">
-          Powered by RSVPizza
-        </p>
+          </div>
+        </form>
       </div>
     </div>
   );

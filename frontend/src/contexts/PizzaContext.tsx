@@ -100,6 +100,10 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
   return {
     id: dbGuest.id,
     name: dbGuest.name,
+    email: dbGuest.email,
+    ethereumAddress: dbGuest.ethereum_address,
+    roles: dbGuest.roles,
+    mailingListOptIn: dbGuest.mailing_list_opt_in,
     dietaryRestrictions: dbGuest.dietary_restrictions,
     toppings: dbGuest.liked_toppings,
     dislikedToppings: dbGuest.disliked_toppings,
@@ -126,6 +130,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     description: dbParty.description,
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
+    coHosts: dbParty.co_hosts || [],
     createdAt: dbParty.created_at,
     guests,
   };

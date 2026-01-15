@@ -13,6 +13,10 @@ export interface Beverage {
 export interface Guest {
   id?: string;
   name: string;
+  email?: string;
+  ethereumAddress?: string;
+  roles?: string[];
+  mailingListOptIn?: boolean;
   dietaryRestrictions: string[];
   toppings: string[];
   dislikedToppings: string[];
@@ -81,6 +85,15 @@ export interface WaveRecommendation {
   totalBeverages: number;
 }
 
+export interface CoHost {
+  id: string;
+  name: string;
+  website?: string;
+  twitter?: string;
+  instagram?: string;
+  avatar_url?: string;
+}
+
 export interface PizzaSettings {
   size: PizzaSize;
   style: PizzaStyle;
@@ -102,6 +115,7 @@ export interface Party {
   description: string | null;
   address: string | null;
   rsvpClosedAt: string | null;
+  coHosts: CoHost[];
   createdAt: string;
   guests: Guest[];
 }
