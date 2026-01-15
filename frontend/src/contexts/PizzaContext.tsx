@@ -55,19 +55,11 @@ export const availableToppings: Topping[] = [
 ];
 
 export const availableBeverages: Beverage[] = [
-  { id: 'coke', name: 'Coca-Cola', category: 'soda' },
-  { id: 'diet-coke', name: 'Diet Coke', category: 'soda' },
-  { id: 'sprite', name: 'Sprite', category: 'soda' },
-  { id: 'fanta', name: 'Fanta', category: 'soda' },
-  { id: 'pepsi', name: 'Pepsi', category: 'soda' },
-  { id: 'mountain-dew', name: 'Mountain Dew', category: 'soda' },
-  { id: 'dr-pepper', name: 'Dr Pepper', category: 'soda' },
-  { id: 'orange-juice', name: 'Orange Juice', category: 'juice' },
-  { id: 'apple-juice', name: 'Apple Juice', category: 'juice' },
-  { id: 'lemonade', name: 'Lemonade', category: 'juice' },
-  { id: 'iced-tea', name: 'Iced Tea', category: 'other' },
   { id: 'water', name: 'Water', category: 'water' },
-  { id: 'sparkling-water', name: 'Sparkling Water', category: 'water' },
+  { id: 'beer', name: 'Beer', category: 'alcohol' },
+  { id: 'soda', name: 'Soda', category: 'soda' },
+  { id: 'wine', name: 'Wine', category: 'alcohol' },
+  { id: 'cocktail', name: 'Cocktail', category: 'alcohol' },
 ];
 
 export const dietaryOptions: string[] = [

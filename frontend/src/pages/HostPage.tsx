@@ -125,10 +125,12 @@ function HostPageContent() {
             )}
           </div>
 
-          {/* Order Summary - Always Visible */}
-          <div className="xl:col-span-1 space-y-6">
-            <PizzaOrderSummary />
-          </div>
+          {/* Order Summary - Only on Pizza & Drinks Tab */}
+          {activeTab === 'pizza' && (
+            <div className="xl:col-span-1 space-y-6">
+              <PizzaOrderSummary />
+            </div>
+          )}
         </div>
       </div>
     </Layout>
