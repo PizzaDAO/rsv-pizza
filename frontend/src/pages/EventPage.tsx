@@ -467,8 +467,8 @@ export function EventPage() {
                   <div className="flex items-center" style={{ marginLeft: '8px' }}>
                     {/* Primary host avatar */}
                     {party.host_name && (
-                      <div className="w-8 h-8 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0 border-2 border-black relative" style={{ zIndex: 10, marginLeft: '-8px' }}>
-                        <User className="w-4 h-4 text-[#ff393a]" />
+                      <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative" style={{ zIndex: 10, marginLeft: '-8px' }}>
+                        <User className="w-4 h-4 text-white" />
                       </div>
                     )}
                     {/* Co-host avatars (first 6) */}
@@ -481,8 +481,8 @@ export function EventPage() {
                             className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0 border-2 border-black">
-                            <User className="w-4 h-4 text-[#ff393a]" />
+                          <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black">
+                            <User className="w-4 h-4 text-white" />
                           </div>
                         )}
                       </div>
@@ -645,8 +645,8 @@ export function EventPage() {
                     {/* Primary Host */}
                     {party.host_name && (
                       <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                          <User className="w-6 h-6 text-[#ff393a]" />
+                        <div className="w-12 h-12 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0">
+                          <User className="w-6 h-6 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-white font-semibold text-lg">{party.host_name}</p>
@@ -666,8 +666,8 @@ export function EventPage() {
                                 className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
-                              <div className="w-12 h-12 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                                <User className="w-6 h-6 text-[#ff393a]" />
+                              <div className="w-12 h-12 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0">
+                                <User className="w-6 h-6 text-white" />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
