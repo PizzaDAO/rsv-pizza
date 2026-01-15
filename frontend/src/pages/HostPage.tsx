@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
@@ -9,6 +9,9 @@ import { AddGuestForm } from '../components/AddGuestForm';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { PizzaSettings } from '../components/PizzaSettings';
 import { BeverageSettings } from '../components/BeverageSettings';
+import { EventDetailsTab } from '../components/EventDetailsTab';
+
+type TabType = 'details' | 'pizza' | 'guests';
 
 function HostPageContent() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -16,6 +19,7 @@ function HostPageContent() {
   const { loadParty, party, partyLoading } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('guests');
 
   useEffect(() => {
     async function load() {
@@ -58,6 +62,12 @@ function HostPageContent() {
     );
   }
 
+  const tabs = [
+    { id: 'guests' as TabType, label: 'Guests & RSVPs', icon: Users },
+    { id: 'pizza' as TabType, label: 'Pizza & Beverages', icon: Pizza },
+    { id: 'details' as TabType, label: 'Event Details', icon: Settings },
+  ];
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -72,13 +82,50 @@ function HostPageContent() {
 
         <PartyHeader />
 
+        {/* Tab Navigation */}
+        <div className="card p-2 mb-6 flex gap-2 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-[#ff393a] text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Icon size={18} />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab Content */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
-            <PizzaSettings />
-            <BeverageSettings />
-            <AddGuestForm />
-            <GuestList />
+            {activeTab === 'guests' && (
+              <>
+                <AddGuestForm />
+                <GuestList />
+              </>
+            )}
+
+            {activeTab === 'pizza' && (
+              <>
+                <PizzaSettings />
+                <BeverageSettings />
+              </>
+            )}
+
+            {activeTab === 'details' && (
+              <EventDetailsTab />
+            )}
           </div>
+
+          {/* Order Summary - Always Visible */}
           <div className="xl:col-span-1 space-y-6">
             <PizzaOrderSummary />
           </div>

@@ -343,3 +343,31 @@ export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[])
     supabase.removeChannel(channel);
   };
 }
+
+// Update party details
+export async function updateParty(
+  partyId: string,
+  updates: {
+    name?: string;
+    host_name?: string | null;
+    date?: string | null;
+    duration?: number | null;
+    address?: string | null;
+    description?: string | null;
+    password?: string | null;
+    custom_url?: string | null;
+    event_image_url?: string | null;
+    max_guests?: number | null;
+  }
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('parties')
+    .update(updates)
+    .eq('id', partyId);
+
+  if (error) {
+    console.error('Error updating party:', error);
+    return false;
+  }
+  return true;
+}
