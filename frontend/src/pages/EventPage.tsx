@@ -352,9 +352,9 @@ export function EventPage() {
                   )}
 
                   {/* Co-Hosts */}
-                  {party.coHosts && party.coHosts.length > 0 && (
+                  {party.co_hosts && party.co_hosts.length > 0 && (
                     <>
-                      {party.coHosts.map((coHost) => (
+                      {party.co_hosts.map((coHost) => (
                         <div key={coHost.id} className="flex items-center gap-3">
                           {coHost.avatar_url ? (
                             <img
