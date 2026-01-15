@@ -55,7 +55,21 @@
       "Bash(node -e:*)",
       "WebFetch(domain:www.rain.xyz)",
       "WebFetch(domain:docs.rain.xyz)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git worktree:*)",
+      "WebFetch(domain:docs.bland.ai)",
+      "Bash(npx prisma:*)",
+      "Bash(where:*)",
+      "Bash(code -g:*)",
+      "Bash(code \"C:/Users/samgo/OneDrive/Documents/PizzaDAO/Code/rsvpizza/algorithm.md\")",
+      "Bash(gh run watch:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)",
+      "Bash(docker:*)",
+      "Bash(git pull:*)",
+      "Bash(git reset:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

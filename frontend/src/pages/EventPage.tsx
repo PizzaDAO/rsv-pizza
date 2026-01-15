@@ -254,13 +254,13 @@ export function EventPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
-            {/* Left Column - Square Image */}
+            {/* Left Column - Image */}
             {party.event_image_url ? (
-              <div className="relative aspect-square bg-black/30">
+              <div className="relative bg-black/30">
                 <img
                   src={party.event_image_url}
                   alt={party.name}
-                  className="w-full h-full object-contain"
+                  className="w-full h-auto"
                 />
               </div>
             ) : (
