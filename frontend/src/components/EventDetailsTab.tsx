@@ -56,6 +56,11 @@ export const EventDetailsTab: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Revoke previous preview URL if it exists
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
     setImageError(null);
 
     if (!file.type.startsWith('image/')) {
@@ -85,7 +90,7 @@ export const EventDetailsTab: React.FC = () => {
 
       setEventImageFile(file);
       setImagePreview(objectUrl);
-      URL.revokeObjectURL(objectUrl);
+      // Don't revoke URL - we need it for the preview
     };
 
     img.onerror = () => {
@@ -97,6 +102,10 @@ export const EventDetailsTab: React.FC = () => {
   };
 
   const removeImage = () => {
+    // Revoke the object URL if it exists to free memory
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setEventImageFile(null);
     setImagePreview(null);
     setImageError(null);
