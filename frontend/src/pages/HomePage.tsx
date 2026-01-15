@@ -442,7 +442,7 @@ export function HomePage() {
                 </div>
 
                 {limitGuests && (
-                  <div className="relative ml-7">
+                  <div className="relative">
                     <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                     <input
                       type="number"

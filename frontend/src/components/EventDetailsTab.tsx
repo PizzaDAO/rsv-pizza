@@ -28,6 +28,7 @@ export const EventDetailsTab: React.FC = () => {
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -203,159 +204,63 @@ export const EventDetailsTab: React.FC = () => {
   }
 
   return (
-    <div className="card p-6">
-      <h2 className="text-xl font-bold text-white mb-6">Event Details</h2>
-
+    <div className="card p-8">
       <form onSubmit={handleSave} className="space-y-6">
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <User size={16} className="inline mr-2" />
-            Event Name*
-          </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Pizza Party at My Place"
+            placeholder="Party Name *"
             className="w-full"
             required
           />
         </div>
 
         {/* Host Name */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <User size={16} className="inline mr-2" />
-            Host Name
-          </label>
+        <div className="relative">
+          <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
           <input
             type="text"
             value={hostName}
             onChange={(e) => setHostName(e.target.value)}
-            placeholder="Your name"
-            className="w-full"
+            placeholder="Your Name (Host)"
+            className="w-full !pl-14"
           />
         </div>
 
-        {/* Date and Duration */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              <Calendar size={16} className="inline mr-2" />
-              Party Date
-            </label>
-            <input
-              type="datetime-local"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              <Clock size={16} className="inline mr-2" />
-              Duration (hrs)
-            </label>
-            <input
-              type="number"
-              step="0.5"
-              min="0.5"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="2.5"
-              className="w-full"
-            />
-          </div>
-        </div>
+        {/* Date and Duration - Hidden for now, matching homepage */}
 
         {/* Address */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <MapPin size={16} className="inline mr-2" />
-            Address
-          </label>
+        <div className="relative">
+          <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
           <input
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="123 Main St, City, State"
-            className="w-full"
+            placeholder="Add Event Location"
+            className="w-full !pl-14"
           />
-        </div>
-
-        {/* Max Guests */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <User size={16} className="inline mr-2" />
-            Expected Guests
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={maxGuests}
-            onChange={(e) => setMaxGuests(e.target.value)}
-            placeholder="20"
-            className="w-full"
-          />
-          <p className="text-xs text-white/50 mt-1">
-            Used for ordering extra pizzas beyond RSVPs
-          </p>
         </div>
 
         {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <FileText size={16} className="inline mr-2" />
-            Description
-          </label>
+        <div className="relative">
+          <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Tell guests about your party... (Markdown supported)"
-            className="w-full min-h-[150px]"
+            placeholder="Add Description"
+            className="w-full !pl-14 min-h-[100px]"
+            rows={3}
           />
-          <p className="text-xs text-white/50 mt-1">
-            Supports Markdown: **bold**, *italic*, [links](url), etc.
-          </p>
         </div>
 
         {/* Event Image */}
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <ImageIcon size={16} className="inline mr-2" />
-            Event Image
-          </label>
-
-          {imagePreview && (
-            <div className="mb-3">
-              <img
-                src={imagePreview}
-                alt="Event preview"
-                className="w-full max-w-xs h-auto rounded-xl border border-white/10"
-              />
-              <button
-                type="button"
-                onClick={removeImage}
-                className="mt-2 text-sm text-[#ff393a] hover:text-[#ff5a5b]"
-              >
-                Remove image
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="w-full"
-            />
-            <div className="flex items-center gap-2 text-white/40 text-sm">
-              <div className="flex-1 h-px bg-white/10" />
-              <span>or</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
+          {/* Image URL Input */}
+          <div className="mb-3 relative">
+            <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input
               type="url"
               value={eventImageUrl}
@@ -363,59 +268,112 @@ export const EventDetailsTab: React.FC = () => {
                 setEventImageUrl(e.target.value);
                 setImagePreview(e.target.value);
               }}
-              placeholder="https://example.com/image.jpg"
-              className="w-full"
+              placeholder="Square Image URL"
+              className="w-full !pl-14"
             />
           </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-white/10"></div>
+            <span className="text-xs text-white/40">OR</span>
+            <div className="flex-1 h-px bg-white/10"></div>
+          </div>
+
+          {/* File Upload */}
+          {imagePreview ? (
+            <div className="space-y-3">
+              <div className="relative w-full max-w-xs mx-auto">
+                <img
+                  src={imagePreview}
+                  alt="Event flyer preview"
+                  className="w-full h-auto rounded-xl border-2 border-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="file"
+                id="eventImage"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="eventImage"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
+              >
+                <svg className="w-8 h-8 text-white/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-sm text-white/60">Click to upload square image</span>
+                <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+              </label>
+            </div>
+          )}
 
           {imageError && (
-            <p className="text-xs text-[#ff393a] mt-2">{imageError}</p>
+            <p className="text-xs text-red-400 mt-2">{imageError}</p>
           )}
-          <p className="text-xs text-white/50 mt-1">
-            Square images (1:1 ratio) work best. Max 5MB.
-          </p>
         </div>
 
-        {/* Custom URL */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <LinkIcon size={16} className="inline mr-2" />
-            Custom URL
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="text-white/40 text-sm whitespace-nowrap">/rsv-pizza/</span>
-            <input
-              type="text"
-              value={customUrl}
-              onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-              placeholder="my-party"
-              className="flex-1"
-              pattern="[a-z0-9-]+"
-            />
+        {/* Custom URL and Password in Options */}
+        <button
+          type="button"
+          onClick={() => setShowOptionalFields(!showOptionalFields)}
+          className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+        >
+          <span className="text-sm font-medium text-white/80">Options</span>
+          {showOptionalFields ? (
+            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </button>
+
+        {showOptionalFields && (
+          <div className="space-y-4 border-l-2 border-white/10 pl-4">
+            <div className="relative">
+              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Event Password"
+                className="w-full !pl-14"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="relative flex items-center">
+              <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
+              <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+              <input
+                type="text"
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="custom-url"
+                className="w-full font-mono text-sm"
+                style={{ paddingLeft: '130px' }}
+                pattern="[a-z0-9-]+"
+                minLength={3}
+                maxLength={50}
+              />
+            </div>
           </div>
-          <p className="text-xs text-white/50 mt-1">
-            Creates a clean URL like /rsv-pizza/my-party
-          </p>
-        </div>
-
-        {/* Password */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            <Lock size={16} className="inline mr-2" />
-            Event Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Optional password protection"
-            className="w-full"
-            autoComplete="new-password"
-          />
-          <p className="text-xs text-white/50 mt-1">
-            Guests will need this password to view the event page
-          </p>
-        </div>
+        )}
 
         {/* Co-Hosts */}
         <div>
