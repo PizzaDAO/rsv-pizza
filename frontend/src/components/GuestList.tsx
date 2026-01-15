@@ -4,7 +4,7 @@ import { GuestCard } from './GuestCard';
 import { UserRoundX } from 'lucide-react';
 
 export const GuestList: React.FC = () => {
-  const { guests, generateRecommendations } = usePizza();
+  const { guests } = usePizza();
 
   if (guests.length === 0) {
     return (
@@ -27,19 +27,11 @@ export const GuestList: React.FC = () => {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {guests.map(guest => (
           <GuestCard key={guest.id} guest={guest} />
         ))}
       </div>
-
-      <button
-        onClick={generateRecommendations}
-        disabled={guests.length === 0}
-        className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Generate Pizza Recommendations
-      </button>
     </div>
   );
 };

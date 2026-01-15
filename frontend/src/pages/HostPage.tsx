@@ -16,7 +16,7 @@ type TabType = 'details' | 'pizza' | 'guests';
 function HostPageContent() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
-  const { loadParty, party, partyLoading } = usePizza();
+  const { loadParty, party, partyLoading, guests, generateRecommendations } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('guests');
@@ -117,6 +117,13 @@ function HostPageContent() {
               <>
                 <PizzaSettings />
                 <BeverageSettings />
+                <button
+                  onClick={generateRecommendations}
+                  disabled={guests.length === 0}
+                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Generate Pizza Recommendations
+                </button>
               </>
             )}
 
