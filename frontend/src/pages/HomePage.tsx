@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { TimePickerInput } from '../components/TimePickerInput';
+import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 
@@ -32,15 +34,6 @@ export function HomePage() {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setTimezone(userTimezone);
   }, []);
-
-  // Format timezone for display (e.g., "GMT-05:00 New York")
-  const getTimezoneDisplay = () => {
-    if (!timezone) return '';
-    const now = new Date();
-    const offset = new Date().toLocaleString('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' }).split(' ').pop() || '';
-    const city = timezone.split('/').pop()?.replace(/_/g, ' ') || timezone;
-    return `${offset} ${city}`;
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -213,11 +206,10 @@ export function HomePage() {
                       }}
                       className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="w-28 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                      onChange={setStartTime}
+                      placeholder="12:30 PM"
                     />
                   </div>
 
@@ -233,26 +225,19 @@ export function HomePage() {
                       onChange={(e) => setEndDate(e.target.value)}
                       className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="w-28 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
+                      onChange={setEndTime}
+                      placeholder="01:30 PM"
                     />
                   </div>
                 </div>
 
-                {/* Timezone Display */}
-                <div className="flex items-center gap-2 text-xs text-white/50 whitespace-nowrap">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div className="text-right">
-                    {getTimezoneDisplay().split(' ').map((part, i) => (
-                      <div key={i} className={i === 0 ? 'font-medium' : ''}>{part}</div>
-                    ))}
-                  </div>
-                </div>
+                {/* Timezone Picker */}
+                <TimezonePickerInput
+                  value={timezone}
+                  onChange={setTimezone}
+                />
               </div>
             </div>
 
