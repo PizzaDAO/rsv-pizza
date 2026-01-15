@@ -485,10 +485,7 @@ export function RSVPPage() {
             <label className="block text-sm font-medium text-white/80 mb-3">
               Topping Preferences
             </label>
-            <p className="text-xs text-white/50 mb-3">
-              Tap <ThumbsUp size={14} className="inline" /> for toppings you love, <ThumbsDown size={14} className="inline" /> for ones you'd rather avoid
-            </p>
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+            <div className="flex flex-wrap gap-2">
               {TOPPINGS.map((topping) => {
                 const isLiked = likedToppings.includes(topping.id);
                 const isDisliked = dislikedToppings.includes(topping.id);
@@ -496,33 +493,39 @@ export function RSVPPage() {
                 return (
                   <div
                     key={topping.id}
-                    className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                      isLiked
+                        ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                        : isDisliked
+                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                        : 'bg-white/5 border-white/10'
+                    }`}
                   >
-                    <span className="text-white">{topping.name}</span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleToppingLike(topping.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          isLiked
-                            ? 'bg-[#39d98a] text-white'
-                            : 'bg-white/10 text-white/50 hover:bg-white/20'
+                    <button
+                      type="button"
+                      onClick={() => handleToppingLike(topping.id)}
+                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsUp
+                        size={12}
+                        className={`transition-all ${
+                          isLiked ? 'text-[#39d98a]' : 'text-white/20'
                         }`}
-                      >
-                        <ThumbsUp size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToppingDislike(topping.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          isDisliked
-                            ? 'bg-[#ff393a] text-white'
-                            : 'bg-white/10 text-white/50 hover:bg-white/20'
+                      />
+                      <span className="text-white text-xs">{topping.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToppingDislike(topping.id)}
+                      className="p-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsDown
+                        size={12}
+                        className={`transition-all ${
+                          isDisliked ? 'text-[#ff393a]' : 'text-white/20'
                         }`}
-                      >
-                        <ThumbsDown size={18} />
-                      </button>
-                    </div>
+                      />
+                    </button>
                   </div>
                 );
               })}
@@ -535,7 +538,7 @@ export function RSVPPage() {
               <label className="block text-sm font-medium text-white/80 mb-3">
                 Beverage Preferences
               </label>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+              <div className="flex flex-wrap gap-2">
                 {BEVERAGES.filter(b => availableBeverages.includes(b.id)).map((beverage) => {
                   const isLiked = likedBeverages.includes(beverage.id);
                   const isDisliked = dislikedBeverages.includes(beverage.id);
@@ -543,33 +546,39 @@ export function RSVPPage() {
                   return (
                     <div
                       key={beverage.id}
-                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                        isLiked
+                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                          : isDisliked
+                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                          : 'bg-white/5 border-white/10'
+                      }`}
                     >
-                      <span className="text-white">{beverage.name}</span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleBeverageLike(beverage.id)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isLiked
-                              ? 'bg-[#39d98a] text-white'
-                              : 'bg-white/10 text-white/50 hover:bg-white/20'
+                      <button
+                        type="button"
+                        onClick={() => handleBeverageLike(beverage.id)}
+                        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                      >
+                        <ThumbsUp
+                          size={12}
+                          className={`transition-all ${
+                            isLiked ? 'text-[#39d98a]' : 'text-white/20'
                           }`}
-                        >
-                          <ThumbsUp size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleBeverageDislike(beverage.id)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isDisliked
-                              ? 'bg-[#ff393a] text-white'
-                              : 'bg-white/10 text-white/50 hover:bg-white/20'
+                        />
+                        <span className="text-white text-xs">{beverage.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBeverageDislike(beverage.id)}
+                        className="p-0.5 hover:opacity-70 transition-opacity"
+                      >
+                        <ThumbsDown
+                          size={12}
+                          className={`transition-all ${
+                            isDisliked ? 'text-[#ff393a]' : 'text-white/20'
                           }`}
-                        >
-                          <ThumbsDown size={18} />
-                        </button>
-                      </div>
+                        />
+                      </button>
                     </div>
                   );
                 })}
