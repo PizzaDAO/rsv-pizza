@@ -238,7 +238,7 @@ export function EventPage() {
       </Helmet>
 
       {/* Header with Logo */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm fixed top-0 left-0 right-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
@@ -315,7 +315,7 @@ export function EventPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 pt-24">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
             {/* Left Column - Image and Host Info */}
