@@ -195,12 +195,6 @@ export function HomePage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
-            Create Your Pizza Party
-          </h1>
-        </header>
-
         <div className="card p-8">
           <form onSubmit={handleCreate} className="space-y-6">
             <div>
