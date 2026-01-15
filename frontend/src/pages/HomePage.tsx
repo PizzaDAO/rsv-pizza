@@ -260,14 +260,143 @@ export function HomePage() {
               </p>
             </div>
 
-            {/* Optional Fields Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                <User size={14} className="inline mr-1" />
+                Your Name (Host)
+              </label>
+              <input
+                type="text"
+                value={hostName}
+                onChange={(e) => setHostName(e.target.value)}
+                placeholder="e.g., John"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                <MapPin size={14} className="inline mr-1" />
+                Party Address
+              </label>
+              <input
+                type="text"
+                value={partyAddress}
+                onChange={(e) => setPartyAddress(e.target.value)}
+                placeholder="e.g., 123 Main St, New York, NY"
+                className="w-full"
+              />
+              <p className="text-xs text-white/50 mt-1">
+                Used to find nearby pizzerias for ordering
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                <Image size={14} className="inline mr-1" />
+                Event Flyer (Square Image)
+              </label>
+
+              {/* Image URL Input */}
+              <div className="mb-3">
+                <input
+                  type="url"
+                  value={eventImageUrl}
+                  onChange={(e) => {
+                    setEventImageUrl(e.target.value);
+                    // Clear file if URL is entered
+                    if (e.target.value.trim()) {
+                      setEventImageFile(null);
+                      setImagePreview(null);
+                      setImageError(null);
+                    }
+                  }}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full"
+                />
+                <p className="text-xs text-white/50 mt-1">
+                  Enter an image URL, or upload a file below
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-1 h-px bg-white/10"></div>
+                <span className="text-xs text-white/40">OR</span>
+                <div className="flex-1 h-px bg-white/10"></div>
+              </div>
+
+              {/* File Upload */}
+              {imagePreview ? (
+                <div className="space-y-3">
+                  <div className="relative w-full max-w-xs mx-auto">
+                    <img
+                      src={imagePreview}
+                      alt="Event flyer preview"
+                      className="w-full h-auto rounded-xl border-2 border-white/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="eventImage"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    disabled={!!eventImageUrl.trim()}
+                  />
+                  <label
+                    htmlFor="eventImage"
+                    className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
+                      eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <Upload className="w-8 h-8 text-white/40 mb-2" />
+                    <span className="text-sm text-white/60">Click to upload square image</span>
+                    <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                  </label>
+                </div>
+              )}
+
+              {imageError && (
+                <p className="text-xs text-red-400 mt-2">{imageError}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                <FileText size={14} className="inline mr-1" />
+                Event Description
+              </label>
+              <textarea
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+                placeholder="Tell guests about your event..."
+                className="w-full"
+                rows={3}
+              />
+              <p className="text-xs text-white/50 mt-1">
+                Describe your event for the event page
+              </p>
+            </div>
+
+            {/* Options Toggle */}
             <button
               type="button"
               onClick={() => setShowOptionalFields(!showOptionalFields)}
               className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
             >
               <span className="text-sm font-medium text-white/80">
-                Optional Details
+                Options
               </span>
               {showOptionalFields ? (
                 <ChevronUp size={18} className="text-white/60" />
@@ -276,40 +405,9 @@ export function HomePage() {
               )}
             </button>
 
-            {/* Collapsible Optional Fields */}
+            {/* Collapsible Options */}
             {showOptionalFields && (
               <div className="space-y-4 border-l-2 border-white/10 pl-4">
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <User size={14} className="inline mr-1" />
-                    Your Name (Host)
-                  </label>
-                  <input
-                    type="text"
-                    value={hostName}
-                    onChange={(e) => setHostName(e.target.value)}
-                    placeholder="e.g., John"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <MapPin size={14} className="inline mr-1" />
-                    Party Address
-                  </label>
-                  <input
-                    type="text"
-                    value={partyAddress}
-                    onChange={(e) => setPartyAddress(e.target.value)}
-                    placeholder="e.g., 123 Main St, New York, NY"
-                    className="w-full"
-                  />
-                  <p className="text-xs text-white/50 mt-1">
-                    Used to find nearby pizzerias for ordering
-                  </p>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
                     <Lock size={14} className="inline mr-1" />
@@ -324,104 +422,6 @@ export function HomePage() {
                   />
                   <p className="text-xs text-white/50 mt-1">
                     Guests will need this password to view event details
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <Image size={14} className="inline mr-1" />
-                    Event Flyer (Square Image)
-                  </label>
-
-                  {/* Image URL Input */}
-                  <div className="mb-3">
-                    <input
-                      type="url"
-                      value={eventImageUrl}
-                      onChange={(e) => {
-                        setEventImageUrl(e.target.value);
-                        // Clear file if URL is entered
-                        if (e.target.value.trim()) {
-                          setEventImageFile(null);
-                          setImagePreview(null);
-                          setImageError(null);
-                        }
-                      }}
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full"
-                    />
-                    <p className="text-xs text-white/50 mt-1">
-                      Enter an image URL, or upload a file below
-                    </p>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex-1 h-px bg-white/10"></div>
-                    <span className="text-xs text-white/40">OR</span>
-                    <div className="flex-1 h-px bg-white/10"></div>
-                  </div>
-
-                  {/* File Upload */}
-                  {imagePreview ? (
-                    <div className="space-y-3">
-                      <div className="relative w-full max-w-xs mx-auto">
-                        <img
-                          src={imagePreview}
-                          alt="Event flyer preview"
-                          className="w-full h-auto rounded-xl border-2 border-white/20"
-                        />
-                        <button
-                          type="button"
-                          onClick={removeImage}
-                          className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <input
-                        type="file"
-                        id="eventImage"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                        disabled={!!eventImageUrl.trim()}
-                      />
-                      <label
-                        htmlFor="eventImage"
-                        className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
-                          eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                      >
-                        <Upload className="w-8 h-8 text-white/40 mb-2" />
-                        <span className="text-sm text-white/60">Click to upload square image</span>
-                        <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
-                      </label>
-                    </div>
-                  )}
-
-                  {imageError && (
-                    <p className="text-xs text-red-400 mt-2">{imageError}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    <FileText size={14} className="inline mr-1" />
-                    Event Description (Optional)
-                  </label>
-                  <textarea
-                    value={eventDescription}
-                    onChange={(e) => setEventDescription(e.target.value)}
-                    placeholder="Tell guests about your event..."
-                    className="w-full"
-                    rows={3}
-                  />
-                  <p className="text-xs text-white/50 mt-1">
-                    Describe your event for the event page
                   </p>
                 </div>
 
