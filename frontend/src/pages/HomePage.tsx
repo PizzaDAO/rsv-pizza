@@ -300,10 +300,10 @@ export function HomePage() {
                 value={partyAddress}
                 onChange={(e) => setPartyAddress(e.target.value)}
                 placeholder="Add Event Location"
-                className="w-full pl-11"
+                className="w-full pl-12"
               />
               {partyAddress && (
-                <p className="text-xs text-white/50 mt-1 ml-11">Offline location or virtual link</p>
+                <p className="text-xs text-white/50 mt-1 ml-12">Offline location or virtual link</p>
               )}
             </div>
 
@@ -313,7 +313,7 @@ export function HomePage() {
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Add Description"
-                className="w-full pl-11"
+                className="w-full pl-12"
                 rows={3}
               />
             </div>
@@ -326,7 +326,7 @@ export function HomePage() {
                 value={expectedGuests}
                 onChange={(e) => setExpectedGuests(e.target.value)}
                 placeholder="Capacity"
-                className="w-full pl-11"
+                className="w-full pl-12"
               />
             </div>
 
@@ -337,7 +337,7 @@ export function HomePage() {
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
                 placeholder="Your Name (Host)"
-                className="w-full pl-11"
+                className="w-full pl-12"
               />
             </div>
 
@@ -358,7 +358,7 @@ export function HomePage() {
                     }
                   }}
                   placeholder="Event Flyer URL (Square Image)"
-                  className="w-full pl-11"
+                  className="w-full pl-12"
                 />
               </div>
 
@@ -453,20 +453,20 @@ export function HomePage() {
                     value={partyPassword}
                     onChange={(e) => setPartyPassword(e.target.value)}
                     placeholder="Event Password"
-                    className="w-full pl-11"
+                    className="w-full pl-12"
                   />
                 </div>
 
                 <div className="relative flex items-center">
                   <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-                  <span className="absolute left-11 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+                  <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
                   <input
                     type="text"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="custom-url"
                     className="w-full font-mono text-sm"
-                    style={{ paddingLeft: '125px' }}
+                    style={{ paddingLeft: '130px' }}
                     pattern="[a-z0-9-]+"
                     minLength={3}
                     maxLength={50}
