@@ -318,8 +318,8 @@ export function EventPage() {
       <div className="max-w-6xl mx-auto px-4 py-8 pt-24">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
-            {/* Left Column - Image and Host Info */}
-            <div className="flex flex-col">
+            {/* Left Column - Image and Host Info (Desktop only) */}
+            <div className="hidden md:flex flex-col">
               {/* Square Image */}
               {party.event_image_url ? (
                 <div className="relative aspect-square bg-black/30">
@@ -425,9 +425,77 @@ export function EventPage() {
 
             {/* Right Column - Event Details */}
             <div className="flex flex-col">
-              {/* Event Header */}
+              {/* Mobile-only sections */}
+              <div className="md:hidden">
+                {/* Square Image - Mobile */}
+                {party.event_image_url ? (
+                  <div className="relative aspect-square bg-black/30">
+                    <img
+                      src={party.event_image_url}
+                      alt={party.name}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
+                    <Pizza className="w-32 h-32 text-white/30" />
+                  </div>
+                )}
+
+                {/* Manage Button - Mobile */}
+                <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
+                  <p className="text-sm text-white/60 mb-2">You have manage access for this event.</p>
+                  <button
+                    onClick={handleEditEvent}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                  >
+                    Manage
+                    <Settings size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Event Title */}
               <div className="p-6 border-b border-white/10">
                 <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
+              </div>
+
+              {/* Mobile: Host Info */}
+              <div className="md:hidden p-6 border-b border-white/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm text-white/60">Hosted by</span>
+                  <span className="text-white font-medium">
+                    {party.host_name}
+                    {party.co_hosts && party.co_hosts.length > 0 && (
+                      <> & {party.co_hosts.length} other{party.co_hosts.length > 1 ? 's' : ''}</>
+                    )}
+                  </span>
+                </div>
+                {/* Host avatars row */}
+                <div className="flex items-center gap-2">
+                  {/* Primary host avatar */}
+                  {party.host_name && (
+                    <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-[#ff393a]" />
+                    </div>
+                  )}
+                  {/* Co-host avatars */}
+                  {party.co_hosts && party.co_hosts.slice(0, 6).map((coHost) => (
+                    <div key={coHost.id}>
+                      {coHost.avatar_url ? (
+                        <img
+                          src={coHost.avatar_url}
+                          alt={coHost.name}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                          <User className="w-5 h-5 text-[#ff393a]" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Event Details */}
@@ -480,6 +548,17 @@ export function EventPage() {
                       RSVPs are closed for this event
                     </p>
                   )}
+                </div>
+
+                {/* Guest Count - Mobile */}
+                <div className="md:hidden pt-4 border-t border-white/10">
+                  <div className="flex items-center gap-2 text-white/60 text-sm">
+                    <Users className="w-4 h-4" />
+                    <span>
+                      {party.guests?.length || 0} {party.guests?.length === 1 ? 'guest' : 'guests'}
+                      {party.max_guests && ` • ${party.max_guests} expected`}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Description */}
