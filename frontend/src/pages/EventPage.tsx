@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, Pizza, Loader2, Lock, AlertCircle } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Calendar, Clock, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
 
 export function EventPage() {
@@ -15,6 +15,9 @@ export function EventPage() {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showEditPasswordPrompt, setShowEditPasswordPrompt] = useState(false);
+  const [editPasswordInput, setEditPasswordInput] = useState('');
+  const [editPasswordError, setEditPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadParty() {
@@ -68,6 +71,34 @@ export function EventPage() {
       ? `/rsvp/${party.custom_url}`
       : `/rsvp/${party?.invite_code}`;
     navigate(rsvpUrl);
+  };
+
+  const handleEditEvent = () => {
+    if (!party) return;
+
+    // If no password, just navigate to host page
+    if (!party.password) {
+      navigate(`/party/${party.invite_code}`);
+      return;
+    }
+
+    // Show password prompt
+    setShowEditPasswordPrompt(true);
+  };
+
+  const handleEditPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!party?.password) return;
+
+    if (editPasswordInput === party.password) {
+      // Correct password - navigate to host page
+      navigate(`/party/${party.invite_code}`);
+    } else {
+      // Wrong password
+      setEditPasswordError('Incorrect password. Please try again.');
+      setEditPasswordInput('');
+    }
   };
 
   if (loading) {
@@ -141,17 +172,95 @@ export function EventPage() {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen">
+      {/* Header with Logo */}
+      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <img
+              src="/rsv-pizza/logo.png"
+              alt="RSVPizza"
+              className="h-8 sm:h-10"
+            />
+          </Link>
+          <button
+            onClick={handleEditEvent}
+            className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
+          >
+            <Settings size={16} />
+            <span className="hidden sm:inline">Edit Event</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Edit Password Prompt Modal */}
+      {showEditPasswordPrompt && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card p-8 max-w-md w-full">
+            <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
+              <Lock className="w-8 h-8 text-[#ff393a]" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2 text-center">Host Password Required</h1>
+            <p className="text-white/60 mb-6 text-center">
+              Enter the password you set when creating this event to edit it.
+            </p>
+
+            <form onSubmit={handleEditPasswordSubmit} className="space-y-4">
+              {editPasswordError && (
+                <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
+                  {editPasswordError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={editPasswordInput}
+                  onChange={(e) => setEditPasswordInput(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditPasswordPrompt(false);
+                    setEditPasswordInput('');
+                    setEditPasswordError(null);
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                >
+                  Continue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
             {/* Left Column - Square Image */}
             {party.event_image_url ? (
-              <div className="relative aspect-square bg-white/5">
+              <div className="relative aspect-square bg-black/30">
                 <img
                   src={party.event_image_url}
                   alt={party.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               </div>
             ) : (
