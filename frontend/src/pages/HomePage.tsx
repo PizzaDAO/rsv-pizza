@@ -165,9 +165,6 @@ export function HomePage() {
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
             Create Your Pizza Party
           </h1>
-          <p className="text-white/70 text-lg max-w-2xl mx-auto">
-            Get the perfect pizza order recommendations based on guest preferences
-          </p>
         </header>
 
         <div className="card p-8">
@@ -254,9 +251,6 @@ export function HomePage() {
                 placeholder="e.g., 123 Main St, New York, NY"
                 className="w-full"
               />
-              <p className="text-xs text-white/50 mt-1">
-                Used to find nearby pizzerias for ordering
-              </p>
             </div>
 
             <div>
@@ -271,9 +265,6 @@ export function HomePage() {
                 className="w-full"
                 rows={3}
               />
-              <p className="text-xs text-white/50 mt-1">
-                Describe your event for the event page
-              </p>
             </div>
 
             <div>
@@ -290,9 +281,6 @@ export function HomePage() {
                 className="w-full"
                 required
               />
-              <p className="text-xs text-white/50 mt-1">
-                Total people attending (we'll calculate extra pizza for those who don't RSVP)
-              </p>
             </div>
 
             <div>
@@ -332,9 +320,6 @@ export function HomePage() {
                   placeholder="https://example.com/image.jpg"
                   className="w-full"
                 />
-                <p className="text-xs text-white/50 mt-1">
-                  Enter an image URL, or upload a file below
-                </p>
               </div>
 
               {/* Divider */}
