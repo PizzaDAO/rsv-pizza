@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram } from 'lucide-react';
+import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram, GripVertical } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage } from '../lib/supabase';
 import { CoHost } from '../types';
@@ -27,6 +27,7 @@ export const EventDetailsTab: React.FC = () => {
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -125,6 +126,27 @@ export const EventDetailsTab: React.FC = () => {
 
   const removeCoHost = (id: string) => {
     setCoHosts(coHosts.filter(h => h.id !== id));
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newCoHosts = [...coHosts];
+    const draggedItem = newCoHosts[draggedIndex];
+    newCoHosts.splice(draggedIndex, 1);
+    newCoHosts.splice(index, 0, draggedItem);
+
+    setCoHosts(newCoHosts);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -405,9 +427,21 @@ export const EventDetailsTab: React.FC = () => {
           {/* Current Co-Hosts List */}
           {coHosts.length > 0 && (
             <div className="space-y-2 mb-3">
-              {coHosts.map((coHost) => (
-                <div key={coHost.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
-                  <div className="flex items-center gap-3">
+              {coHosts.map((coHost, index) => (
+                <div
+                  key={coHost.id}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${
+                    draggedIndex === index ? 'opacity-50' : 'opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
+                      <GripVertical size={18} />
+                    </div>
                     {coHost.avatar_url ? (
                       <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover" />
                     ) : (
@@ -419,17 +453,17 @@ export const EventDetailsTab: React.FC = () => {
                       <p className="text-white font-medium">{coHost.name}</p>
                       <div className="flex items-center gap-2 mt-1">
                         {coHost.website && (
-                          <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                          <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                             <Globe size={14} />
                           </a>
                         )}
                         {coHost.twitter && (
-                          <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                          <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                             <Twitter size={14} />
                           </a>
                         )}
                         {coHost.instagram && (
-                          <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white">
+                          <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                             <Instagram size={14} />
                           </a>
                         )}
