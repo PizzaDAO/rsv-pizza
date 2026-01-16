@@ -110,7 +110,7 @@ function HostPageContent() {
           <div className="xl:col-span-2 space-y-6">
             {activeTab === 'guests' && (
               <>
-                <GuestList onInviteClick={() => setActiveTab('pizza')} />
+                <GuestList />
               </>
             )}
 
