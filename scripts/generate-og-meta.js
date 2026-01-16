@@ -83,6 +83,7 @@ async function generateOGMetaPages() {
   <meta name="description" content="${escapeHtml(metaDescription)}">
 
   <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="RSV.Pizza">
   <meta property="og:type" content="website">
   <meta property="og:url" content="${pageUrl}">
   <meta property="og:title" content="${escapeHtml(metaTitle)}">

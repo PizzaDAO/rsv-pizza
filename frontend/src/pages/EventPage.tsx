@@ -243,6 +243,7 @@ export function EventPage() {
         <meta name="description" content={metaDescription} />
 
         {/* Open Graph / Facebook */}
+        <meta property="og:site_name" content="RSV.Pizza" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:title" content={metaTitle} />
