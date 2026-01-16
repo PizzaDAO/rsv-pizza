@@ -51,6 +51,78 @@ export function HomePage() {
     }
   }, []);
 
+  // Check for pending party form data after auth redirect
+  const pendingFormProcessed = React.useRef(false);
+  React.useEffect(() => {
+    if (!user || pendingFormProcessed.current) return;
+
+    const savedForm = sessionStorage.getItem('pendingPartyForm');
+    if (savedForm) {
+      pendingFormProcessed.current = true;
+      sessionStorage.removeItem('pendingPartyForm');
+
+      try {
+        const formData = JSON.parse(savedForm);
+        // Auto-create party with saved form data
+        createPartyFromSavedData(formData);
+      } catch (err) {
+        console.error('Failed to restore form data:', err);
+      }
+    }
+  }, [user]);
+
+  // Create party from saved form data (after auth redirect)
+  const createPartyFromSavedData = async (formData: any) => {
+    setCreating(true);
+
+    try {
+      const guestCount = formData.expectedGuests ? parseInt(formData.expectedGuests, 10) : undefined;
+      const password = formData.partyPassword?.trim() || undefined;
+      const description = formData.eventDescription?.trim() || undefined;
+      const urlSlug = formData.customUrl?.trim() || undefined;
+
+      // Calculate duration from start/end times
+      let duration: number | undefined;
+      let startDateTime: string | undefined;
+      if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
+        const start = new Date(`${formData.startDate}T${formData.startTime}`);
+        const end = new Date(`${formData.endDate}T${formData.endTime}`);
+        const durationMs = end.getTime() - start.getTime();
+        duration = durationMs / (1000 * 60 * 60);
+        startDateTime = start.toISOString();
+      } else if (formData.startDate && formData.startTime) {
+        startDateTime = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
+      }
+
+      const imageUrl = formData.eventImageUrl?.trim() || undefined;
+
+      const party = await createPartyAPI(
+        formData.partyName.trim(),
+        formData.hostName?.trim() || undefined,
+        startDateTime,
+        'new-york',
+        guestCount,
+        formData.partyAddress?.trim() || undefined,
+        [],
+        duration,
+        password,
+        imageUrl,
+        description,
+        urlSlug,
+        formData.timezone || undefined
+      );
+
+      setCreating(false);
+
+      if (party?.invite_code) {
+        navigate(`/host/${party.invite_code}`);
+      }
+    } catch (error) {
+      console.error('Error creating party:', error);
+      setCreating(false);
+    }
+  };
+
   // Format date for display
   const formatDateDisplay = (date: string) => {
     if (!date) return '';
@@ -147,12 +219,20 @@ export function HomePage() {
     setEventImageUrl('');
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!partyName.trim()) return;
 
     // Show sign-in modal if user is not authenticated
     if (!user) {
+      // Save form data to restore after auth
+      const formData = {
+        partyName, hostName, startDate, startTime, endDate, endTime, timezone,
+        expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
+        customUrl, requireApproval, limitGuests
+      };
+      sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
+      sessionStorage.setItem('authReturnUrl', '/');
       setShowSignInModal(true);
       return;
     }
