@@ -190,7 +190,7 @@ export const PartyHeader: React.FC = () => {
         {party ? (
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Square Event Image */}
-            <div className="w-full sm:w-48 h-48 flex-shrink-0 rounded-xl overflow-hidden">
+            <div className="w-48 h-48 flex-shrink-0 rounded-xl overflow-hidden">
               {party.eventImageUrl ? (
                 <img
                   src={party.eventImageUrl}
