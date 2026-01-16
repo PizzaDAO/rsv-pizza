@@ -21,8 +21,30 @@ const POPULAR_TIMEZONES = [
   'Asia/Tokyo',
 ];
 
-// Get all IANA timezones
-const ALL_TIMEZONES = Intl.supportedValuesOf('timeZone');
+// Get all IANA timezones with fallback for older browsers
+const ALL_TIMEZONES = (() => {
+  try {
+    // @ts-ignore - supportedValuesOf may not be in older TypeScript definitions
+    return Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [
+      'America/Anchorage', 'America/Los_Angeles', 'America/Phoenix', 'America/Denver',
+      'America/Chicago', 'America/New_York', 'America/Toronto', 'America/Mexico_City',
+      'America/Sao_Paulo', 'Europe/London', 'Europe/Madrid', 'Europe/Paris',
+      'Europe/Berlin', 'Europe/Rome', 'Europe/Moscow', 'Asia/Dubai',
+      'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
+      'Asia/Tokyo', 'Australia/Sydney'
+    ];
+  } catch (e) {
+    // Fallback list if supportedValuesOf throws an error
+    return [
+      'America/Anchorage', 'America/Los_Angeles', 'America/Phoenix', 'America/Denver',
+      'America/Chicago', 'America/New_York', 'America/Toronto', 'America/Mexico_City',
+      'America/Sao_Paulo', 'Europe/London', 'Europe/Madrid', 'Europe/Paris',
+      'Europe/Berlin', 'Europe/Rome', 'Europe/Moscow', 'Asia/Dubai',
+      'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
+      'Asia/Tokyo', 'Australia/Sydney'
+    ];
+  }
+})();
 
 export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProps) {
   const [isOpen, setIsOpen] = useState(false);
