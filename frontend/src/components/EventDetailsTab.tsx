@@ -57,7 +57,13 @@ export const EventDetailsTab: React.FC = () => {
       const partyHostName = party.hostName || '';
       const partyDate = party.date || '';
       const partyDuration = party.duration?.toString() || '';
-      const partyTimezone = party.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const partyTimezone = party.timezone || (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch (error) {
+          return 'UTC';
+        }
+      })();
 
       let partyStartDate = '';
       let partyStartTime = '';

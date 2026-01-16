@@ -37,8 +37,14 @@ export function HomePage() {
 
   // Get user's timezone on mount
   React.useEffect(() => {
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    setTimezone(userTimezone);
+    try {
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setTimezone(userTimezone);
+    } catch (error) {
+      // Fallback to UTC if timezone detection fails
+      console.warn('Timezone detection failed, using UTC', error);
+      setTimezone('UTC');
+    }
   }, []);
 
   // Format date for display
