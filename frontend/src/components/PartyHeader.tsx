@@ -277,15 +277,17 @@ export const PartyHeader: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    <Calendar size={14} className="inline mr-1" />
                     Party Date
                   </label>
-                  <input
-                    type="date"
-                    value={partyDate}
-                    onChange={(e) => setPartyDate(e.target.value)}
-                    className="w-full"
-                  />
+                  <div className="relative">
+                    <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={partyDate}
+                      onChange={(e) => setPartyDate(e.target.value)}
+                      className="w-full !pl-14"
+                    />
+                  </div>
                 </div>
 
                 <div>

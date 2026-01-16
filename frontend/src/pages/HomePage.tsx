@@ -245,6 +245,7 @@ export function HomePage() {
             {/* Desktop: Inline Date/Time Picker */}
             <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-start gap-4">
+                <Calendar size={20} className="text-white/40 mt-1 flex-shrink-0" />
                 <div className="flex-1 space-y-3">
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
