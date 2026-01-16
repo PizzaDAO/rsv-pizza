@@ -36,7 +36,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-6">
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-white/40 text-xs">Powered by</span>
           <a
             href="https://pizzadao.xyz"
             target="_blank"
@@ -46,7 +47,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <img
               src="/pizzadao-logo.svg"
               alt="PizzaDAO"
-              className="h-10"
+              className="h-7"
             />
           </a>
         </div>
