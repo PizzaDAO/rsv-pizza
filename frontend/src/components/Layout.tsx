@@ -37,7 +37,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Footer */}
       <footer className="border-t border-white/10 py-6">
         <div className="flex flex-col items-center gap-1">
-          <span className="text-white/40 text-xs">Powered by</span>
+          <span className="text-white/40 text-sm">Powered by</span>
           <a
             href="https://pizzadao.xyz"
             target="_blank"

@@ -347,68 +347,68 @@ export function HomePage() {
 
             {/* Desktop: Inline Date/Time Picker */}
             <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
-              <div className="space-y-3">
-                {/* Start Time */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className="relative flex-1 cursor-pointer"
-                    onClick={() => startDateInputRef.current?.showPicker?.()}
-                  >
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <Play size={21} className="text-white/40" />
+              <div className="flex items-start gap-4">
+                <div className="flex-1 space-y-3">
+                  {/* Start Time */}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="relative flex-1 cursor-pointer"
+                      onClick={() => startDateInputRef.current?.showPicker?.()}
+                    >
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Play size={21} className="text-white/40" />
+                      </div>
+                      <input
+                        ref={startDateInputRef}
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          // Auto-populate end date if empty
+                          if (!endDate) setEndDate(e.target.value);
+                        }}
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        style={{ colorScheme: 'dark' }}
+                      />
                     </div>
-                    <input
-                      ref={startDateInputRef}
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
-                        // Auto-populate end date if empty
-                        if (!endDate) setEndDate(e.target.value);
-                      }}
-                      className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                      style={{ colorScheme: 'dark' }}
+                    <TimePickerInput
+                      value={startTime}
+                      onChange={setStartTime}
+                      placeholder="12:30 PM"
                     />
                   </div>
-                  <TimePickerInput
-                    value={startTime}
-                    onChange={setStartTime}
-                    placeholder="12:30 PM"
-                  />
-                </div>
 
-                {/* End Time */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className="relative flex-1 cursor-pointer"
-                    onClick={() => endDateInputRef.current?.showPicker?.()}
-                  >
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <SquareIcon size={17} className="text-white/40" />
+                  {/* End Time */}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="relative flex-1 cursor-pointer"
+                      onClick={() => endDateInputRef.current?.showPicker?.()}
+                    >
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <SquareIcon size={17} className="text-white/40" />
+                      </div>
+                      <input
+                        ref={endDateInputRef}
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        style={{ colorScheme: 'dark' }}
+                      />
                     </div>
-                    <input
-                      ref={endDateInputRef}
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                      style={{ colorScheme: 'dark' }}
+                    <TimePickerInput
+                      value={endTime}
+                      onChange={setEndTime}
+                      placeholder="01:30 PM"
                     />
                   </div>
-                  <TimePickerInput
-                    value={endTime}
-                    onChange={setEndTime}
-                    placeholder="01:30 PM"
-                  />
                 </div>
 
                 {/* Timezone Picker */}
-                <div className="flex justify-end">
-                  <TimezonePickerInput
-                    value={timezone}
-                    onChange={setTimezone}
-                  />
-                </div>
+                <TimezonePickerInput
+                  value={timezone}
+                  onChange={setTimezone}
+                />
               </div>
             </div>
 

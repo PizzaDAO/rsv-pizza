@@ -489,63 +489,63 @@ export const EventDetailsTab: React.FC = () => {
 
         {/* Desktop: Date/Time Picker */}
         <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
-          <div className="space-y-3">
-            {/* Start Time */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <Play size={21} className="text-white/40" />
+          <div className="flex items-start gap-4">
+            <div className="flex-1 space-y-3">
+              {/* Start Time */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Play size={21} className="text-white/40" />
+                  </div>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (!endDate) setEndDate(e.target.value);
+                    }}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
                 </div>
                 <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    if (!endDate) setEndDate(e.target.value);
-                  }}
-                  className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
-                style={{ colorScheme: 'dark' }}
-              />
-            </div>
 
-            {/* End Time */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <SquareIcon size={17} className="text-white/40" />
+              {/* End Time */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <SquareIcon size={17} className="text-white/40" />
+                  </div>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
                 </div>
                 <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
-                style={{ colorScheme: 'dark' }}
-              />
             </div>
 
             {/* Timezone Picker */}
-            <div className="flex justify-end">
-              <TimezonePickerInput
-                value={timezone}
-                onChange={setTimezone}
-              />
-            </div>
+            <TimezonePickerInput
+              value={timezone}
+              onChange={setTimezone}
+            />
           </div>
         </div>
 
