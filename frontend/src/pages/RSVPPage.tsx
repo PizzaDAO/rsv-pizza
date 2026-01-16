@@ -253,7 +253,7 @@ export function RSVPPage() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
           <p className="text-white/60 mb-6 text-center">
-            This event is password-protected. Please enter the password to RSVP.
+            This event is password-protected
           </p>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -264,14 +264,11 @@ export function RSVPPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Password
-              </label>
               <input
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password"
+                placeholder="Event Password"
                 className="w-full"
                 required
                 autoFocus
@@ -441,8 +438,8 @@ export function RSVPPage() {
         <div className="flex items-center gap-3 mb-6">
           <Pizza className="w-10 h-10 text-[#ff393a]" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Pizza Preferences</h1>
-            <p className="text-sm text-white/60">Step 2 of 2 - Help us order the perfect pizzas!</p>
+            <h1 className="text-2xl font-bold text-white">Pizza Requests</h1>
+            <p className="text-sm text-white/60">Step 2 of 2</p>
           </div>
         </div>
 

@@ -114,6 +114,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     customUrl: dbParty.custom_url,
     date: dbParty.date,
     duration: dbParty.duration,
+    timezone: dbParty.timezone,
     hostName: dbParty.host_name,
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],

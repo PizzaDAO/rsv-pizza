@@ -32,6 +32,7 @@ model Party {
   customUrl          String?   @unique
   date               DateTime?
   duration           Float?
+  timezone           String?
   pizzaSize          String
   pizzaStyle         String
   availableBeverages String[]
@@ -56,6 +57,10 @@ model Party {
 model Guest {
   id                  String   @id @default(cuid())
   name                String
+  email               String?
+  ethereumAddress     String?
+  roles               String[]
+  mailingListOptIn    Boolean  @default(false)
   dietaryRestrictions String[]
   likedToppings       String[]
   dislikedToppings    String[]

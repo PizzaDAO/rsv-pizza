@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { TimePickerInput } from '../components/TimePickerInput';
 import { TimezonePickerInput } from '../components/TimezonePickerInput';
-import { Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square, CheckSquare2 } from 'lucide-react';
+import { LocationAutocomplete } from '../components/LocationAutocomplete';
+import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 
 export function HomePage() {
@@ -185,7 +186,8 @@ export function HomePage() {
         password,
         imageUrl,
         description,
-        urlSlug
+        urlSlug,
+        timezone || undefined
       );
 
       setCreating(false);
@@ -247,7 +249,7 @@ export function HomePage() {
             {/* Desktop: Inline Date/Time Picker */}
             <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-start gap-4">
-                <Calendar size={20} className="text-white/40 mt-1 flex-shrink-0" />
+                <Calendar size={20} className="text-white/40 mt-[3px] flex-shrink-0" />
                 <div className="flex-1 space-y-3">
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
@@ -255,9 +257,9 @@ export function HomePage() {
                       className="relative flex-1 cursor-pointer"
                       onClick={() => startDateInputRef.current?.showPicker?.()}
                     >
-                      <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
-                        Start
-                      </label>
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Play size={21} className="text-white/40" />
+                      </div>
                       <input
                         ref={startDateInputRef}
                         type="date"
@@ -267,7 +269,7 @@ export function HomePage() {
                           // Auto-populate end date if empty
                           if (!endDate) setEndDate(e.target.value);
                         }}
-                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-14 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                         style={{ colorScheme: 'dark' }}
                       />
                     </div>
@@ -284,15 +286,15 @@ export function HomePage() {
                       className="relative flex-1 cursor-pointer"
                       onClick={() => endDateInputRef.current?.showPicker?.()}
                     >
-                      <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
-                        End
-                      </label>
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <SquareIcon size={17} className="text-white/40" />
+                      </div>
                       <input
                         ref={endDateInputRef}
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-14 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                         style={{ colorScheme: 'dark' }}
                       />
                     </div>
@@ -312,19 +314,11 @@ export function HomePage() {
               </div>
             </div>
 
-            <div className="relative">
-              <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={partyAddress}
-                onChange={(e) => setPartyAddress(e.target.value)}
-                placeholder="Add Event Location"
-                className="w-full !pl-14"
-              />
-              {partyAddress && (
-                <p className="text-xs text-white/50 mt-1 ml-14">Offline location or virtual link</p>
-              )}
-            </div>
+            <LocationAutocomplete
+              value={partyAddress}
+              onChange={setPartyAddress}
+              placeholder="Add Event Location"
+            />
 
             <div className="relative">
               <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
@@ -349,36 +343,9 @@ export function HomePage() {
             </div>
 
             <div>
-              {/* Image URL Input */}
-              <div className="mb-3 relative">
-                <Image size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="url"
-                  value={eventImageUrl}
-                  onChange={(e) => {
-                    setEventImageUrl(e.target.value);
-                    // Clear file if URL is entered
-                    if (e.target.value.trim()) {
-                      setEventImageFile(null);
-                      setImagePreview(null);
-                      setImageError(null);
-                    }
-                  }}
-                  placeholder="Square Image URL"
-                  className="w-full !pl-14"
-                />
-              </div>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex-1 h-px bg-white/10"></div>
-                <span className="text-xs text-white/40">OR</span>
-                <div className="flex-1 h-px bg-white/10"></div>
-              </div>
-
               {/* File Upload */}
               {imagePreview ? (
-                <div className="space-y-3">
+                <div className="space-y-3 mb-3">
                   <div className="relative w-full max-w-xs mx-auto">
                     <img
                       src={imagePreview}
@@ -395,7 +362,7 @@ export function HomePage() {
                   </div>
                 </div>
               ) : (
-                <div className="relative">
+                <div className="relative mb-3">
                   <input
                     type="file"
                     id="eventImage"
@@ -416,6 +383,33 @@ export function HomePage() {
                   </label>
                 </div>
               )}
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-1 h-px bg-white/10"></div>
+                <span className="text-xs text-white/40">OR</span>
+                <div className="flex-1 h-px bg-white/10"></div>
+              </div>
+
+              {/* Image URL Input */}
+              <div className="relative">
+                <Image size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="url"
+                  value={eventImageUrl}
+                  onChange={(e) => {
+                    setEventImageUrl(e.target.value);
+                    // Clear file if URL is entered
+                    if (e.target.value.trim()) {
+                      setEventImageFile(null);
+                      setImagePreview(null);
+                      setImageError(null);
+                    }
+                  }}
+                  placeholder="Square Image URL"
+                  className="w-full !pl-14"
+                />
+              </div>
 
               {imageError && (
                 <p className="text-xs text-red-400 mt-2">{imageError}</p>
@@ -450,7 +444,7 @@ export function HomePage() {
                     {requireApproval ? (
                       <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
                     ) : (
-                      <Square size={18} className="text-white/40 flex-shrink-0" />
+                      <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                     )}
                     <span className="text-sm font-medium text-white/80">Require Approval</span>
                   </button>
@@ -465,7 +459,7 @@ export function HomePage() {
                     {limitGuests ? (
                       <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
                     ) : (
-                      <Square size={18} className="text-white/40 flex-shrink-0" />
+                      <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                     )}
                     <span className="text-sm font-medium text-white/80">Limit Guests</span>
                   </button>
@@ -545,12 +539,12 @@ export function HomePage() {
       {showDateTimeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold text-black mb-6">Event Time</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Time</h2>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Start */}
               <div className="flex items-center gap-3">
-                <span className="text-gray-500 text-base w-20">Start</span>
+                <span className="text-gray-500 text-sm w-12">Start</span>
                 <input
                   type="date"
                   value={startDate}
@@ -558,47 +552,47 @@ export function HomePage() {
                     setStartDate(e.target.value);
                     if (!endDate) setEndDate(e.target.value);
                   }}
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                  className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
                 <input
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-32 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                  className="w-28 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               {/* End */}
               <div className="flex items-center gap-3">
-                <span className="text-gray-500 text-base w-20">End</span>
+                <span className="text-gray-500 text-sm w-12">End</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                  className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
                 <input
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-32 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent"
+                  className="w-28 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               {/* Timezone */}
               <div className="flex items-center gap-3">
-                <span className="text-gray-500 text-base w-20">Timezone</span>
+                <span className="text-gray-500 text-sm w-16">Timezone</span>
                 <div className="flex-1">
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-black text-base focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:border-transparent appearance-none"
+                    className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none"
                     style={{
                       backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                       backgroundRepeat: 'no-repeat',
                       backgroundPosition: 'right 0.5rem center',
-                      backgroundSize: '1.5em 1.5em',
-                      paddingRight: '2.5rem'
+                      backgroundSize: '1.2em 1.2em',
+                      paddingRight: '2rem'
                     }}
                   >
                     <option value="">Select timezone</option>
@@ -641,7 +635,7 @@ export function HomePage() {
             <button
               type="button"
               onClick={() => setShowDateTimeModal(false)}
-              className="w-full mt-6 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-3 rounded-xl transition-colors"
+              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Done
             </button>

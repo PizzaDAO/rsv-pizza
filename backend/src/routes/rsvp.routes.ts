@@ -77,20 +77,41 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
 router.post('/:inviteCode/guest', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
-    const { name, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
+    const {
+      name,
+      email,
+      ethereumAddress,
+      roles,
+      mailingListOptIn,
+      dietaryRestrictions,
+      likedToppings,
+      dislikedToppings,
+      likedBeverages,
+      dislikedBeverages
+    } = req.body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
-    // Find party
+    // Find party with more details for email
     const party = await prisma.party.findUnique({
       where: { inviteCode },
       select: {
         id: true,
+        name: true,
+        date: true,
+        address: true,
+        customUrl: true,
         rsvpClosedAt: true,
         maxGuests: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
         _count: { select: { guests: true } },
       },
     });
@@ -113,6 +134,10 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     const guest = await prisma.guest.create({
       data: {
         name: name.trim(),
+        email: email?.trim() || null,
+        ethereumAddress: ethereumAddress?.trim() || null,
+        roles: roles || [],
+        mailingListOptIn: mailingListOptIn || false,
         dietaryRestrictions: dietaryRestrictions || [],
         likedToppings: likedToppings || [],
         dislikedToppings: dislikedToppings || [],
@@ -122,6 +147,24 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         partyId: party.id,
       },
     });
+
+    // Send confirmation email if email provided
+    if (email?.trim()) {
+      try {
+        await sendRSVPConfirmationEmail({
+          guestEmail: email.trim(),
+          guestName: name.trim(),
+          partyName: party.name,
+          partyDate: party.date,
+          partyAddress: party.address,
+          inviteCode,
+          customUrl: party.customUrl,
+        });
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the RSVP if email fails
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -135,5 +178,96 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     next(error);
   }
 });
+
+// Helper function to send RSVP confirmation email
+async function sendRSVPConfirmationEmail(params: {
+  guestEmail: string;
+  guestName: string;
+  partyName: string;
+  partyDate: Date | null;
+  partyAddress: string | null;
+  inviteCode: string;
+  customUrl: string | null;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email');
+    return;
+  }
+
+  const eventUrl = params.customUrl
+    ? `https://rsvpizza.com/${params.customUrl}`
+    : `https://rsvpizza.com/${params.inviteCode}`;
+
+  const dateText = params.partyDate
+    ? new Date(params.partyDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'Date TBD';
+
+  const addressText = params.partyAddress || 'Location TBD';
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RSVP Confirmed</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Going!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Thanks for RSVPing</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>See you there, ${params.guestName}!</p>
+          <p style="margin-top: 20px;">
+            <a href="${eventUrl}" style="color: #ff393a; text-decoration: none;">View Full Event Details</a>
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'RSVPizza <noreply@rsvpizza.com>',
+      to: [params.guestEmail],
+      subject: `You're going to ${params.partyName}! 🍕`,
+      html: emailHtml,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+
+  return response.json();
+}
 
 export default router;

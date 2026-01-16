@@ -1,16 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram, GripVertical, Square, CheckSquare2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Twitter, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Play } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
-import { updateParty, uploadEventImage } from '../lib/supabase';
+import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
 import { CoHost } from '../types';
+import { TimezonePickerInput } from './TimezonePickerInput';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
+  const navigate = useNavigate();
 
   const [name, setName] = useState('');
   const [hostName, setHostName] = useState('');
   const [date, setDate] = useState('');
   const [duration, setDuration] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [timezone, setTimezone] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +27,8 @@ export const EventDetailsTab: React.FC = () => {
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [maxGuests, setMaxGuests] = useState('');
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [limitGuests, setLimitGuests] = useState(false);
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
@@ -32,24 +42,96 @@ export const EventDetailsTab: React.FC = () => {
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+
+  // Track original values to detect changes
+  const [originalValues, setOriginalValues] = useState<any>(null);
 
   // Load party data into form
   useEffect(() => {
     if (party) {
-      setName(party.name || '');
-      setHostName(party.hostName || '');
-      setDate(party.date || '');
-      setDuration(party.duration?.toString() || '');
-      setAddress(party.address || '');
-      setDescription(party.description || '');
-      setPassword(party.password || '');
-      setCustomUrl(party.customUrl || '');
-      setEventImageUrl(party.eventImageUrl || '');
-      setImagePreview(party.eventImageUrl || null);
-      setMaxGuests(party.maxGuests?.toString() || '');
-      setCoHosts(party.coHosts || []);
+      const partyName = party.name || '';
+      const partyHostName = party.hostName || '';
+      const partyDate = party.date || '';
+      const partyDuration = party.duration?.toString() || '';
+      const partyTimezone = party.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      let partyStartDate = '';
+      let partyStartTime = '';
+      let partyEndDate = '';
+      let partyEndTime = '';
+
+      // Parse date and duration into start/end date/time fields
+      if (party.date) {
+        const startDateTime = new Date(party.date);
+        partyStartDate = startDateTime.toISOString().split('T')[0];
+        const hours = startDateTime.getHours().toString().padStart(2, '0');
+        const minutes = startDateTime.getMinutes().toString().padStart(2, '0');
+        partyStartTime = `${hours}:${minutes}`;
+
+        // Calculate end date/time if duration exists
+        if (party.duration) {
+          const endDateTime = new Date(startDateTime.getTime() + party.duration * 60 * 60 * 1000);
+          partyEndDate = endDateTime.toISOString().split('T')[0];
+          const endHours = endDateTime.getHours().toString().padStart(2, '0');
+          const endMinutes = endDateTime.getMinutes().toString().padStart(2, '0');
+          partyEndTime = `${endHours}:${endMinutes}`;
+        } else {
+          partyEndDate = startDateTime.toISOString().split('T')[0];
+          partyEndTime = '';
+        }
+      }
+
+      const partyAddress = party.address || '';
+      const partyDescription = party.description || '';
+      const partyPassword = party.password || '';
+      const partyCustomUrl = party.customUrl || '';
+      const partyEventImageUrl = party.eventImageUrl || '';
+      const partyMaxGuests = party.maxGuests?.toString() || '';
+      const partyLimitGuests = !!party.maxGuests;
+      const partyCoHosts = party.coHosts || [];
+
+      // Set form values
+      setName(partyName);
+      setHostName(partyHostName);
+      setDate(partyDate);
+      setDuration(partyDuration);
+      setTimezone(partyTimezone);
+      setStartDate(partyStartDate);
+      setStartTime(partyStartTime);
+      setEndDate(partyEndDate);
+      setEndTime(partyEndTime);
+      setAddress(partyAddress);
+      setDescription(partyDescription);
+      setPassword(partyPassword);
+      setCustomUrl(partyCustomUrl);
+      setEventImageUrl(partyEventImageUrl);
+      setImagePreview(partyEventImageUrl || null);
+      setMaxGuests(partyMaxGuests);
+      setLimitGuests(partyLimitGuests);
+      setCoHosts(partyCoHosts);
+
+      // Store original values
+      setOriginalValues({
+        name: partyName,
+        hostName: partyHostName,
+        startDate: partyStartDate,
+        startTime: partyStartTime,
+        endDate: partyEndDate,
+        endTime: partyEndTime,
+        timezone: partyTimezone,
+        address: partyAddress,
+        description: partyDescription,
+        password: partyPassword,
+        customUrl: partyCustomUrl,
+        eventImageUrl: partyEventImageUrl,
+        maxGuests: partyMaxGuests,
+        limitGuests: partyLimitGuests,
+        coHosts: JSON.stringify(partyCoHosts),
+      });
     }
   }, [party]);
 
@@ -160,6 +242,54 @@ export const EventDetailsTab: React.FC = () => {
     setDraggedIndex(null);
   };
 
+  // Check if any values have changed
+  const hasChanges = () => {
+    if (!originalValues) return false;
+
+    return (
+      name !== originalValues.name ||
+      hostName !== originalValues.hostName ||
+      startDate !== originalValues.startDate ||
+      startTime !== originalValues.startTime ||
+      endDate !== originalValues.endDate ||
+      endTime !== originalValues.endTime ||
+      timezone !== originalValues.timezone ||
+      address !== originalValues.address ||
+      description !== originalValues.description ||
+      password !== originalValues.password ||
+      customUrl !== originalValues.customUrl ||
+      eventImageUrl !== originalValues.eventImageUrl ||
+      maxGuests !== originalValues.maxGuests ||
+      limitGuests !== originalValues.limitGuests ||
+      JSON.stringify(coHosts) !== originalValues.coHosts ||
+      eventImageFile !== null
+    );
+  };
+
+  // Cancel changes and revert to original values
+  const handleCancelChanges = () => {
+    if (!originalValues) return;
+
+    setName(originalValues.name);
+    setHostName(originalValues.hostName);
+    setStartDate(originalValues.startDate);
+    setStartTime(originalValues.startTime);
+    setEndDate(originalValues.endDate);
+    setEndTime(originalValues.endTime);
+    setTimezone(originalValues.timezone);
+    setAddress(originalValues.address);
+    setDescription(originalValues.description);
+    setPassword(originalValues.password);
+    setCustomUrl(originalValues.customUrl);
+    setEventImageUrl(originalValues.eventImageUrl);
+    setImagePreview(originalValues.eventImageUrl || null);
+    setMaxGuests(originalValues.maxGuests);
+    setLimitGuests(originalValues.limitGuests);
+    setCoHosts(JSON.parse(originalValues.coHosts));
+    setEventImageFile(null);
+    setImageError(null);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!party) return;
@@ -179,18 +309,32 @@ export const EventDetailsTab: React.FC = () => {
         }
       }
 
+      // Calculate duration from start/end times
+      let calculatedDuration: number | null = null;
+      let startDateTime: string | null = null;
+      if (startDate && startTime && endDate && endTime) {
+        const start = new Date(`${startDate}T${startTime}`);
+        const end = new Date(`${endDate}T${endTime}`);
+        const durationMs = end.getTime() - start.getTime();
+        calculatedDuration = durationMs / (1000 * 60 * 60); // Convert to hours
+        startDateTime = start.toISOString();
+      } else if (startDate && startTime) {
+        startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      }
+
       // Update party in database
       const success = await updateParty(party.id, {
         name: name.trim(),
         host_name: hostName.trim() || null,
-        date: date || null,
-        duration: duration ? parseFloat(duration) : null,
+        date: startDateTime,
+        duration: calculatedDuration,
+        timezone: timezone || null,
         address: address.trim() || null,
         description: description.trim() || null,
         password: password.trim() || null,
         custom_url: customUrl.trim() || null,
         event_image_url: imageUrl || null,
-        max_guests: maxGuests ? parseInt(maxGuests, 10) : null,
+        max_guests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
         co_hosts: coHosts,
       });
 
@@ -206,6 +350,30 @@ export const EventDetailsTab: React.FC = () => {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to update event details' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!party) return;
+
+    setDeleting(true);
+    setMessage(null);
+
+    try {
+      const success = await deleteParty(party.id);
+      if (success) {
+        setMessage({ type: 'success', text: 'Event deleted successfully' });
+        // Redirect to home page after a short delay
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
+      } else {
+        throw new Error('Failed to delete event');
+      }
+    } catch (error) {
+      console.error('Error deleting party:', error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to delete event' });
+      setDeleting(false);
     }
   };
 
@@ -240,7 +408,68 @@ export const EventDetailsTab: React.FC = () => {
           />
         </div>
 
-        {/* Date and Duration - Hidden for now, matching homepage */}
+        {/* Date/Time Picker */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="flex items-start gap-4">
+            <Calendar size={20} className="text-white/40 mt-[3px] flex-shrink-0" />
+            <div className="flex-1 space-y-3">
+              {/* Start Time */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Play size={21} className="text-white/40" />
+                  </div>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (!endDate) setEndDate(e.target.value);
+                    }}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
+
+              {/* End Time */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <SquareIcon size={17} className="text-white/40" />
+                  </div>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
+            </div>
+
+            {/* Timezone Picker */}
+            <TimezonePickerInput
+              value={timezone}
+              onChange={setTimezone}
+            />
+          </div>
+        </div>
 
         {/* Address */}
         <div className="relative">
@@ -268,31 +497,9 @@ export const EventDetailsTab: React.FC = () => {
 
         {/* Event Image */}
         <div>
-          {/* Image URL Input */}
-          <div className="mb-3 relative">
-            <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-            <input
-              type="url"
-              value={eventImageUrl}
-              onChange={(e) => {
-                setEventImageUrl(e.target.value);
-                setImagePreview(e.target.value);
-              }}
-              placeholder="Square Image URL"
-              className="w-full !pl-14"
-            />
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-white/10"></div>
-            <span className="text-xs text-white/40">OR</span>
-            <div className="flex-1 h-px bg-white/10"></div>
-          </div>
-
           {/* File Upload */}
           {imagePreview ? (
-            <div className="space-y-3">
+            <div className="space-y-3 mb-3">
               <div className="relative w-full max-w-xs mx-auto">
                 <img
                   src={imagePreview}
@@ -309,7 +516,7 @@ export const EventDetailsTab: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative mb-3">
               <input
                 type="file"
                 id="eventImage"
@@ -329,6 +536,28 @@ export const EventDetailsTab: React.FC = () => {
               </label>
             </div>
           )}
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-white/10"></div>
+            <span className="text-xs text-white/40">OR</span>
+            <div className="flex-1 h-px bg-white/10"></div>
+          </div>
+
+          {/* Image URL Input */}
+          <div className="relative">
+            <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+            <input
+              type="url"
+              value={eventImageUrl}
+              onChange={(e) => {
+                setEventImageUrl(e.target.value);
+                setImagePreview(e.target.value);
+              }}
+              placeholder="Square Image URL"
+              className="w-full !pl-14"
+            />
+          </div>
 
           {imageError && (
             <p className="text-xs text-red-400 mt-2">{imageError}</p>
@@ -355,6 +584,50 @@ export const EventDetailsTab: React.FC = () => {
 
         {showOptionalFields && (
           <div className="space-y-4 border-l-2 border-white/10 pl-4">
+            <div>
+              <button
+                type="button"
+                onClick={() => setRequireApproval(!requireApproval)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {requireApproval ? (
+                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                ) : (
+                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                )}
+                <span className="text-sm font-medium text-white/80">Require Approval</span>
+              </button>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setLimitGuests(!limitGuests)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {limitGuests ? (
+                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                ) : (
+                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                )}
+                <span className="text-sm font-medium text-white/80">Limit Guests</span>
+              </button>
+            </div>
+
+            {limitGuests && (
+              <div className="relative">
+                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="number"
+                  min="1"
+                  value={maxGuests}
+                  onChange={(e) => setMaxGuests(e.target.value)}
+                  placeholder="Capacity"
+                  className="w-full !pl-14"
+                />
+              </div>
+            )}
+
             <div className="relative">
               <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
               <input
@@ -400,7 +673,7 @@ export const EventDetailsTab: React.FC = () => {
               {showCoHostsOnEvent ? (
                 <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
               ) : (
-                <Square size={16} className="text-white/40 flex-shrink-0" />
+                <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
               )}
               <span className="text-xs font-medium text-white/60">Show on event</span>
             </button>
@@ -545,11 +818,72 @@ export const EventDetailsTab: React.FC = () => {
           ) : (
             <>
               <Save size={18} />
-              Save Event Details
+              Save Settings
             </>
           )}
         </button>
+
+        {/* Cancel Changes Button */}
+        {hasChanges() && (
+          <button
+            type="button"
+            onClick={handleCancelChanges}
+            className="w-full btn-secondary flex items-center justify-center gap-2"
+          >
+            <X size={18} />
+            Cancel Changes
+          </button>
+        )}
+
+        {/* Cancel Event Button */}
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={deleting}
+          className="w-full bg-[#ff393a]/10 hover:bg-[#ff393a]/20 border border-[#ff393a]/30 text-[#ff393a] hover:text-[#ff5a5b] font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+        >
+          <Trash2 size={18} />
+          Cancel Event
+        </button>
       </form>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-white mb-3">Cancel Event?</h2>
+            <p className="text-white/60 mb-6">
+              This will permanently delete this event and all guest responses. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 btn-secondary"
+              >
+                Keep Event
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={18} />
+                    Delete Event
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

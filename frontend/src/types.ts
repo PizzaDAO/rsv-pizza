@@ -106,6 +106,7 @@ export interface Party {
   customUrl: string | null;
   date: string | null;
   duration: number | null;
+  timezone: string | null;
   hostName: string | null;
   pizzaStyle: string;
   availableBeverages?: string[];

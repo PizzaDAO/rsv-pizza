@@ -52,6 +52,7 @@ export interface DbParty {
   host_name: string | null;
   date: string | null;
   duration: number | null;
+  timezone: string | null;
   pizza_style: string;
   available_beverages: string[];
   available_toppings: string[];
@@ -95,7 +96,8 @@ export async function createParty(
   password?: string,
   eventImageUrl?: string,
   description?: string,
-  customUrl?: string
+  customUrl?: string,
+  timezone?: string
 ): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
@@ -104,6 +106,7 @@ export async function createParty(
       host_name: hostName || null,
       date: date || null,
       duration: duration || null,
+      timezone: timezone || null,
       pizza_style: pizzaStyle,
       available_beverages: availableBeverages || [],
       max_guests: expectedGuests || null,
@@ -397,6 +400,19 @@ export async function updateParty(
 
   if (error) {
     console.error('Error updating party:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteParty(partyId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('parties')
+    .delete()
+    .eq('id', partyId);
+
+  if (error) {
+    console.error('Error deleting party:', error);
     return false;
   }
   return true;

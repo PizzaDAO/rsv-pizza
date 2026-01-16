@@ -32,7 +32,8 @@ export function EventPage() {
           // Check if party has password protection
           if (foundParty.password) {
             // Check if already authenticated in this session
-            const authKey = `rsvpizza_event_auth_${slug}`;
+            // Use invite_code as key to be consistent with RSVPPage
+            const authKey = `rsvpizza_auth_${foundParty.invite_code}`;
             const storedAuth = sessionStorage.getItem(authKey);
             if (storedAuth === foundParty.password) {
               setIsAuthenticated(true);
@@ -60,7 +61,8 @@ export function EventPage() {
       setIsAuthenticated(true);
       setPasswordError(null);
       // Store in session storage to avoid re-prompting
-      const authKey = `rsvpizza_event_auth_${slug}`;
+      // Use invite_code as key to be consistent with RSVPPage
+      const authKey = `rsvpizza_auth_${party.invite_code}`;
       sessionStorage.setItem(authKey, party.password);
     } else {
       // Wrong password
@@ -137,7 +139,7 @@ export function EventPage() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
           <p className="text-white/60 mb-6 text-center">
-            This event is password-protected. Please enter the password to continue.
+            This event is password-protected
           </p>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -148,14 +150,11 @@ export function EventPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Event Password
-              </label>
               <input
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password"
+                placeholder="Event Password"
                 className="w-full"
                 required
                 autoFocus
@@ -187,11 +186,30 @@ export function EventPage() {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: party.timezone || undefined,
   });
   const formattedTime = eventDate?.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: party.timezone || undefined,
   });
+
+  // Get timezone abbreviation for display
+  const getTimezoneAbbr = () => {
+    if (!party.timezone || !eventDate) return '';
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: party.timezone,
+        timeZoneName: 'short'
+      });
+      const parts = formatter.formatToParts(eventDate);
+      const tzPart = parts.find(p => p.type === 'timeZoneName');
+      return tzPart?.value || '';
+    } catch {
+      return '';
+    }
+  };
+  const timezoneAbbr = getTimezoneAbbr();
 
   const metaTitle = party.name;
   const metaDescription = party.description
@@ -509,18 +527,11 @@ export function EventPage() {
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-medium text-white">
-                        {new Date(party.date).toLocaleDateString(undefined, {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        {formattedDate}
                       </p>
                       <p className="text-sm text-white/60">
-                        {new Date(party.date).toLocaleTimeString(undefined, {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formattedTime}
+                        {timezoneAbbr && ` ${timezoneAbbr}`}
                         {party.duration && ` • ${party.duration} hour${party.duration !== 1 ? 's' : ''}`}
                       </p>
                     </div>

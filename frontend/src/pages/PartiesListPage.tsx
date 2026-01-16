@@ -16,12 +16,13 @@ export const PartiesListPage: React.FC = () => {
     fetchParties();
   }, []);
 
-  const formatDate = (dateStr: string | null) => {
+  const formatDate = (dateStr: string | null, timezone: string | null) => {
     if (!dateStr) return null;
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: timezone || undefined,
     });
   };
 
@@ -92,7 +93,7 @@ export const PartiesListPage: React.FC = () => {
                       {party.date && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
-                          {formatDate(party.date)}
+                          {formatDate(party.date, party.timezone)}
                         </span>
                       )}
                       {party.max_guests && (

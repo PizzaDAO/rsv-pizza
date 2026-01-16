@@ -5,7 +5,6 @@ import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
-import { AddGuestForm } from '../components/AddGuestForm';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { PizzaSettings } from '../components/PizzaSettings';
 import { BeverageSettings } from '../components/BeverageSettings';
@@ -21,7 +20,7 @@ function HostPageContent() {
   const { loadParty, party, partyLoading, guests, generateRecommendations } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('guests');
+  const [activeTab, setActiveTab] = useState<TabType>('details');
 
   useEffect(() => {
     async function load() {
@@ -65,41 +64,35 @@ function HostPageContent() {
   }
 
   const tabs = [
-    { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
+    { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
   ];
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <header className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-            Pizza Party Planner
-          </h1>
-          <p className="text-white/60 max-w-2xl mx-auto">
-            Manage your party, view guest responses, and get pizza recommendations!
-          </p>
-        </header>
-
         <PartyHeader />
 
         {/* Tab Navigation */}
-        <div className="card p-2 mb-6 flex gap-2 overflow-x-auto">
+        <div className="border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${
                   activeTab === tab.id
-                    ? 'bg-[#ff393a] text-white'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? 'text-white'
+                    : 'text-white/40 hover:text-white/60'
                 }`}
               >
                 <Icon size={18} />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.label}</span>
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
+                )}
               </button>
             );
           })}
@@ -116,7 +109,6 @@ function HostPageContent() {
 
             {activeTab === 'pizza' && (
               <>
-                <AddGuestForm />
                 <GuestPreferencesList />
                 <PizzaSettings />
                 <ToppingsSettings />
@@ -126,7 +118,7 @@ function HostPageContent() {
                   disabled={guests.length === 0}
                   className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Generate Pizza Recommendations
+                  Create Order
                 </button>
               </>
             )}

@@ -167,6 +167,18 @@ export const PartyHeader: React.FC = () => {
     navigate(`/${slug}`);
   };
 
+  const handleCopyEventLink = () => {
+    if (!party) return;
+    const slug = party.customUrl || party.inviteCode;
+    const eventLink = `${window.location.origin}/${slug}`;
+    navigator.clipboard.writeText(eventLink)
+      .then(() => {
+        setCopied('event');
+        setTimeout(() => setCopied(null), 2000);
+      })
+      .catch(err => console.error('Failed to copy:', err));
+  };
+
   const inviteLink = getInviteLink();
   const hostLink = getHostLink();
   const eventLink = getEventLink();
@@ -204,18 +216,20 @@ export const PartyHeader: React.FC = () => {
                 <span className="hidden sm:inline">View Event Page</span>
               </button>
               <button
-                onClick={() => setShowShareModal(true)}
+                onClick={handleCopyEventLink}
                 className="btn-primary flex items-center gap-2"
               >
-                <Link2 size={18} />
-                <span className="hidden sm:inline">Share Links</span>
-              </button>
-              <button
-                onClick={clearParty}
-                className="btn-secondary px-3"
-                title="Start new party"
-              >
-                <X size={18} />
+                {copied === 'event' ? (
+                  <>
+                    <Check size={18} />
+                    <span className="hidden sm:inline">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={18} />
+                    <span className="hidden sm:inline">Copy Link</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

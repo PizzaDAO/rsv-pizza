@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User } from 'lucide-react';
+import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User, X } from 'lucide-react';
 
-export const AddGuestForm: React.FC = () => {
+interface AddGuestFormProps {
+  onClose?: () => void;
+}
+
+export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
   const { availableToppings, availableBeverages, addGuest, dietaryOptions, party } = usePizza();
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -42,6 +46,7 @@ export const AddGuestForm: React.FC = () => {
     setIsSubmitting(false);
     resetForm();
     setIsFormVisible(false);
+    onClose?.(); // Close modal if in modal mode
   };
 
   const handleDietaryChange = (option: string) => {
@@ -72,11 +77,21 @@ export const AddGuestForm: React.FC = () => {
     setDislikedBeverages(prev => prev.includes(beverageId) ? prev.filter(id => id !== beverageId) : [...prev, beverageId]);
   };
 
+  // Modal mode: always show form, ignore isFormVisible
+  const shouldShowForm = onClose ? true : isFormVisible;
+
   return (
     <div className="card p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-white">Add Guest</h2>
-        {!isFormVisible && (
+        {onClose ? (
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+        ) : !isFormVisible ? (
           <button
             onClick={() => setIsFormVisible(true)}
             className="btn-primary flex items-center space-x-2"
@@ -84,10 +99,10 @@ export const AddGuestForm: React.FC = () => {
             <UserPlus size={18} />
             <span>Add Guest</span>
           </button>
-        )}
+        ) : null}
       </div>
 
-      {isFormVisible && (
+      {shouldShowForm && (
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="relative">
             <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
