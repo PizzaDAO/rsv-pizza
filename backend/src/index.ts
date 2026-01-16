@@ -12,12 +12,7 @@ const PORT = process.env.PORT || 3006;
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5176',
-    'http://localhost:5173',
-    'https://rsv.pizza',
-    'https://www.rsv.pizza',
-  ],
+  origin: /^https?:\/\/(www\.)?rsv\.pizza$|^http:\/\/localhost:(5173|5176)$/,
   credentials: true,
 }));
 app.use(express.json());
