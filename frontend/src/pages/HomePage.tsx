@@ -328,7 +328,7 @@ export function HomePage() {
                 type="text"
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
-                placeholder="Your Name (Host)"
+                placeholder="Host Name"
                 className="w-full !pl-14"
               />
             </div>
@@ -349,7 +349,7 @@ export function HomePage() {
                       setImageError(null);
                     }
                   }}
-                  placeholder="Event Flyer URL (Square Image)"
+                  placeholder="Square Image URL"
                   className="w-full !pl-14"
                 />
               </div>

@@ -235,7 +235,7 @@ export const EventDetailsTab: React.FC = () => {
             type="text"
             value={hostName}
             onChange={(e) => setHostName(e.target.value)}
-            placeholder="Your Name (Host)"
+            placeholder="Host Name"
             className="w-full !pl-14"
           />
         </div>

@@ -346,7 +346,7 @@ export const PartyHeader: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-white/80 mb-2">
                       <User size={14} className="inline mr-1" />
-                      Your Name (Host)
+                      Host Name
                     </label>
                     <input
                       type="text"
@@ -394,7 +394,7 @@ export const PartyHeader: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-white/80 mb-2">
                       <Image size={14} className="inline mr-1" />
-                      Event Flyer (Square Image)
+                      Square Image
                     </label>
 
                     {/* Image URL Input */}
