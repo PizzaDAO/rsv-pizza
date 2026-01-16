@@ -41,7 +41,7 @@ export default function middleware(request: Request) {
   }
 
   // Skip known paths and files with extensions
-  if (KNOWN_PATHS.some(p => pathname.startsWith(p)) || pathname.includes('.')) {
+  if (KNOWN_PATHS.some(p => pathname.startsWith(p)) || pathname.includes('.') || pathname === '/parties') {
     return next();
   }
 
