@@ -246,7 +246,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'payment') {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold text-white">Add Payment Method</h2>
@@ -277,7 +277,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'confirm') {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold text-white">Confirm Order</h2>
@@ -395,7 +395,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   // Render details step (main form)
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -445,11 +445,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <button
               type="button"
               onClick={() => setFulfillmentType('PICKUP')}
-              className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
-                fulfillmentType === 'PICKUP'
+              className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${fulfillmentType === 'PICKUP'
                   ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
                   : 'border-white/10 text-white/60 hover:border-white/20'
-              }`}
+                }`}
             >
               <Store size={18} />
               Pickup
@@ -457,11 +456,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <button
               type="button"
               onClick={() => setFulfillmentType('DELIVERY')}
-              className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
-                fulfillmentType === 'DELIVERY'
+              className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${fulfillmentType === 'DELIVERY'
                   ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
                   : 'border-white/10 text-white/60 hover:border-white/20'
-              }`}
+                }`}
             >
               <Truck size={18} />
               Delivery
@@ -545,11 +543,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               <button
                 type="button"
                 onClick={() => setPayWithCard(false)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                  !payWithCard
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${!payWithCard
                     ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
                     : 'border-white/10 text-white/60 hover:border-white/20'
-                }`}
+                  }`}
               >
                 <Store size={18} />
                 <div className="text-left">
@@ -560,11 +557,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               <button
                 type="button"
                 onClick={() => setPayWithCard(true)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                  payWithCard
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${payWithCard
                     ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-white'
                     : 'border-white/10 text-white/60 hover:border-white/20'
-                }`}
+                  }`}
               >
                 <CreditCard size={18} />
                 <div className="text-left flex-1">
@@ -640,11 +636,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <>
               <button
                 onClick={handlePhoneOrder}
-                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
-                  copied
+                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${copied
                     ? 'bg-[#39d98a] text-white'
                     : 'btn-secondary'
-                }`}
+                  }`}
               >
                 {copied ? (
                   <>

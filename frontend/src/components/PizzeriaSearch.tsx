@@ -26,13 +26,15 @@ interface PizzeriaSearchProps {
   partyAddress?: string | null;
   initialPizzerias?: Pizzeria[];
   initialSearchAddress?: string;
+  className?: string; // Allow overriding styles (e.g. for modals)
 }
 
 export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   onSelectPizzeria,
   partyAddress,
   initialPizzerias,
-  initialSearchAddress
+  initialSearchAddress,
+  className = "card p-6"
 }) => {
   const [pizzerias, setPizzerias] = useState<Pizzeria[]>(initialPizzerias || []);
   const [loading, setLoading] = useState(false);
@@ -172,7 +174,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   };
 
   return (
-    <div className="card p-6">
+    <div className={className}>
       <h2 className="text-xl font-bold text-white mb-4">Find a Pizzeria</h2>
 
       {/* Search options */}
@@ -206,7 +208,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               value={searchAddress}
               onChange={(e) => setSearchAddress(e.target.value)}
               placeholder="Enter delivery address..."
-              className="w-full pl-10"
+              className="w-full pl-12"
             />
           </div>
           <button
@@ -241,45 +243,69 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
             Found {pizzerias.length} pizzeria{pizzerias.length !== 1 ? 's' : ''} nearby
           </p>
 
-          {pizzerias.map((pizzeria) => (
-            <div
-              key={pizzeria.id}
-              className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/[0.07] transition-all"
-            >
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-white">{pizzeria.name}</h3>
-                    {renderStars(pizzeria.rating)}
-                    {pizzeria.reviewCount && (
-                      <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
-                    )}
+          {pizzerias.map((pizzeria) => {
+            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`;
+
+            return (
+              <div
+                key={pizzeria.id}
+                className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/[0.07] transition-all"
+              >
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a
+                        href={googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
+                      >
+                        {pizzeria.name}
+                        <ExternalLink size={12} className="opacity-50" />
+                      </a>
+                      {renderStars(pizzeria.rating)}
+                      {pizzeria.reviewCount && (
+                        <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60 mt-1">{pizzeria.address}</p>
+                    <div className="flex items-center gap-3 mt-2 text-sm">
+                      {pizzeria.distance && (
+                        <span className="text-white/50">
+                          {formatDistance(pizzeria.distance)}
+                        </span>
+                      )}
+                      {pizzeria.isOpen !== undefined && (
+                        <span className={`flex items-center gap-1 ${pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}`}>
+                          <Clock size={12} />
+                          {pizzeria.isOpen ? 'Open' : 'Closed'}
+                        </span>
+                      )}
+                      {pizzeria.priceLevel && (
+                        <span className="text-white/50">
+                          {'$'.repeat(pizzeria.priceLevel)}
+                        </span>
+                      )}
+                    </div>
+
+                    {renderOrderingOptions(pizzeria)}
                   </div>
-                  <p className="text-sm text-white/60 mt-1">{pizzeria.address}</p>
-                  <div className="flex items-center gap-3 mt-2 text-sm">
-                    {pizzeria.distance && (
-                      <span className="text-white/50">
-                        {formatDistance(pizzeria.distance)}
-                      </span>
-                    )}
-                    {pizzeria.isOpen !== undefined && (
-                      <span className={`flex items-center gap-1 ${pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}`}>
-                        <Clock size={12} />
-                        {pizzeria.isOpen ? 'Open' : 'Closed'}
-                      </span>
-                    )}
-                    {pizzeria.priceLevel && (
-                      <span className="text-white/50">
-                        {'$'.repeat(pizzeria.priceLevel)}
-                      </span>
-                    )}
-                  </div>
+
+                  {/* Right side: Map Thumbnail */}
+                  <a
+                    href={googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group"
+                    title="View on Google Maps"
+                  >
+                    <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                  </a>
                 </div>
               </div>
-
-              {renderOrderingOptions(pizzeria)}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

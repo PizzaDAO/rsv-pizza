@@ -191,11 +191,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     const orderText = [...recommendations]
       .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
       .map(pizza => {
-      const qty = pizza.quantity || 1;
-      const toppingsText = pizza.toppings.map(t => t.name).join(', ');
-      const label = pizza.label || toppingsText;
-      return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name}) - serves ${pizza.guestCount}`;
-    }).join('\n');
+        const qty = pizza.quantity || 1;
+        const toppingsText = pizza.toppings.map(t => t.name).join(', ');
+        const label = pizza.label || toppingsText;
+        return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name}) - serves ${pizza.guestCount}`;
+      }).join('\n');
 
     const fullText = `PIZZA PARTY ORDER\n\nExpected guests: ${expectedGuests}\nResponded: ${respondedGuests}\nTotal pizzas: ${totalPizzas}\n\n${orderText}`;
 
@@ -411,8 +411,8 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   {[...recommendations]
                     .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                     .map((pizza, index) => (
-                    <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
-                  ))}
+                      <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
+                    ))}
                 </div>
 
                 {/* Beverage Order Section */}
@@ -463,11 +463,10 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               <button
                 onClick={handleCopyOrder}
                 disabled={recommendations.length === 0}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm transition-all ${
-                  isCopied
-                    ? 'bg-[#39d98a] text-white'
-                    : 'btn-secondary'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm transition-all ${isCopied
+                  ? 'bg-[#39d98a] text-white'
+                  : 'btn-secondary'
+                  }`}
               >
                 {isCopied ? (
                   <>
@@ -678,6 +677,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               partyAddress={party?.address}
               initialPizzerias={pizzerias}
               initialSearchAddress={searchAddress}
+              className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6"
             />
           </div>
         </div>
@@ -697,7 +697,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       {/* Order Complete Modal */}
       {orderComplete && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md text-center">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md text-center">
             <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-[#39d98a]" />
             </div>

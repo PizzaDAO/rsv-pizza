@@ -927,7 +927,7 @@ export const EventDetailsTab: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-white mb-3">Cancel Event?</h2>
             <p className="text-white/60 mb-6">
               This will permanently delete this event and all guest responses. This action cannot be undone.
