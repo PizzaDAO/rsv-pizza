@@ -23,17 +23,17 @@ async function generateOGMetaPages() {
 
   console.log(`Found ${parties.length} parties with custom URLs\n`);
 
-  const baseUrl = 'https://pizzadao.github.io';
+  const baseUrl = 'https://www.rsv.pizza';
   const distDir = path.join(__dirname, '../frontend/dist');
 
   for (const party of parties) {
     const slug = party.custom_url;
-    const pageUrl = `${baseUrl}/rsv-pizza/${slug}`;
+    const pageUrl = `${baseUrl}/${slug}`;
     const ogImageUrl = (() => {
-      if (!party.event_image_url) return `${baseUrl}/rsv-pizza/logo.png`;
+      if (!party.event_image_url) return `${baseUrl}/logo.png`;
       if (party.event_image_url.startsWith('http')) return party.event_image_url;
       if (party.event_image_url.startsWith('/')) return `${baseUrl}${party.event_image_url}`;
-      return `${baseUrl}/rsv-pizza/${party.event_image_url}`;
+      return `${baseUrl}/${party.event_image_url}`;
     })();
 
     const eventDate = party.date ? new Date(party.date) : null;
@@ -82,7 +82,7 @@ async function generateOGMetaPages() {
   ${party.address ? `<meta property="event:location" content="${escapeHtml(party.address)}">` : ''}
 
   <!-- Redirect to React app -->
-  <meta http-equiv="refresh" content="0; url=/rsv-pizza/${slug}">
+  <meta http-equiv="refresh" content="0; url=/${slug}">
   <link rel="canonical" href="${pageUrl}">
 
   <style>
@@ -121,7 +121,7 @@ async function generateOGMetaPages() {
   </div>
   <script>
     // JavaScript redirect as backup
-    window.location.href = '/rsv-pizza/${slug}';
+    window.location.href = '/${slug}';
   </script>
 </body>
 </html>`;
