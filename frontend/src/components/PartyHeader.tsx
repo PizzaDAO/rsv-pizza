@@ -593,7 +593,7 @@ export const PartyHeader: React.FC = () => {
 
                 {/* Event Info */}
                 <div className="flex-1 p-4">
-                  <p className="text-xs text-white/40 mb-1">RSVPizza</p>
+                  <p className="text-xs text-white/40 mb-1">RSV.Pizza</p>
                   <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{party.name}</h3>
                   {party.description && (
                     <p className="text-sm text-white/60 line-clamp-3 mb-3">

@@ -255,7 +255,7 @@ async function sendRSVPConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSVPizza <noreply@rsvpizza.com>',
+      from: 'RSV.Pizza <noreply@rsvpizza.com>',
       to: [params.guestEmail],
       subject: `You're going to ${params.partyName}! 🍕`,
       html: emailHtml,

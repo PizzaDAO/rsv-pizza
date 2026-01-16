@@ -220,7 +220,7 @@ export function EventPage() {
     <div className="min-h-screen">
       <Helmet>
         {/* Primary Meta Tags */}
-        <title>{metaTitle} | RSVPizza</title>
+        <title>{metaTitle} | RSV.Pizza</title>
         <meta name="title" content={metaTitle} />
         <meta name="description" content={metaDescription} />
 
@@ -261,7 +261,7 @@ export function EventPage() {
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
               src="/logo.png"
-              alt="RSVPizza"
+              alt="RSV.Pizza"
               className="h-8 sm:h-10"
             />
           </Link>
@@ -732,7 +732,7 @@ export function EventPage() {
         </div>
 
         <p className="text-center text-white/30 text-sm mt-6">
-          Powered by RSVPizza
+          Powered by RSV.Pizza
         </p>
       </div>
     </div>

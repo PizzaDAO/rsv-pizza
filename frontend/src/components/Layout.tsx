@@ -13,10 +13,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
               src="/logo.png"
-              alt="RSVPizza"
+              alt="RSV.Pizza"
               className="h-8 sm:h-10"
             />
-            <span className="text-lg sm:text-xl font-semibold text-white/90">RSVPizza</span>
+            <span className="text-lg sm:text-xl font-semibold text-white/90">RSV.Pizza</span>
           </a>
           <a
             href="https://pizzadao.xyz"
@@ -37,7 +37,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Footer */}
       <footer className="border-t border-white/10 py-6">
         <p className="text-center text-white/40 text-sm">
-          RSVPizza by PizzaDAO
+          RSV.Pizza by PizzaDAO
         </p>
       </footer>
 

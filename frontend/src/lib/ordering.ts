@@ -59,7 +59,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
     {
       headers: {
-        'User-Agent': 'RSVPizza/1.0',
+        'User-Agent': 'RSV.Pizza/1.0',
       },
     }
   );
