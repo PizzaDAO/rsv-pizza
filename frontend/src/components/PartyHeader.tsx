@@ -186,55 +186,126 @@ export const PartyHeader: React.FC = () => {
   return (
     <>
       {/* Party Status Bar */}
-      <div className="card p-4 mb-6">
+      <div className="card p-0 mb-6 overflow-hidden">
         {party ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
-                <PartyPopper className="w-5 h-5 text-[#ff393a]" />
+          <>
+            {/* Event Image Banner */}
+            {party.eventImageUrl ? (
+              <div className="relative h-64 bg-gradient-to-br from-[#ff393a] to-[#ff6b35]">
+                <img
+                  src={party.eventImageUrl}
+                  alt={party.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+                {/* Content overlay */}
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 border border-white/20">
+                        <PartyPopper className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-white drop-shadow-lg">{party.name}</h3>
+                        <p className="text-sm text-white/90 drop-shadow">
+                          {party.hostName && `Hosted by ${party.hostName} • `}
+                          {party.maxGuests ? (
+                            <span>
+                              {party.guests.length} of {party.maxGuests} guests responded
+                            </span>
+                          ) : (
+                            <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleViewEventPage}
+                        className="btn-secondary flex items-center gap-2 backdrop-blur-sm"
+                      >
+                        <ExternalLink size={18} />
+                        <span className="hidden sm:inline">View Event Page</span>
+                      </button>
+                      <button
+                        onClick={handleCopyEventLink}
+                        className="btn-primary flex items-center gap-2"
+                      >
+                        {copied === 'event' ? (
+                          <>
+                            <Check size={18} />
+                            <span className="hidden sm:inline">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={18} />
+                            <span className="hidden sm:inline">Copy Link</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-white">{party.name}</h3>
-                <p className="text-sm text-white/50">
-                  {party.hostName && `Hosted by ${party.hostName} • `}
-                  {party.maxGuests ? (
-                    <span>
-                      {party.guests.length} of {party.maxGuests} guests responded
-                    </span>
-                  ) : (
-                    <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
-                  )}
-                </p>
+            ) : (
+              <div className="relative h-64 bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
+                <Pizza className="w-32 h-32 text-white/20 absolute" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+
+                {/* Content overlay */}
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 border border-white/20">
+                        <PartyPopper className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-white drop-shadow-lg">{party.name}</h3>
+                        <p className="text-sm text-white/90 drop-shadow">
+                          {party.hostName && `Hosted by ${party.hostName} • `}
+                          {party.maxGuests ? (
+                            <span>
+                              {party.guests.length} of {party.maxGuests} guests responded
+                            </span>
+                          ) : (
+                            <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleViewEventPage}
+                        className="btn-secondary flex items-center gap-2 backdrop-blur-sm"
+                      >
+                        <ExternalLink size={18} />
+                        <span className="hidden sm:inline">View Event Page</span>
+                      </button>
+                      <button
+                        onClick={handleCopyEventLink}
+                        className="btn-primary flex items-center gap-2"
+                      >
+                        {copied === 'event' ? (
+                          <>
+                            <Check size={18} />
+                            <span className="hidden sm:inline">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={18} />
+                            <span className="hidden sm:inline">Copy Link</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleViewEventPage}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <ExternalLink size={18} />
-                <span className="hidden sm:inline">View Event Page</span>
-              </button>
-              <button
-                onClick={handleCopyEventLink}
-                className="btn-primary flex items-center gap-2"
-              >
-                {copied === 'event' ? (
-                  <>
-                    <Check size={18} />
-                    <span className="hidden sm:inline">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={18} />
-                    <span className="hidden sm:inline">Copy Link</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+            )}
+          </>
         ) : (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
                 <PartyPopper className="w-5 h-5 text-white/50" />
