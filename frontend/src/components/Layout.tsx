@@ -36,9 +36,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-6">
-        <p className="text-center text-white/40 text-sm">
-          RSV.Pizza by PizzaDAO
-        </p>
+        <div className="flex justify-center">
+          <a
+            href="https://pizzadao.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logo.png"
+              alt="PizzaDAO"
+              className="h-8"
+            />
+          </a>
+        </div>
       </footer>
 
       {/* Corner Links */}

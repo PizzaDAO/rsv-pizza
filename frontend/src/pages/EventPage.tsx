@@ -731,9 +731,20 @@ export function EventPage() {
           </div>
         </div>
 
-        <p className="text-center text-white/30 text-sm mt-6">
-          Powered by RSV.Pizza
-        </p>
+        <div className="flex justify-center mt-6">
+          <a
+            href="https://pizzadao.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logo.png"
+              alt="PizzaDAO"
+              className="h-6 opacity-30 hover:opacity-50"
+            />
+          </a>
+        </div>
       </div>
     </div>
   );
