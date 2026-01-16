@@ -176,7 +176,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
       <h2 className="text-xl font-bold text-white mb-4">Find a Pizzeria</h2>
 
       {/* Search options */}
-      <div className="space-y-4 mb-6">
+      <div className="space-y-3 mb-6">
         {/* Use current location */}
         <button
           onClick={handleUseCurrentLocation}

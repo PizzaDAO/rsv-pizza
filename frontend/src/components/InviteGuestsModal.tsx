@@ -87,7 +87,7 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
         <div className="flex-1 overflow-y-auto p-6">
           {step === 1 ? (
             /* Step 1: Add Emails */
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex gap-3">
                 <input
                   type="text"
@@ -137,7 +137,7 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
             </div>
           ) : (
             /* Step 2: Send Invites */
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Left Sidebar - Email List */}
               <div className="md:col-span-1">
                 <h3 className="text-sm font-medium text-white/60 mb-3">
@@ -159,8 +159,8 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
               </div>
 
               {/* Right Side - Message Preview */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+              <div className="md:col-span-2 space-y-3">
+                <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-3">
                   <p className="text-white text-lg">
                     Hi, {hostName} invites you to join {eventName}.
                   </p>

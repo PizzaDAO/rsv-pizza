@@ -103,7 +103,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
       </div>
 
       {shouldShowForm && (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="relative">
             <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input

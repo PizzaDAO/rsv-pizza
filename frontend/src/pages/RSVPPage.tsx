@@ -256,7 +256,7 @@ export function RSVPPage() {
             This event is password-protected
           </p>
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <form onSubmit={handlePasswordSubmit} className="space-y-3">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {passwordError}
@@ -325,7 +325,7 @@ export function RSVPPage() {
             </div>
           </div>
 
-          <form onSubmit={handleStep1Continue} className="space-y-5">
+          <form onSubmit={handleStep1Continue} className="space-y-3">
             {/* Name */}
             <div className="relative">
               <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
@@ -443,7 +443,7 @@ export function RSVPPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Dietary Restrictions */}
           <div>
             <label className="block text-sm font-medium text-white/80 mb-3">

@@ -395,7 +395,7 @@ export const EventDetailsTab: React.FC = () => {
 
   return (
     <div className="card p-8">
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="space-y-3">
         {/* Name */}
         <div>
           <input
@@ -595,7 +595,7 @@ export const EventDetailsTab: React.FC = () => {
         </button>
 
         {showOptionalFields && (
-          <div className="space-y-4 border-l-2 border-white/10 pl-4">
+          <div className="space-y-3 border-l-2 border-white/10 pl-4">
             <div>
               <button
                 type="button"

@@ -142,7 +142,7 @@ export function EventPage() {
             This event is password-protected
           </p>
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <form onSubmit={handlePasswordSubmit} className="space-y-3">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {passwordError}
@@ -287,7 +287,7 @@ export function EventPage() {
               Enter the password you set when creating this event to edit it.
             </p>
 
-            <form onSubmit={handleEditPasswordSubmit} className="space-y-4">
+            <form onSubmit={handleEditPasswordSubmit} className="space-y-3">
               {editPasswordError && (
                 <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                   {editPasswordError}
@@ -520,7 +520,7 @@ export function EventPage() {
               </div>
 
               {/* Event Details */}
-              <div className="p-6 space-y-4 flex-1">
+              <div className="p-6 space-y-3 flex-1">
                 {/* Date & Time */}
                 {party.date && (
                   <div className="flex items-start gap-3">
@@ -652,7 +652,7 @@ export function EventPage() {
                 {/* Mobile: Full Host Section */}
                 <div className="md:hidden border-t border-white/10 pt-6 mt-6">
                   <h3 className="font-semibold text-white mb-4">Hosted By</h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Primary Host */}
                     {party.host_name && (
                       <div className="flex items-start gap-3">

@@ -226,7 +226,7 @@ export function HomePage() {
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
-          <form onSubmit={handleCreate} className="space-y-6">
+          <form onSubmit={handleCreate} className="space-y-3">
             <div>
               <input
                 type="text"
@@ -451,7 +451,7 @@ export function HomePage() {
 
             {/* Collapsible Options */}
             {showOptionalFields && (
-              <div className="space-y-4 border-l-2 border-white/10 pl-4">
+              <div className="space-y-3 border-l-2 border-white/10 pl-4">
                 <div>
                   <button
                     type="button"

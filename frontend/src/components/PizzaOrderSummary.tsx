@@ -318,7 +318,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
             {waveRecommendations.length > 1 ? (
               // Multi-wave display
-              <div className="space-y-4 mb-4">
+              <div className="space-y-3 mb-4">
                 {waveRecommendations.map((waveRec, waveIndex) => (
                   <div
                     key={waveRec.wave.id}

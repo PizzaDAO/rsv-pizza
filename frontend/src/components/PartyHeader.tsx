@@ -212,6 +212,27 @@ export const PartyHeader: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-white text-lg">{party.name}</h3>
+                  {party.date && (
+                    <p className="text-sm text-white/70 mb-1 flex items-center gap-1.5">
+                      <Calendar size={14} className="flex-shrink-0" />
+                      <span>
+                        {new Date(party.date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                          timeZone: party.timezone || undefined
+                        })}
+                        {' at '}
+                        {new Date(party.date).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          timeZone: party.timezone || undefined
+                        })}
+                        {party.timezone && ` (${party.timezone.replace(/_/g, ' ')})`}
+                      </span>
+                    </p>
+                  )}
                   <p className="text-sm text-white/50">
                     {party.hostName && `Hosted by ${party.hostName} • `}
                     {party.maxGuests ? (
@@ -290,7 +311,7 @@ export const PartyHeader: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+            <form onSubmit={handleCreate} className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
                   Party Name *
@@ -377,7 +398,7 @@ export const PartyHeader: React.FC = () => {
 
               {/* Collapsible Optional Fields */}
               {showOptionalFields && (
-                <div className="space-y-4 border-l-2 border-white/10 pl-4">
+                <div className="space-y-3 border-l-2 border-white/10 pl-4">
                   <div>
                     <label className="block text-sm font-medium text-white/80 mb-2">
                       <User size={14} className="inline mr-1" />
@@ -627,7 +648,7 @@ export const PartyHeader: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-4 mb-6">
+            <div className="space-y-3 mb-6">
               {/* Event Page Link */}
               <div>
                 <p className="text-white/60 mb-2 text-sm font-medium">

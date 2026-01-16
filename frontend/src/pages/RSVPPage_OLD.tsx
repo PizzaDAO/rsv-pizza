@@ -219,7 +219,7 @@ export function RSVPPage() {
             This party is password-protected. Please enter the password to continue.
           </p>
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <form onSubmit={handlePasswordSubmit} className="space-y-3">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {passwordError}
@@ -314,7 +314,7 @@ export function RSVPPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-3">
             {error && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {error}

@@ -470,7 +470,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         </div>
 
         {/* Customer Info */}
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-6">
           <div>
             <label className="block text-sm font-medium text-white/80 mb-2">
               <User size={14} className="inline mr-1" />

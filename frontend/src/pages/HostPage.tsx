@@ -99,8 +99,8 @@ function HostPageContent() {
         </div>
 
         {/* Tab Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 space-y-3">
             {activeTab === 'guests' && (
               <>
                 <GuestList />
@@ -130,7 +130,7 @@ function HostPageContent() {
 
           {/* Order Summary - Only on Pizza & Drinks Tab */}
           {activeTab === 'pizza' && (
-            <div className="xl:col-span-1 space-y-6">
+            <div className="xl:col-span-1 space-y-3">
               <PizzaOrderSummary />
             </div>
           )}

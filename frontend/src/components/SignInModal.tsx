@@ -61,7 +61,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <h2 className="text-2xl font-bold text-white mb-2">Sign In</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
                 <Mail size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input

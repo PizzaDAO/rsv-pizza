@@ -131,7 +131,7 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div>
         <label className="block text-sm font-medium text-white/80 mb-2">
           <CreditCard size={14} className="inline mr-1" />
