@@ -77,17 +77,21 @@ export function generateWaveRecommendations(
   guests: Guest[],
   style: PizzaStyle,
   party: Party,
-  allBeverages: Beverage[]
+  allBeverages: Beverage[],
+  expectedGuestsOverride?: number | null
 ): WaveRecommendation[] {
+  // Use override if provided, otherwise fall back to party.maxGuests
+  const effectiveMaxGuests = expectedGuestsOverride ?? party.maxGuests;
+
   // Backward compatibility: no date/duration → single wave
   if (!party.date || !party.duration) {
-    const pizzas = generatePizzaRecommendations(guests, style, party.maxGuests);
+    const pizzas = generatePizzaRecommendations(guests, style, effectiveMaxGuests);
     const beverages = party.availableBeverages && party.availableBeverages.length > 0
       ? generateBeverageRecommendations(
           guests,
           party.availableBeverages,
           allBeverages,
-          party.maxGuests
+          effectiveMaxGuests
         )
       : [];
 
@@ -95,7 +99,7 @@ export function generateWaveRecommendations(
       wave: {
         id: 'wave-1',
         arrivalTime: new Date(),
-        guestAllocation: party.maxGuests || guests.length,
+        guestAllocation: effectiveMaxGuests || guests.length,
         weight: 1.0,
         label: 'All Pizzas'
       },
@@ -108,7 +112,7 @@ export function generateWaveRecommendations(
 
   // Multi-wave logic
   const partyStartTime = new Date(party.date);
-  const totalGuests = party.maxGuests || guests.length;
+  const totalGuests = effectiveMaxGuests || guests.length;
   const waves = calculateWaves({
     partyStartTime,
     durationHours: party.duration,

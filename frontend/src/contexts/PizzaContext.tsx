@@ -25,6 +25,8 @@ interface PizzaContextType {
   generateRecommendations: () => void;
   beverageRecommendations: BeverageRecommendation[];
   waveRecommendations: WaveRecommendation[];
+  orderExpectedGuests: number | null;
+  setOrderExpectedGuests: (count: number | null) => void;
   // Static data
   availableToppings: Topping[];
   availableBeverages: Beverage[];
@@ -138,6 +140,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [recommendations, setRecommendations] = useState<PizzaRecommendation[]>([]);
   const [beverageRecommendations, setBeverageRecommendations] = useState<BeverageRecommendation[]>([]);
   const [waveRecommendations, setWaveRecommendations] = useState<WaveRecommendation[]>([]);
+  const [orderExpectedGuests, setOrderExpectedGuests] = useState<number | null>(null);
 
   const [pizzaSettings, setPizzaSettings] = useState<PizzaSettings>(() => {
     const savedSettings = localStorage.getItem('pizzaPartySettings');
@@ -299,7 +302,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!party) return;
 
     // Generate wave-based recommendations (handles both single and multi-wave)
-    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party, availableBeverages);
+    // Pass orderExpectedGuests as override if set
+    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party, availableBeverages, orderExpectedGuests);
     setWaveRecommendations(waves);
 
     // Also update single recommendations for backward compatibility
@@ -325,6 +329,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       generateRecommendations,
       beverageRecommendations,
       waveRecommendations,
+      orderExpectedGuests,
+      setOrderExpectedGuests,
       availableToppings,
       availableBeverages,
       dietaryOptions,
