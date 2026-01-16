@@ -63,7 +63,7 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
     onClose();
   };
 
-  const inviteLink = party ? `${window.location.origin}/rsv-pizza/rsvp/${party.inviteCode}` : '';
+  const inviteLink = party ? `${window.location.origin}/rsvp/${party.inviteCode}` : '';
   const hostName = party?.hostName || 'PizzaDAO';
   const eventName = party?.name || 'the event';
 

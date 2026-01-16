@@ -12,7 +12,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
-              src="/rsv-pizza/logo.png"
+              src="/logo.png"
               alt="RSVPizza"
               className="h-8 sm:h-10"
             />

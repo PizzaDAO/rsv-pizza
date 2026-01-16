@@ -175,11 +175,11 @@ export function EventPage() {
   }
 
   // Generate meta tags for social sharing
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pizzadao.github.io';
-  const pageUrl = `${baseUrl}/rsv-pizza/${slug}`;
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rsv.pizza';
+  const pageUrl = `${baseUrl}/${slug}`;
   const ogImageUrl = party.event_image_url?.startsWith('/')
     ? `${baseUrl}${party.event_image_url}`
-    : party.event_image_url || `${baseUrl}/rsv-pizza/logo.png`;
+    : party.event_image_url || `${baseUrl}/logo.png`;
 
   const eventDate = party.date ? new Date(party.date) : null;
   const formattedDate = eventDate?.toLocaleDateString(undefined, {
@@ -242,7 +242,7 @@ export function EventPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
-              src="/rsv-pizza/logo.png"
+              src="/logo.png"
               alt="RSVPizza"
               className="h-8 sm:h-10"
             />

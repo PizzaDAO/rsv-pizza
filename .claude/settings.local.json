@@ -70,7 +70,8 @@
       "Bash(git pull:*)",
       "Bash(git reset:*)",
       "Bash(npx tsx:*)",
-      "Bash(code \"C:\\\\Users\\\\samgo\\\\OneDrive\\\\Documents\\\\PizzaDAO\\\\Code\\\\rsvpizza\\\\backend\\\\sql\")"
+      "Bash(code \"C:\\\\Users\\\\samgo\\\\OneDrive\\\\Documents\\\\PizzaDAO\\\\Code\\\\rsvpizza\\\\backend\\\\sql\")",
+      "Bash(npx vercel:*)"
     ]
   }
 }

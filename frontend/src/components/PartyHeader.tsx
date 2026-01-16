@@ -158,7 +158,7 @@ export const PartyHeader: React.FC = () => {
     if (!party) return '';
     const baseUrl = window.location.origin;
     const slug = party.customUrl || party.inviteCode;
-    return `${baseUrl}/rsv-pizza/${slug}`;
+    return `${baseUrl}/${slug}`;
   };
 
   const handleViewEventPage = () => {
