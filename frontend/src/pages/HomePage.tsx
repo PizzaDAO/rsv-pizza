@@ -323,31 +323,31 @@ export function HomePage() {
             <button
               type="button"
               onClick={() => setShowDateTimeModal(true)}
-              className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors relative"
+              className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
             >
-              <Calendar size={20} className="absolute left-4 top-4 text-white/40 pointer-events-none" />
-              {startDate && startTime && endDate && endTime ? (
-                <div className="pl-7">
-                  <div className="text-white font-medium">
-                    {formatDateDisplay(startDate)}
+              <div className="flex items-center gap-3">
+                <Play size={18} className="text-white/40 flex-shrink-0" />
+                {startDate && startTime && endDate && endTime ? (
+                  <div>
+                    <div className="text-white font-medium">
+                      {formatDateDisplay(startDate)}
+                    </div>
+                    <div className="text-white/60 text-sm mt-1">
+                      {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                    </div>
                   </div>
-                  <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                ) : (
+                  <div>
+                    <span className="text-white/60">Thursday, January 15</span>
+                    <div className="text-white/40 text-sm mt-1">2:00 PM — 3:00 PM EST</div>
                   </div>
-                </div>
-              ) : (
-                <div className="pl-7">
-                  <span className="text-white/60">Thursday, January 15</span>
-                  <div className="text-white/40 text-sm mt-1">2:00 PM — 3:00 PM EST</div>
-                </div>
-              )}
+                )}
+              </div>
             </button>
 
             {/* Desktop: Inline Date/Time Picker */}
             <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
-              <div className="flex items-start gap-4">
-                <Calendar size={20} className="text-white/40 mt-[3px] flex-shrink-0" />
-                <div className="flex-1 space-y-3">
+              <div className="flex-1 space-y-3">
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
                     <div
@@ -404,10 +404,12 @@ export function HomePage() {
                 </div>
 
                 {/* Timezone Picker */}
-                <TimezonePickerInput
-                  value={timezone}
-                  onChange={setTimezone}
-                />
+                <div className="flex justify-end">
+                  <TimezonePickerInput
+                    value={timezone}
+                    onChange={setTimezone}
+                  />
+                </div>
               </div>
             </div>
 
