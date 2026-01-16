@@ -543,7 +543,7 @@ export const PartyHeader: React.FC = () => {
       {/* Share Link Modal */}
       {showShareModal && party && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-lg">
+          <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">Share Invite Link</h2>
               <button
@@ -552,6 +552,44 @@ export const PartyHeader: React.FC = () => {
               >
                 <X size={24} />
               </button>
+            </div>
+
+            {/* Link Preview Card */}
+            <div className="mb-6 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+              <div className="p-3 border-b border-white/10">
+                <p className="text-xs text-white/40 font-mono truncate">{eventLink}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-0">
+                {/* Event Image */}
+                {party.eventImageUrl ? (
+                  <div className="sm:w-48 sm:h-48 w-full aspect-square flex-shrink-0 bg-black/30">
+                    <img
+                      src={party.eventImageUrl}
+                      alt={party.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="sm:w-48 sm:h-48 w-full aspect-square flex-shrink-0 bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
+                    <Pizza className="w-20 h-20 text-white/30" />
+                  </div>
+                )}
+
+                {/* Event Info */}
+                <div className="flex-1 p-4">
+                  <p className="text-xs text-white/40 mb-1">RSVPizza</p>
+                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{party.name}</h3>
+                  {party.description && (
+                    <p className="text-sm text-white/60 line-clamp-3 mb-3">
+                      {party.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-white/50">
+                    <PartyPopper size={14} />
+                    <span>RSVP</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4 mb-6">
