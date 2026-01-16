@@ -112,17 +112,17 @@ async function generateOGMetaPages() {
 </body>
 </html>`;
 
-    // Ensure _og directory exists
-    const ogDir = path.join(distDir, '_og');
+    // Ensure og-static directory exists
+    const ogDir = path.join(distDir, 'og-static');
     if (!fs.existsSync(ogDir)) {
       fs.mkdirSync(ogDir, { recursive: true });
     }
 
-    // Write slug.html to _og directory
+    // Write slug.html to og-static directory
     const indexPath = path.join(ogDir, `${slug}.html`);
     fs.writeFileSync(indexPath, html, 'utf8');
 
-    console.log(`✓ Generated _og/${slug}.html`);
+    console.log(`✓ Generated og-static/${slug}.html`);
     console.log(`  Title: ${metaTitle}`);
     console.log(`  Image: ${ogImageUrl}\n`);
   }

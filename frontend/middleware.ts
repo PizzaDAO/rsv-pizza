@@ -50,7 +50,7 @@ export default function middleware(request: Request) {
     // Extract slug (remove leading slash)
     const slug = pathname.slice(1);
     // Rewrite to the static OG file generated at build time
-    return rewrite(new URL(`/_og/${slug}.html`, request.url));
+    return rewrite(new URL(`/og-static/${slug}.html`, request.url));
   }
 
   return next();
