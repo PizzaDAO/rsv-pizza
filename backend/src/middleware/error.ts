@@ -21,7 +21,6 @@ export const errorHandler = (
     name: err.name,
     message: err.message,
     stack: err.stack,
-    ...err
   });
 
   if (err instanceof AppError) {
