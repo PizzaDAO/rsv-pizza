@@ -8,6 +8,8 @@ import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase
 
 export function HomePage() {
   const navigate = useNavigate();
+  const startDateInputRef = React.useRef<HTMLInputElement>(null);
+  const endDateInputRef = React.useRef<HTMLInputElement>(null);
 
   // Form state
   const [partyName, setPartyName] = useState('');
@@ -249,11 +251,15 @@ export function HomePage() {
                 <div className="flex-1 space-y-3">
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
+                    <div
+                      className="relative flex-1 cursor-pointer"
+                      onClick={() => startDateInputRef.current?.showPicker?.()}
+                    >
                       <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
                         Start
                       </label>
                       <input
+                        ref={startDateInputRef}
                         type="date"
                         value={startDate}
                         onChange={(e) => {
@@ -274,11 +280,15 @@ export function HomePage() {
 
                   {/* End Time */}
                   <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
+                    <div
+                      className="relative flex-1 cursor-pointer"
+                      onClick={() => endDateInputRef.current?.showPicker?.()}
+                    >
                       <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
                         End
                       </label>
                       <input
+                        ref={endDateInputRef}
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
