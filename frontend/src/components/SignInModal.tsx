@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Mail, Loader2, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +10,7 @@ interface SignInModalProps {
 
 export function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const { signIn } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -106,18 +108,29 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <Check className="w-8 h-8 text-[#39d98a]" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Check your email!</h2>
-            <p className="text-white/60 mb-6">
-              We sent a magic link to <span className="text-white font-medium">{email}</span>
+            <p className="text-white/60 mb-4">
+              We sent a 6-digit code to <span className="text-white font-medium">{email}</span>
             </p>
             <p className="text-sm text-white/50 mb-6">
-              Click the link in your email to sign in. The link expires in 15 minutes.
+              Enter the code or click the link in your email to sign in. Expires in 15 minutes.
             </p>
-            <button
-              onClick={handleClose}
-              className="btn-secondary"
-            >
-              Close
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  handleClose();
+                  navigate('/auth/verify');
+                }}
+                className="btn-primary"
+              >
+                Enter Code
+              </button>
+              <button
+                onClick={handleClose}
+                className="btn-secondary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
       </div>

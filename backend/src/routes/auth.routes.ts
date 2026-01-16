@@ -7,7 +7,7 @@ import { AppError } from '../middleware/error.js';
 const router = Router();
 
 // Helper function to send magic link email
-async function sendMagicLinkEmail(email: string, magicLinkUrl: string, resendApiKey: string) {
+async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string) {
   const emailHtml = `
     <!DOCTYPE html>
     <html>
@@ -19,24 +19,21 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, resendApi
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSV.Pizza</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Click the button below to sign in</p>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
         </div>
 
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${magicLinkUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">Sign In</a>
+        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
+          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">${code}</div>
+          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
         </div>
 
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; margin: 30px 0;">
-          <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">
-            Or copy and paste this link into your browser:
-          </p>
-          <p style="margin: 0; word-break: break-all; font-size: 13px; color: #ff393a;">
-            ${magicLinkUrl}
-          </p>
+        <div style="text-align: center; margin: 30px 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Or click the button below:</p>
+          <a href="${magicLinkUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px;">Sign In with Link</a>
         </div>
 
-        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
-          <p>This link expires in 15 minutes.</p>
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
           <p style="margin-top: 20px;">
             If you didn't request this email, you can safely ignore it.
           </p>
@@ -52,7 +49,7 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, resendApi
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsvpizza.com>',
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
       to: [email],
       subject: 'Sign In to RSV.Pizza 🍕',
       html: emailHtml,
@@ -87,12 +84,23 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
 
     // Generate secure token
     const token = randomBytes(32).toString('hex');
+
+    // Generate unique 6-digit code
+    let code = '';
+    let codeExists = true;
+    while (codeExists) {
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      const existing = await prisma.magicLink.findUnique({ where: { code } });
+      codeExists = !!existing;
+    }
+
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Create magic link record
     await prisma.magicLink.create({
       data: {
         token,
+        code,
         email,
         expiresAt,
         userId: user?.id,
@@ -115,7 +123,7 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     const resendApiKey = process.env.RESEND_API_KEY;
     if (resendApiKey) {
       try {
-        await sendMagicLinkEmail(email, magicLinkUrl, resendApiKey);
+        await sendMagicLinkEmail(email, magicLinkUrl, code, resendApiKey);
       } catch (emailError) {
         console.error('Failed to send magic link email:', emailError);
         // Don't fail the request if email fails
@@ -158,6 +166,85 @@ router.get('/verify', async (req: Request, res: Response, next: NextFunction) =>
 
     if (magicLink.expiresAt < new Date()) {
       throw new AppError('Magic link expired', 401, 'TOKEN_EXPIRED');
+    }
+
+    // Mark as used
+    await prisma.magicLink.update({
+      where: { id: magicLink.id },
+      data: { used: true },
+    });
+
+    // Create user if doesn't exist
+    let user = magicLink.user;
+    if (!user) {
+      user = await prisma.user.create({
+        data: { email: magicLink.email },
+      });
+    }
+
+    // Generate JWT
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user.id, email: user.email },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      accessToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/verify-code - Verify 6-digit code
+router.post('/verify-code', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.body;
+
+    if (!code || typeof code !== 'string') {
+      throw new AppError('Code is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate code format (6 digits)
+    if (!/^\d{6}$/.test(code)) {
+      throw new AppError('Invalid code format', 400, 'INVALID_FORMAT');
+    }
+
+    // Find magic link by code
+    const magicLink = await prisma.magicLink.findUnique({
+      where: { code },
+      include: { user: true },
+    });
+
+    if (!magicLink) {
+      throw new AppError('Invalid code', 401, 'INVALID_CODE');
+    }
+
+    // Check if locked due to too many attempts
+    if (magicLink.lockedAt) {
+      throw new AppError('Code locked due to too many failed attempts', 429, 'CODE_LOCKED');
+    }
+
+    // Check if expired
+    if (magicLink.expiresAt < new Date()) {
+      throw new AppError('Code expired', 401, 'CODE_EXPIRED');
+    }
+
+    // Check if already used
+    if (magicLink.used) {
+      throw new AppError('Code already used', 401, 'CODE_USED');
     }
 
     // Mark as used

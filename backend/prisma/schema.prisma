@@ -141,12 +141,15 @@ model GuestPizzaMapping {
 }
 
 model MagicLink {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
+  code      String    @unique
   email     String
   expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  used      Boolean   @default(false)
+  attempts  Int       @default(0)
+  lockedAt  DateTime?
+  createdAt DateTime  @default(now())
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)

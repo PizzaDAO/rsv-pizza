@@ -19,7 +19,7 @@ function App() {
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
-            <Route path="/manage/:inviteCode" element={<HostPage />} />
+            <Route path="/host/:inviteCode" element={<HostPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

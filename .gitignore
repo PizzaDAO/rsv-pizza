@@ -31,3 +31,8 @@ backend/prisma/migrations/*.sql
 
 .vercel
 .env*.local
+
+# Claude Code temp files
+tmpclaude-*
+**/tmpclaude-*
+nul

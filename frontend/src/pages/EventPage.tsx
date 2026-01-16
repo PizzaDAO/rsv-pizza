@@ -83,7 +83,7 @@ export function EventPage() {
 
     // If no password, just navigate to host page
     if (!party.password) {
-      navigate(`/manage/${party.invite_code}`);
+      navigate(`/host/${party.invite_code}`);
       return;
     }
 
@@ -98,7 +98,7 @@ export function EventPage() {
 
     if (editPasswordInput === party.password) {
       // Correct password - navigate to host page
-      navigate(`/manage/${party.invite_code}`);
+      navigate(`/host/${party.invite_code}`);
     } else {
       // Wrong password
       setEditPasswordError('Incorrect password. Please try again.');
@@ -460,14 +460,14 @@ export function EventPage() {
                   </div>
                 )}
 
-                {/* Manage Button - Mobile */}
+                {/* Host Button - Mobile */}
                 <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
-                  <p className="text-sm text-white/60 mb-2">You have manage access for this event.</p>
+                  <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                   <button
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
                   >
-                    Manage
+                    Host Dashboard
                     <Settings size={16} />
                   </button>
                 </div>

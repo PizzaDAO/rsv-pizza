@@ -228,7 +228,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const getHostLink = (): string => {
     if (!party) return '';
     const baseUrl = window.location.origin;
-    return `${baseUrl}/manage/${party.inviteCode}`;
+    return `${baseUrl}/host/${party.inviteCode}`;
   };
 
   const addGuest = async (guest: Omit<Guest, 'id'>) => {

@@ -131,7 +131,7 @@ export const PartyHeader: React.FC = () => {
 
       // Navigate to host page
       if (inviteCode) {
-        navigate(`/manage/${inviteCode}`);
+        navigate(`/host/${inviteCode}`);
       } else {
         setImageError('Failed to create party. Please try again.');
       }
@@ -724,7 +724,7 @@ export const PartyHeader: React.FC = () => {
 
             <div className="bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl p-4 mb-6">
               <p className="text-sm text-[#ffb347]">
-                Share the <strong>Event Page Link</strong> to show event details with an RSVP button. Use the <strong>RSVP Link</strong> for direct RSVP access. Bookmark the <strong>Host Dashboard Link</strong> to manage your party.
+                Share the <strong>Event Page Link</strong> to show event details with an RSVP button. Use the <strong>RSVP Link</strong> for direct RSVP access. Bookmark the <strong>Host Dashboard Link</strong> to host your party.
               </p>
             </div>
 
