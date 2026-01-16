@@ -82,11 +82,10 @@ function HostPageContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${activeTab === tab.id
                     ? 'text-white'
                     : 'text-white/40 hover:text-white/60'
-                }`}
+                  }`}
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
@@ -109,6 +108,24 @@ function HostPageContent() {
 
             {activeTab === 'pizza' && (
               <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
+                    <span className="text-3xl font-bold text-white">{guests.length}</span>
+                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Total Guests RSVP'd</span>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
+                    <span className="text-3xl font-bold text-[#ff393a]">
+                      {guests.filter(g =>
+                        g.toppings.length > 0 ||
+                        g.dislikedToppings.length > 0 ||
+                        g.dietaryRestrictions.length > 0 ||
+                        (g.likedBeverages && g.likedBeverages.length > 0) ||
+                        (g.dislikedBeverages && g.dislikedBeverages.length > 0)
+                      ).length}
+                    </span>
+                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Requests Submitted</span>
+                  </div>
+                </div>
                 <GuestPreferencesList />
                 <PizzaSettings />
                 <ToppingsSettings />
