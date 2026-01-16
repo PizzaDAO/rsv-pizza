@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@googlemaps/js-api-loader": "^2.0.2",
     "@napi-rs/canvas": "^0.1.88",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.6.1",

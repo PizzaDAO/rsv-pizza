@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 import { MapPin } from 'lucide-react';
 
 interface LocationAutocompleteProps {
@@ -28,14 +27,39 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       return;
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places']
-    });
+    // Load Google Maps script manually
+    const loadGoogleMaps = async () => {
+      try {
+        // Check if already loaded
+        if (window.google?.maps?.places) {
+          initAutocomplete();
+          return;
+        }
 
-    loader.load().then(() => {
-      if (inputRef.current && window.google) {
+        // Create script tag
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+        script.async = true;
+        script.defer = true;
+
+        script.onload = () => {
+          initAutocomplete();
+        };
+
+        script.onerror = () => {
+          console.error('Error loading Google Maps');
+          setIsLoaded(true);
+        };
+
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('Error loading Google Maps:', error);
+        setIsLoaded(true);
+      }
+    };
+
+    const initAutocomplete = () => {
+      if (inputRef.current && window.google?.maps?.places) {
         const autocompleteInstance = new window.google.maps.places.Autocomplete(
           inputRef.current,
           {
@@ -56,10 +80,9 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         setAutocomplete(autocompleteInstance);
         setIsLoaded(true);
       }
-    }).catch((error) => {
-      console.error('Error loading Google Maps:', error);
-      setIsLoaded(true); // Still set loaded to show input
-    });
+    };
+
+    loadGoogleMaps();
 
     return () => {
       if (autocomplete) {

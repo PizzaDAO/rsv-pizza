@@ -28,3 +28,6 @@ dist-ssr
 # Prisma
 backend/prisma/*.db
 backend/prisma/migrations/*.sql
+
+.vercel
+.env*.local
