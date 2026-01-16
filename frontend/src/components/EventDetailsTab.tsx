@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Play } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
 import { TimezonePickerInput } from './TimezonePickerInput';
 
@@ -542,16 +543,11 @@ export const EventDetailsTab: React.FC = () => {
         </div>
 
         {/* Address */}
-        <div className="relative">
-          <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-          <input
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="Add Event Location"
-            className="w-full !pl-14"
-          />
-        </div>
+        <LocationAutocomplete
+          value={address}
+          onChange={setAddress}
+          placeholder="Add Event Location"
+        />
 
         {/* Description */}
         <div className="relative">
