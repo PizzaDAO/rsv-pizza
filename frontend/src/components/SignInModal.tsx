@@ -112,11 +112,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
               We sent a 6-digit code to <span className="text-white font-medium">{email}</span>
             </p>
             <p className="text-sm text-white/50 mb-6">
-              Enter the code or click the link in your email to sign in. Expires in 15 minutes.
+              Enter the code to sign in. Expires in 15 minutes.
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => {
+                  // Store current URL to return after auth
+                  sessionStorage.setItem('authReturnUrl', window.location.pathname);
                   handleClose();
                   navigate('/auth/verify');
                 }}

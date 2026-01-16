@@ -51,9 +51,11 @@ export function AuthVerifyPage() {
 
     setStatus('success');
 
-    // Redirect to home after 2 seconds
+    // Redirect to stored return URL or /host/ after 2 seconds
     setTimeout(() => {
-      navigate('/');
+      const returnUrl = sessionStorage.getItem('authReturnUrl');
+      sessionStorage.removeItem('authReturnUrl');
+      navigate(returnUrl || '/host/');
     }, 2000);
   }
 
