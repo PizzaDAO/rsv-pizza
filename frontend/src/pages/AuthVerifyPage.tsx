@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Check, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 export function AuthVerifyPage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
@@ -14,32 +13,10 @@ export function AuthVerifyPage() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Check for token in URL on mount
+  // Focus first input on mount
   useEffect(() => {
-    const token = searchParams.get('token');
-
-    if (token) {
-      verifyToken(token);
-    }
-  }, [searchParams]);
-
-  async function verifyToken(token: string) {
-    setStatus('verifying');
-    try {
-      const response = await fetch(`${API_URL}/api/auth/verify?token=${token}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Verification failed');
-      }
-
-      const data = await response.json();
-      handleSuccess(data);
-    } catch (err: any) {
-      setStatus('error');
-      setError(err.message || 'Failed to verify magic link');
-    }
-  }
+    inputRefs.current[0]?.focus();
+  }, []);
 
   async function verifyCode(fullCode: string) {
     setStatus('verifying');
@@ -126,13 +103,10 @@ export function AuthVerifyPage() {
     inputRefs.current[0]?.focus();
   }
 
-  // If no token in URL, show code entry form
-  const token = searchParams.get('token');
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="card p-8 max-w-md w-full text-center">
-        {status === 'idle' && !token && (
+        {status === 'idle' && (
           <>
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Mail className="w-8 h-8 text-[#ff393a]" />

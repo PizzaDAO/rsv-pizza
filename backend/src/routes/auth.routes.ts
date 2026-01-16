@@ -28,11 +28,6 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: str
           <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
         </div>
 
-        <div style="text-align: center; margin: 30px 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Or click the button below:</p>
-          <a href="${magicLinkUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px;">Sign In with Link</a>
-        </div>
-
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
           <p style="margin-top: 20px;">
             If you didn't request this email, you can safely ignore it.
@@ -141,10 +136,49 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// GET /api/auth/verify - Verify magic link token
+// GET /api/auth/verify - Validate magic link token (does NOT mark as used)
+// This allows email scanners to click without consuming the token
 router.get('/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+      throw new AppError('Token is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Find magic link
+    const magicLink = await prisma.magicLink.findUnique({
+      where: { token },
+    });
+
+    if (!magicLink) {
+      throw new AppError('Invalid magic link', 401, 'INVALID_TOKEN');
+    }
+
+    if (magicLink.used) {
+      throw new AppError('Magic link already used', 401, 'TOKEN_USED');
+    }
+
+    if (magicLink.expiresAt < new Date()) {
+      throw new AppError('Magic link expired', 401, 'TOKEN_EXPIRED');
+    }
+
+    // Return success but DON'T mark as used - frontend must call POST /verify-token
+    res.json({
+      success: true,
+      valid: true,
+      email: magicLink.email,
+      message: 'Token is valid. Call POST /verify-token to complete sign-in.',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/verify-token - Complete magic link verification
+router.post('/verify-token', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
 
     if (!token || typeof token !== 'string') {
       throw new AppError('Token is required', 400, 'VALIDATION_ERROR');
