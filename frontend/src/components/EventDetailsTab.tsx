@@ -74,7 +74,11 @@ export const EventDetailsTab: React.FC = () => {
       // Parse date and duration into start/end date/time fields
       if (party.date) {
         const startDateTime = new Date(party.date);
-        partyStartDate = startDateTime.toISOString().split('T')[0];
+        // Use local date formatting to avoid timezone shift
+        const startYear = startDateTime.getFullYear();
+        const startMonth = (startDateTime.getMonth() + 1).toString().padStart(2, '0');
+        const startDay = startDateTime.getDate().toString().padStart(2, '0');
+        partyStartDate = `${startYear}-${startMonth}-${startDay}`;
         const hours = startDateTime.getHours().toString().padStart(2, '0');
         const minutes = startDateTime.getMinutes().toString().padStart(2, '0');
         partyStartTime = `${hours}:${minutes}`;
@@ -82,12 +86,15 @@ export const EventDetailsTab: React.FC = () => {
         // Calculate end date/time if duration exists
         if (party.duration) {
           const endDateTime = new Date(startDateTime.getTime() + party.duration * 60 * 60 * 1000);
-          partyEndDate = endDateTime.toISOString().split('T')[0];
+          const endYear = endDateTime.getFullYear();
+          const endMonth = (endDateTime.getMonth() + 1).toString().padStart(2, '0');
+          const endDay = endDateTime.getDate().toString().padStart(2, '0');
+          partyEndDate = `${endYear}-${endMonth}-${endDay}`;
           const endHours = endDateTime.getHours().toString().padStart(2, '0');
           const endMinutes = endDateTime.getMinutes().toString().padStart(2, '0');
           partyEndTime = `${endHours}:${endMinutes}`;
         } else {
-          partyEndDate = startDateTime.toISOString().split('T')[0];
+          partyEndDate = partyStartDate;
           partyEndTime = '';
         }
       }
@@ -957,7 +964,7 @@ export const EventDetailsTab: React.FC = () => {
 
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
 

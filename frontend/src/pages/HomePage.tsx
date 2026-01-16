@@ -635,7 +635,7 @@ export function HomePage() {
 
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
 
