@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from 'cors';
+// import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.routes.js';
@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3006;
 
 // Middleware
-app.use(cors());
+// app.use(cors());
 app.use(express.json());
 
 // Rate limiting
