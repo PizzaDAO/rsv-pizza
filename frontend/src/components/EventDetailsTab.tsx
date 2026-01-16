@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Clock, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Play } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
 import { LocationAutocomplete } from './LocationAutocomplete';
@@ -16,8 +16,6 @@ export const EventDetailsTab: React.FC = () => {
 
   const [name, setName] = useState('');
   const [hostName, setHostName] = useState('');
-  const [date, setDate] = useState('');
-  const [duration, setDuration] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -59,8 +57,6 @@ export const EventDetailsTab: React.FC = () => {
     if (party) {
       const partyName = party.name || '';
       const partyHostName = party.hostName || '';
-      const partyDate = party.date || '';
-      const partyDuration = party.duration?.toString() || '';
       const partyTimezone = party.timezone || (() => {
         try {
           return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -114,8 +110,6 @@ export const EventDetailsTab: React.FC = () => {
       // Set form values
       setName(partyName);
       setHostName(partyHostName);
-      setDate(partyDate);
-      setDuration(partyDuration);
       setTimezone(partyTimezone);
       setStartDate(partyStartDate);
       setStartTime(partyStartTime);
@@ -509,18 +503,17 @@ export const EventDetailsTab: React.FC = () => {
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value);
+                      // Auto-populate end date if empty
                       if (!endDate) setEndDate(e.target.value);
                     }}
                     className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
-                <input
-                  type="time"
+                <TimePickerInput
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
-                  style={{ colorScheme: 'dark' }}
+                  onChange={setStartTime}
+                  placeholder="12:30 PM"
                 />
               </div>
 
@@ -542,12 +535,10 @@ export const EventDetailsTab: React.FC = () => {
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
-                <input
-                  type="time"
+                <TimePickerInput
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ff393a]"
-                  style={{ colorScheme: 'dark' }}
+                  onChange={setEndTime}
+                  placeholder="01:30 PM"
                 />
               </div>
             </div>
@@ -761,9 +752,8 @@ export const EventDetailsTab: React.FC = () => {
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${
-                    draggedIndex === index ? 'opacity-50' : 'opacity-100'
-                  }`}
+                  className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
+                    }`}
                 >
                   <div className="flex items-center gap-3 flex-1">
                     <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
@@ -787,7 +777,7 @@ export const EventDetailsTab: React.FC = () => {
                         {coHost.twitter && (
                           <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                             </svg>
                           </a>
                         )}
@@ -883,11 +873,10 @@ export const EventDetailsTab: React.FC = () => {
 
         {/* Message */}
         {message && (
-          <div className={`p-3 rounded-xl text-sm ${
-            message.type === 'success'
-              ? 'bg-[#39d98a]/10 border border-[#39d98a]/30 text-[#39d98a]'
-              : 'bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a]'
-          }`}>
+          <div className={`p-3 rounded-xl text-sm ${message.type === 'success'
+            ? 'bg-[#39d98a]/10 border border-[#39d98a]/30 text-[#39d98a]'
+            : 'bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a]'
+            }`}>
             {message.text}
           </div>
         )}

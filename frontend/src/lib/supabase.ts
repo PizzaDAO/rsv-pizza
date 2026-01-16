@@ -127,7 +127,7 @@ export async function createParty(
 }
 
 export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty | null> {
-  const { data, error} = await supabase
+  const { data, error } = await supabase
     .from('parties')
     .select('*')
     .eq('invite_code', inviteCode)
@@ -288,7 +288,7 @@ export async function addGuestByHost(
   likedBeverages: string[],
   dislikedBeverages: string[]
 ): Promise<DbGuest | null> {
-  const { data, error} = await supabase
+  const { data, error } = await supabase
     .from('guests')
     .insert({
       party_id: partyId,
@@ -391,6 +391,7 @@ export async function updateParty(
     event_image_url?: string | null;
     max_guests?: number | null;
     co_hosts?: any[];
+    timezone?: string | null;
   }
 ): Promise<boolean> {
   const { error } = await supabase
