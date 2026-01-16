@@ -17,7 +17,12 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error('Error:', err);
+  console.error('Error details:', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+    ...err
+  });
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
@@ -45,6 +50,10 @@ export const errorHandler = (
 
   // Generic error
   res.status(500).json({
-    error: { message: 'Internal server error', code: 'INTERNAL_ERROR' },
+    error: {
+      message: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      ...(process.env.NODE_ENV !== 'production' && { details: err.message })
+    },
   });
 };
