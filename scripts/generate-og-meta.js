@@ -29,9 +29,12 @@ async function generateOGMetaPages() {
   for (const party of parties) {
     const slug = party.custom_url;
     const pageUrl = `${baseUrl}/rsv-pizza/${slug}`;
-    const ogImageUrl = party.event_image_url?.startsWith('/')
-      ? `${baseUrl}${party.event_image_url}`
-      : party.event_image_url || `${baseUrl}/rsv-pizza/logo.png`;
+    const ogImageUrl = (() => {
+      if (!party.event_image_url) return `${baseUrl}/rsv-pizza/logo.png`;
+      if (party.event_image_url.startsWith('http')) return party.event_image_url;
+      if (party.event_image_url.startsWith('/')) return `${baseUrl}${party.event_image_url}`;
+      return `${baseUrl}/rsv-pizza/${party.event_image_url}`;
+    })();
 
     const eventDate = party.date ? new Date(party.date) : null;
     const formattedDate = eventDate?.toLocaleDateString('en-US', {

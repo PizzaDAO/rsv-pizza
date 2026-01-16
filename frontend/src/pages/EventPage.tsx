@@ -176,9 +176,12 @@ export function EventPage() {
   // Generate meta tags for social sharing
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rsv.pizza';
   const pageUrl = `${baseUrl}/${slug}`;
-  const ogImageUrl = party.event_image_url?.startsWith('/')
-    ? `${baseUrl}${party.event_image_url}`
-    : party.event_image_url || `${baseUrl}/logo.png`;
+  const ogImageUrl = (() => {
+    if (!party.event_image_url) return `${baseUrl}/logo.png`;
+    if (party.event_image_url.startsWith('http')) return party.event_image_url;
+    if (party.event_image_url.startsWith('/')) return `${baseUrl}${party.event_image_url}`;
+    return `${baseUrl}/${party.event_image_url}`;
+  })();
 
   const eventDate = party.date ? new Date(party.date) : null;
   const formattedDate = eventDate?.toLocaleDateString(undefined, {
