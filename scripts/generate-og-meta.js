@@ -49,7 +49,7 @@ async function generateOGMetaPages() {
       ? party.description.substring(0, 160) + (party.description.length > 160 ? '...' : '')
       : `Join ${party.host_name || 'us'} for ${party.name}${formattedDate ? ` on ${formattedDate}` : ''}${party.address ? ` at ${party.address}` : ''}. RSVP now!`;
 
-    // Generate HTML file with meta tags that redirects to the React app
+    // Generate HTML for bots (no redirect needed, but good for safety)
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,62 +81,27 @@ async function generateOGMetaPages() {
   ${party.duration && eventDate ? `<meta property="event:end_time" content="${new Date(eventDate.getTime() + party.duration * 3600000).toISOString()}">` : ''}
   ${party.address ? `<meta property="event:location" content="${escapeHtml(party.address)}">` : ''}
 
-  <!-- Redirect to React app -->
-  <meta http-equiv="refresh" content="0; url=/${slug}">
-  <link rel="canonical" href="${pageUrl}">
-
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-center;
-      min-height: 100vh;
-    }
-    .loading {
-      text-align: center;
-    }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid rgba(255, 57, 58, 0.2);
-      border-top-color: #ff393a;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 20px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    body { font-family: sans-serif; background: #1a1a1a; color: white; display: flex; align-items: center; justify-center; height: 100vh; }
   </style>
 </head>
 <body>
-  <div class="loading">
-    <div class="spinner"></div>
-    <p>Loading event...</p>
-  </div>
-  <script>
-    // JavaScript redirect as backup
-    window.location.href = '/${slug}';
-  </script>
+  <h1>${escapeHtml(metaTitle)}</h1>
+  <script>window.location.href = '/${slug}';</script>
 </body>
 </html>`;
 
-    // Create directory for the event
-    const eventDir = path.join(distDir, slug);
-    if (!fs.existsSync(eventDir)) {
-      fs.mkdirSync(eventDir, { recursive: true });
+    // Ensure _og directory exists
+    const ogDir = path.join(distDir, '_og');
+    if (!fs.existsSync(ogDir)) {
+      fs.mkdirSync(ogDir, { recursive: true });
     }
 
-    // Write index.html file
-    const indexPath = path.join(eventDir, 'index.html');
+    // Write slug.html to _og directory
+    const indexPath = path.join(ogDir, `${slug}.html`);
     fs.writeFileSync(indexPath, html, 'utf8');
 
-    console.log(`✓ Generated ${slug}/index.html`);
+    console.log(`✓ Generated _og/${slug}.html`);
     console.log(`  Title: ${metaTitle}`);
     console.log(`  Image: ${ogImageUrl}\n`);
   }

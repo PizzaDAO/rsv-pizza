@@ -49,8 +49,8 @@ export default function middleware(request: Request) {
   if (isCrawler(userAgent)) {
     // Extract slug (remove leading slash)
     const slug = pathname.slice(1);
-    // Rewrite to the OG handler API
-    return rewrite(new URL(`/api/event/${slug}`, request.url));
+    // Rewrite to the static OG file generated at build time
+    return rewrite(new URL(`/_og/${slug}.html`, request.url));
   }
 
   return next();
