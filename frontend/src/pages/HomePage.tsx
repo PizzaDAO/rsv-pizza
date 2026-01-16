@@ -250,7 +250,7 @@ export function HomePage() {
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
                     <div className="relative flex-1">
-                      <label className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
+                      <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
                         Start
                       </label>
                       <input
@@ -261,7 +261,8 @@ export function HomePage() {
                           // Auto-populate end date if empty
                           if (!endDate) setEndDate(e.target.value);
                         }}
-                        className="w-full bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 pl-10 cursor-pointer"
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-14 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        style={{ colorScheme: 'dark' }}
                       />
                     </div>
                     <TimePickerInput
@@ -274,14 +275,15 @@ export function HomePage() {
                   {/* End Time */}
                   <div className="flex items-center gap-3">
                     <div className="relative flex-1">
-                      <label className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
+                      <label className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
                         End
                       </label>
                       <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 pl-10 cursor-pointer"
+                        className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-14 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                        style={{ colorScheme: 'dark' }}
                       />
                     </div>
                     <TimePickerInput
