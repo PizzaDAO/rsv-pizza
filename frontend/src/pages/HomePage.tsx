@@ -249,20 +249,21 @@ export function HomePage() {
                 <div className="flex-1 space-y-3">
                   {/* Start Time */}
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 w-12">
-                      <div className="w-3 h-3 rounded-full bg-[#ff393a] border-2 border-white"></div>
-                      <span className="text-sm text-white/60">Start</span>
+                    <div className="relative flex-1">
+                      <label className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
+                        Start
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          // Auto-populate end date if empty
+                          if (!endDate) setEndDate(e.target.value);
+                        }}
+                        className="w-full bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 pl-10 cursor-pointer"
+                      />
                     </div>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
-                        // Auto-populate end date if empty
-                        if (!endDate) setEndDate(e.target.value);
-                      }}
-                      className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
-                    />
                     <TimePickerInput
                       value={startTime}
                       onChange={setStartTime}
@@ -272,16 +273,17 @@ export function HomePage() {
 
                   {/* End Time */}
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 w-12">
-                      <div className="w-3 h-3 rounded-full border-2 border-white/40"></div>
-                      <span className="text-sm text-white/60">End</span>
+                    <div className="relative flex-1">
+                      <label className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
+                        End
+                      </label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 pl-10 cursor-pointer"
+                      />
                     </div>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0"
-                    />
                     <TimePickerInput
                       value={endTime}
                       onChange={setEndTime}
