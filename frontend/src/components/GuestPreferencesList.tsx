@@ -10,9 +10,9 @@ export const GuestPreferencesList: React.FC = () => {
     return (
       <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
         <UserRoundX size={48} className="text-white/30 mb-4" />
-        <h3 className="text-xl font-medium text-white/80">No Guest Preferences Yet</h3>
+        <h3 className="text-xl font-medium text-white/80">No Guest Requests Yet</h3>
         <p className="text-white/50 mt-2">
-          Guest preferences will appear here once they RSVP.
+          Guest requests will appear here once they RSVP.
         </p>
       </div>
     );
@@ -21,7 +21,7 @@ export const GuestPreferencesList: React.FC = () => {
   return (
     <div className="card p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">Guest Preferences</h2>
+        <h2 className="text-xl font-bold text-white">Guest Requests</h2>
         <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
           {guests.length} {guests.length === 1 ? 'Guest' : 'Guests'}
         </span>
