@@ -5,14 +5,10 @@ import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
-import { TimezonePickerInput } from './TimezonePickerInput';
-import { TimePickerInput } from './TimePickerInput';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
   const navigate = useNavigate();
-  const startDateInputRef = React.useRef<HTMLInputElement>(null);
-  const endDateInputRef = React.useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
   const [hostName, setHostName] = useState('');
@@ -41,11 +37,18 @@ export const EventDetailsTab: React.FC = () => {
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [editingHostId, setEditingHostId] = useState<string | null>(null);
+  const [editHostName, setEditHostName] = useState('');
+  const [editHostWebsite, setEditHostWebsite] = useState('');
+  const [editHostTwitter, setEditHostTwitter] = useState('');
+  const [editHostInstagram, setEditHostInstagram] = useState('');
+  const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -227,6 +230,55 @@ export const EventDetailsTab: React.FC = () => {
     setNewCoHostTwitter('');
     setNewCoHostInstagram('');
     setNewCoHostAvatarUrl('');
+  };
+
+  const startEditingHost = (host: CoHost) => {
+    setEditingHostId(host.id);
+    setEditHostName(host.name);
+    setEditHostWebsite(host.website || '');
+    setEditHostTwitter(host.twitter || '');
+    setEditHostInstagram(host.instagram || '');
+    setEditHostAvatarUrl(host.avatar_url || '');
+  };
+
+  const startEditingMainHost = () => {
+    setEditingHostId('main-host');
+    setEditHostName(hostName);
+    setEditHostWebsite('');
+    setEditHostTwitter('');
+    setEditHostInstagram('');
+    setEditHostAvatarUrl('');
+  };
+
+  const cancelEditingHost = () => {
+    setEditingHostId(null);
+    setEditHostName('');
+    setEditHostWebsite('');
+    setEditHostTwitter('');
+    setEditHostInstagram('');
+    setEditHostAvatarUrl('');
+  };
+
+  const saveHostEdit = () => {
+    if (!editHostName.trim()) return;
+
+    if (editingHostId === 'main-host') {
+      setHostName(editHostName.trim());
+    } else {
+      setCoHosts(coHosts.map(h =>
+        h.id === editingHostId
+          ? {
+            ...h,
+            name: editHostName.trim(),
+            website: editHostWebsite.trim() || undefined,
+            twitter: editHostTwitter.trim() || undefined,
+            instagram: editHostInstagram.trim() || undefined,
+            avatar_url: editHostAvatarUrl.trim() || undefined,
+          }
+          : h
+      ));
+    }
+    cancelEditingHost();
   };
 
   const removeCoHost = (id: string) => {
@@ -446,110 +498,34 @@ export const EventDetailsTab: React.FC = () => {
           />
         </div>
 
-        {/* Host Name */}
-        <div className="relative">
-          <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-          <input
-            type="text"
-            value={hostName}
-            onChange={(e) => setHostName(e.target.value)}
-            placeholder="Host Name"
-            className="w-full !pl-14"
-          />
-        </div>
-
-        {/* Mobile: Date/Time Button */}
+        {/* Change Date Button */}
         <button
           type="button"
           onClick={() => setShowDateTimeModal(true)}
-          className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
         >
-          <div className="flex items-center gap-3">
-            <Play size={18} className="text-white/40 flex-shrink-0" />
-            {startDate && startTime && endDate && endTime ? (
-              <div>
-                <div className="text-white font-medium">
-                  {formatDateDisplay(startDate)}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Play size={18} className="text-white/40 flex-shrink-0" />
+              {startDate && startTime && endDate && endTime ? (
+                <div>
+                  <div className="text-white font-medium">
+                    {formatDateDisplay(startDate)}
+                  </div>
+                  <div className="text-white/60 text-sm mt-1">
+                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                  </div>
                 </div>
-                <div className="text-white/60 text-sm mt-1">
-                  {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+              ) : (
+                <div>
+                  <span className="text-white/60">No date set</span>
+                  <div className="text-white/40 text-sm mt-1">Click to set event time</div>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <span className="text-white/60">Add Date & Time</span>
-                <div className="text-white/40 text-sm mt-1">Tap to set event time</div>
-              </div>
-            )}
+              )}
+            </div>
+            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b]">Change Date</span>
           </div>
         </button>
-
-        {/* Desktop: Date/Time Picker */}
-        <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
-          <div className="flex items-start gap-4">
-            <div className="flex-1 space-y-3">
-              {/* Start Time */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="relative flex-1 cursor-pointer"
-                  onClick={() => startDateInputRef.current?.showPicker?.()}
-                >
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <Play size={21} className="text-white/40" />
-                  </div>
-                  <input
-                    ref={startDateInputRef}
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      // Auto-populate end date if empty
-                      if (!endDate) setEndDate(e.target.value);
-                    }}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                    style={{ colorScheme: 'dark' }}
-                  />
-                </div>
-                <TimePickerInput
-                  value={startTime}
-                  onChange={setStartTime}
-                  placeholder="12:30 PM"
-                />
-              </div>
-
-              {/* End Time */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="relative flex-1 cursor-pointer"
-                  onClick={() => endDateInputRef.current?.showPicker?.()}
-                >
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <SquareIcon size={17} className="text-white/40" />
-                  </div>
-                  <input
-                    ref={endDateInputRef}
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                    style={{ colorScheme: 'dark' }}
-                  />
-                </div>
-                <TimePickerInput
-                  value={endTime}
-                  onChange={setEndTime}
-                  placeholder="01:30 PM"
-                />
-              </div>
-            </div>
-
-            {/* Timezone Picker */}
-            <TimezonePickerInput
-              value={timezone}
-              onChange={setTimezone}
-            />
-          </div>
-        </div>
 
         {/* Address */}
         <LocationAutocomplete
@@ -570,74 +546,37 @@ export const EventDetailsTab: React.FC = () => {
           />
         </div>
 
-        {/* Event Image */}
-        <div>
-          {/* File Upload */}
-          {imagePreview ? (
-            <div className="space-y-3 mb-3">
-              <div className="relative w-full max-w-xs mx-auto">
-                <img
-                  src={imagePreview}
-                  alt="Event flyer preview"
-                  className="w-full h-auto rounded-xl border-2 border-white/20"
-                />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+        {/* Event Image - Change Image Button */}
+        <button
+          type="button"
+          onClick={() => setShowImageModal(true)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ImageIcon size={18} className="text-white/40 flex-shrink-0" />
+              {imagePreview ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={imagePreview}
+                    alt="Event flyer preview"
+                    className="w-12 h-12 rounded-lg object-cover border border-white/20"
+                  />
+                  <span className="text-white font-medium">Event Image</span>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-white/60">No image set</span>
+                  <div className="text-white/40 text-sm mt-1">Click to add event image</div>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="relative mb-3">
-              <input
-                type="file"
-                id="eventImage"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-              <label
-                htmlFor="eventImage"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
-              >
-                <svg className="w-8 h-8 text-white/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span className="text-sm text-white/60">Click to upload square image</span>
-                <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
-              </label>
-            </div>
-          )}
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-white/10"></div>
-            <span className="text-xs text-white/40">OR</span>
-            <div className="flex-1 h-px bg-white/10"></div>
+            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b]">Change Image</span>
           </div>
-
-          {/* Image URL Input */}
-          <div className="relative">
-            <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-            <input
-              type="url"
-              value={eventImageUrl}
-              onChange={(e) => {
-                setEventImageUrl(e.target.value);
-                setImagePreview(e.target.value);
-              }}
-              placeholder="Square Image URL"
-              className="w-full !pl-14"
-            />
-          </div>
-
-          {imageError && (
-            <p className="text-xs text-red-400 mt-2">{imageError}</p>
-          )}
-        </div>
+        </button>
+        {imageError && (
+          <p className="text-xs text-red-400 mt-1">{imageError}</p>
+        )}
 
         {/* Custom URL and Password in Options */}
         <button
@@ -733,89 +672,119 @@ export const EventDetailsTab: React.FC = () => {
           </div>
         )}
 
-        {/* Co-Hosts */}
+        {/* Hosts Section */}
         <div>
           <div className="mb-3">
             <label className="block text-sm font-medium text-white/80">
               <User size={16} className="inline mr-2" />
-              Co-Hosts
+              Hosts
             </label>
           </div>
 
-          {/* Current Co-Hosts List */}
-          {coHosts.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {coHosts.map((coHost, index) => (
-                <div
-                  key={coHost.id}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
-                    }`}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
-                      <GripVertical size={18} />
-                    </div>
-                    {coHost.avatar_url ? (
-                      <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
-                        <User className="w-5 h-5 text-[#ff393a]" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-white font-medium">{coHost.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {coHost.website && (
-                          <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
-                            <Globe size={14} />
-                          </a>
-                        )}
-                        {coHost.twitter && (
-                          <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                            </svg>
-                          </a>
-                        )}
-                        {coHost.instagram && (
-                          <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
-                            <Instagram size={14} />
-                          </a>
-                        )}
-                      </div>
-                    </div>
+          {/* Hosts List (Main Host + Co-Hosts) */}
+          <div className="space-y-2 mb-3">
+            {/* Main Host */}
+            {hostName && (
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                    <User className="w-5 h-5 text-[#ff393a]" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleCoHostShowOnEvent(coHost.id)}
-                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                    >
-                      {coHost.showOnEvent !== false ? (
-                        <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
-                      ) : (
-                        <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
-                      )}
-                      <span className="text-xs font-medium text-white/60">Show on event</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeCoHost(coHost.id)}
-                      className="text-[#ff393a] hover:text-[#ff5a5b]"
-                    >
-                      <X size={18} />
-                    </button>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-white font-medium">{hostName}</p>
+                      <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={startEditingMainHost}
+                  className="text-white/50 hover:text-white text-sm font-medium"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
 
-          {/* Add New Co-Host Form */}
+            {/* Co-Hosts */}
+            {coHosts.map((coHost, index) => (
+              <div
+                key={coHost.id}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
+                  }`}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
+                    <GripVertical size={18} />
+                  </div>
+                  {coHost.avatar_url ? (
+                    <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                      <User className="w-5 h-5 text-[#ff393a]" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-white font-medium">{coHost.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {coHost.website && (
+                        <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                          <Globe size={14} />
+                        </a>
+                      )}
+                      {coHost.twitter && (
+                        <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                          </svg>
+                        </a>
+                      )}
+                      {coHost.instagram && (
+                        <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                          <Instagram size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleCoHostShowOnEvent(coHost.id)}
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {coHost.showOnEvent !== false ? (
+                      <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
+                    ) : (
+                      <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
+                    )}
+                    <span className="text-xs font-medium text-white/60">Show</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEditingHost(coHost)}
+                    className="text-white/50 hover:text-white text-sm font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeCoHost(coHost.id)}
+                    className="text-[#ff393a] hover:text-[#ff5a5b]"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add New Host Form */}
           <div className="border border-white/20 rounded-xl p-4 space-y-3">
             <input
               type="text"
@@ -866,7 +835,7 @@ export const EventDetailsTab: React.FC = () => {
               className="w-full btn-secondary flex items-center justify-center gap-2"
             >
               <UserPlus size={16} />
-              Add Co-Host
+              Add Host
             </button>
           </div>
         </div>
@@ -1068,6 +1037,170 @@ export const EventDetailsTab: React.FC = () => {
             >
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowImageModal(false)}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">Event Image</h2>
+
+            <div className="space-y-4">
+              {/* Current Image Preview */}
+              {imagePreview && (
+                <div className="relative w-full max-w-xs mx-auto">
+                  <img
+                    src={imagePreview}
+                    alt="Event flyer preview"
+                    className="w-full h-auto rounded-xl border-2 border-white/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* File Upload */}
+              {!imagePreview && (
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="eventImageModal"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="eventImageModal"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
+                  >
+                    <svg className="w-8 h-8 text-white/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-sm text-white/60">Click to upload square image</span>
+                    <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-white/10"></div>
+                <span className="text-xs text-white/40">OR</span>
+                <div className="flex-1 h-px bg-white/10"></div>
+              </div>
+
+              {/* Image URL Input */}
+              <div className="relative">
+                <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="url"
+                  value={eventImageUrl}
+                  onChange={(e) => {
+                    setEventImageUrl(e.target.value);
+                    setImagePreview(e.target.value);
+                  }}
+                  placeholder="Square Image URL"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] !pl-10"
+                />
+              </div>
+
+              {imageError && (
+                <p className="text-xs text-red-400">{imageError}</p>
+              )}
+            </div>
+
+            {/* Done Button */}
+            <button
+              type="button"
+              onClick={() => setShowImageModal(false)}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Host Edit Modal */}
+      {editingHostId && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={cancelEditingHost}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">
+              {editingHostId === 'main-host' ? 'Edit Primary Host' : 'Edit Host'}
+            </h2>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={editHostName}
+                onChange={(e) => setEditHostName(e.target.value)}
+                placeholder="Name *"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+
+              {editingHostId !== 'main-host' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="url"
+                      value={editHostWebsite}
+                      onChange={(e) => setEditHostWebsite(e.target.value)}
+                      placeholder="Website"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                    />
+                    <input
+                      type="url"
+                      value={editHostAvatarUrl}
+                      onChange={(e) => setEditHostAvatarUrl(e.target.value)}
+                      placeholder="Avatar URL"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={editHostTwitter}
+                      onChange={(e) => setEditHostTwitter(e.target.value)}
+                      placeholder="Twitter (no @)"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                    />
+                    <input
+                      type="text"
+                      value={editHostInstagram}
+                      onChange={(e) => setEditHostInstagram(e.target.value)}
+                      placeholder="Instagram (no @)"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={cancelEditingHost}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveHostEdit}
+                disabled={!editHostName.trim()}
+                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       )}
