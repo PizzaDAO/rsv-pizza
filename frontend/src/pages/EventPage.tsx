@@ -370,9 +370,9 @@ export function EventPage() {
                   )}
 
                   {/* Co-Hosts */}
-                  {party.co_hosts && party.co_hosts.length > 0 && (
+                  {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
                     <>
-                      {party.co_hosts.map((coHost) => (
+                      {party.co_hosts.filter(h => h.showOnEvent !== false).map((coHost) => (
                         <div key={coHost.id} className="flex items-center gap-3">
                           {coHost.avatar_url ? (
                             <img
@@ -490,7 +490,7 @@ export function EventPage() {
                       </div>
                     )}
                     {/* Co-host avatars (first 6) */}
-                    {party.co_hosts && party.co_hosts.slice(0, 6).map((coHost, index) => (
+                    {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).slice(0, 6).map((coHost, index) => (
                       <div key={coHost.id} style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
                         {coHost.avatar_url ? (
                           <img
@@ -511,8 +511,8 @@ export function EventPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white">
                       Hosted by <span className="font-medium">{party.host_name}</span>
-                      {party.co_hosts && party.co_hosts.length > 0 && (
-                        <> & {party.co_hosts.length} other{party.co_hosts.length > 1 ? 's' : ''}</>
+                      {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
+                        <> & {party.co_hosts.filter(h => h.showOnEvent !== false).length} other{party.co_hosts.filter(h => h.showOnEvent !== false).length > 1 ? 's' : ''}</>
                       )}
                     </p>
                   </div>
@@ -666,9 +666,9 @@ export function EventPage() {
                     )}
 
                     {/* Co-Hosts */}
-                    {party.co_hosts && party.co_hosts.length > 0 && (
+                    {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
                       <>
-                        {party.co_hosts.map((coHost) => (
+                        {party.co_hosts.filter(h => h.showOnEvent !== false).map((coHost) => (
                           <div key={coHost.id} className="flex items-start gap-3">
                             {coHost.avatar_url ? (
                               <img

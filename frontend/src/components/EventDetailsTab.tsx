@@ -32,7 +32,6 @@ export const EventDetailsTab: React.FC = () => {
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
-  const [showCoHostsOnEvent, setShowCoHostsOnEvent] = useState(true);
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostWebsite, setNewCoHostWebsite] = useState('');
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
@@ -211,6 +210,7 @@ export const EventDetailsTab: React.FC = () => {
       twitter: newCoHostTwitter.trim() || undefined,
       instagram: newCoHostInstagram.trim() || undefined,
       avatar_url: newCoHostAvatarUrl.trim() || undefined,
+      showOnEvent: true,
     };
 
     setCoHosts([...coHosts, newCoHost]);
@@ -225,6 +225,12 @@ export const EventDetailsTab: React.FC = () => {
 
   const removeCoHost = (id: string) => {
     setCoHosts(coHosts.filter(h => h.id !== id));
+  };
+
+  const toggleCoHostShowOnEvent = (id: string) => {
+    setCoHosts(coHosts.map(h =>
+      h.id === id ? { ...h, showOnEvent: !h.showOnEvent } : h
+    ));
   };
 
   const handleDragStart = (index: number) => {
@@ -666,23 +672,11 @@ export const EventDetailsTab: React.FC = () => {
 
         {/* Co-Hosts */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3">
             <label className="block text-sm font-medium text-white/80">
               <User size={16} className="inline mr-2" />
               Co-Hosts
             </label>
-            <button
-              type="button"
-              onClick={() => setShowCoHostsOnEvent(!showCoHostsOnEvent)}
-              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              {showCoHostsOnEvent ? (
-                <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
-              ) : (
-                <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
-              )}
-              <span className="text-xs font-medium text-white/60">Show on event</span>
-            </button>
           </div>
 
           {/* Current Co-Hosts List */}
@@ -710,7 +704,7 @@ export const EventDetailsTab: React.FC = () => {
                         <User className="w-5 h-5 text-[#ff393a]" />
                       </div>
                     )}
-                    <div>
+                    <div className="flex-1">
                       <p className="text-white font-medium">{coHost.name}</p>
                       <div className="flex items-center gap-2 mt-1">
                         {coHost.website && (
@@ -733,13 +727,27 @@ export const EventDetailsTab: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeCoHost(coHost.id)}
-                    className="text-[#ff393a] hover:text-[#ff5a5b]"
-                  >
-                    <X size={18} />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleCoHostShowOnEvent(coHost.id)}
+                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      {coHost.showOnEvent !== false ? (
+                        <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
+                      ) : (
+                        <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
+                      )}
+                      <span className="text-xs font-medium text-white/60">Show on event</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCoHost(coHost.id)}
+                      className="text-[#ff393a] hover:text-[#ff5a5b]"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

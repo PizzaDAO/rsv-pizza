@@ -92,6 +92,7 @@ export interface CoHost {
   twitter?: string;
   instagram?: string;
   avatar_url?: string;
+  showOnEvent?: boolean;
 }
 
 export interface PizzaSettings {
