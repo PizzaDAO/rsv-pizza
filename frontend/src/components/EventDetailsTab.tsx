@@ -6,10 +6,13 @@ import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
 import { TimezonePickerInput } from './TimezonePickerInput';
+import { TimePickerInput } from './TimePickerInput';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
   const navigate = useNavigate();
+  const startDateInputRef = React.useRef<HTMLInputElement>(null);
+  const endDateInputRef = React.useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
   const [hostName, setHostName] = useState('');
@@ -493,18 +496,22 @@ export const EventDetailsTab: React.FC = () => {
             <div className="flex-1 space-y-3">
               {/* Start Time */}
               <div className="flex items-center gap-3">
-                <div className="relative flex-1">
+                <div
+                  className="relative flex-1 cursor-pointer"
+                  onClick={() => startDateInputRef.current?.showPicker?.()}
+                >
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                     <Play size={21} className="text-white/40" />
                   </div>
                   <input
+                    ref={startDateInputRef}
                     type="date"
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value);
                       if (!endDate) setEndDate(e.target.value);
                     }}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
@@ -519,15 +526,19 @@ export const EventDetailsTab: React.FC = () => {
 
               {/* End Time */}
               <div className="flex items-center gap-3">
-                <div className="relative flex-1">
+                <div
+                  className="relative flex-1 cursor-pointer"
+                  onClick={() => endDateInputRef.current?.showPicker?.()}
+                >
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                     <SquareIcon size={17} className="text-white/40" />
                   </div>
                   <input
+                    ref={endDateInputRef}
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
