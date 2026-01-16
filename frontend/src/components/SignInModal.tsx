@@ -59,9 +59,6 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-2">Sign In</h2>
-              <p className="text-white/60 text-sm">
-                We'll send you a magic link to sign in instantly
-              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -97,7 +94,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 ) : (
                   <>
                     <Mail size={18} />
-                    Send Magic Link
+                    Continue
                   </>
                 )}
               </button>
