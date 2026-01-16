@@ -206,44 +206,39 @@ export const PartyHeader: React.FC = () => {
 
             {/* Content */}
             <div className="flex-1 flex flex-col justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                  <PartyPopper className="w-5 h-5 text-[#ff393a]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-white text-lg">{party.name}</h3>
-                  {party.date && (
-                    <p className="text-sm text-white/70 mb-1 flex items-center gap-1.5">
-                      <Calendar size={14} className="flex-shrink-0" />
-                      <span>
-                        {new Date(party.date).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                          timeZone: party.timezone || undefined
-                        })}
-                        {' at '}
-                        {new Date(party.date).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          timeZone: party.timezone || undefined
-                        })}
-                        {party.timezone && ` (${party.timezone.replace(/_/g, ' ')})`}
-                      </span>
-                    </p>
-                  )}
-                  <p className="text-sm text-white/50">
-                    {party.hostName && `Hosted by ${party.hostName} • `}
-                    {party.maxGuests ? (
-                      <span>
-                        {party.guests.length} of {party.maxGuests} guests responded
-                      </span>
-                    ) : (
-                      <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
-                    )}
+              <div>
+                <h3 className="font-semibold text-white text-lg">{party.name}</h3>
+                {party.date && (
+                  <p className="text-sm text-white/70 mb-1 flex items-center gap-1.5">
+                    <Calendar size={14} className="flex-shrink-0" />
+                    <span>
+                      {new Date(party.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                        timeZone: party.timezone || undefined
+                      })}
+                      {' at '}
+                      {new Date(party.date).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        timeZone: party.timezone || undefined
+                      })}
+                      {party.timezone && ` (${party.timezone.replace(/_/g, ' ')})`}
+                    </span>
                   </p>
-                </div>
+                )}
+                <p className="text-sm text-white/50">
+                  {party.hostName && `Hosted by ${party.hostName} • `}
+                  {party.maxGuests ? (
+                    <span>
+                      {party.guests.length} of {party.maxGuests} guests responded
+                    </span>
+                  ) : (
+                    <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
+                  )}
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -418,13 +413,13 @@ export const PartyHeader: React.FC = () => {
                       <MapPin size={14} className="inline mr-1" />
                       Party Address
                     </label>
-                <input
-                  type="text"
-                  value={partyAddress}
-                  onChange={(e) => setPartyAddress(e.target.value)}
-                  placeholder="e.g., 123 Main St, New York, NY"
-                  className="w-full"
-                />
+                    <input
+                      type="text"
+                      value={partyAddress}
+                      onChange={(e) => setPartyAddress(e.target.value)}
+                      placeholder="e.g., 123 Main St, New York, NY"
+                      className="w-full"
+                    />
                     <p className="text-xs text-white/50 mt-1">
                       Used to find nearby pizzerias for ordering
                     </p>
@@ -458,92 +453,91 @@ export const PartyHeader: React.FC = () => {
                       <input
                         type="url"
                         value={eventImageUrl}
-                    onChange={(e) => {
-                      setEventImageUrl(e.target.value);
-                      // Clear file if URL is entered
-                      if (e.target.value.trim()) {
-                        setEventImageFile(null);
-                        setImagePreview(null);
-                        setImageError(null);
-                      }
-                    }}
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full"
-                  />
-                  <p className="text-xs text-white/50 mt-1">
-                    Enter an image URL, or upload a file below
-                  </p>
-                </div>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex-1 h-px bg-white/10"></div>
-                  <span className="text-xs text-white/40">OR</span>
-                  <div className="flex-1 h-px bg-white/10"></div>
-                </div>
-
-                {/* File Upload */}
-                {imagePreview ? (
-                  <div className="space-y-3">
-                    <div className="relative w-full max-w-xs mx-auto">
-                      <img
-                        src={imagePreview}
-                        alt="Event flyer preview"
-                        className="w-full h-auto rounded-xl border-2 border-white/20"
+                        onChange={(e) => {
+                          setEventImageUrl(e.target.value);
+                          // Clear file if URL is entered
+                          if (e.target.value.trim()) {
+                            setEventImageFile(null);
+                            setImagePreview(null);
+                            setImageError(null);
+                          }
+                        }}
+                        placeholder="https://example.com/image.jpg"
+                        className="w-full"
                       />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <p className="text-xs text-white/50 mt-1">
+                        Enter an image URL, or upload a file below
+                      </p>
                     </div>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 h-px bg-white/10"></div>
+                      <span className="text-xs text-white/40">OR</span>
+                      <div className="flex-1 h-px bg-white/10"></div>
+                    </div>
+
+                    {/* File Upload */}
+                    {imagePreview ? (
+                      <div className="space-y-3">
+                        <div className="relative w-full max-w-xs mx-auto">
+                          <img
+                            src={imagePreview}
+                            alt="Event flyer preview"
+                            className="w-full h-auto rounded-xl border-2 border-white/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="eventImage"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          disabled={!!eventImageUrl.trim()}
+                        />
+                        <label
+                          htmlFor="eventImage"
+                          className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                        >
+                          <Upload className="w-8 h-8 text-white/40 mb-2" />
+                          <span className="text-sm text-white/60">Click to upload square image</span>
+                          <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                        </label>
+                      </div>
+                    )}
+
+                    {imageError && (
+                      <p className="text-xs text-red-400 mt-2">{imageError}</p>
+                    )}
                   </div>
-                ) : (
-                  <div className="relative">
-                    <input
-                      type="file"
-                      id="eventImage"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                      disabled={!!eventImageUrl.trim()}
-                    />
-                    <label
-                      htmlFor="eventImage"
-                      className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
-                        eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      <Upload className="w-8 h-8 text-white/40 mb-2" />
-                      <span className="text-sm text-white/60">Click to upload square image</span>
-                      <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">
+                      <FileText size={14} className="inline mr-1" />
+                      Event Description (Optional)
                     </label>
+                    <textarea
+                      value={eventDescription}
+                      onChange={(e) => setEventDescription(e.target.value)}
+                      placeholder="Tell guests about your event..."
+                      className="w-full"
+                      rows={3}
+                    />
+                    <p className="text-xs text-white/50 mt-1">
+                      Describe your event for the event page
+                    </p>
                   </div>
-                )}
-
-                {imageError && (
-                  <p className="text-xs text-red-400 mt-2">{imageError}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  <FileText size={14} className="inline mr-1" />
-                  Event Description (Optional)
-                </label>
-                <textarea
-                  value={eventDescription}
-                  onChange={(e) => setEventDescription(e.target.value)}
-                  placeholder="Tell guests about your event..."
-                  className="w-full"
-                  rows={3}
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  Describe your event for the event page
-                </p>
-              </div>
 
                   <div>
                     <label className="block text-sm font-medium text-white/80 mb-2">
@@ -661,11 +655,10 @@ export const PartyHeader: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleCopyLink('event')}
-                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
-                        copied === 'event'
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'event'
                           ? 'bg-[#39d98a] text-white'
                           : 'bg-white/10 text-white hover:bg-white/20'
-                      }`}
+                        }`}
                     >
                       {copied === 'event' ? <Check size={20} /> : <Copy size={20} />}
                     </button>
@@ -685,11 +678,10 @@ export const PartyHeader: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleCopyLink('guest')}
-                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
-                        copied === 'guest'
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'guest'
                           ? 'bg-[#39d98a] text-white'
                           : 'bg-white/10 text-white hover:bg-white/20'
-                      }`}
+                        }`}
                     >
                       {copied === 'guest' ? <Check size={20} /> : <Copy size={20} />}
                     </button>
@@ -709,11 +701,10 @@ export const PartyHeader: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleCopyLink('host')}
-                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
-                        copied === 'host'
+                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'host'
                           ? 'bg-[#39d98a] text-white'
                           : 'bg-white/10 text-white hover:bg-white/20'
-                      }`}
+                        }`}
                     >
                       {copied === 'host' ? <Check size={20} /> : <Copy size={20} />}
                     </button>
