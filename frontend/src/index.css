@@ -182,3 +182,57 @@ textarea {
 .corner-link:hover svg {
   opacity: 1;
 }
+
+/* Google Maps Autocomplete Dark Mode */
+.pac-container {
+  background-color: #1a1a1a !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  margin-top: 4px !important;
+  font-family: inherit !important;
+}
+
+.pac-item {
+  background-color: #1a1a1a !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-primary) !important;
+  padding: 10px 14px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.pac-item:first-child {
+  border-top: none !important;
+}
+
+.pac-item:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.pac-item-selected,
+.pac-item-selected:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.pac-item-query {
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+}
+
+.pac-matched {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+.pac-icon {
+  background-image: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 10px !important;
+}
+
+/* Hide the Google logo in autocomplete */
+.pac-logo:after {
+  display: none !important;
+}
