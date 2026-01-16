@@ -44,9 +44,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="hover:opacity-80 transition-opacity"
           >
             <img
-              src="/logo.png"
+              src="/pizzadao-logo.svg"
               alt="PizzaDAO"
-              className="h-8"
+              className="h-10"
             />
           </a>
         </div>
