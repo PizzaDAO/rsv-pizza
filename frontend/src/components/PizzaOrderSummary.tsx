@@ -591,7 +591,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <h4 className="font-medium text-white text-sm truncate">{pizzeria.name}</h4>
-                              {renderStars(pizzeria.rating)}
+                              <div className="flex items-center gap-1">
+                                {renderStars(pizzeria.rating)}
+                                {pizzeria.reviewCount !== undefined && (
+                                  <span className="text-xs text-white/50">({pizzeria.reviewCount})</span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-xs text-white/50">
                               {pizzeria.distance && (
@@ -611,8 +616,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                                 href={`tel:${pizzeria.phone}`}
                                 className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
                               >
-                                <Phone size={12} />
-                                Call
+                                <Phone size={12} className="md:hidden" />
+                                <span className="md:hidden">Call</span>
+                                <span className="hidden md:inline">{pizzeria.phone}</span>
                               </a>
                             ) : supportsDirectOrdering(primaryOption.provider) ? (
                               <button
