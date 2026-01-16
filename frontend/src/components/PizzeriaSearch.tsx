@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Pizzeria, OrderingOption } from '../types';
 import {
   searchPizzerias,
@@ -112,8 +112,6 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   // Render star rating
   const renderStars = (rating: number | undefined) => {
     if (!rating) return null;
-    const fullStars = Math.floor(rating);
-    const hasHalf = rating % 1 >= 0.5;
 
     return (
       <div className="flex items-center gap-1">
@@ -173,6 +171,8 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
     );
   };
 
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
   return (
     <div className={className}>
       <h2 className="text-xl font-bold text-white mb-4">Find a Pizzeria</h2>
@@ -208,7 +208,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               value={searchAddress}
               onChange={(e) => setSearchAddress(e.target.value)}
               placeholder="Enter delivery address..."
-              className="w-full pl-12"
+              className="w-full !pl-14"
             />
           </div>
           <button
@@ -245,6 +245,11 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
           {pizzerias.map((pizzeria) => {
             const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`;
+
+            // Construct static map URL
+            const staticMapUrl = googleMapsApiKey && pizzeria.location
+              ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${googleMapsApiKey}&style=feature:all|element:all|saturation:-100|lightness:-20`
+              : null;
 
             return (
               <div
@@ -296,11 +301,21 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
                     href={googleMapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group"
+                    className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
                     title="View on Google Maps"
                   >
-                    <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                    {staticMapUrl ? (
+                      <img
+                        src={staticMapUrl}
+                        alt="Map"
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                      />
+                    ) : (
+                      <>
+                        <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                      </>
+                    )}
                   </a>
                 </div>
               </div>

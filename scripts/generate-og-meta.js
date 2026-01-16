@@ -89,8 +89,7 @@ async function generateOGMetaPages() {
   <meta property="og:title" content="${escapeHtml(metaTitle)}">
   <meta property="og:description" content="${escapeHtml(metaDescription)}">
   <meta property="og:image" content="${ogImageUrl}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
+
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
