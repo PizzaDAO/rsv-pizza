@@ -11,10 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3006;
 
 // Middleware
-app.use(cors({
-  origin: /^https?:\/\/(www\.)?rsv\.pizza$|^http:\/\/localhost:(5173|5176)$/,
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 
 // Rate limiting
