@@ -11,8 +11,25 @@ const app = express();
 const PORT = process.env.PORT || 3006;
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:5176',
+  'http://localhost:5173',
+  'https://rsv.pizza',
+  'https://www.rsv.pizza',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5176',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
