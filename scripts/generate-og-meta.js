@@ -44,10 +44,31 @@ async function generateOGMetaPages() {
       day: 'numeric',
     });
 
+    const formattedTime = eventDate?.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: party.timezone || undefined,
+    });
+
     const metaTitle = party.name;
-    const metaDescription = party.description
-      ? party.description.substring(0, 160) + (party.description.length > 160 ? '...' : '')
-      : `Join ${party.host_name || 'us'} for ${party.name}${formattedDate ? ` on ${formattedDate}` : ''}${party.address ? ` at ${party.address}` : ''}. RSVP now!`;
+
+    // Construct description: Host • Date @ Time • Location. Description
+    const detailsParts = [];
+    if (party.host_name) detailsParts.push(`Hosted by ${party.host_name}`);
+    if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
+    if (party.address) detailsParts.push(party.address);
+
+    const details = detailsParts.join(' • ');
+    let metaDescription = details;
+
+    if (party.description) {
+      const remainingChars = 300 - details.length; // Allow more chars for OG tags
+      if (remainingChars > 10) {
+        metaDescription += `. ${party.description.substring(0, remainingChars)}${party.description.length > remainingChars ? '...' : ''}`;
+      }
+    } else if (!metaDescription) {
+      metaDescription = `Join us for ${party.name}! RSVP now.`;
+    }
 
     // Generate HTML for bots (no redirect needed, but good for safety)
     const html = `<!DOCTYPE html>

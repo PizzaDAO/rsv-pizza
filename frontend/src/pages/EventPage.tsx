@@ -215,9 +215,24 @@ export function EventPage() {
   const timezoneAbbr = getTimezoneAbbr();
 
   const metaTitle = party.name;
-  const metaDescription = party.description
-    ? party.description.substring(0, 160) + (party.description.length > 160 ? '...' : '')
-    : `Join ${party.host_name || 'us'} for ${party.name}${formattedDate ? ` on ${formattedDate}` : ''}${party.address ? ` at ${party.address}` : ''}. RSVP now!`;
+
+  // Construct description: Host • Date @ Time • Location. Description
+  const detailsParts: string[] = [];
+  if (party.host_name) detailsParts.push(`Hosted by ${party.host_name}`);
+  if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
+  if (party.address) detailsParts.push(party.address);
+
+  const details = detailsParts.join(' • ');
+  let metaDescription = details;
+
+  if (party.description) {
+    const remainingChars = 300 - details.length;
+    if (remainingChars > 10) {
+      metaDescription += `. ${party.description.substring(0, remainingChars)}${party.description.length > remainingChars ? '...' : ''}`;
+    }
+  } else if (!metaDescription) {
+    metaDescription = `Join us for ${party.name}! RSVP now.`;
+  }
 
   return (
     <div className="min-h-screen">
@@ -734,7 +749,8 @@ export function EventPage() {
           </div>
         </div>
 
-        <div className="flex justify-center mt-6">
+        <div className="flex flex-col items-center gap-1 mt-8 pb-8">
+          <span className="text-white/40 text-sm">Powered by</span>
           <a
             href="https://pizzadao.xyz"
             target="_blank"
@@ -742,9 +758,9 @@ export function EventPage() {
             className="hover:opacity-80 transition-opacity"
           >
             <img
-              src="/logo.png"
+              src="/pizzadao-logo.svg"
               alt="PizzaDAO"
-              className="h-6 opacity-30 hover:opacity-50"
+              className="h-7"
             />
           </a>
         </div>
