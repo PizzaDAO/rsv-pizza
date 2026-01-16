@@ -4,11 +4,14 @@ import { Layout } from '../components/Layout';
 import { TimePickerInput } from '../components/TimePickerInput';
 import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { LocationAutocomplete } from '../components/LocationAutocomplete';
+import { SignInModal } from '../components/SignInModal';
+import { useAuth } from '../contexts/AuthContext';
 import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 
 export function HomePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const startDateInputRef = React.useRef<HTMLInputElement>(null);
   const endDateInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -34,6 +37,7 @@ export function HomePage() {
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   // Get user's timezone on mount
   React.useEffect(() => {
@@ -146,6 +150,13 @@ export function HomePage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partyName.trim()) return;
+
+    // Show sign-in modal if user is not authenticated
+    if (!user) {
+      setShowSignInModal(true);
+      return;
+    }
+
     setCreating(true);
 
     try {
@@ -648,6 +659,12 @@ export function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Sign In Modal */}
+      <SignInModal
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+      />
     </Layout>
   );
 }

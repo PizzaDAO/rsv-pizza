@@ -6,6 +6,67 @@ import { AppError } from '../middleware/error.js';
 
 const router = Router();
 
+// Helper function to send magic link email
+async function sendMagicLinkEmail(email: string, magicLinkUrl: string, resendApiKey: string) {
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In to RSVPizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSVPizza</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Click the button below to sign in</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${magicLinkUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">Sign In</a>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; margin: 30px 0;">
+          <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">
+            Or copy and paste this link into your browser:
+          </p>
+          <p style="margin: 0; word-break: break-all; font-size: 13px; color: #ff393a;">
+            ${magicLinkUrl}
+          </p>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>This link expires in 15 minutes.</p>
+          <p style="margin-top: 20px;">
+            If you didn't request this email, you can safely ignore it.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'RSVPizza <noreply@rsvpizza.com>',
+      to: [email],
+      subject: 'Sign In to RSVPizza 🍕',
+      html: emailHtml,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+
+  return response.json();
+}
+
 // POST /api/auth/magic-link - Request magic link
 router.post('/magic-link', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -38,18 +99,28 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
       },
     });
 
-    // In production, send email here
-    // For development, log the link
+    // Send magic link email
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176';
     const magicLinkUrl = `${frontendUrl}/auth/verify?token=${token}`;
 
-    console.log('\n========================================');
-    console.log('Magic Link (dev mode):');
-    console.log(magicLinkUrl);
-    console.log('========================================\n');
+    // Log for development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('\n========================================');
+      console.log('Magic Link (dev mode):');
+      console.log(magicLinkUrl);
+      console.log('========================================\n');
+    }
 
-    // TODO: Send email in production
-    // await emailService.sendMagicLink(email, magicLinkUrl);
+    // Send email via Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      try {
+        await sendMagicLinkEmail(email, magicLinkUrl, resendApiKey);
+      } catch (emailError) {
+        console.error('Failed to send magic link email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     res.json({
       success: true,
