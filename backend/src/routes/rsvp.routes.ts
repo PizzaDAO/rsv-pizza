@@ -126,11 +126,34 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('Party has reached maximum guests', 400, 'MAX_GUESTS_REACHED');
     }
 
+    // Check for duplicate email if email is provided
+    if (email?.trim()) {
+      const existingGuest = await prisma.guest.findFirst({
+        where: {
+          partyId: party.id,
+          email: email.trim().toLowerCase(),
+        },
+      });
+
+      if (existingGuest) {
+        // Return success with existing guest info - they've already RSVP'd
+        return res.status(200).json({
+          success: true,
+          alreadyRegistered: true,
+          guest: {
+            id: existingGuest.id,
+            name: existingGuest.name,
+          },
+          message: 'You have already RSVP\'d to this party!',
+        });
+      }
+    }
+
     // Create guest
     const guest = await prisma.guest.create({
       data: {
         name: name.trim(),
-        email: email?.trim() || null,
+        email: email?.trim().toLowerCase() || null,
         ethereumAddress: ethereumAddress?.trim() || null,
         roles: roles || [],
         mailingListOptIn: mailingListOptIn || false,
