@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Settings, Pizza, Users, MapPin } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
@@ -95,6 +95,41 @@ function HostPageContent() {
     ).length;
   }, [guests]);
 
+  // Track previous values for auto-regeneration
+  const prevExpectedGuests = useRef<number | null>(null);
+  const prevGuestsWithRequests = useRef<number>(0);
+  const hasInitialized = useRef(false);
+
+  // Auto-generate recommendations when expected guests or requests change
+  useEffect(() => {
+    // Skip if party hasn't loaded yet or no guests
+    if (!party || guests.length === 0) return;
+
+    const currentExpected = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
+
+    // On first load, generate recommendations
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      prevExpectedGuests.current = currentExpected;
+      prevGuestsWithRequests.current = guestsWithRequests;
+      generateRecommendations();
+      return;
+    }
+
+    // Regenerate if expected guests changed
+    if (prevExpectedGuests.current !== currentExpected) {
+      prevExpectedGuests.current = currentExpected;
+      generateRecommendations();
+      return;
+    }
+
+    // Regenerate if new requests came in
+    if (prevGuestsWithRequests.current !== guestsWithRequests) {
+      prevGuestsWithRequests.current = guestsWithRequests;
+      generateRecommendations();
+    }
+  }, [party, guests.length, orderExpectedGuests, guestsWithRequests, generateRecommendations]);
+
   if (partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
@@ -167,64 +202,7 @@ function HostPageContent() {
 
             {activeTab === 'pizza' && (
               <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
-                    <span className="text-3xl font-bold text-white">{guests.length}</span>
-                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Total Guests RSVP'd</span>
-                  </div>
-                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
-                    <span className="text-3xl font-bold text-[#ff393a]">
-                      {guests.filter(g =>
-                        g.toppings.length > 0 ||
-                        g.dislikedToppings.length > 0 ||
-                        g.dietaryRestrictions.length > 0 ||
-                        (g.likedBeverages && g.likedBeverages.length > 0) ||
-                        (g.dislikedBeverages && g.dislikedBeverages.length > 0)
-                      ).length}
-                    </span>
-                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Requests Submitted</span>
-                  </div>
-                </div>
-                <GuestPreferencesList />
-                <PizzaStyleAndToppings>
-                  {/* Pizzeria Search Section - inside Pizza Options */}
-                  <div className="border-t border-white/10 mt-6 pt-6">
-                    {party?.address ? (
-                      <PizzeriaSearch
-                        partyAddress={party.address}
-                        onSelectPizzeria={(pizzeria, option) => {
-                          // Open the ordering link
-                          if (option.deepLink) {
-                            window.open(option.deepLink, '_blank');
-                          }
-                        }}
-                        rankings={pizzeriaRankings}
-                        className=""
-                      />
-                    ) : (
-                      <div>
-                        <div className="flex items-center gap-2 mb-4">
-                          <MapPin size={24} className="text-[#ff393a]" />
-                          <h2 className="text-xl font-bold text-white">Top Pizzerias Nearby</h2>
-                        </div>
-                        <div className="text-center py-8">
-                          <MapPin size={48} className="mx-auto mb-4 text-white/20" />
-                          <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
-                          <button
-                            onClick={() => setActiveTab('details')}
-                            className="btn-secondary inline-flex items-center gap-2"
-                          >
-                            <Settings size={16} />
-                            Go to Settings
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </PizzaStyleAndToppings>
-                <BeverageSettings />
-
-                {/* Expected Guests Slider */}
+                {/* Expected Guests Slider - at top */}
                 <div className="card p-4 bg-[#1a1a2e] border-white/10">
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -300,13 +278,63 @@ function HostPageContent() {
                   })()}
                 </div>
 
-                <button
-                  onClick={generateRecommendations}
-                  disabled={guests.length === 0}
-                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Create Order
-                </button>
+                {/* Recommended Order - always shown, auto-generated */}
+                <PizzaOrderSummary />
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
+                    <span className="text-3xl font-bold text-white">{guests.length}</span>
+                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Total Guests RSVP'd</span>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
+                    <span className="text-3xl font-bold text-[#ff393a]">
+                      {guests.filter(g =>
+                        g.toppings.length > 0 ||
+                        g.dislikedToppings.length > 0 ||
+                        g.dietaryRestrictions.length > 0 ||
+                        (g.likedBeverages && g.likedBeverages.length > 0) ||
+                        (g.dislikedBeverages && g.dislikedBeverages.length > 0)
+                      ).length}
+                    </span>
+                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Requests Submitted</span>
+                  </div>
+                </div>
+                <GuestPreferencesList />
+                <PizzaStyleAndToppings>
+                  {/* Pizzeria Search Section - inside Pizza Options */}
+                  <div className="border-t border-white/10 mt-6 pt-6">
+                    {party?.address ? (
+                      <PizzeriaSearch
+                        partyAddress={party.address}
+                        onSelectPizzeria={(pizzeria, option) => {
+                          // Open the ordering link
+                          if (option.deepLink) {
+                            window.open(option.deepLink, '_blank');
+                          }
+                        }}
+                        rankings={pizzeriaRankings}
+                        className=""
+                      />
+                    ) : (
+                      <div>
+                        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Top Pizzerias Nearby</h3>
+                        <div className="text-center py-8">
+                          <MapPin size={48} className="mx-auto mb-4 text-white/20" />
+                          <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
+                          <button
+                            onClick={() => setActiveTab('details')}
+                            className="btn-secondary inline-flex items-center gap-2"
+                          >
+                            <Settings size={16} />
+                            Go to Settings
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </PizzaStyleAndToppings>
+                <BeverageSettings />
               </>
             )}
 
@@ -314,13 +342,6 @@ function HostPageContent() {
               <EventDetailsTab />
             )}
           </div>
-
-          {/* Order Summary - Only on Pizza & Drinks Tab */}
-          {activeTab === 'pizza' && (
-            <div className="xl:col-span-1 space-y-3">
-              <PizzaOrderSummary />
-            </div>
-          )}
         </div>
       </div>
     </Layout>
