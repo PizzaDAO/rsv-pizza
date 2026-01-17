@@ -65,7 +65,7 @@ export interface DbParty {
   name: string;
   invite_code: string;
   custom_url: string | null;
-  host_name: string | null;
+  host_name?: string | null; // Optional - comes from API (User.name), not DB column
   date: string | null;
   duration: number | null;
   timezone: string | null;
@@ -186,7 +186,7 @@ export async function createParty(
     .from('parties')
     .insert({
       name: partyName,
-      host_name: hostName || null,
+      // Note: host_name removed - now derived from User.name via user_id relationship
       date: date || null,
       duration: duration || null,
       timezone: timezone || null,
@@ -337,10 +337,11 @@ export async function verifyPartyPassword(partyId: string, passwordAttempt: stri
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
   // Define safe columns to fetch (excluding password)
+  // Note: host_name was removed - now derived from User.name via API
   const safeColumns = `
-    id, name, invite_code, custom_url, host_name, date, duration, timezone, 
-    pizza_style, available_beverages, available_toppings, max_guests, hide_guests, 
-    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at
+    id, name, invite_code, custom_url, date, duration, timezone,
+    pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id
   `;
 
   let party: DbParty | null = null;
@@ -683,7 +684,7 @@ export async function updateParty(
   partyId: string,
   updates: {
     name?: string;
-    host_name?: string | null;
+    // Note: host_name removed - now derived from User.name via user_id relationship
     date?: string | null;
     duration?: number | null;
     address?: string | null;
@@ -704,7 +705,6 @@ export async function updateParty(
     try {
       await updatePartyApi(partyId, {
         name: updates.name,
-        hostName: updates.host_name ?? undefined,
         date: updates.date,
         duration: updates.duration,
         timezone: updates.timezone,

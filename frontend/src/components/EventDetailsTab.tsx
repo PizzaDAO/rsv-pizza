@@ -418,9 +418,9 @@ export const EventDetailsTab: React.FC = () => {
       }
 
       // Update party in database
+      // Note: host_name is now derived from User.name via user_id relationship
       const success = await updateParty(party.id, {
         name: name.trim(),
-        host_name: hostName.trim() || null,
         date: startDateTime,
         duration: calculatedDuration,
         timezone: timezone || null,
