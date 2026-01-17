@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail } from 'lucide-react';
+import { IconInput } from '../components/IconInput';
+import { uploadProfilePicture } from '../lib/supabase';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -10,7 +12,7 @@ export function AccountPage() {
 
   // Form state
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
@@ -31,7 +33,6 @@ export function AccountPage() {
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState({
     name: '',
-    username: '',
     bio: '',
     instagram: '',
     twitter: '',
@@ -44,7 +45,6 @@ export function AccountPage() {
   // Check if any field has changed
   const hasChanges =
     name !== originalValues.name ||
-    username !== originalValues.username ||
     bio !== originalValues.bio ||
     instagram !== originalValues.instagram ||
     twitter !== originalValues.twitter ||
@@ -66,7 +66,6 @@ export function AccountPage() {
     if (user) {
       const values = {
         name: user.name || '',
-        username: user.username || '',
         bio: user.bio || '',
         instagram: user.instagram || '',
         twitter: user.twitter || '',
@@ -76,7 +75,7 @@ export function AccountPage() {
         website: user.website || '',
       };
       setName(values.name);
-      setUsername(values.username);
+      setEmail(user.email || '');
       setBio(values.bio);
       setInstagram(values.instagram);
       setTwitter(values.twitter);
@@ -113,10 +112,18 @@ export function AccountPage() {
     setSaving(true);
 
     try {
+      // Upload profile picture if one was selected
+      let newProfilePictureUrl: string | undefined;
+      if (profilePictureFile && user) {
+        const uploadedUrl = await uploadProfilePicture(profilePictureFile, user.id);
+        if (uploadedUrl) {
+          newProfilePictureUrl = uploadedUrl;
+        }
+      }
+
       // Save profile to backend
       await updateProfile({
         name: name.trim() || undefined,
-        username: username.trim() || undefined,
         bio: bio.trim() || undefined,
         instagram: instagram.trim() || undefined,
         twitter: twitter.trim() || undefined,
@@ -124,12 +131,12 @@ export function AccountPage() {
         tiktok: tiktok.trim() || undefined,
         linkedin: linkedin.trim() || undefined,
         website: website.trim() || undefined,
+        ...(newProfilePictureUrl && { profilePictureUrl: newProfilePictureUrl }),
       });
 
       // Update original values to current values
       setOriginalValues({
         name,
-        username,
         bio,
         instagram,
         twitter,
@@ -199,42 +206,26 @@ export function AccountPage() {
             <div className="flex flex-col md:flex-row gap-6">
               <div className="flex-1 space-y-4">
                 {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full"
-                  />
-                </div>
+                <IconInput
+                  icon={User}
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                />
 
-                {/* Username */}
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
-                    Username
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-medium">@</span>
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                      placeholder="username"
-                      className="w-full pl-8"
-                    />
-                  </div>
-                </div>
+                {/* Email */}
+                <IconInput
+                  icon={Mail}
+                  type="email"
+                  value={email}
+                  placeholder="Your email"
+                  disabled
+                />
               </div>
 
               {/* Profile Picture */}
               <div className="flex-shrink-0">
-                <label className="block text-sm font-medium text-white/70 mb-2">
-                  Profile Picture
-                </label>
                 <div className="relative">
                   <input
                     type="file"
@@ -270,24 +261,16 @@ export function AccountPage() {
             </div>
 
             {/* Bio */}
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">
-                Bio
-              </label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell us about yourself..."
-                className="w-full"
-                rows={3}
-              />
-            </div>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Bio - Tell us about yourself..."
+              className="w-full"
+              rows={3}
+            />
 
             {/* Social Links */}
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-3">
-                Social Links
-              </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Instagram */}
                 <div className="flex items-center gap-2">

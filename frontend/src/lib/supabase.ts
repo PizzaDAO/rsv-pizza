@@ -22,6 +22,43 @@ function isAuthenticated(): boolean {
 }
 
 /**
+ * Upload a profile picture to Supabase Storage and return the public URL
+ * @param file The image file to upload
+ * @param userId The user's ID for organizing uploads
+ * @returns The public URL of the uploaded image, or null if upload failed
+ */
+export async function uploadProfilePicture(file: File, userId: string): Promise<string | null> {
+  try {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+    // Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from('profile-pictures')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error('Error uploading profile picture:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('profile-pictures')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
+    return null;
+  }
+}
+
+/**
  * Upload an image to Supabase Storage and return the public URL
  * @param file The image file to upload
  * @param bucket The storage bucket name (default: 'event-images')

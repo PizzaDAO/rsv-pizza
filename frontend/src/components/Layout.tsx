@@ -1,25 +1,7 @@
-import React, { ReactNode, useState, useEffect } from 'react';
+import React, { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, LogIn } from 'lucide-react';
-
-const LOGO_FONTS = [
-  "'Lobster', cursive",
-  "'Pacifico', cursive",
-  "'Cookie', cursive",
-  "'Bangers', cursive",
-  "'Bungee', sans-serif",
-  "'Caveat', cursive",
-  "'Chewy', cursive",
-  "'Concert One', cursive",
-  "'Fredoka One', cursive",
-  "'Kalam', cursive",
-  "'Luckiest Guy', cursive",
-  "'Permanent Marker', cursive",
-  "'Righteous', cursive",
-  "'Satisfy', cursive",
-  "'Shadows Into Light', cursive",
-];
 
 interface LayoutProps {
   children: ReactNode;
@@ -27,14 +9,6 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, loading } = useAuth();
-  const [fontIndex, setFontIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFontIndex((prev) => (prev + 1) % LOGO_FONTS.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -49,7 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             />
             <span
               className="text-lg sm:text-xl text-white/90"
-              style={{ fontFamily: LOGO_FONTS[fontIndex] }}
+              style={{ fontFamily: "'Bungee', sans-serif" }}
             >
               RSV.Pizza
             </span>
