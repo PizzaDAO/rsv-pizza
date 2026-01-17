@@ -3,8 +3,9 @@ import { usePizza } from '../contexts/PizzaContext';
 import { PizzaCard } from './PizzaCard';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import { Pizzeria, OrderingOption } from '../types';
-import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, MapPin, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
+import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   searchPizzerias,
@@ -564,14 +565,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   </div>
 
                   <form onSubmit={handleAddressSearch} className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <MapPin size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
-                      <input
-                        type="text"
+                    <div className="flex-1">
+                      <LocationAutocomplete
                         value={searchAddress}
-                        onChange={(e) => setSearchAddress(e.target.value)}
+                        onChange={setSearchAddress}
                         placeholder="Enter delivery address..."
-                        className="w-full pl-8 py-2 text-sm"
                       />
                     </div>
                     <button
@@ -579,7 +577,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       disabled={pizzeriaLoading || !searchAddress.trim()}
                       className="btn-secondary px-3"
                     >
-                      <Search size={16} />
+                      {pizzeriaLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     </button>
                   </form>
 
