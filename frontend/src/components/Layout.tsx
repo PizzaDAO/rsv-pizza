@@ -21,7 +21,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               alt="RSV.Pizza"
               className="h-8 sm:h-10"
             />
-            <span className="text-lg sm:text-xl text-white/90" style={{ fontFamily: "'Pacifico', cursive" }}>RSV.Pizza</span>
+            <span className="text-lg sm:text-xl text-white/90" style={{ fontFamily: "'Cookie', cursive" }}>RSV.Pizza</span>
           </a>
           <div className="flex items-center gap-4">
             {!loading && (
