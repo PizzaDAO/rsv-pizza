@@ -86,6 +86,7 @@ export function RSVPPage() {
   const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [availableBeverages, setAvailableBeverages] = useState<string[]>([]);
+  const [saveToProfile, setSaveToProfile] = useState(false);
 
   useEffect(() => {
     async function loadParty() {
@@ -578,6 +579,23 @@ export function RSVPPage() {
               {error}
             </div>
           )}
+
+          {/* Save to Profile Checkbox */}
+          <button
+            type="button"
+            onClick={() => setSaveToProfile(!saveToProfile)}
+            className="flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+          >
+            {saveToProfile ? (
+              <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-white/40 flex-shrink-0" />
+            )}
+            <div className="text-left">
+              <span className="text-sm font-medium text-white">Save to profile</span>
+              <p className="text-xs text-white/50">Remember my preferences for future events</p>
+            </div>
+          </button>
 
           <div className="flex gap-3">
             <button

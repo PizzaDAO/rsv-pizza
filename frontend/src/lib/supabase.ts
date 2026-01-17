@@ -418,3 +418,106 @@ export async function deleteParty(partyId: string): Promise<boolean> {
   }
   return true;
 }
+
+// Get parties for a user (RSVP'd or hosting)
+export interface UserParty extends DbParty {
+  userRole: 'host' | 'guest';
+  guestCount?: number;
+}
+
+export async function getUserParties(userEmail: string): Promise<UserParty[]> {
+  // First, get all parties where the user is a guest (via email)
+  const { data: guestEntries, error: guestError } = await supabase
+    .from('guests')
+    .select('party_id')
+    .eq('email', userEmail);
+
+  if (guestError) {
+    console.error('Error fetching guest entries:', guestError);
+  }
+
+  const partyIdsAsGuest = guestEntries?.map(g => g.party_id) || [];
+
+  // Get parties where user is a guest
+  let guestParties: DbParty[] = [];
+  if (partyIdsAsGuest.length > 0) {
+    const { data, error } = await supabase
+      .from('parties')
+      .select('*')
+      .in('id', partyIdsAsGuest)
+      .order('date', { ascending: true, nullsFirst: false });
+
+    if (error) {
+      console.error('Error fetching guest parties:', error);
+    } else {
+      guestParties = data || [];
+    }
+  }
+
+  // Get parties where user is a host (co_hosts array contains their email)
+  const { data: hostParties, error: hostError } = await supabase
+    .from('parties')
+    .select('*')
+    .contains('co_hosts', [{ email: userEmail }])
+    .order('date', { ascending: true, nullsFirst: false });
+
+  if (hostError) {
+    console.error('Error fetching host parties:', hostError);
+  }
+
+  // Combine and deduplicate
+  const partyMap = new Map<string, UserParty>();
+
+  // Add host parties first (host role takes priority)
+  for (const party of hostParties || []) {
+    partyMap.set(party.id, { ...party, userRole: 'host' });
+  }
+
+  // Add guest parties (only if not already a host)
+  for (const party of guestParties) {
+    if (!partyMap.has(party.id)) {
+      partyMap.set(party.id, { ...party, userRole: 'guest' });
+    }
+  }
+
+  // Get guest counts for each party
+  const allPartyIds = Array.from(partyMap.keys());
+  if (allPartyIds.length > 0) {
+    for (const partyId of allPartyIds) {
+      const { count, error } = await supabase
+        .from('guests')
+        .select('*', { count: 'exact', head: true })
+        .eq('party_id', partyId);
+
+      if (!error && count !== null) {
+        const party = partyMap.get(partyId);
+        if (party) {
+          party.guestCount = count;
+        }
+      }
+    }
+  }
+
+  // Convert to array and sort by date
+  const parties = Array.from(partyMap.values());
+  parties.sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
+
+  return parties;
+}
+
+// Get upcoming parties (future or no date set) for a user
+export async function getUpcomingUserParties(userEmail: string): Promise<UserParty[]> {
+  const allParties = await getUserParties(userEmail);
+  const now = new Date();
+
+  // Filter to only upcoming parties (date is null or in the future)
+  return allParties.filter(party => {
+    if (!party.date) return true; // Include parties without a date
+    return new Date(party.date) >= now;
+  });
+}

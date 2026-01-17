@@ -1,10 +1,15 @@
 import React, { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { User, LogIn } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { user, loading } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -16,16 +21,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               alt="RSV.Pizza"
               className="h-8 sm:h-10"
             />
-            <span className="text-lg sm:text-xl font-semibold text-white/90">RSV.Pizza</span>
+            <span className="text-lg sm:text-xl text-white/90" style={{ fontFamily: 'Goldman, sans-serif' }}>RSV.Pizza</span>
           </a>
-          <a
-            href="https://pizzadao.xyz"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/60 hover:text-white/90 text-sm transition-colors"
-          >
-            pizzadao.xyz
-          </a>
+          <div className="flex items-center gap-4">
+            {!loading && (
+              user ? (
+                <Link
+                  to="/account"
+                  className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+                >
+                  <User size={18} />
+                  <span className="text-sm hidden sm:inline">{user.name || user.email}</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/80 hover:text-white text-sm transition-all"
+                >
+                  <LogIn size={16} />
+                  <span>Log In</span>
+                </Link>
+              )
+            )}
+          </div>
         </div>
       </nav>
 

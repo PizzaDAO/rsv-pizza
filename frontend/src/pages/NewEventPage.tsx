@@ -1,23 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { TimePickerInput } from '../components/TimePickerInput';
 import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { LocationAutocomplete } from '../components/LocationAutocomplete';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
-import { createParty as createPartyAPI, uploadEventImage, getUpcomingUserParties, UserParty } from '../lib/supabase';
+import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
+import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 
-export function HomePage() {
+export function NewEventPage() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const startDateInputRef = React.useRef<HTMLInputElement>(null);
-  const endDateInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Parties state for signed-in users
-  const [userParties, setUserParties] = useState<UserParty[]>([]);
-  const [partiesLoading, setPartiesLoading] = useState(false);
+  const { user } = useAuth();
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [partyName, setPartyName] = useState('');
@@ -43,40 +39,20 @@ export function HomePage() {
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Load user's parties when signed in
-  useEffect(() => {
-    if (user?.email) {
-      setPartiesLoading(true);
-      getUpcomingUserParties(user.email)
-        .then(parties => {
-          setUserParties(parties);
-        })
-        .catch(err => {
-          console.error('Error loading user parties:', err);
-        })
-        .finally(() => {
-          setPartiesLoading(false);
-        });
-    } else {
-      setUserParties([]);
-    }
-  }, [user?.email]);
-
   // Get user's timezone on mount
-  React.useEffect(() => {
+  useEffect(() => {
     try {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setTimezone(userTimezone);
     } catch (error) {
-      // Fallback to UTC if timezone detection fails
       console.warn('Timezone detection failed, using UTC', error);
       setTimezone('UTC');
     }
   }, []);
 
   // Check for pending party form data after auth redirect
-  const pendingFormProcessed = React.useRef(false);
-  React.useEffect(() => {
+  const pendingFormProcessed = useRef(false);
+  useEffect(() => {
     if (!user || pendingFormProcessed.current) return;
 
     const savedForm = sessionStorage.getItem('pendingPartyForm');
@@ -86,7 +62,6 @@ export function HomePage() {
 
       try {
         const formData = JSON.parse(savedForm);
-        // Auto-create party with saved form data
         createPartyFromSavedData(formData);
       } catch (err) {
         console.error('Failed to restore form data:', err);
@@ -94,7 +69,6 @@ export function HomePage() {
     }
   }, [user]);
 
-  // Create party from saved form data (after auth redirect)
   const createPartyFromSavedData = async (formData: any) => {
     setCreating(true);
 
@@ -104,7 +78,6 @@ export function HomePage() {
       const description = formData.eventDescription?.trim() || undefined;
       const urlSlug = formData.customUrl?.trim() || undefined;
 
-      // Calculate duration from start/end times
       let duration: number | undefined;
       let startDateTime: string | undefined;
       if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
@@ -146,14 +119,12 @@ export function HomePage() {
     }
   };
 
-  // Format date for display
   const formatDateDisplay = (date: string) => {
     if (!date) return '';
     const d = new Date(date);
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  // Format time for display (12-hour)
   const formatTimeDisplay = (time: string) => {
     if (!time) return '';
     const [hours, minutes] = time.split(':').map(Number);
@@ -162,7 +133,6 @@ export function HomePage() {
     return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
-  // Get timezone abbreviation
   const getTimezoneAbbr = () => {
     if (!timezone) return '';
     try {
@@ -178,50 +148,32 @@ export function HomePage() {
     }
   };
 
-  // Format party date for display
-  const formatPartyDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Date TBD';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
-  };
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Revoke previous preview URL if it exists
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
 
     setImageError(null);
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setImageError('Please select an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setImageError('Image must be less than 5MB');
       return;
     }
 
-    // Validate square aspect ratio
     const img = new window.Image();
     const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
       const aspectRatio = img.width / img.height;
 
-      // Allow some tolerance (0.9 to 1.1 is considered square)
       if (aspectRatio < 0.9 || aspectRatio > 1.1) {
         setImageError('Image must be square (1:1 aspect ratio)');
         setEventImageFile(null);
@@ -230,10 +182,8 @@ export function HomePage() {
         return;
       }
 
-      // Image is valid
       setEventImageFile(file);
       setImagePreview(objectUrl);
-      // Don't revoke URL - we need it for the preview
     };
 
     img.onerror = () => {
@@ -245,7 +195,6 @@ export function HomePage() {
   };
 
   const removeImage = () => {
-    // Revoke the object URL if it exists to free memory
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
@@ -259,16 +208,14 @@ export function HomePage() {
     e?.preventDefault();
     if (!partyName.trim()) return;
 
-    // Show sign-in modal if user is not authenticated
     if (!user) {
-      // Save form data to restore after auth
       const formData = {
         partyName, hostName, startDate, startTime, endDate, endTime, timezone,
         expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
-      sessionStorage.setItem('authReturnUrl', '/');
+      sessionStorage.setItem('authReturnUrl', '/new');
       setShowLoginModal(true);
       return;
     }
@@ -281,20 +228,18 @@ export function HomePage() {
       const description = eventDescription.trim() || undefined;
       const urlSlug = customUrl.trim() || undefined;
 
-      // Calculate duration from start/end times
       let duration: number | undefined;
       let startDateTime: string | undefined;
       if (startDate && startTime && endDate && endTime) {
         const start = new Date(`${startDate}T${startTime}`);
         const end = new Date(`${endDate}T${endTime}`);
         const durationMs = end.getTime() - start.getTime();
-        duration = durationMs / (1000 * 60 * 60); // Convert to hours
+        duration = durationMs / (1000 * 60 * 60);
         startDateTime = start.toISOString();
       } else if (startDate && startTime) {
         startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
       }
 
-      // Upload image if file is selected
       let imageUrl = eventImageUrl.trim() || undefined;
       if (eventImageFile) {
         const uploadedUrl = await uploadEventImage(eventImageFile);
@@ -325,7 +270,6 @@ export function HomePage() {
 
       setCreating(false);
 
-      // Navigate to host page
       if (party?.invite_code) {
         navigate(`/host/${party.invite_code}`);
       } else {
@@ -338,107 +282,12 @@ export function HomePage() {
     }
   };
 
-  // Show loading state while auth is loading
-  if (authLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 size={32} className="animate-spin text-white/60" />
-        </div>
-      </Layout>
-    );
-  }
-
-  // If user is signed in and has parties, show parties list
-  if (user && (userParties.length > 0 || partiesLoading)) {
-    return (
-      <Layout>
-        <div className="max-w-3xl mx-auto px-4 py-12">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Your Events</h1>
-            <p className="text-white/60">Events you're hosting or attending</p>
-          </div>
-
-          {partiesLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={32} className="animate-spin text-white/60" />
-            </div>
-          ) : (
-            <div className="space-y-3 mb-8">
-              {userParties.map(party => (
-                <Link
-                  key={party.id}
-                  to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/rsvp/${party.invite_code}`}
-                  className="block card p-4 hover:bg-white/10 transition-colors"
-                >
-                  <div className="flex items-start gap-4">
-                    {/* Event Image or Placeholder */}
-                    {party.event_image_url ? (
-                      <img
-                        src={party.event_image_url}
-                        alt={party.name}
-                        className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#ff393a]/20 to-[#ff5a5b]/20 border border-white/10 flex items-center justify-center flex-shrink-0">
-                        <Calendar size={24} className="text-white/40" />
-                      </div>
-                    )}
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-white truncate">{party.name}</h3>
-                        {party.userRole === 'host' && (
-                          <span className="flex items-center gap-1 px-2 py-0.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-full text-xs text-[#ff393a] flex-shrink-0">
-                            <Crown size={10} />
-                            Host
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-sm text-white/60 mb-1">
-                        {formatPartyDate(party.date)}
-                      </p>
-
-                      <div className="flex items-center gap-4 text-xs text-white/50">
-                        {party.address && (
-                          <span className="flex items-center gap-1 truncate">
-                            <MapPin size={12} />
-                            {party.address.split(',')[0]}
-                          </span>
-                        )}
-                        {party.guestCount !== undefined && (
-                          <span className="flex items-center gap-1">
-                            <Users size={12} />
-                            {party.guestCount} guest{party.guestCount !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Create Party Button */}
-          <Link
-            to="/new"
-            className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
-          >
-            <Plus size={20} />
-            Create Party
-          </Link>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Default: Show event creation form (for non-signed-in users or users with no parties)
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
+          <h1 className="text-2xl font-bold text-white mb-6">Create New Event</h1>
+
           <form onSubmit={handleCreate} className="space-y-3">
             <div>
               <input
@@ -482,7 +331,6 @@ export function HomePage() {
             <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-start gap-4">
                 <div className="flex-1 space-y-3">
-                  {/* Start Time */}
                   <div className="flex items-center gap-3">
                     <div
                       className="relative flex-1 cursor-pointer"
@@ -497,7 +345,6 @@ export function HomePage() {
                         value={startDate}
                         onChange={(e) => {
                           setStartDate(e.target.value);
-                          // Auto-populate end date if empty
                           if (!endDate) setEndDate(e.target.value);
                         }}
                         className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
@@ -511,7 +358,6 @@ export function HomePage() {
                     />
                   </div>
 
-                  {/* End Time */}
                   <div className="flex items-center gap-3">
                     <div
                       className="relative flex-1 cursor-pointer"
@@ -537,7 +383,6 @@ export function HomePage() {
                   </div>
                 </div>
 
-                {/* Timezone Picker */}
                 <TimezonePickerInput
                   value={timezone}
                   onChange={setTimezone}
@@ -574,7 +419,6 @@ export function HomePage() {
             </div>
 
             <div>
-              {/* File Upload */}
               {imagePreview ? (
                 <div className="space-y-3 mb-3">
                   <div className="relative w-full max-w-xs mx-auto">
@@ -615,14 +459,12 @@ export function HomePage() {
                 </div>
               )}
 
-              {/* Divider */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex-1 h-px bg-white/10"></div>
                 <span className="text-xs text-white/40">OR</span>
                 <div className="flex-1 h-px bg-white/10"></div>
               </div>
 
-              {/* Image URL Input */}
               <div className="relative">
                 <Image size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
@@ -630,7 +472,6 @@ export function HomePage() {
                   value={eventImageUrl}
                   onChange={(e) => {
                     setEventImageUrl(e.target.value);
-                    // Clear file if URL is entered
                     if (e.target.value.trim()) {
                       setEventImageFile(null);
                       setImagePreview(null);
@@ -755,15 +596,6 @@ export function HomePage() {
             </button>
           </form>
         </div>
-
-        <div className="mt-8 text-center">
-          <p className="text-white/50 text-sm">
-            Already created a party?{' '}
-            <a href="/parties" className="text-[#ff393a] hover:text-[#ff5a5b] underline">
-              View all test events
-            </a>
-          </p>
-        </div>
       </div>
 
       {/* Mobile Date/Time Modal */}
@@ -773,7 +605,6 @@ export function HomePage() {
             <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
 
             <div className="space-y-3">
-              {/* Start */}
               <div className="flex items-center gap-2">
                 <Play size={18} className="text-white/40 flex-shrink-0" />
                 <input
@@ -795,7 +626,6 @@ export function HomePage() {
                 />
               </div>
 
-              {/* End */}
               <div className="flex items-center gap-2">
                 <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
                 <input
@@ -814,7 +644,6 @@ export function HomePage() {
                 />
               </div>
 
-              {/* Timezone */}
               <div className="pt-2 border-t border-white/10">
                 <select
                   value={timezone}
@@ -864,7 +693,6 @@ export function HomePage() {
               </div>
             </div>
 
-            {/* Done Button */}
             <button
               type="button"
               onClick={() => setShowDateTimeModal(false)}
@@ -876,7 +704,6 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Sign In Modal */}
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
