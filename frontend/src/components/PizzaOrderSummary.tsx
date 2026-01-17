@@ -322,27 +322,10 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
               <h3 className="font-medium text-[#ffb347] mb-2">Order Summary</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/60">Expected guests:</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={orderExpectedGuests ?? expectedGuests}
-                      onChange={(e) => {
-                        const value = e.target.value ? parseInt(e.target.value, 10) : null;
-                        setOrderExpectedGuests(value);
-                      }}
-                      className="w-16 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                    />
-                    <button
-                      onClick={generateRecommendations}
-                      className="text-xs text-[#ff393a] hover:text-[#ff5a5b] font-medium"
-                    >
-                      Update
-                    </button>
-                  </div>
-                </div>
+                <p className="text-white/80">
+                  <span className="text-white/60">Expected guests:</span>{' '}
+                  <span className="font-semibold text-white">{orderExpectedGuests ?? expectedGuests}</span>
+                </p>
                 <p className="text-white/80">
                   <span className="text-white/60">Responded:</span>{' '}
                   <span className="font-semibold text-white">{respondedGuests}</span>

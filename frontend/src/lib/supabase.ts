@@ -146,6 +146,24 @@ export async function createParty(
     console.error('Error creating party:', error);
     return null;
   }
+
+  // Add the host as a guest so they can bypass password protection
+  if (hostEmail && data) {
+    await supabase
+      .from('guests')
+      .insert({
+        party_id: data.id,
+        name: hostName || 'Host',
+        email: hostEmail.toLowerCase(),
+        dietary_restrictions: [],
+        liked_toppings: [],
+        disliked_toppings: [],
+        liked_beverages: [],
+        disliked_beverages: [],
+        submitted_via: 'host',
+      });
+  }
+
   return data;
 }
 
@@ -487,6 +505,33 @@ export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
     return [];
   }
   return data || [];
+}
+
+// Check if a user is already a guest at a party by email
+export async function isUserGuestAtParty(partyId: string, email: string): Promise<boolean> {
+  if (!email) return false;
+
+  const { count, error } = await supabase
+    .from('guests')
+    .select('*', { count: 'exact', head: true })
+    .eq('party_id', partyId)
+    .eq('email', email.toLowerCase());
+
+  if (error) {
+    console.error('Error checking guest status:', error);
+    return false;
+  }
+  return (count || 0) > 0;
+}
+
+// Check if a user is a host of a party (by checking co_hosts array)
+export function isUserHostOfParty(party: DbParty, email: string): boolean {
+  if (!email || !party.co_hosts) return false;
+
+  const normalizedEmail = email.toLowerCase();
+  return party.co_hosts.some((host: any) =>
+    host.email?.toLowerCase() === normalizedEmail
+  );
 }
 
 // Get all parties

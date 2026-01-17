@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
-import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
+import { updateParty, uploadEventImage, deleteParty, isUserGuestAtParty, supabase } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
@@ -35,6 +35,7 @@ export const EventDetailsTab: React.FC = () => {
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
   const [newCoHostName, setNewCoHostName] = useState('');
+  const [newCoHostEmail, setNewCoHostEmail] = useState('');
   const [newCoHostWebsite, setNewCoHostWebsite] = useState('');
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
@@ -43,6 +44,7 @@ export const EventDetailsTab: React.FC = () => {
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
   const [editHostName, setEditHostName] = useState('');
+  const [editHostEmail, setEditHostEmail] = useState('');
   const [editHostWebsite, setEditHostWebsite] = useState('');
   const [editHostTwitter, setEditHostTwitter] = useState('');
   const [editHostInstagram, setEditHostInstagram] = useState('');
@@ -225,6 +227,7 @@ export const EventDetailsTab: React.FC = () => {
     const newCoHost: CoHost = {
       id: crypto.randomUUID(),
       name: newCoHostName.trim(),
+      email: newCoHostEmail.trim().toLowerCase() || undefined,
       website: newCoHostWebsite.trim() || undefined,
       twitter: newCoHostTwitter.trim() || undefined,
       instagram: newCoHostInstagram.trim() || undefined,
@@ -236,6 +239,7 @@ export const EventDetailsTab: React.FC = () => {
 
     // Reset form and close modal
     setNewCoHostName('');
+    setNewCoHostEmail('');
     setNewCoHostWebsite('');
     setNewCoHostTwitter('');
     setNewCoHostInstagram('');
@@ -246,6 +250,7 @@ export const EventDetailsTab: React.FC = () => {
   const startEditingHost = (host: CoHost) => {
     setEditingHostId(host.id);
     setEditHostName(host.name);
+    setEditHostEmail(host.email || '');
     setEditHostWebsite(host.website || '');
     setEditHostTwitter(host.twitter || '');
     setEditHostInstagram(host.instagram || '');
@@ -264,6 +269,7 @@ export const EventDetailsTab: React.FC = () => {
   const cancelEditingHost = () => {
     setEditingHostId(null);
     setEditHostName('');
+    setEditHostEmail('');
     setEditHostWebsite('');
     setEditHostTwitter('');
     setEditHostInstagram('');
@@ -281,6 +287,7 @@ export const EventDetailsTab: React.FC = () => {
           ? {
             ...h,
             name: editHostName.trim(),
+            email: editHostEmail.trim().toLowerCase() || undefined,
             website: editHostWebsite.trim() || undefined,
             twitter: editHostTwitter.trim() || undefined,
             instagram: editHostInstagram.trim() || undefined,
@@ -428,6 +435,26 @@ export const EventDetailsTab: React.FC = () => {
       });
 
       if (success) {
+        // Add co-hosts with emails to guests table (so they can bypass password)
+        for (const coHost of coHosts) {
+          if (coHost.email) {
+            const isGuest = await isUserGuestAtParty(party.id, coHost.email);
+            if (!isGuest) {
+              await supabase.from('guests').insert({
+                party_id: party.id,
+                name: coHost.name,
+                email: coHost.email.toLowerCase(),
+                dietary_restrictions: [],
+                liked_toppings: [],
+                disliked_toppings: [],
+                liked_beverages: [],
+                disliked_beverages: [],
+                submitted_via: 'host',
+              });
+            }
+          }
+        }
+
         setSaved(true);
         // Refresh party data from server
         if (party?.inviteCode) {
@@ -790,6 +817,9 @@ export const EventDetailsTab: React.FC = () => {
                   )}
                   <div className="flex-1">
                     <p className="text-white font-medium">{coHost.name}</p>
+                    {coHost.email && (
+                      <p className="text-white/50 text-xs">{coHost.email}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                       {coHost.website && (
                         <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
@@ -1164,6 +1194,14 @@ export const EventDetailsTab: React.FC = () => {
 
               {editingHostId !== 'main-host' && (
                 <>
+                  <input
+                    type="email"
+                    value={editHostEmail}
+                    onChange={(e) => setEditHostEmail(e.target.value)}
+                    placeholder="Email (required to edit event)"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  />
+
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       type="url"
@@ -1234,6 +1272,14 @@ export const EventDetailsTab: React.FC = () => {
                 value={newCoHostName}
                 onChange={(e) => setNewCoHostName(e.target.value)}
                 placeholder="Name *"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+
+              <input
+                type="email"
+                value={newCoHostEmail}
+                onChange={(e) => setNewCoHostEmail(e.target.value)}
+                placeholder="Email (required to edit event)"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 

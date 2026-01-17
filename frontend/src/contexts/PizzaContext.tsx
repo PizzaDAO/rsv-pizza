@@ -61,6 +61,7 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     dislikedToppings: dbGuest.disliked_toppings,
     likedBeverages: dbGuest.liked_beverages || [],
     dislikedBeverages: dbGuest.disliked_beverages || [],
+    pizzeriaRankings: dbGuest.pizzeria_rankings || [],
   };
 }
 

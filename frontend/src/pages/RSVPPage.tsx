@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
@@ -101,13 +101,24 @@ export function RSVPPage() {
 
           // Check if party has password protection
           if (foundParty.has_password) {
-            const authKey = `rsvpizza_auth_${inviteCode}`;
-            const storedAuth = sessionStorage.getItem(authKey);
+            // Skip password for existing guests (hosts are now added as guests too)
+            // Also check co_hosts for backward compatibility with old parties
+            const userIsGuest = user?.email && await isUserGuestAtParty(foundParty.id, user.email);
+            const userIsHost = user?.email && isUserHostOfParty(foundParty, user.email);
 
-            if (storedAuth) {
-              const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
-              if (isValid) {
-                setIsAuthenticated(true);
+            if (userIsGuest || userIsHost) {
+              setIsAuthenticated(true);
+            }
+            // Check stored password
+            else {
+              const authKey = `rsvpizza_auth_${inviteCode}`;
+              const storedAuth = sessionStorage.getItem(authKey);
+
+              if (storedAuth) {
+                const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
+                if (isValid) {
+                  setIsAuthenticated(true);
+                }
               }
             }
           } else {
@@ -120,7 +131,7 @@ export function RSVPPage() {
       setLoading(false);
     }
     loadParty();
-  }, [inviteCode]);
+  }, [inviteCode, user?.email]);
 
   // Fetch nearby pizzerias when party has an address
   useEffect(() => {

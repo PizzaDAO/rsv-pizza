@@ -22,6 +22,7 @@ export interface Guest {
   dislikedToppings: string[];
   likedBeverages?: string[];
   dislikedBeverages?: string[];
+  pizzeriaRankings?: string[];
 }
 
 export interface PizzaStyle {
@@ -88,6 +89,7 @@ export interface WaveRecommendation {
 export interface CoHost {
   id: string;
   name: string;
+  email?: string;
   website?: string;
   twitter?: string;
   instagram?: string;
