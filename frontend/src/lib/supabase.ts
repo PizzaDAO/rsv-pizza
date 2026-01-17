@@ -91,7 +91,7 @@ export interface DbGuest {
 
 // Party operations
 export async function createParty(
-  name: string,
+  name?: string,
   hostName?: string,
   date?: string,
   pizzaStyle: string = 'new-york',
@@ -106,13 +106,24 @@ export async function createParty(
   timezone?: string,
   hostEmail?: string
 ): Promise<DbParty | null> {
+  // Generate default party name if not provided
+  let partyName = name?.trim();
+  if (!partyName) {
+    // Count existing parties to generate unique name
+    const { count } = await supabase
+      .from('parties')
+      .select('*', { count: 'exact', head: true });
+    const partyNumber = (count || 0) + 1;
+    partyName = `Pizza Party ${partyNumber}`;
+  }
+
   // If host email is provided, add them as a co-host so they're linked to the event
   const coHosts = hostEmail ? [{ id: crypto.randomUUID(), name: hostName || '', email: hostEmail, showOnEvent: false }] : [];
 
   const { data, error } = await supabase
     .from('parties')
     .insert({
-      name,
+      name: partyName,
       host_name: hostName || null,
       date: date || null,
       duration: duration || null,

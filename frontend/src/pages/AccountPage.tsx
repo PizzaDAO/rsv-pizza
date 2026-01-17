@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X } from 'lucide-react';
 
 export function AccountPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   // Form state
@@ -92,27 +92,31 @@ export function AccountPage() {
     e.preventDefault();
     setSaving(true);
 
-    // TODO: Save profile data to database
-    // For now, just simulate a save
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Save profile to backend
+      await updateProfile({ name: name.trim() || undefined });
 
-    // Update original values to current values
-    setOriginalValues({
-      name,
-      username,
-      bio,
-      instagram,
-      twitter,
-      youtube,
-      tiktok,
-      linkedin,
-      website,
-    });
-    setProfilePictureFile(null);
+      // Update original values to current values
+      setOriginalValues({
+        name,
+        username,
+        bio,
+        instagram,
+        twitter,
+        youtube,
+        tiktok,
+        linkedin,
+        website,
+      });
+      setProfilePictureFile(null);
 
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {

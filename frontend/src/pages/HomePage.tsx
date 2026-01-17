@@ -123,7 +123,7 @@ export function HomePage() {
       const effectiveHostName = user?.name || formData.hostName?.trim() || undefined;
 
       const party = await createPartyAPI(
-        formData.partyName.trim(),
+        formData.partyName?.trim() || undefined,
         effectiveHostName,
         startDateTime,
         'new-york',
@@ -261,7 +261,6 @@ export function HomePage() {
 
   const handleCreate = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!partyName.trim()) return;
 
     // Show sign-in modal if user is not authenticated
     if (!user) {
@@ -315,7 +314,7 @@ export function HomePage() {
       const effectiveHostName = user?.name || hostName.trim() || undefined;
 
       const party = await createPartyAPI(
-        partyName.trim(),
+        partyName.trim() || undefined,
         effectiveHostName,
         startDateTime,
         'new-york',
@@ -453,9 +452,8 @@ export function HomePage() {
                 type="text"
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
-                placeholder="Party Name *"
+                placeholder="Party Name"
                 className="w-full pl-3"
-                required
                 autoFocus
               />
             </div>

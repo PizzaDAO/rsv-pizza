@@ -328,4 +328,50 @@ router.post('/logout', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Logged out' });
 });
 
+// PATCH /api/auth/profile - Update user profile
+router.patch('/profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new AppError('Authorization required', 401, 'UNAUTHORIZED');
+    }
+
+    const token = authHeader.split(' ')[1];
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
+    }
+
+    // Verify token
+    let decoded: { userId: string; email: string };
+    try {
+      decoded = jwt.verify(token, jwtSecret) as { userId: string; email: string };
+    } catch {
+      throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
+    }
+
+    const { name } = req.body;
+
+    // Update user
+    const user = await prisma.user.update({
+      where: { id: decoded.userId },
+      data: {
+        ...(name !== undefined && { name: name?.trim() || null }),
+      },
+    });
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
