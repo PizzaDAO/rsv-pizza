@@ -464,11 +464,43 @@ export async function addGuestToParty(
   inviteCode?: string,
   pizzeriaRankings?: string[]
 ): Promise<DbGuest | null> {
-  const { data, error } = await supabase
-    .from('guests')
-    .insert({
+  if (!inviteCode) {
+    console.error('Invite code is required to add guest');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email: email || null,
+        ethereumAddress: ethereumAddress || null,
+        roles: roles || [],
+        mailingListOptIn: mailingListOptIn || false,
+        dietaryRestrictions,
+        likedToppings,
+        dislikedToppings,
+        likedBeverages,
+        dislikedBeverages,
+        pizzeriaRankings: pizzeriaRankings || [],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error adding guest:', errorData);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Return a minimal DbGuest object (backend only returns id and name)
+    return {
+      id: data.guest.id,
       party_id: partyId,
-      name,
+      name: data.guest.name,
       email: email || null,
       ethereum_address: ethereumAddress || null,
       roles: roles || [],
@@ -480,34 +512,12 @@ export async function addGuestToParty(
       disliked_beverages: dislikedBeverages,
       pizzeria_rankings: pizzeriaRankings || [],
       submitted_via: 'link',
-    })
-    .select()
-    .single();
-
-  if (error) {
+      submitted_at: new Date().toISOString(),
+    } as DbGuest;
+  } catch (error) {
     console.error('Error adding guest:', error);
     return null;
   }
-
-  // Send confirmation email via backend API if email provided
-  if (email && inviteCode) {
-    try {
-      await fetch(`${API_URL}/api/rsvp/${inviteCode}/send-confirmation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestId: data.id,
-          guestEmail: email,
-          guestName: name,
-        }),
-      });
-    } catch (emailError) {
-      console.error('Failed to send confirmation email:', emailError);
-      // Don't fail the RSVP if email fails
-    }
-  }
-
-  return data;
 }
 
 export async function addGuestByHost(

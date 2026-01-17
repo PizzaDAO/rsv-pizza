@@ -78,7 +78,11 @@
       "Bash(vercel env:*)",
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
-      "mcp__supabase__get_logs"
+      "mcp__supabase__get_logs",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "Bash(git restore:*)"
     ]
   }
 }
