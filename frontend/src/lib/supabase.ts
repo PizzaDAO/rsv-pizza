@@ -477,6 +477,7 @@ export async function updateParty(
     custom_url?: string | null;
     event_image_url?: string | null;
     max_guests?: number | null;
+    hide_guests?: boolean;
     co_hosts?: any[];
     timezone?: string | null;
   }

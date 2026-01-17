@@ -93,7 +93,7 @@ export function NewEventPage() {
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
 
       const party = await createPartyAPI(
-        formData.partyName.trim(),
+        formData.partyName?.trim() || undefined,
         formData.hostName?.trim() || undefined,
         startDateTime,
         'new-york',
@@ -206,7 +206,6 @@ export function NewEventPage() {
 
   const handleCreate = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!partyName.trim()) return;
 
     if (!user) {
       const formData = {
@@ -253,7 +252,7 @@ export function NewEventPage() {
       }
 
       const party = await createPartyAPI(
-        partyName.trim(),
+        partyName.trim() || undefined,
         hostName.trim() || undefined,
         startDateTime,
         'new-york',
@@ -294,9 +293,8 @@ export function NewEventPage() {
                 type="text"
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
-                placeholder="Party Name *"
+                placeholder="Party Name"
                 className="w-full pl-3"
-                required
                 autoFocus
               />
             </div>

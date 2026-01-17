@@ -7,7 +7,7 @@ import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
 
 export const EventDetailsTab: React.FC = () => {
-  const { party } = usePizza();
+  const { party, loadParty } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -421,8 +421,33 @@ export const EventDetailsTab: React.FC = () => {
 
       if (success) {
         setSaved(true);
-        // Reload the page to reflect changes after showing saved state
-        setTimeout(() => window.location.reload(), 1500);
+        // Refresh party data from server
+        if (party?.inviteCode) {
+          await loadParty(party.inviteCode);
+        }
+        // Update original values to match current form state
+        setOriginalValues({
+          name: name.trim(),
+          hostName: hostName.trim(),
+          startDate,
+          startTime,
+          endDate,
+          endTime,
+          timezone,
+          address: address.trim(),
+          description: description.trim(),
+          password: password.trim(),
+          customUrl: customUrl.trim(),
+          eventImageUrl: imageUrl || '',
+          maxGuests,
+          limitGuests,
+          hideGuests,
+          coHosts: JSON.stringify(coHosts),
+        });
+        // Clear the image file since it's been uploaded
+        setEventImageFile(null);
+        // Reset saved state after a moment
+        setTimeout(() => setSaved(false), 2000);
       } else {
         throw new Error('Failed to update party');
       }
@@ -534,7 +559,6 @@ export const EventDetailsTab: React.FC = () => {
                 </div>
               )}
             </div>
-            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b]">Change Date</span>
           </div>
         </button>
 
@@ -560,9 +584,6 @@ export const EventDetailsTab: React.FC = () => {
                 <span className="text-white/60">Add Description</span>
               )}
             </div>
-            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b] flex-shrink-0 ml-2">
-              {description ? 'Edit' : 'Add'}
-            </span>
           </div>
         </button>
 
@@ -591,7 +612,6 @@ export const EventDetailsTab: React.FC = () => {
                 </div>
               )}
             </div>
-            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b]">Change Image</span>
           </div>
         </button>
         {imageError && (
