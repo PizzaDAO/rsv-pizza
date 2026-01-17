@@ -692,21 +692,6 @@ export const EventDetailsTab: React.FC = () => {
               <div>
                 <button
                   type="button"
-                  onClick={() => setLimitGuests(!limitGuests)}
-                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  {limitGuests ? (
-                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                  ) : (
-                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-white/80">Limit Guests</span>
-                </button>
-              </div>
-
-              <div>
-                <button
-                  type="button"
                   onClick={() => setHideGuests(!hideGuests)}
                   className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 >
@@ -716,6 +701,21 @@ export const EventDetailsTab: React.FC = () => {
                     <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                   )}
                   <span className="text-sm font-medium text-white/80">Hide Guests</span>
+                </button>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setLimitGuests(!limitGuests)}
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {limitGuests ? (
+                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                  ) : (
+                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                  )}
+                  <span className="text-sm font-medium text-white/80">Limit Guests</span>
                 </button>
               </div>
 
