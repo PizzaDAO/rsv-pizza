@@ -87,7 +87,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       likedToppings,
       dislikedToppings,
       likedBeverages,
-      dislikedBeverages
+      dislikedBeverages,
+      pizzeriaRankings
     } = req.body;
 
     // Validate required fields
@@ -143,6 +144,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         dislikedToppings: dislikedToppings || [],
         likedBeverages: likedBeverages || [],
         dislikedBeverages: dislikedBeverages || [],
+        pizzeriaRankings: pizzeriaRankings || [],
         submittedVia: 'link',
         partyId: party.id,
       },

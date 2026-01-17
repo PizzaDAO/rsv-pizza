@@ -28,10 +28,21 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 // POST /api/parties - Create new party
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password, eventImageUrl, description, customUrl } = req.body;
+    const {
+      name, date, duration, pizzaSize, pizzaStyle, address, maxGuests,
+      availableBeverages, availableToppings, password, eventImageUrl, description,
+      customUrl, hostName, timezone, hideGuests, coHosts
+    } = req.body;
 
-    if (!name || !pizzaSize || !pizzaStyle) {
-      throw new AppError('Name, pizza size, and pizza style are required', 400, 'VALIDATION_ERROR');
+    if (!pizzaSize || !pizzaStyle) {
+      throw new AppError('Pizza size and pizza style are required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Generate default party name if not provided
+    let partyName = name?.trim();
+    if (!partyName) {
+      const count = await prisma.party.count();
+      partyName = `Pizza Party ${count + 1}`;
     }
 
     // Validate custom URL if provided
@@ -45,23 +56,51 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       }
     }
 
+    // Build coHosts array with host email if provided
+    const hostCoHosts = req.userEmail
+      ? [{ id: crypto.randomUUID(), name: hostName || '', email: req.userEmail, showOnEvent: false }]
+      : [];
+    const finalCoHosts = coHosts || hostCoHosts;
+
     const party = await prisma.party.create({
       data: {
-        name,
+        name: partyName,
         date: date ? new Date(date) : null,
         duration: duration || null,
+        timezone: timezone || null,
         pizzaSize,
         pizzaStyle,
         availableBeverages: availableBeverages || [],
-        address,
-        maxGuests,
+        availableToppings: availableToppings || [],
+        address: address || null,
+        maxGuests: maxGuests || null,
+        hideGuests: hideGuests || false,
         password: password || null,
         eventImageUrl: eventImageUrl || null,
         description: description || null,
         customUrl: customUrl || null,
+        hostName: hostName || null,
+        coHosts: finalCoHosts,
         userId: req.userId!,
       },
     });
+
+    // Add the host as a guest so they can bypass password protection
+    if (req.userEmail) {
+      await prisma.guest.create({
+        data: {
+          name: hostName || 'Host',
+          email: req.userEmail.toLowerCase(),
+          dietaryRestrictions: [],
+          likedToppings: [],
+          dislikedToppings: [],
+          likedBeverages: [],
+          dislikedBeverages: [],
+          submittedVia: 'host',
+          partyId: party.id,
+        },
+      });
+    }
 
     res.status(201).json({ party });
   } catch (error) {
@@ -97,7 +136,11 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, date, duration, pizzaSize, pizzaStyle, address, maxGuests, availableBeverages, password, eventImageUrl, description, customUrl } = req.body;
+    const {
+      name, date, duration, pizzaSize, pizzaStyle, address, maxGuests,
+      availableBeverages, availableToppings, password, eventImageUrl, description,
+      customUrl, hostName, timezone, hideGuests, coHosts
+    } = req.body;
 
     // Verify ownership
     const existing = await prisma.party.findFirst({
@@ -121,18 +164,23 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const party = await prisma.party.update({
       where: { id },
       data: {
-        ...(name && { name }),
+        ...(name !== undefined && { name }),
         ...(date !== undefined && { date: date ? new Date(date) : null }),
         ...(duration !== undefined && { duration }),
+        ...(timezone !== undefined && { timezone }),
         ...(pizzaSize && { pizzaSize }),
         ...(pizzaStyle && { pizzaStyle }),
         ...(address !== undefined && { address }),
         ...(maxGuests !== undefined && { maxGuests }),
+        ...(hideGuests !== undefined && { hideGuests }),
         ...(availableBeverages !== undefined && { availableBeverages }),
+        ...(availableToppings !== undefined && { availableToppings }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
+        ...(hostName !== undefined && { hostName }),
+        ...(coHosts !== undefined && { coHosts }),
       },
     });
 

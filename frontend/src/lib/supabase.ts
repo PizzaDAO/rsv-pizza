@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  createPartyApi,
+  updatePartyApi,
+  deletePartyApi,
+  addGuestByHostApi,
+  removeGuestApi,
+} from './api';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -8,6 +15,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Helper to check if user is authenticated
+function isAuthenticated(): boolean {
+  return !!localStorage.getItem('authToken');
+}
 
 /**
  * Upload an image to Supabase Storage and return the public URL
@@ -107,10 +119,60 @@ export async function createParty(
   timezone?: string,
   hostEmail?: string
 ): Promise<DbParty | null> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      const result = await createPartyApi({
+        name,
+        hostName,
+        date,
+        pizzaStyle,
+        maxGuests: expectedGuests,
+        address,
+        availableBeverages,
+        duration,
+        password,
+        eventImageUrl,
+        description,
+        customUrl,
+        timezone,
+      });
+
+      // Convert API response to DbParty format
+      const party = result.party;
+      return {
+        id: party.id,
+        name: party.name,
+        invite_code: party.inviteCode,
+        custom_url: party.customUrl,
+        host_name: party.hostName,
+        date: party.date,
+        duration: party.duration,
+        timezone: party.timezone,
+        pizza_style: party.pizzaStyle,
+        available_beverages: party.availableBeverages || [],
+        available_toppings: party.availableToppings || [],
+        max_guests: party.maxGuests,
+        hide_guests: party.hideGuests || false,
+        event_image_url: party.eventImageUrl,
+        description: party.description,
+        address: party.address,
+        rsvp_closed_at: party.rsvpClosedAt,
+        co_hosts: party.coHosts || [],
+        created_at: party.createdAt,
+      };
+    } catch (error) {
+      console.error('Error creating party via API:', error);
+      return null;
+    }
+  }
+
+  // Fallback to direct Supabase (for unauthenticated users - will fail after RLS lockdown)
+  console.warn('Creating party without authentication - this will fail after security lockdown');
+
   // Generate default party name if not provided
   let partyName = name?.trim();
   if (!partyName) {
-    // Count existing parties to generate unique name
     const { count } = await supabase
       .from('parties')
       .select('*', { count: 'exact', head: true });
@@ -118,7 +180,6 @@ export async function createParty(
     partyName = `Pizza Party ${partyNumber}`;
   }
 
-  // If host email is provided, add them as a co-host so they're linked to the event
   const coHosts = hostEmail ? [{ id: crypto.randomUUID(), name: hostName || '', email: hostEmail, showOnEvent: false }] : [];
 
   const { data, error } = await supabase
@@ -147,7 +208,6 @@ export async function createParty(
     return null;
   }
 
-  // Add the host as a guest so they can bypass password protection
   if (hostEmail && data) {
     await supabase
       .from('guests')
@@ -356,32 +416,32 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
 }
 
 export async function updatePartyBeverages(partyId: string, availableBeverages: string[]): Promise<DbParty | null> {
-  const { data, error } = await supabase
+  // Use the updateParty function which handles API routing
+  const success = await updateParty(partyId, { available_beverages: availableBeverages });
+  if (!success) return null;
+
+  // Fetch the updated party
+  const { data } = await supabase
     .from('parties')
-    .update({ available_beverages: availableBeverages })
+    .select('*')
     .eq('id', partyId)
-    .select()
     .single();
 
-  if (error) {
-    console.error('Error updating party beverages:', error);
-    return null;
-  }
   return data;
 }
 
 export async function updatePartyToppings(partyId: string, availableToppings: string[]): Promise<DbParty | null> {
-  const { data, error } = await supabase
+  // Use the updateParty function which handles API routing
+  const success = await updateParty(partyId, { available_toppings: availableToppings });
+  if (!success) return null;
+
+  // Fetch the updated party
+  const { data } = await supabase
     .from('parties')
-    .update({ available_toppings: availableToppings })
+    .select('*')
     .eq('id', partyId)
-    .select()
     .single();
 
-  if (error) {
-    console.error('Error updating party toppings:', error);
-    return null;
-  }
   return data;
 }
 
@@ -458,6 +518,39 @@ export async function addGuestByHost(
   likedBeverages: string[],
   dislikedBeverages: string[]
 ): Promise<DbGuest | null> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      const result = await addGuestByHostApi(partyId, {
+        name,
+        dietaryRestrictions,
+        likedToppings,
+        dislikedToppings,
+        likedBeverages,
+        dislikedBeverages,
+      });
+
+      const guest = result.guest;
+      return {
+        id: guest.id,
+        party_id: guest.partyId,
+        name: guest.name,
+        email: guest.email,
+        dietary_restrictions: guest.dietaryRestrictions || [],
+        liked_toppings: guest.likedToppings || [],
+        disliked_toppings: guest.dislikedToppings || [],
+        liked_beverages: guest.likedBeverages || [],
+        disliked_beverages: guest.dislikedBeverages || [],
+        submitted_at: guest.submittedAt,
+        submitted_via: guest.submittedVia,
+      };
+    } catch (error) {
+      console.error('Error adding guest via API:', error);
+      return null;
+    }
+  }
+
+  // Fallback to direct Supabase
   const { data, error } = await supabase
     .from('guests')
     .insert({
@@ -480,7 +573,19 @@ export async function addGuestByHost(
   return data;
 }
 
-export async function removeGuest(guestId: string): Promise<boolean> {
+export async function removeGuest(guestId: string, partyId?: string): Promise<boolean> {
+  // Use API if authenticated and partyId provided (secure path)
+  if (isAuthenticated() && partyId) {
+    try {
+      await removeGuestApi(partyId, guestId);
+      return true;
+    } catch (error) {
+      console.error('Error removing guest via API:', error);
+      return false;
+    }
+  }
+
+  // Fallback to direct Supabase
   const { error } = await supabase
     .from('guests')
     .delete()
@@ -590,8 +695,38 @@ export async function updateParty(
     hide_guests?: boolean;
     co_hosts?: any[];
     timezone?: string | null;
+    available_beverages?: string[];
+    available_toppings?: string[];
   }
 ): Promise<boolean> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      await updatePartyApi(partyId, {
+        name: updates.name,
+        hostName: updates.host_name ?? undefined,
+        date: updates.date,
+        duration: updates.duration,
+        timezone: updates.timezone,
+        address: updates.address,
+        maxGuests: updates.max_guests,
+        hideGuests: updates.hide_guests,
+        availableBeverages: updates.available_beverages,
+        availableToppings: updates.available_toppings,
+        password: updates.password,
+        eventImageUrl: updates.event_image_url,
+        description: updates.description,
+        customUrl: updates.custom_url,
+        coHosts: updates.co_hosts,
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating party via API:', error);
+      return false;
+    }
+  }
+
+  // Fallback to direct Supabase
   const { error } = await supabase
     .from('parties')
     .update(updates)
@@ -605,6 +740,18 @@ export async function updateParty(
 }
 
 export async function deleteParty(partyId: string): Promise<boolean> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      await deletePartyApi(partyId);
+      return true;
+    } catch (error) {
+      console.error('Error deleting party via API:', error);
+      return false;
+    }
+  }
+
+  // Fallback to direct Supabase
   const { error } = await supabase
     .from('parties')
     .delete()

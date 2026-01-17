@@ -215,7 +215,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const removeGuest = async (id: string) => {
-    const success = await db.removeGuest(id);
+    const success = await db.removeGuest(id, party?.id);
     if (success) {
       setGuests(prev => prev.filter(g => g.id !== id));
       setParty(prev => prev ? { ...prev, guests: prev.guests.filter(g => g.id !== id) } : null);

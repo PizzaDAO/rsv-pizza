@@ -37,51 +37,60 @@ model User {
 model Party {
   id                 String    @id @default(cuid())
   name               String
-  inviteCode         String    @unique @default(cuid())
-  customUrl          String?   @unique
+  inviteCode         String    @unique @default(cuid()) @map("invite_code")
+  customUrl          String?   @unique @map("custom_url")
+  hostName           String?   @map("host_name")
   date               DateTime?
   duration           Float?
   timezone           String?
-  pizzaSize          String
-  pizzaStyle         String
-  availableBeverages String[]
+  pizzaSize          String    @map("pizza_size")
+  pizzaStyle         String    @map("pizza_style")
+  availableBeverages String[]  @map("available_beverages")
+  availableToppings  String[]  @map("available_toppings")
   address            String?
   latitude           Float?
   longitude          Float?
-  maxGuests          Int?
+  maxGuests          Int?      @map("max_guests")
+  hideGuests         Boolean   @default(false) @map("hide_guests")
+  coHosts            Json      @default("[]") @map("co_hosts")
   password           String?
-  eventImageUrl      String?
+  eventImageUrl      String?   @map("event_image_url")
   description        String?
-  rsvpClosedAt       DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  rsvpClosedAt       DateTime? @map("rsvp_closed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  userId String
+  userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   guests Guest[]
   orders Order[]
+
+  @@map("parties")
 }
 
 model Guest {
   id                  String   @id @default(cuid())
   name                String
   email               String?
-  ethereumAddress     String?
+  ethereumAddress     String?  @map("ethereum_address")
   roles               String[]
-  mailingListOptIn    Boolean  @default(false)
-  dietaryRestrictions String[]
-  likedToppings       String[]
-  dislikedToppings    String[]
-  likedBeverages      String[]
-  dislikedBeverages   String[]
-  submittedAt         DateTime @default(now())
-  submittedVia        String   @default("link")
+  mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
+  dietaryRestrictions String[] @map("dietary_restrictions")
+  likedToppings       String[] @map("liked_toppings")
+  dislikedToppings    String[] @map("disliked_toppings")
+  likedBeverages      String[] @map("liked_beverages")
+  dislikedBeverages   String[] @map("disliked_beverages")
+  pizzeriaRankings    String[] @map("pizzeria_rankings")
+  submittedAt         DateTime @default(now()) @map("submitted_at")
+  submittedVia        String   @default("link") @map("submitted_via")
 
-  partyId String
+  partyId String @map("party_id")
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   pizzaMappings GuestPizzaMapping[]
+
+  @@map("guests")
 }
 
 model Order {
