@@ -225,7 +225,9 @@ function HostPageContent() {
                   {(() => {
                     const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
                     const minValue = 1;
-                    const maxValue = Math.max(guests.length * 2, currentValue + 20, 50);
+                    // Scale max dynamically based on data - use smaller max for low guest counts
+                    const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
+                    const maxValue = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
                     const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
                     const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;
 
@@ -281,25 +283,6 @@ function HostPageContent() {
                 {/* Recommended Order - always shown, auto-generated */}
                 <PizzaOrderSummary />
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
-                    <span className="text-3xl font-bold text-white">{guests.length}</span>
-                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Total Guests RSVP'd</span>
-                  </div>
-                  <div className="card p-4 flex flex-col items-center justify-center text-center bg-[#1a1a2e] border-white/10">
-                    <span className="text-3xl font-bold text-[#ff393a]">
-                      {guests.filter(g =>
-                        g.toppings.length > 0 ||
-                        g.dislikedToppings.length > 0 ||
-                        g.dietaryRestrictions.length > 0 ||
-                        (g.likedBeverages && g.likedBeverages.length > 0) ||
-                        (g.dislikedBeverages && g.dislikedBeverages.length > 0)
-                      ).length}
-                    </span>
-                    <span className="text-xs text-white/50 uppercase tracking-wider font-semibold mt-1">Requests Submitted</span>
-                  </div>
-                </div>
                 <GuestPreferencesList />
                 <PizzaStyleAndToppings>
                   {/* Pizzeria Search Section - inside Pizza Options */}

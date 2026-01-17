@@ -39,6 +39,7 @@ interface PizzeriaSearchProps {
   initialSearchAddress?: string;
   className?: string; // Allow overriding styles (e.g. for modals)
   rankings?: PizzeriaRanking[]; // Guest vote rankings
+  initialShowAll?: boolean; // Open the "All Pizzerias" modal immediately
 }
 
 export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
@@ -48,6 +49,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   initialSearchAddress,
   className = "card p-6",
   rankings = [],
+  initialShowAll = false,
 }) => {
   const [pizzerias, setPizzerias] = useState<Pizzeria[]>(initialPizzerias || []);
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   const [searchAddress, setSearchAddress] = useState(initialSearchAddress || partyAddress || '');
   const [hasSearched, setHasSearched] = useState(!!initialPizzerias?.length);
   const [autoSearched, setAutoSearched] = useState(!!initialPizzerias?.length);
-  const [showAllModal, setShowAllModal] = useState(false);
+  const [showAllModal, setShowAllModal] = useState(initialShowAll && !!initialPizzerias?.length);
 
   const DISPLAY_LIMIT = 3;
 
