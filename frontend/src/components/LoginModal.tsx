@@ -97,10 +97,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 Sending...
               </>
             ) : (
-              <>
-                <Mail size={18} />
-                Continue
-              </>
+              'Continue'
             )}
           </button>
         </form>

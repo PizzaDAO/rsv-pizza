@@ -81,10 +81,7 @@ export function LoginPage() {
                   Sending...
                 </>
               ) : (
-                <>
-                  <Mail size={18} />
-                  Continue
-                </>
+                'Continue'
               )}
             </button>
           </form>
