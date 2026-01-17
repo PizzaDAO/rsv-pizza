@@ -7,7 +7,7 @@ import { LocationAutocomplete } from '../components/LocationAutocomplete';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
-import { createParty as createPartyAPI, uploadEventImage, getUpcomingUserParties, UserParty } from '../lib/supabase';
+import { createParty as createPartyAPI, uploadEventImage, getUserParties, UserParty } from '../lib/supabase';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ export function HomePage() {
   // Parties state for signed-in users
   const [userParties, setUserParties] = useState<UserParty[]>([]);
   const [partiesLoading, setPartiesLoading] = useState(false);
+  const [eventFilter, setEventFilter] = useState<'upcoming' | 'past'>('upcoming');
 
   // Form state
   const [partyName, setPartyName] = useState('');
@@ -47,7 +48,7 @@ export function HomePage() {
   useEffect(() => {
     if (user?.email) {
       setPartiesLoading(true);
-      getUpcomingUserParties(user.email)
+      getUserParties(user.email)
         .then(parties => {
           setUserParties(parties);
         })
@@ -361,9 +362,37 @@ export function HomePage() {
     return (
       <Layout>
         <div className="max-w-3xl mx-auto px-4 py-12">
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-2xl font-bold text-white mb-2">Your Events</h1>
             <p className="text-white/60">Events you're hosting or attending</p>
+          </div>
+
+          {/* Upcoming/Past Toggle */}
+          <div className="flex mb-6">
+            <div className="inline-flex bg-white/5 border border-white/10 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setEventFilter('upcoming')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  eventFilter === 'upcoming'
+                    ? 'bg-white text-black'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Upcoming
+              </button>
+              <button
+                type="button"
+                onClick={() => setEventFilter('past')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  eventFilter === 'past'
+                    ? 'bg-white text-black'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Past
+              </button>
+            </div>
           </div>
 
           {partiesLoading ? (
@@ -372,7 +401,26 @@ export function HomePage() {
             </div>
           ) : (
             <div className="space-y-3 mb-8">
-              {userParties.map(party => (
+              {(() => {
+                const now = new Date();
+                const filteredParties = userParties.filter(party => {
+                  const partyDate = party.date ? new Date(party.date) : null;
+                  if (eventFilter === 'upcoming') {
+                    return !partyDate || partyDate >= now;
+                  } else {
+                    return partyDate && partyDate < now;
+                  }
+                });
+
+                if (filteredParties.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-white/50">
+                      No {eventFilter} events
+                    </div>
+                  );
+                }
+
+                return filteredParties.map(party => (
                 <Link
                   key={party.id}
                   to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/rsvp/${party.invite_code}`}
@@ -424,7 +472,8 @@ export function HomePage() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              ));
+              })()}
             </div>
           )}
 

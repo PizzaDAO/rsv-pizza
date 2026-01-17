@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
 import { LocationAutocomplete } from './LocationAutocomplete';
@@ -542,7 +542,7 @@ export const EventDetailsTab: React.FC = () => {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Play size={18} className="text-white/40 flex-shrink-0" />
+              <Calendar size={18} className="text-white/40 flex-shrink-0" />
               {startDate && startTime && endDate && endTime ? (
                 <div>
                   <div className="text-white font-medium">
