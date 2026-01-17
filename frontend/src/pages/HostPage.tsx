@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, MapPin } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
@@ -9,10 +9,7 @@ import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
 import { GuestPreferencesList } from '../components/GuestPreferencesList';
 import { EventDetailsTab } from '../components/EventDetailsTab';
-import { PizzeriaSearch } from '../components/PizzeriaSearch';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
-import { Pizzeria } from '../types';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 
 type TabType = 'details' | 'pizza' | 'guests';
 
@@ -23,7 +20,6 @@ function HostPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('details');
-  const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -38,51 +34,6 @@ function HostPageContent() {
     }
     load();
   }, [inviteCode, loadParty, loadedCode]);
-
-  // Fetch nearby pizzerias for ranking display
-  useEffect(() => {
-    async function fetchPizzerias() {
-      if (!party?.address) return;
-      try {
-        const location = await geocodeAddress(party.address);
-        if (location) {
-          const results = await searchPizzerias(location.lat, location.lng);
-          setNearbyPizzerias(results); // Keep all for matching guest rankings
-        }
-      } catch (err) {
-        console.error('Failed to fetch pizzerias:', err);
-      }
-    }
-    fetchPizzerias();
-  }, [party?.address]);
-
-  // Compute pizzeria rankings from guest votes
-  const pizzeriaRankings = React.useMemo(() => {
-    const rankings: Record<string, { first: number; second: number; third: number }> = {};
-
-    guests.forEach(guest => {
-      if (guest.pizzeriaRankings && guest.pizzeriaRankings.length > 0) {
-        guest.pizzeriaRankings.forEach((pizzeriaId, index) => {
-          if (!rankings[pizzeriaId]) {
-            rankings[pizzeriaId] = { first: 0, second: 0, third: 0 };
-          }
-          if (index === 0) rankings[pizzeriaId].first++;
-          else if (index === 1) rankings[pizzeriaId].second++;
-          else if (index === 2) rankings[pizzeriaId].third++;
-        });
-      }
-    });
-
-    // Convert to array and sort by total votes (weighted: 1st=3, 2nd=2, 3rd=1)
-    return Object.entries(rankings)
-      .map(([id, votes]) => ({
-        id,
-        ...votes,
-        total: votes.first * 3 + votes.second * 2 + votes.third,
-        pizzeria: nearbyPizzerias.find(p => p.id === id),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [guests, nearbyPizzerias]);
 
   // Count guests with requests for slider marks
   const guestsWithRequests = useMemo(() => {
@@ -284,39 +235,7 @@ function HostPageContent() {
                 <PizzaOrderSummary />
 
                 <GuestPreferencesList />
-                <PizzaStyleAndToppings>
-                  {/* Pizzeria Search Section - inside Pizza Options */}
-                  <div className="border-t border-white/10 mt-6 pt-6">
-                    {party?.address ? (
-                      <PizzeriaSearch
-                        partyAddress={party.address}
-                        onSelectPizzeria={(pizzeria, option) => {
-                          // Open the ordering link
-                          if (option.deepLink) {
-                            window.open(option.deepLink, '_blank');
-                          }
-                        }}
-                        rankings={pizzeriaRankings}
-                        className=""
-                      />
-                    ) : (
-                      <div>
-                        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Top Pizzerias Nearby</h3>
-                        <div className="text-center py-8">
-                          <MapPin size={48} className="mx-auto mb-4 text-white/20" />
-                          <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
-                          <button
-                            onClick={() => setActiveTab('details')}
-                            className="btn-secondary inline-flex items-center gap-2"
-                          >
-                            <Settings size={16} />
-                            Go to Settings
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </PizzaStyleAndToppings>
+                <PizzaStyleAndToppings />
                 <BeverageSettings />
               </>
             )}
