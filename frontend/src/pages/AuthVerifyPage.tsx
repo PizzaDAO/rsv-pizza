@@ -11,6 +11,7 @@ export function AuthVerifyPage() {
   const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
@@ -20,6 +21,7 @@ export function AuthVerifyPage() {
 
   async function verifyCode(fullCode: string) {
     setStatus('verifying');
+    setLastSubmittedCode(fullCode);
     try {
       const response = await fetch(`${API_URL}/api/auth/verify-code`, {
         method: 'POST',
@@ -37,9 +39,6 @@ export function AuthVerifyPage() {
     } catch (err: any) {
       setStatus('error');
       setError(err.message || 'Failed to verify code');
-      // Reset code input on error
-      setCode(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
     }
   }
 
@@ -99,9 +98,23 @@ export function AuthVerifyPage() {
   }
 
   function handleRetry() {
+    if (lastSubmittedCode) {
+      // Resubmit the same code
+      verifyCode(lastSubmittedCode);
+    } else {
+      // Fallback: reset to idle state
+      setStatus('idle');
+      setError(null);
+      setCode(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
+  }
+
+  function handleEnterNewCode() {
     setStatus('idle');
     setError(null);
     setCode(['', '', '', '', '', '']);
+    setLastSubmittedCode(null);
     inputRefs.current[0]?.focus();
   }
 
@@ -168,18 +181,18 @@ export function AuthVerifyPage() {
             <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
             <p className="text-white/60 mb-6">{error}</p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col gap-3">
               <button
                 onClick={handleRetry}
-                className="btn-secondary"
+                className="btn-primary"
               >
                 Try Again
               </button>
               <button
-                onClick={() => navigate('/')}
-                className="btn-primary"
+                onClick={handleEnterNewCode}
+                className="btn-secondary"
               >
-                Go to Home
+                Enter New Code
               </button>
             </div>
           </>

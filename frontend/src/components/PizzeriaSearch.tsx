@@ -202,13 +202,14 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
         {/* Search by address */}
         <form onSubmit={handleAddressSearch} className="flex gap-2">
           <div className="flex-1 relative">
-            <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+            <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
             <input
               type="text"
               value={searchAddress}
               onChange={(e) => setSearchAddress(e.target.value)}
               placeholder="Enter delivery address..."
-              className="w-full !pl-14"
+              className="w-full"
+              style={{ paddingLeft: '3.5rem' }}
             />
           </div>
           <button
