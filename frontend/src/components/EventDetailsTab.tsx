@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar, Play } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, isUserGuestAtParty, supabase } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
