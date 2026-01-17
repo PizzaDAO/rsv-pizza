@@ -10,6 +10,7 @@ import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
 import { LoginPage } from './pages/LoginPage';
 import { NewEventPage } from './pages/NewEventPage';
+import { AccountPage } from './pages/AccountPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/new" element={<NewEventPage />} />
+            <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />

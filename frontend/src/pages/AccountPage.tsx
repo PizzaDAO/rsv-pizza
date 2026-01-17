@@ -1,0 +1,330 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Layout } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut } from 'lucide-react';
+
+export function AccountPage() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  // Form state
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [bio, setBio] = useState('');
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+
+  // Social links
+  const [instagram, setInstagram] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [youtube, setYoutube] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [website, setWebsite] = useState('');
+
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Load user data
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      // TODO: Load other profile data from database when available
+    }
+  }, [user]);
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setProfilePictureFile(file);
+    setProfilePicture(objectUrl);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+
+    // TODO: Save profile data to database
+    // For now, just simulate a save
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleLogout = () => {
+    signOut();
+    navigate('/');
+  };
+
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 size={32} className="animate-spin text-white/60" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <Layout>
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        <div className="card p-8">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-white mb-2">Your Profile</h1>
+            <p className="text-white/60">Choose how you are displayed as a host or guest.</p>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-6">
+            {/* Name and Profile Picture Row */}
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex-1 space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-2">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Username */}
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-2">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-medium">@</span>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      placeholder="username"
+                      className="w-full pl-8"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Picture */}
+              <div className="flex-shrink-0">
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Profile Picture
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="profilePicture"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="profilePicture"
+                    className="block w-24 h-24 rounded-full cursor-pointer overflow-hidden bg-[#ff393a]/20 border-2 border-white/10 hover:border-[#ff393a]/50 transition-colors"
+                  >
+                    {profilePicture ? (
+                      <img
+                        src={profilePicture}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-4xl">🍕</span>
+                      </div>
+                    )}
+                  </label>
+                  <label
+                    htmlFor="profilePicture"
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-[#1a1a2e] border-2 border-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors"
+                  >
+                    <Upload size={14} className="text-white/70" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Bio
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell us about yourself..."
+                className="w-full"
+                rows={3}
+              />
+            </div>
+
+            {/* Social Links */}
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-3">
+                Social Links
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Instagram */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <Instagram size={16} className="text-white/50" />
+                    <span className="text-white/50 text-sm">instagram.com/</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="username"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+
+                {/* X (Twitter) */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-white/50 fill-current">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                    <span className="text-white/50 text-sm">x.com/</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={twitter}
+                    onChange={(e) => setTwitter(e.target.value)}
+                    placeholder="username"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+
+                {/* YouTube */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <Youtube size={16} className="text-white/50" />
+                    <span className="text-white/50 text-sm">youtube.com/@</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={youtube}
+                    onChange={(e) => setYoutube(e.target.value)}
+                    placeholder="channel"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+
+                {/* TikTok */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-white/50 fill-current">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+                    </svg>
+                    <span className="text-white/50 text-sm">tiktok.com/@</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={tiktok}
+                    onChange={(e) => setTiktok(e.target.value)}
+                    placeholder="username"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+
+                {/* LinkedIn */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <Linkedin size={16} className="text-white/50" />
+                    <span className="text-white/50 text-sm">linkedin.com</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    placeholder="/in/handle"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+
+                {/* Website */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
+                    <Globe size={16} className="text-white/50" />
+                  </div>
+                  <input
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yourwebsite.com"
+                    className="flex-1 min-w-0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex items-center gap-4">
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-primary flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : saved ? (
+                  'Saved!'
+                ) : (
+                  <>
+                    <Upload size={18} />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Logout Section */}
+          <div className="mt-12 pt-6 border-t border-white/10">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+            >
+              <LogOut size={18} />
+              Log Out
+            </button>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}

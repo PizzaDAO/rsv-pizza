@@ -36,7 +36,7 @@ const TOPPINGS = [
   { id: 'jalapenos', name: 'Jalapeños', category: 'vegetable' },
   { id: 'tomatoes', name: 'Tomatoes', category: 'vegetable' },
   { id: 'extra-cheese', name: 'Extra Cheese', category: 'cheese' },
-  { id: 'feta', name: 'Feta Cheese', category: 'cheese' },
+  { id: 'anchovies', name: 'Anchovies', category: 'meat' },
   { id: 'pineapple', name: 'Pineapple', category: 'fruit' },
 ];
 
@@ -86,6 +86,7 @@ export function RSVPPage() {
   const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [availableBeverages, setAvailableBeverages] = useState<string[]>([]);
+  const [availableToppings, setAvailableToppings] = useState<string[]>([]);
   const [saveToProfile, setSaveToProfile] = useState(false);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export function RSVPPage() {
         if (foundParty) {
           setParty(foundParty);
           setAvailableBeverages(foundParty.available_beverages || []);
+          setAvailableToppings(foundParty.available_toppings || []);
 
           // Check if party has password protection
           if (foundParty.password) {
@@ -448,7 +450,7 @@ export function RSVPPage() {
           {/* Dietary Restrictions */}
           <div>
             <label className="block text-sm font-medium text-white/80 mb-3">
-              Dietary Restrictions (Optional)
+              Dietary Restrictions
             </label>
             <div className="flex flex-wrap gap-2">
               {DIETARY_OPTIONS.map((option) => (
@@ -474,7 +476,7 @@ export function RSVPPage() {
               Topping Preferences
             </label>
             <div className="flex flex-wrap gap-2">
-              {TOPPINGS.map((topping) => {
+              {TOPPINGS.filter(t => availableToppings.length === 0 || availableToppings.includes(t.id)).map((topping) => {
                 const isLiked = likedToppings.includes(topping.id);
                 const isDisliked = dislikedToppings.includes(topping.id);
 
@@ -524,7 +526,7 @@ export function RSVPPage() {
           {availableBeverages.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-white/80 mb-3">
-                Beverage Preferences
+                Drink Preferences
               </label>
               <div className="flex flex-wrap gap-2">
                 {BEVERAGES.filter(b => availableBeverages.includes(b.id)).map((beverage) => {

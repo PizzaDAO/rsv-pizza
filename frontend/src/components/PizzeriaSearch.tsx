@@ -175,7 +175,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
   return (
     <div className={className}>
-      <h2 className="text-xl font-bold text-white mb-4">Find a Pizzeria</h2>
+      <h2 className="text-xl font-bold text-white mb-4">Top Pizzerias Nearby</h2>
 
       {/* Search options */}
       <div className="space-y-3 mb-6">

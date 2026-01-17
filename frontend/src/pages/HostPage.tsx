@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Loader2, AlertCircle, Settings, Pizza, Users, MapPin } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
-import { PizzaSettings } from '../components/PizzaSettings';
 import { BeverageSettings } from '../components/BeverageSettings';
-import { ToppingsSettings } from '../components/ToppingsSettings';
 import { GuestPreferencesList } from '../components/GuestPreferencesList';
 import { EventDetailsTab } from '../components/EventDetailsTab';
+import { PizzeriaSearch } from '../components/PizzeriaSearch';
+import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 
 type TabType = 'details' | 'pizza' | 'guests';
 
@@ -127,9 +127,40 @@ function HostPageContent() {
                   </div>
                 </div>
                 <GuestPreferencesList />
-                <PizzaSettings />
-                <ToppingsSettings />
+                <PizzaStyleAndToppings />
                 <BeverageSettings />
+
+                {/* Pizzeria Search Section */}
+                {party?.address ? (
+                  <PizzeriaSearch
+                    partyAddress={party.address}
+                    onSelectPizzeria={(pizzeria, option) => {
+                      // Open the ordering link
+                      if (option.deepLink) {
+                        window.open(option.deepLink, '_blank');
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="card p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <MapPin size={24} className="text-[#ff393a]" />
+                      <h2 className="text-xl font-bold text-white">Top Pizzerias Nearby</h2>
+                    </div>
+                    <div className="text-center py-8">
+                      <MapPin size={48} className="mx-auto mb-4 text-white/20" />
+                      <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
+                      <button
+                        onClick={() => setActiveTab('details')}
+                        className="btn-secondary inline-flex items-center gap-2"
+                      >
+                        <Settings size={16} />
+                        Go to Settings
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={generateRecommendations}
                   disabled={guests.length === 0}
