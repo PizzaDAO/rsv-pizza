@@ -1,13 +1,13 @@
 export interface Topping {
   id: string;
   name: string;
-  category: 'meat' | 'vegetable' | 'cheese' | 'fruit';
+  type: 'meat' | 'vegetable' | 'cheese' | 'fruit';
 }
 
 export interface Beverage {
   id: string;
   name: string;
-  category: 'soda' | 'juice' | 'water' | 'other';
+  type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
 export interface Guest {

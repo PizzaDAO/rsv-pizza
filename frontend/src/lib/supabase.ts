@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://znpiwdvvsqaxuskpfleo.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env.local file.');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -520,4 +524,83 @@ export async function getUpcomingUserParties(userEmail: string): Promise<UserPar
     if (!party.date) return true; // Include parties without a date
     return new Date(party.date) >= now;
   });
+}
+
+// User preferences types and functions
+export interface UserPreferences {
+  dietary_restrictions: string[];
+  liked_toppings: string[];
+  disliked_toppings: string[];
+  liked_beverages: string[];
+  disliked_beverages: string[];
+}
+
+export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('default_dietary_restrictions, default_liked_toppings, default_disliked_toppings, default_liked_beverages, default_disliked_beverages')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    dietary_restrictions: data.default_dietary_restrictions || [],
+    liked_toppings: data.default_liked_toppings || [],
+    disliked_toppings: data.default_disliked_toppings || [],
+    liked_beverages: data.default_liked_beverages || [],
+    disliked_beverages: data.default_disliked_beverages || [],
+  };
+}
+
+export async function saveUserPreferences(
+  email: string,
+  preferences: UserPreferences
+): Promise<boolean> {
+  // Try to update first, if no rows affected then insert
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existingUser) {
+    // Update existing user
+    const { error } = await supabase
+      .from('users')
+      .update({
+        default_dietary_restrictions: preferences.dietary_restrictions,
+        default_liked_toppings: preferences.liked_toppings,
+        default_disliked_toppings: preferences.disliked_toppings,
+        default_liked_beverages: preferences.liked_beverages,
+        default_disliked_beverages: preferences.disliked_beverages,
+      })
+      .eq('email', email);
+
+    if (error) {
+      console.error('Error updating user preferences:', error);
+      return false;
+    }
+  } else {
+    // Insert new user with preferences
+    const { error } = await supabase
+      .from('users')
+      .insert({
+        email,
+        default_dietary_restrictions: preferences.dietary_restrictions,
+        default_liked_toppings: preferences.liked_toppings,
+        default_disliked_toppings: preferences.disliked_toppings,
+        default_liked_beverages: preferences.liked_beverages,
+        default_disliked_beverages: preferences.disliked_beverages,
+      });
+
+    if (error) {
+      console.error('Error creating user with preferences:', error);
+      return false;
+    }
+  }
+
+  return true;
 }

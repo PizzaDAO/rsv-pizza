@@ -3,6 +3,7 @@ import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettin
 import { generatePizzaRecommendations } from '../utils/pizzaAlgorithm';
 import { generateBeverageRecommendations } from '../utils/beverageAlgorithm';
 import { generateWaveRecommendations } from '../utils/waveAlgorithm';
+import { TOPPINGS, DRINK_CATEGORIES, DIETARY_OPTIONS, PIZZA_STYLES, PIZZA_SIZES } from '../constants/options';
 import * as db from '../lib/supabase';
 
 interface PizzaContextType {
@@ -39,56 +40,12 @@ interface PizzaContextType {
 
 const PizzaContext = createContext<PizzaContextType | undefined>(undefined);
 
-export const availableToppings: Topping[] = [
-  { id: 'pepperoni', name: 'Pepperoni', category: 'meat' },
-  { id: 'sausage', name: 'Sausage', category: 'meat' },
-  { id: 'bacon', name: 'Bacon', category: 'meat' },
-  { id: 'ham', name: 'Ham', category: 'meat' },
-  { id: 'chicken', name: 'Chicken', category: 'meat' },
-  { id: 'mushrooms', name: 'Mushrooms', category: 'vegetable' },
-  { id: 'onions', name: 'Onions', category: 'vegetable' },
-  { id: 'bell-peppers', name: 'Bell Peppers', category: 'vegetable' },
-  { id: 'olives', name: 'Olives', category: 'vegetable' },
-  { id: 'spinach', name: 'Spinach', category: 'vegetable' },
-  { id: 'pineapple', name: 'Pineapple', category: 'fruit' },
-  { id: 'extra-cheese', name: 'Extra Cheese', category: 'cheese' },
-  { id: 'anchovies', name: 'Anchovies', category: 'meat' },
-  { id: 'jalapenos', name: 'Jalapeños', category: 'vegetable' },
-  { id: 'tomatoes', name: 'Tomatoes', category: 'vegetable' },
-];
-
-export const availableBeverages: Beverage[] = [
-  { id: 'water', name: 'Water', category: 'water' },
-  { id: 'beer', name: 'Beer', category: 'alcohol' },
-  { id: 'soda', name: 'Soda', category: 'soda' },
-  { id: 'wine', name: 'Wine', category: 'alcohol' },
-  { id: 'cocktail', name: 'Cocktail', category: 'alcohol' },
-];
-
-export const dietaryOptions: string[] = [
-  'Vegetarian',
-  'Vegan',
-  'Gluten-Free',
-  'Dairy-Free',
-  'None',
-];
-
-export const pizzaStyles: PizzaStyle[] = [
-  { id: 'neapolitan', name: 'Neapolitan', description: 'Thin crust, wood-fired, authentic Italian style' },
-  { id: 'new-york', name: 'New York', description: 'Large, thin crust, foldable slices' },
-  { id: 'detroit', name: 'Detroit', description: 'Square, thick crust, crispy edges' }
-];
-
-// Servings based on surface area: 18" feeds 4 people (2 slices each, 1/4 surface area per person)
-// Formula: (diameter/2)² * π / (9² * π / 4) = (diameter/18)² * 4
-export const pizzaSizes: PizzaSize[] = [
-  { diameter: 10, name: 'Personal', servings: 1.2 },  // (10/18)² * 4 = 1.23
-  { diameter: 12, name: 'Small', servings: 1.8 },     // (12/18)² * 4 = 1.78
-  { diameter: 14, name: 'Medium', servings: 2.4 },    // (14/18)² * 4 = 2.42
-  { diameter: 16, name: 'Large', servings: 3.2 },     // (16/18)² * 4 = 3.16
-  { diameter: 18, name: 'Extra Large', servings: 4 }, // baseline
-  { diameter: 20, name: 'Family', servings: 4.9 }     // (20/18)² * 4 = 4.94
-];
+// Re-export from constants for backward compatibility
+export const availableToppings = TOPPINGS;
+export const availableBeverages = DRINK_CATEGORIES;
+export const dietaryOptions = [...DIETARY_OPTIONS, 'None'];
+export const pizzaStyles = PIZZA_STYLES;
+export const pizzaSizes = PIZZA_SIZES;
 
 // Convert database guest to app guest
 function dbGuestToGuest(dbGuest: db.DbGuest): Guest {

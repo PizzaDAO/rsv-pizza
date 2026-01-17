@@ -10,8 +10,8 @@ interface PizzaCardProps {
 }
 
 export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = false }) => {
-  // Colors for different topping categories
-  const categoryColors: Record<string, string> = {
+  // Colors for different topping types
+  const typeColors: Record<string, string> = {
     meat: 'bg-red-500/20 text-red-300',
     vegetable: 'bg-green-500/20 text-green-300',
     cheese: 'bg-yellow-500/20 text-yellow-300',
@@ -137,7 +137,7 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
                 {pizza.leftHalf.toppings.map(topping => (
                   <span
                     key={topping.id}
-                    className={`px-1 py-0.5 rounded text-[9px] font-medium ${categoryColors[topping.category] || 'bg-white/10 text-white/70'}`}
+                    className={`px-1 py-0.5 rounded text-[9px] font-medium ${typeColors[topping.type] || 'bg-white/10 text-white/70'}`}
                   >
                     {getToppingEmoji(topping.name)} {topping.name}
                   </span>
@@ -164,7 +164,7 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
                 {pizza.rightHalf.toppings.map(topping => (
                   <span
                     key={topping.id}
-                    className={`px-1 py-0.5 rounded text-[9px] font-medium ${categoryColors[topping.category] || 'bg-white/10 text-white/70'}`}
+                    className={`px-1 py-0.5 rounded text-[9px] font-medium ${typeColors[topping.type] || 'bg-white/10 text-white/70'}`}
                   >
                     {getToppingEmoji(topping.name)} {topping.name}
                   </span>
@@ -222,7 +222,7 @@ export const PizzaCard: React.FC<PizzaCardProps> = ({ pizza, index, compact = fa
           {pizza.toppings.map(topping => (
             <span
               key={topping.id}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[topping.category] || 'bg-white/10 text-white/70'}`}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColors[topping.type] || 'bg-white/10 text-white/70'}`}
             >
               {getToppingEmoji(topping.name)} {topping.name}
             </span>

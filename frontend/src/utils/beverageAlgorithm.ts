@@ -62,7 +62,7 @@ export function generateBeverageRecommendations(
     // - Water exception: Always provide minimum based on total guests
     let quantity = 0;
 
-    if (beverage.category === 'water') {
+    if (beverage.type === 'water') {
       // Water: 1 per 2 people minimum, plus extra if people like it
       quantity = Math.ceil(totalGuestCount / 2) + (stats.likes * BEVERAGES_PER_PERSON);
     } else if (stats.likes > 0) {
@@ -129,7 +129,7 @@ function generateDefaultBeverages(
     const beverage = allBeverages.find(b => b.id === bevId);
     if (!beverage) return;
 
-    const weight = beverage.category === 'water' ? 1.5 : 1.0;
+    const weight = beverage.type === 'water' ? 1.5 : 1.0;
     beverageWeights[bevId] = weight;
     totalWeight += weight;
   });

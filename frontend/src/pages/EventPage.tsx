@@ -3,8 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Calendar, Clock, MapPin, Users, User, Pizza, Loader2, Lock, AlertCircle, Settings, Globe, Instagram } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, DbParty } from '../lib/supabase';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
+import { getPartyByInviteCodeOrCustomUrl, getGuestsByPartyId, DbParty } from '../lib/supabase';
+import { HostsList, HostsAvatars } from '../components/HostsList';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -13,6 +14,7 @@ export function EventPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [party, setParty] = useState<DbParty | null>(null);
+  const [guestCount, setGuestCount] = useState(0);
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -28,6 +30,10 @@ export function EventPage() {
         const foundParty = await getPartyByInviteCodeOrCustomUrl(slug);
         if (foundParty) {
           setParty(foundParty);
+
+          // Fetch guest count
+          const guests = await getGuestsByPartyId(foundParty.id);
+          setGuestCount(guests.length);
 
           // Check if party has password protection
           if (foundParty.password) {
@@ -121,9 +127,9 @@ export function EventPage() {
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Event Not Found</h1>
           <p className="text-white/60 mb-6">{error}</p>
-          <a href="/rsv-pizza/" className="btn-primary inline-block">
+          <Link to="/" className="btn-primary inline-block">
             Go to Home
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -373,87 +379,18 @@ export function EventPage() {
 
               {/* Host and Guest Info */}
               <div className="p-6 border-t border-white/10">
-                <h3 className="text-sm font-semibold text-white/60 mb-3">Hosted By</h3>
-
-                {/* All Hosts - Primary Host + Co-Hosts in one list */}
-                <div className="space-y-3">
-                  {/* Primary Host */}
-                  {party.host_name && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                        <User className="w-5 h-5 text-[#ff393a]" />
-                      </div>
-                      <span className="text-white font-medium">{party.host_name}</span>
-                    </div>
-                  )}
-
-                  {/* Co-Hosts */}
-                  {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
-                    <>
-                      {party.co_hosts.filter(h => h.showOnEvent !== false).map((coHost) => (
-                        <div key={coHost.id} className="flex items-center gap-3">
-                          {coHost.avatar_url ? (
-                            <img
-                              src={coHost.avatar_url}
-                              alt={coHost.name}
-                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                              <User className="w-5 h-5 text-[#ff393a]" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium">{coHost.name}</p>
-                            {(coHost.website || coHost.twitter || coHost.instagram) && (
-                              <div className="flex items-center gap-2 mt-0.5">
-                                {coHost.website && (
-                                  <a
-                                    href={coHost.website}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white/50 hover:text-white transition-colors"
-                                  >
-                                    <Globe size={14} />
-                                  </a>
-                                )}
-                                {coHost.twitter && (
-                                  <a
-                                    href={`https://twitter.com/${coHost.twitter}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white/50 hover:text-white transition-colors"
-                                  >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                    </svg>
-                                  </a>
-                                )}
-                                {coHost.instagram && (
-                                  <a
-                                    href={`https://instagram.com/${coHost.instagram}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white/50 hover:text-white transition-colors"
-                                  >
-                                    <Instagram size={14} />
-                                  </a>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
+                <HostsList
+                  hostName={party.host_name}
+                  coHosts={party.co_hosts}
+                  size="md"
+                />
 
                 {/* Guest Count */}
                 <div className="pt-4 border-t border-white/10 mt-4">
                   <div className="flex items-center gap-2 text-white/60 text-sm">
                     <Users className="w-4 h-4" />
                     <span>
-                      {party.guests?.length || 0} {party.guests?.length === 1 ? 'guest' : 'guests'}
+                      {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
                       {party.max_guests && ` • ${party.max_guests} expected`}
                     </span>
                   </div>
@@ -500,43 +437,10 @@ export function EventPage() {
 
               {/* Mobile: Host Info */}
               <div className="md:hidden px-6 pt-3 pb-2">
-                <div className="flex items-center gap-3">
-                  {/* Overlapping avatars */}
-                  <div className="flex items-center" style={{ marginLeft: '8px' }}>
-                    {/* Primary host avatar */}
-                    {party.host_name && (
-                      <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative" style={{ zIndex: 10, marginLeft: '-8px' }}>
-                        <User className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    {/* Co-host avatars (first 6) */}
-                    {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).slice(0, 6).map((coHost, index) => (
-                      <div key={coHost.id} style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
-                        {coHost.avatar_url ? (
-                          <img
-                            src={coHost.avatar_url}
-                            alt={coHost.name}
-                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black">
-                            <User className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Host text */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white">
-                      Hosted by <span className="font-medium">{party.host_name}</span>
-                      {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
-                        <> & {party.co_hosts.filter(h => h.showOnEvent !== false).length} other{party.co_hosts.filter(h => h.showOnEvent !== false).length > 1 ? 's' : ''}</>
-                      )}
-                    </p>
-                  </div>
-                </div>
+                <HostsAvatars
+                  hostName={party.host_name}
+                  coHosts={party.co_hosts}
+                />
               </div>
 
               {/* Event Details */}
@@ -589,7 +493,7 @@ export function EventPage() {
                   <div className="flex items-center gap-2 text-white/60 text-sm">
                     <Users className="w-4 h-4" />
                     <span>
-                      {party.guests?.length || 0} {party.guests?.length === 1 ? 'guest' : 'guests'}
+                      {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
                       {party.max_guests && ` • ${party.max_guests} expected`}
                     </span>
                   </div>
@@ -671,80 +575,12 @@ export function EventPage() {
 
                 {/* Mobile: Full Host Section */}
                 <div className="md:hidden border-t border-white/10 pt-6 mt-6">
-                  <h3 className="font-semibold text-white mb-4">Hosted By</h3>
-                  <div className="space-y-3">
-                    {/* Primary Host */}
-                    {party.host_name && (
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0">
-                          <User className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold text-lg">{party.host_name}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Co-Hosts */}
-                    {party.co_hosts && party.co_hosts.filter(h => h.showOnEvent !== false).length > 0 && (
-                      <>
-                        {party.co_hosts.filter(h => h.showOnEvent !== false).map((coHost) => (
-                          <div key={coHost.id} className="flex items-start gap-3">
-                            {coHost.avatar_url ? (
-                              <img
-                                src={coHost.avatar_url}
-                                alt={coHost.name}
-                                className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0">
-                                <User className="w-6 h-6 text-white" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-semibold text-lg">{coHost.name}</p>
-                              {(coHost.website || coHost.twitter || coHost.instagram) && (
-                                <div className="flex items-center gap-3 mt-2">
-                                  {coHost.website && (
-                                    <a
-                                      href={coHost.website}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-white/50 hover:text-white transition-colors"
-                                    >
-                                      <Globe size={18} />
-                                    </a>
-                                  )}
-                                  {coHost.twitter && (
-                                    <a
-                                      href={`https://twitter.com/${coHost.twitter}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-white/50 hover:text-white transition-colors"
-                                    >
-                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                      </svg>
-                                    </a>
-                                  )}
-                                  {coHost.instagram && (
-                                    <a
-                                      href={`https://instagram.com/${coHost.instagram}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-white/50 hover:text-white transition-colors"
-                                    >
-                                      <Instagram size={18} />
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
+                  <HostsList
+                    hostName={party.host_name}
+                    coHosts={party.co_hosts}
+                    size="lg"
+                    showTitle={true}
+                  />
                 </div>
               </div>
             </div>

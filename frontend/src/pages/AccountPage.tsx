@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle } from 'lucide-react';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -25,6 +25,8 @@ export function AccountPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -72,6 +74,14 @@ export function AccountPage() {
   };
 
   const handleLogout = () => {
+    signOut();
+    navigate('/');
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    // TODO: Call API to delete user account and all associated data
+    await new Promise(resolve => setTimeout(resolve, 500));
     signOut();
     navigate('/');
   };
@@ -314,7 +324,7 @@ export function AccountPage() {
           </form>
 
           {/* Logout Section */}
-          <div className="mt-12 pt-6 border-t border-white/10">
+          <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between">
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
@@ -322,8 +332,64 @@ export function AccountPage() {
               <LogOut size={18} />
               Log Out
             </button>
+
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 text-[#ff393a]/60 hover:text-[#ff393a] transition-colors"
+            >
+              <Trash2 size={18} />
+              Delete Account
+            </button>
           </div>
         </div>
+
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+            <div className="card p-6 max-w-md w-full">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-[#ff393a]/20 rounded-full flex items-center justify-center">
+                  <AlertTriangle size={24} className="text-[#ff393a]" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Delete Account</h2>
+                  <p className="text-white/60 text-sm">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <p className="text-white/70 mb-6">
+                Are you sure you want to delete your account? All your data, including hosted parties and RSVP history, will be permanently removed.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 btn-secondary"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="flex-1 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Delete Account
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

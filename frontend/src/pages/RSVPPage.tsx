@@ -1,64 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, DbParty } from '../lib/supabase';
-
-const DIETARY_OPTIONS = [
-  'Vegetarian',
-  'Vegan',
-  'Gluten-Free',
-  'Dairy-Free',
-];
-
-const ROLE_OPTIONS = [
-  'Biz Dev',
-  'Dev',
-  'Artist',
-  'Marketing',
-  'Founder',
-  'Student',
-  'Investor',
-  'Ops',
-  'Designer',
-];
-
-const TOPPINGS = [
-  { id: 'pepperoni', name: 'Pepperoni', category: 'meat' },
-  { id: 'sausage', name: 'Sausage', category: 'meat' },
-  { id: 'bacon', name: 'Bacon', category: 'meat' },
-  { id: 'ham', name: 'Ham', category: 'meat' },
-  { id: 'chicken', name: 'Chicken', category: 'meat' },
-  { id: 'mushrooms', name: 'Mushrooms', category: 'vegetable' },
-  { id: 'onions', name: 'Onions', category: 'vegetable' },
-  { id: 'bell-peppers', name: 'Bell Peppers', category: 'vegetable' },
-  { id: 'olives', name: 'Olives', category: 'vegetable' },
-  { id: 'spinach', name: 'Spinach', category: 'vegetable' },
-  { id: 'jalapenos', name: 'Jalapeños', category: 'vegetable' },
-  { id: 'tomatoes', name: 'Tomatoes', category: 'vegetable' },
-  { id: 'extra-cheese', name: 'Extra Cheese', category: 'cheese' },
-  { id: 'anchovies', name: 'Anchovies', category: 'meat' },
-  { id: 'pineapple', name: 'Pineapple', category: 'fruit' },
-];
-
-const BEVERAGES = [
-  { id: 'coke', name: 'Coca-Cola', category: 'soda' },
-  { id: 'diet-coke', name: 'Diet Coke', category: 'soda' },
-  { id: 'sprite', name: 'Sprite', category: 'soda' },
-  { id: 'fanta', name: 'Fanta', category: 'soda' },
-  { id: 'pepsi', name: 'Pepsi', category: 'soda' },
-  { id: 'mountain-dew', name: 'Mountain Dew', category: 'soda' },
-  { id: 'dr-pepper', name: 'Dr Pepper', category: 'soda' },
-  { id: 'orange-juice', name: 'Orange Juice', category: 'juice' },
-  { id: 'apple-juice', name: 'Apple Juice', category: 'juice' },
-  { id: 'lemonade', name: 'Lemonade', category: 'juice' },
-  { id: 'iced-tea', name: 'Iced Tea', category: 'other' },
-  { id: 'water', name: 'Water', category: 'water' },
-  { id: 'sparkling-water', name: 'Sparkling Water', category: 'water' },
-];
+import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, DbParty } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -88,6 +38,50 @@ export function RSVPPage() {
   const [availableBeverages, setAvailableBeverages] = useState<string[]>([]);
   const [availableToppings, setAvailableToppings] = useState<string[]>([]);
   const [saveToProfile, setSaveToProfile] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
+  // Load saved preferences when user is logged in or when email matches a saved profile
+  useEffect(() => {
+    async function loadSavedPreferences() {
+      const emailToCheck = user?.email || email;
+      if (!emailToCheck || preferencesLoaded) return;
+
+      const prefs = await getUserPreferences(emailToCheck);
+      if (prefs) {
+        if (prefs.dietary_restrictions.length > 0) {
+          setDietaryRestrictions(prefs.dietary_restrictions);
+        }
+        if (prefs.liked_toppings.length > 0) {
+          setLikedToppings(prefs.liked_toppings);
+        }
+        if (prefs.disliked_toppings.length > 0) {
+          setDislikedToppings(prefs.disliked_toppings);
+        }
+        if (prefs.liked_beverages.length > 0) {
+          setLikedBeverages(prefs.liked_beverages);
+        }
+        if (prefs.disliked_beverages.length > 0) {
+          setDislikedBeverages(prefs.disliked_beverages);
+        }
+        setPreferencesLoaded(true);
+        // Auto-check save to profile if user is logged in
+        if (user?.email) {
+          setSaveToProfile(true);
+        }
+      }
+    }
+    loadSavedPreferences();
+  }, [user?.email, email, preferencesLoaded]);
+
+  // Pre-fill email if user is logged in
+  useEffect(() => {
+    if (user?.email && !email) {
+      setEmail(user.email);
+    }
+    if (user?.name && !name) {
+      setName(user.name);
+    }
+  }, [user]);
 
   useEffect(() => {
     async function loadParty() {
@@ -172,6 +166,16 @@ export function RSVPPage() {
       );
 
       if (guest) {
+        // Save preferences to profile if checkbox is checked and email is provided
+        if (saveToProfile && email.trim()) {
+          await saveUserPreferences(email.trim(), {
+            dietary_restrictions: dietaryRestrictions,
+            liked_toppings: likedToppings,
+            disliked_toppings: dislikedToppings,
+            liked_beverages: likedBeverages,
+            disliked_beverages: dislikedBeverages,
+          });
+        }
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -209,12 +213,12 @@ export function RSVPPage() {
     setDislikedToppings(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
 
-  const handleBeverageLike = (id: string) => {
+  const handleDrinkLike = (id: string) => {
     setDislikedBeverages(prev => prev.filter(b => b !== id));
     setLikedBeverages(prev => prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]);
   };
 
-  const handleBeverageDislike = (id: string) => {
+  const handleDrinkDislike = (id: string) => {
     setLikedBeverages(prev => prev.filter(b => b !== id));
     setDislikedBeverages(prev => prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]);
   };
@@ -522,20 +526,20 @@ export function RSVPPage() {
             </div>
           </div>
 
-          {/* Beverages */}
+          {/* Drinks */}
           {availableBeverages.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-white/80 mb-3">
                 Drink Preferences
               </label>
               <div className="flex flex-wrap gap-2">
-                {BEVERAGES.filter(b => availableBeverages.includes(b.id)).map((beverage) => {
-                  const isLiked = likedBeverages.includes(beverage.id);
-                  const isDisliked = dislikedBeverages.includes(beverage.id);
+                {DRINKS.filter(d => availableBeverages.includes(d.id)).map((drink) => {
+                  const isLiked = likedBeverages.includes(drink.id);
+                  const isDisliked = dislikedBeverages.includes(drink.id);
 
                   return (
                     <div
-                      key={beverage.id}
+                      key={drink.id}
                       className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
                         isLiked
                           ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
@@ -546,7 +550,7 @@ export function RSVPPage() {
                     >
                       <button
                         type="button"
-                        onClick={() => handleBeverageLike(beverage.id)}
+                        onClick={() => handleDrinkLike(drink.id)}
                         className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
                       >
                         <ThumbsUp
@@ -555,11 +559,11 @@ export function RSVPPage() {
                             isLiked ? 'text-[#39d98a]' : 'text-white/20'
                           }`}
                         />
-                        <span className="text-white text-xs">{beverage.name}</span>
+                        <span className="text-white text-xs">{drink.name}</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleBeverageDislike(beverage.id)}
+                        onClick={() => handleDrinkDislike(drink.id)}
                         className="p-0.5 hover:opacity-70 transition-opacity"
                       >
                         <ThumbsDown
@@ -582,22 +586,24 @@ export function RSVPPage() {
             </div>
           )}
 
-          {/* Save to Profile Checkbox */}
-          <button
-            type="button"
-            onClick={() => setSaveToProfile(!saveToProfile)}
-            className="flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
-          >
-            {saveToProfile ? (
-              <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-white/40 flex-shrink-0" />
-            )}
-            <div className="text-left">
-              <span className="text-sm font-medium text-white">Save to profile</span>
-              <p className="text-xs text-white/50">Remember my preferences for future events</p>
-            </div>
-          </button>
+          {/* Save to Profile Checkbox - only show if email is provided */}
+          {email.trim() && (
+            <button
+              type="button"
+              onClick={() => setSaveToProfile(!saveToProfile)}
+              className="flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+            >
+              {saveToProfile ? (
+                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-white/40 flex-shrink-0" />
+              )}
+              <div className="text-left">
+                <span className="text-sm font-medium text-white">Save to profile</span>
+                <p className="text-xs text-white/50">Remember my preferences for future events</p>
+              </div>
+            </button>
+          )}
 
           <div className="flex gap-3">
             <button
