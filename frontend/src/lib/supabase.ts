@@ -61,6 +61,7 @@ export interface DbParty {
   available_beverages: string[];
   available_toppings: string[];
   max_guests: number | null;
+  hide_guests: boolean;
   password: string | null;
   event_image_url: string | null;
   description: string | null;

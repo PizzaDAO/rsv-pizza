@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X } from 'lucide-react';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -145,7 +145,16 @@ export function AccountPage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <div className="card p-8">
+        <div className="card p-8 relative">
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white mb-2">Your Profile</h1>
             <p className="text-white/60">Choose how you are displayed as a host or guest.</p>

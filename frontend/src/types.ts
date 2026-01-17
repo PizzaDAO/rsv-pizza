@@ -113,6 +113,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   maxGuests: number | null;
+  hideGuests: boolean;
   password: string | null;
   eventImageUrl: string | null;
   description: string | null;

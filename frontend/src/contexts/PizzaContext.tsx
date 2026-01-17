@@ -79,6 +79,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
     maxGuests: dbParty.max_guests,
+    hideGuests: dbParty.hide_guests || false,
     password: dbParty.password,
     eventImageUrl: dbParty.event_image_url,
     description: dbParty.description,

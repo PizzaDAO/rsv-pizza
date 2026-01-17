@@ -27,6 +27,7 @@ export const EventDetailsTab: React.FC = () => {
   const [maxGuests, setMaxGuests] = useState('');
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
+  const [hideGuests, setHideGuests] = useState(false);
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
@@ -111,6 +112,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyEventImageUrl = party.eventImageUrl || '';
       const partyMaxGuests = party.maxGuests?.toString() || '';
       const partyLimitGuests = !!party.maxGuests;
+      const partyHideGuests = party.hideGuests || false;
       const partyCoHosts = party.coHosts || [];
 
       // Set form values
@@ -129,6 +131,7 @@ export const EventDetailsTab: React.FC = () => {
       setImagePreview(partyEventImageUrl || null);
       setMaxGuests(partyMaxGuests);
       setLimitGuests(partyLimitGuests);
+      setHideGuests(partyHideGuests);
       setCoHosts(partyCoHosts);
 
       // Store original values
@@ -147,6 +150,7 @@ export const EventDetailsTab: React.FC = () => {
         eventImageUrl: partyEventImageUrl,
         maxGuests: partyMaxGuests,
         limitGuests: partyLimitGuests,
+        hideGuests: partyHideGuests,
         coHosts: JSON.stringify(partyCoHosts),
       });
     }
@@ -335,6 +339,7 @@ export const EventDetailsTab: React.FC = () => {
       eventImageUrl !== originalValues.eventImageUrl ||
       maxGuests !== originalValues.maxGuests ||
       limitGuests !== originalValues.limitGuests ||
+      hideGuests !== originalValues.hideGuests ||
       JSON.stringify(coHosts) !== originalValues.coHosts ||
       eventImageFile !== null
     );
@@ -359,6 +364,7 @@ export const EventDetailsTab: React.FC = () => {
     setImagePreview(originalValues.eventImageUrl || null);
     setMaxGuests(originalValues.maxGuests);
     setLimitGuests(originalValues.limitGuests);
+    setHideGuests(originalValues.hideGuests);
     setCoHosts(JSON.parse(originalValues.coHosts));
     setEventImageFile(null);
     setImageError(null);
@@ -409,6 +415,7 @@ export const EventDetailsTab: React.FC = () => {
         custom_url: customUrl.trim() || null,
         event_image_url: imageUrl || null,
         max_guests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
+        hide_guests: hideGuests,
         co_hosts: coHosts,
       });
 
@@ -639,6 +646,21 @@ export const EventDetailsTab: React.FC = () => {
                     <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                   )}
                   <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                </button>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setHideGuests(!hideGuests)}
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {hideGuests ? (
+                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                  ) : (
+                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                  )}
+                  <span className="text-sm font-medium text-white/80">Hide Guests</span>
                 </button>
               </div>
 
