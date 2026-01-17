@@ -47,7 +47,7 @@ function HostPageContent() {
         const location = await geocodeAddress(party.address);
         if (location) {
           const results = await searchPizzerias(location.lat, location.lng);
-          setNearbyPizzerias(results.slice(0, 3)); // Same as RSVP page shows
+          setNearbyPizzerias(results); // Keep all for matching guest rankings
         }
       } catch (err) {
         console.error('Failed to fetch pizzerias:', err);

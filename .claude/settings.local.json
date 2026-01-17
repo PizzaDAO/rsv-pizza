@@ -83,7 +83,10 @@
       "mcp__puppeteer__puppeteer_screenshot",
       "mcp__puppeteer__puppeteer_evaluate",
       "Bash(git restore:*)",
-      "mcp__supabase__list_projects"
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__get_edge_function",
+      "mcp__puppeteer__puppeteer_click"
     ]
   }
 }
