@@ -500,7 +500,7 @@ export async function addGuestToParty(
   mailingListOptIn?: boolean,
   inviteCode?: string,
   pizzeriaRankings?: string[]
-): Promise<DbGuest | null> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     return null;
@@ -534,7 +534,7 @@ export async function addGuestToParty(
     const data = await response.json();
 
     // Return a minimal DbGuest object (backend only returns id and name)
-    return {
+    const guest = {
       id: data.guest.id,
       party_id: partyId,
       name: data.guest.name,
@@ -551,6 +551,8 @@ export async function addGuestToParty(
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
     } as DbGuest;
+
+    return { guest, alreadyRegistered: data.alreadyRegistered || false };
   } catch (error) {
     console.error('Error adding guest:', error);
     return null;

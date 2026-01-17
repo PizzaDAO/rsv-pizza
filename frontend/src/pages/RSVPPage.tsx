@@ -18,6 +18,7 @@ export function RSVPPage() {
   const [error, setError] = useState<string | null>(null);
   const [party, setParty] = useState<DbParty | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [step, setStep] = useState(1); // 1 or 2
 
   // Password protection state
@@ -211,7 +212,7 @@ export function RSVPPage() {
     setError(null);
 
     try {
-      const guest = await addGuestToParty(
+      const result = await addGuestToParty(
         party!.id,
         name.trim(),
         dietaryRestrictions,
@@ -227,9 +228,9 @@ export function RSVPPage() {
         pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined
       );
 
-      if (guest) {
+      if (result) {
         // Save preferences to profile if checkbox is checked and email is provided
-        if (saveToProfile && email.trim()) {
+        if (saveToProfile && email.trim() && !result.alreadyRegistered) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
             liked_toppings: likedToppings,
@@ -238,6 +239,7 @@ export function RSVPPage() {
             disliked_beverages: dislikedBeverages,
           });
         }
+        setAlreadyRegistered(result.alreadyRegistered);
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -358,10 +360,25 @@ export function RSVPPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
-            <Check className="w-8 h-8 text-[#39d98a]" />
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${
+            alreadyRegistered
+              ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+              : 'bg-[#39d98a]/20 border-[#39d98a]/30'
+          }`}>
+            {alreadyRegistered ? (
+              <AlertCircle className="w-8 h-8 text-[#ff393a]" />
+            ) : (
+              <Check className="w-8 h-8 text-[#39d98a]" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-6">See you at {party?.name}!</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            {alreadyRegistered ? "You're already registered!" : `See you at ${party?.name}!`}
+          </h1>
+          {alreadyRegistered && (
+            <p className="text-white/60 mb-4">
+              This email has already been used to RSVP to this event.
+            </p>
+          )}
           <button
             onClick={handleClose}
             className="btn-secondary"
