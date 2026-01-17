@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, MapPin, Star, Trophy } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, MapPin } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
@@ -84,7 +84,16 @@ function HostPageContent() {
       .sort((a, b) => b.total - a.total);
   }, [guests, nearbyPizzerias]);
 
-  const hasAnyRankings = pizzeriaRankings.length > 0;
+  // Count guests with requests for slider marks
+  const guestsWithRequests = useMemo(() => {
+    return guests.filter(g =>
+      g.toppings.length > 0 ||
+      g.dislikedToppings.length > 0 ||
+      g.dietaryRestrictions.length > 0 ||
+      (g.likedBeverages && g.likedBeverages.length > 0) ||
+      (g.dislikedBeverages && g.dislikedBeverages.length > 0)
+    ).length;
+  }, [guests]);
 
   if (partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
@@ -180,63 +189,6 @@ function HostPageContent() {
                 <PizzaStyleAndToppings />
                 <BeverageSettings />
 
-                {/* Guest Pizzeria Rankings */}
-                {hasAnyRankings && (
-                  <div className="card p-6 bg-[#1a1a2e] border-white/10">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Trophy size={20} className="text-yellow-400" />
-                      <h2 className="text-lg font-bold text-white">Guest Pizzeria Rankings</h2>
-                    </div>
-                    <div className="space-y-3">
-                      {pizzeriaRankings.map((ranking, index) => (
-                        <div
-                          key={ranking.id}
-                          className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10"
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                            index === 0 ? 'bg-yellow-400 text-black' :
-                            index === 1 ? 'bg-gray-300 text-black' :
-                            index === 2 ? 'bg-amber-600 text-white' :
-                            'bg-white/10 text-white/60'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-white truncate">
-                              {ranking.pizzeria?.name || `Pizzeria ${ranking.id.slice(0, 8)}...`}
-                            </h3>
-                            {ranking.pizzeria?.rating && (
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <Star size={12} className="text-yellow-400 fill-yellow-400" />
-                                <span className="text-xs text-white/60">{ranking.pizzeria.rating.toFixed(1)}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            {ranking.first > 0 && (
-                              <span className="px-2 py-1 bg-yellow-400/20 text-yellow-400 rounded-full">
-                                🥇 {ranking.first}
-                              </span>
-                            )}
-                            {ranking.second > 0 && (
-                              <span className="px-2 py-1 bg-gray-300/20 text-gray-300 rounded-full">
-                                🥈 {ranking.second}
-                              </span>
-                            )}
-                            {ranking.third > 0 && (
-                              <span className="px-2 py-1 bg-amber-600/20 text-amber-500 rounded-full">
-                                🥉 {ranking.third}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-white/40 mt-3">
-                      Based on {guests.filter(g => g.pizzeriaRankings && g.pizzeriaRankings.length > 0).length} guest{guests.filter(g => g.pizzeriaRankings && g.pizzeriaRankings.length > 0).length !== 1 ? 's' : ''} who ranked pizzerias
-                    </p>
-                  </div>
-                )}
 
                 {/* Pizzeria Search Section */}
                 {party?.address ? (
@@ -270,9 +222,9 @@ function HostPageContent() {
                   </div>
                 )}
 
-                {/* Expected Guests Input */}
+                {/* Expected Guests Slider */}
                 <div className="card p-4 bg-[#1a1a2e] border-white/10">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
                       <span className="text-sm font-medium text-white">Expected Guests</span>
                       <p className="text-xs text-white/50 mt-0.5">Adjust for non-respondents</p>
@@ -288,6 +240,62 @@ function HostPageContent() {
                       className="w-20 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
                     />
                   </div>
+
+                  {/* Slider with marks */}
+                  {(() => {
+                    const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
+                    const minValue = 1;
+                    const maxValue = Math.max(guests.length * 2, currentValue + 20, 50);
+                    const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
+                    const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;
+
+                    return (
+                      <div className="relative pt-6 pb-2">
+                        {/* Marks */}
+                        {guestsWithRequests > 0 && (
+                          <div
+                            className="absolute top-0 flex flex-col items-center"
+                            style={{ left: `${requestsPercent}%`, transform: 'translateX(-50%)' }}
+                          >
+                            <span className="text-[10px] text-[#ff393a] font-medium whitespace-nowrap">
+                              {guestsWithRequests} requests
+                            </span>
+                            <div className="w-0.5 h-2 bg-[#ff393a]/50 mt-0.5" />
+                          </div>
+                        )}
+                        {guests.length > 0 && guests.length !== guestsWithRequests && (
+                          <div
+                            className="absolute top-0 flex flex-col items-center"
+                            style={{ left: `${rsvpsPercent}%`, transform: 'translateX(-50%)' }}
+                          >
+                            <span className="text-[10px] text-white/60 font-medium whitespace-nowrap">
+                              {guests.length} RSVPs
+                            </span>
+                            <div className="w-0.5 h-2 bg-white/30 mt-0.5" />
+                          </div>
+                        )}
+
+                        {/* Slider track */}
+                        <input
+                          type="range"
+                          min={minValue}
+                          max={maxValue}
+                          value={currentValue}
+                          onChange={(e) => setOrderExpectedGuests(parseInt(e.target.value, 10))}
+                          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#ff393a]"
+                          style={{
+                            background: `linear-gradient(to right, #ff393a 0%, #ff393a ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) 100%)`
+                          }}
+                        />
+
+                        {/* Min/Max labels */}
+                        <div className="flex justify-between mt-1">
+                          <span className="text-[10px] text-white/40">{minValue}</span>
+                          <span className="text-[10px] text-white/40">{maxValue}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button

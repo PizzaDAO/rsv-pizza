@@ -40,11 +40,6 @@ export const PizzaSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
-        <p className="text-sm text-white/60">
-          Pizza sizes are automatically calculated based on guest count to minimize waste and maximize satisfaction.
-        </p>
-      </div>
     </div>
   );
 };

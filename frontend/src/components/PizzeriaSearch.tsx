@@ -22,6 +22,7 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
+import { LocationAutocomplete } from './LocationAutocomplete';
 
 interface PizzeriaRanking {
   id: string;
@@ -194,37 +195,37 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
       {/* Search options */}
       <div className="space-y-3 mb-6">
-        {/* Use current location */}
-        <button
-          onClick={handleUseCurrentLocation}
-          disabled={loading}
-          className="w-full btn-primary flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <Navigation size={18} />
-          )}
-          Use My Location
-        </button>
+        {/* Use current location - only show if no party address */}
+        {!partyAddress && (
+          <>
+            <button
+              onClick={handleUseCurrentLocation}
+              disabled={loading}
+              className="w-full btn-primary flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Navigation size={18} />
+              )}
+              Use My Location
+            </button>
 
-        <div className="flex items-center gap-3 text-white/40">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-sm">or</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
+            <div className="flex items-center gap-3 text-white/40">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-sm">or</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+          </>
+        )}
 
         {/* Search by address */}
         <form onSubmit={handleAddressSearch} className="flex gap-2">
-          <div className="flex-1 relative">
-            <MapPin size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
-            <input
-              type="text"
+          <div className="flex-1">
+            <LocationAutocomplete
               value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
+              onChange={setSearchAddress}
               placeholder="Enter delivery address..."
-              className="w-full"
-              style={{ paddingLeft: '3.5rem' }}
             />
           </div>
           <button
@@ -232,7 +233,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
             disabled={loading || !searchAddress.trim()}
             className="btn-secondary px-4"
           >
-            <Search size={18} />
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
           </button>
         </form>
       </div>
