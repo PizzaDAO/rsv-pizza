@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Pizza, Check, Plus, X } from 'lucide-react';
 
-export const PizzaStyleAndToppings: React.FC = () => {
+interface PizzaStyleAndToppingsProps {
+  children?: React.ReactNode;
+}
+
+export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ children }) => {
   const {
     party,
     pizzaSettings,
@@ -171,6 +175,8 @@ export const PizzaStyleAndToppings: React.FC = () => {
         )}
       </div>
 
+      {/* Additional content passed as children */}
+      {children}
     </div>
   );
 };

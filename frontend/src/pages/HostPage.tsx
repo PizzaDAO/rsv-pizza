@@ -186,41 +186,43 @@ function HostPageContent() {
                   </div>
                 </div>
                 <GuestPreferencesList />
-                <PizzaStyleAndToppings />
-                <BeverageSettings />
-
-
-                {/* Pizzeria Search Section */}
-                {party?.address ? (
-                  <PizzeriaSearch
-                    partyAddress={party.address}
-                    onSelectPizzeria={(pizzeria, option) => {
-                      // Open the ordering link
-                      if (option.deepLink) {
-                        window.open(option.deepLink, '_blank');
-                      }
-                    }}
-                    rankings={pizzeriaRankings}
-                  />
-                ) : (
-                  <div className="card p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <MapPin size={24} className="text-[#ff393a]" />
-                      <h2 className="text-xl font-bold text-white">Top Pizzerias Nearby</h2>
-                    </div>
-                    <div className="text-center py-8">
-                      <MapPin size={48} className="mx-auto mb-4 text-white/20" />
-                      <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
-                      <button
-                        onClick={() => setActiveTab('details')}
-                        className="btn-secondary inline-flex items-center gap-2"
-                      >
-                        <Settings size={16} />
-                        Go to Settings
-                      </button>
-                    </div>
+                <PizzaStyleAndToppings>
+                  {/* Pizzeria Search Section - inside Pizza Options */}
+                  <div className="border-t border-white/10 mt-6 pt-6">
+                    {party?.address ? (
+                      <PizzeriaSearch
+                        partyAddress={party.address}
+                        onSelectPizzeria={(pizzeria, option) => {
+                          // Open the ordering link
+                          if (option.deepLink) {
+                            window.open(option.deepLink, '_blank');
+                          }
+                        }}
+                        rankings={pizzeriaRankings}
+                        className=""
+                      />
+                    ) : (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <MapPin size={24} className="text-[#ff393a]" />
+                          <h2 className="text-xl font-bold text-white">Top Pizzerias Nearby</h2>
+                        </div>
+                        <div className="text-center py-8">
+                          <MapPin size={48} className="mx-auto mb-4 text-white/20" />
+                          <p className="text-white/60 mb-4">Set your event location to find nearby pizzerias</p>
+                          <button
+                            onClick={() => setActiveTab('details')}
+                            className="btn-secondary inline-flex items-center gap-2"
+                          >
+                            <Settings size={16} />
+                            Go to Settings
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </PizzaStyleAndToppings>
+                <BeverageSettings />
 
                 {/* Expected Guests Slider */}
                 <div className="card p-4 bg-[#1a1a2e] border-white/10">
