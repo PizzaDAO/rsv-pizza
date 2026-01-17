@@ -14,12 +14,20 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     const parties = await prisma.party.findMany({
       where: { userId: req.userId },
       include: {
+        user: { select: { name: true } },
         _count: { select: { guests: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ parties });
+    // Map to include hostName from user for backwards compatibility
+    const partiesWithHost = parties.map(party => ({
+      ...party,
+      hostName: party.user?.name || null,
+      user: undefined, // Remove user object from response
+    }));
+
+    res.json({ parties: partiesWithHost });
   } catch (error) {
     next(error);
   }
@@ -29,14 +37,10 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, duration, pizzaSize, pizzaStyle, address, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, hostName, timezone, hideGuests, coHosts
+      customUrl, timezone, hideGuests, coHosts
     } = req.body;
-
-    if (!pizzaSize || !pizzaStyle) {
-      throw new AppError('Pizza size and pizza style are required', 400, 'VALIDATION_ERROR');
-    }
 
     // Generate default party name if not provided
     let partyName = name?.trim();
@@ -56,9 +60,15 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       }
     }
 
+    // Get user's name for co-hosts default
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { name: true },
+    });
+
     // Build coHosts array with host email if provided
     const hostCoHosts = req.userEmail
-      ? [{ id: crypto.randomUUID(), name: hostName || '', email: req.userEmail, showOnEvent: false }]
+      ? [{ id: crypto.randomUUID(), name: user?.name || '', email: req.userEmail, showOnEvent: false }]
       : [];
     const finalCoHosts = coHosts || hostCoHosts;
 
@@ -66,10 +76,10 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       data: {
         name: partyName,
         date: date ? new Date(date) : null,
+        endTime: endTime ? new Date(endTime) : null,
         duration: duration || null,
         timezone: timezone || null,
-        pizzaSize,
-        pizzaStyle,
+        pizzaStyle: pizzaStyle || 'new-york',
         availableBeverages: availableBeverages || [],
         availableToppings: availableToppings || [],
         address: address || null,
@@ -79,9 +89,11 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         eventImageUrl: eventImageUrl || null,
         description: description || null,
         customUrl: customUrl || null,
-        hostName: hostName || null,
         coHosts: finalCoHosts,
         userId: req.userId!,
+      },
+      include: {
+        user: { select: { name: true } },
       },
     });
 
@@ -89,7 +101,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     if (req.userEmail) {
       await prisma.guest.create({
         data: {
-          name: hostName || 'Host',
+          name: user?.name || 'Host',
           email: req.userEmail.toLowerCase(),
           dietaryRestrictions: [],
           likedToppings: [],
@@ -102,7 +114,14 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       });
     }
 
-    res.status(201).json({ party });
+    // Return with hostName for backwards compatibility
+    res.status(201).json({
+      party: {
+        ...party,
+        hostName: party.user?.name || null,
+        user: undefined,
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -116,6 +135,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     const party = await prisma.party.findFirst({
       where: { id, userId: req.userId },
       include: {
+        user: { select: { name: true } },
         guests: {
           orderBy: { submittedAt: 'desc' },
         },
@@ -126,7 +146,14 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ party });
+    // Return with hostName for backwards compatibility
+    res.json({
+      party: {
+        ...party,
+        hostName: party.user?.name || null,
+        user: undefined,
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -137,9 +164,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, duration, pizzaSize, pizzaStyle, address, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, hostName, timezone, hideGuests, coHosts
+      customUrl, timezone, hideGuests, coHosts
     } = req.body;
 
     // Verify ownership
@@ -166,9 +193,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       data: {
         ...(name !== undefined && { name }),
         ...(date !== undefined && { date: date ? new Date(date) : null }),
+        ...(endTime !== undefined && { endTime: endTime ? new Date(endTime) : null }),
         ...(duration !== undefined && { duration }),
         ...(timezone !== undefined && { timezone }),
-        ...(pizzaSize && { pizzaSize }),
         ...(pizzaStyle && { pizzaStyle }),
         ...(address !== undefined && { address }),
         ...(maxGuests !== undefined && { maxGuests }),
@@ -179,12 +206,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
-        ...(hostName !== undefined && { hostName }),
         ...(coHosts !== undefined && { coHosts }),
+      },
+      include: {
+        user: { select: { name: true } },
       },
     });
 
-    res.json({ party });
+    // Return with hostName for backwards compatibility
+    res.json({
+      party: {
+        ...party,
+        hostName: party.user?.name || null,
+        user: undefined,
+      }
+    });
   } catch (error) {
     next(error);
   }

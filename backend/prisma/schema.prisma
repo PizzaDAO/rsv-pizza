@@ -35,33 +35,30 @@ model User {
 }
 
 model Party {
-  id                 String    @id @default(cuid())
+  id                 String    @id @default(uuid()) @db.Uuid
   name               String
   inviteCode         String    @unique @default(cuid()) @map("invite_code")
   customUrl          String?   @unique @map("custom_url")
-  hostName           String?   @map("host_name")
-  date               DateTime?
+  date               DateTime? @db.Timestamptz
+  endTime            DateTime? @map("end_time") @db.Timestamptz
   duration           Float?
-  timezone           String?
-  pizzaSize          String    @map("pizza_size")
-  pizzaStyle         String    @map("pizza_style")
+  timezone           String?   @db.VarChar
+  pizzaStyle         String    @default("new-york") @map("pizza_style")
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
   address            String?
-  latitude           Float?
-  longitude          Float?
   maxGuests          Int?      @map("max_guests")
   hideGuests         Boolean   @default(false) @map("hide_guests")
   coHosts            Json      @default("[]") @map("co_hosts")
   password           String?
   eventImageUrl      String?   @map("event_image_url")
   description        String?
-  rsvpClosedAt       DateTime? @map("rsvp_closed_at")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  rsvpClosedAt       DateTime? @map("rsvp_closed_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  userId String @map("user_id")
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   guests Guest[]
   orders Order[]
@@ -70,10 +67,10 @@ model Party {
 }
 
 model Guest {
-  id                  String   @id @default(cuid())
+  id                  String   @id @default(uuid()) @db.Uuid
   name                String
-  email               String?
-  ethereumAddress     String?  @map("ethereum_address")
+  email               String?  @db.VarChar
+  ethereumAddress     String?  @map("ethereum_address") @db.VarChar
   roles               String[]
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   dietaryRestrictions String[] @map("dietary_restrictions")
@@ -82,10 +79,10 @@ model Guest {
   likedBeverages      String[] @map("liked_beverages")
   dislikedBeverages   String[] @map("disliked_beverages")
   pizzeriaRankings    String[] @map("pizzeria_rankings")
-  submittedAt         DateTime @default(now()) @map("submitted_at")
+  submittedAt         DateTime @default(now()) @map("submitted_at") @db.Timestamptz
   submittedVia        String   @default("link") @map("submitted_via")
 
-  partyId String @map("party_id")
+  partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   pizzaMappings GuestPizzaMapping[]

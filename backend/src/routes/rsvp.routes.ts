@@ -18,9 +18,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         availableBeverages: true,
         rsvpClosedAt: true,
         maxGuests: true,
-        user: {
-          select: { name: true },
-        },
+        user: { select: { name: true } },
         _count: {
           select: { guests: true },
         },
@@ -31,13 +29,15 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
+    const hostName = party.user?.name || null;
+
     // Check if RSVPs are closed
     if (party.rsvpClosedAt) {
       return res.json({
         party: {
           name: party.name,
           date: party.date,
-          hostName: party.user.name,
+          hostName,
         },
         rsvpClosed: true,
         message: 'RSVPs are no longer being accepted for this party',
@@ -50,7 +50,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         party: {
           name: party.name,
           date: party.date,
-          hostName: party.user.name,
+          hostName,
         },
         rsvpClosed: true,
         message: 'This party has reached its maximum number of guests',
@@ -61,7 +61,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
       party: {
         name: party.name,
         date: party.date,
-        hostName: party.user.name,
+        hostName,
         availableBeverages: party.availableBeverages,
         guestCount: party._count.guests,
         maxGuests: party.maxGuests,
@@ -107,12 +107,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         customUrl: true,
         rsvpClosedAt: true,
         maxGuests: true,
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
+        user: { select: { name: true } },
         _count: { select: { guests: true } },
       },
     });
