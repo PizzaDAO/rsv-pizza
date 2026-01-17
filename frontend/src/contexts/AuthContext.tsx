@@ -4,6 +4,15 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  username?: string;
+  bio?: string;
+  profilePictureUrl?: string;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+  tiktok?: string;
+  linkedin?: string;
+  website?: string;
 }
 
 interface AuthContextType {
@@ -12,7 +21,7 @@ interface AuthContextType {
   signIn: (email: string) => Promise<void>;
   signOut: () => void;
   setUser: (user: User | null) => void;
-  updateProfile: (data: { name?: string }) => Promise<User>;
+  updateProfile: (data: Partial<Omit<User, 'id' | 'email'>>) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const updateProfile = async (data: { name?: string }): Promise<User> => {
+  const updateProfile = async (data: Partial<Omit<User, 'id' | 'email'>>): Promise<User> => {
     const token = localStorage.getItem('authToken');
     if (!token) {
       throw new Error('Not authenticated');

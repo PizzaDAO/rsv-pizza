@@ -64,10 +64,30 @@ export function AccountPage() {
   // Load user data
   useEffect(() => {
     if (user) {
-      const userName = user.name || '';
-      setName(userName);
-      setOriginalValues(prev => ({ ...prev, name: userName }));
-      // TODO: Load other profile data from database when available
+      const values = {
+        name: user.name || '',
+        username: user.username || '',
+        bio: user.bio || '',
+        instagram: user.instagram || '',
+        twitter: user.twitter || '',
+        youtube: user.youtube || '',
+        tiktok: user.tiktok || '',
+        linkedin: user.linkedin || '',
+        website: user.website || '',
+      };
+      setName(values.name);
+      setUsername(values.username);
+      setBio(values.bio);
+      setInstagram(values.instagram);
+      setTwitter(values.twitter);
+      setYoutube(values.youtube);
+      setTiktok(values.tiktok);
+      setLinkedin(values.linkedin);
+      setWebsite(values.website);
+      if (user.profilePictureUrl) {
+        setProfilePicture(user.profilePictureUrl);
+      }
+      setOriginalValues(values);
     }
   }, [user]);
 
@@ -94,7 +114,17 @@ export function AccountPage() {
 
     try {
       // Save profile to backend
-      await updateProfile({ name: name.trim() || undefined });
+      await updateProfile({
+        name: name.trim() || undefined,
+        username: username.trim() || undefined,
+        bio: bio.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        twitter: twitter.trim() || undefined,
+        youtube: youtube.trim() || undefined,
+        tiktok: tiktok.trim() || undefined,
+        linkedin: linkedin.trim() || undefined,
+        website: website.trim() || undefined,
+      });
 
       // Update original values to current values
       setOriginalValues({

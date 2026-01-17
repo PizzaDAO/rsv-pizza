@@ -351,13 +351,22 @@ router.patch('/profile', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
     }
 
-    const { name } = req.body;
+    const { name, username, bio, profilePictureUrl, instagram, twitter, youtube, tiktok, linkedin, website } = req.body;
 
     // Update user
     const user = await prisma.user.update({
       where: { id: decoded.userId },
       data: {
         ...(name !== undefined && { name: name?.trim() || null }),
+        ...(username !== undefined && { username: username?.trim() || null }),
+        ...(bio !== undefined && { bio: bio?.trim() || null }),
+        ...(profilePictureUrl !== undefined && { profilePictureUrl: profilePictureUrl?.trim() || null }),
+        ...(instagram !== undefined && { instagram: instagram?.trim() || null }),
+        ...(twitter !== undefined && { twitter: twitter?.trim() || null }),
+        ...(youtube !== undefined && { youtube: youtube?.trim() || null }),
+        ...(tiktok !== undefined && { tiktok: tiktok?.trim() || null }),
+        ...(linkedin !== undefined && { linkedin: linkedin?.trim() || null }),
+        ...(website !== undefined && { website: website?.trim() || null }),
       },
     });
 
@@ -367,6 +376,15 @@ router.patch('/profile', async (req: Request, res: Response, next: NextFunction)
         id: user.id,
         email: user.email,
         name: user.name,
+        username: user.username,
+        bio: user.bio,
+        profilePictureUrl: user.profilePictureUrl,
+        instagram: user.instagram,
+        twitter: user.twitter,
+        youtube: user.youtube,
+        tiktok: user.tiktok,
+        linkedin: user.linkedin,
+        website: user.website,
       },
     });
   } catch (error) {

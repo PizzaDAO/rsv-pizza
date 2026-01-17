@@ -11,6 +11,15 @@ model User {
   id                         String   @id @default(cuid())
   email                      String   @unique
   name                       String?
+  username                   String?  @unique
+  bio                        String?
+  profilePictureUrl          String?
+  instagram                  String?
+  twitter                    String?
+  youtube                    String?
+  tiktok                     String?
+  linkedin                   String?
+  website                    String?
   defaultDietaryRestrictions String[]
   defaultLikedToppings       String[]
   defaultDislikedToppings    String[]
