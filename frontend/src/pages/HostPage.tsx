@@ -211,7 +211,7 @@ function HostPageContent() {
                     </div>
                     <input
                       type="number"
-                      min="1"
+                      min="0"
                       value={orderExpectedGuests ?? party?.maxGuests ?? guests.length}
                       onChange={(e) => {
                         const value = e.target.value ? parseInt(e.target.value, 10) : null;
@@ -224,7 +224,7 @@ function HostPageContent() {
                   {/* Slider with marks */}
                   {(() => {
                     const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
-                    const minValue = 1;
+                    const minValue = 0;
                     // Scale max dynamically based on data - use smaller max for low guest counts
                     const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
                     const maxValue = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));

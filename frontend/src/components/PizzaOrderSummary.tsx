@@ -307,7 +307,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
   return (
     <>
-      <div className="card p-6 sticky top-6">
+      <div className="card p-6">
         <h2 className="text-xl font-bold text-white mb-4">Recommended Order</h2>
 
         {recommendations.length === 0 ? (
