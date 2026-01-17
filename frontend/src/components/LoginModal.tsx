@@ -66,7 +66,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </button>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Log In</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">Log In or Sign Up</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">

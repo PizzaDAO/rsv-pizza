@@ -39,7 +39,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/80 hover:text-white text-sm transition-all"
                 >
                   <LogIn size={16} />
-                  <span>Log In</span>
+                  <span>Log In / Sign Up</span>
                 </Link>
               )
             )}

@@ -47,7 +47,7 @@ export function LoginPage() {
       <div className="max-w-md mx-auto px-4 py-12">
         <div className="card p-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Log In</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">Log In or Sign Up</h1>
             <p className="text-white/60 text-sm">
               Enter your email to receive a login code.
             </p>
