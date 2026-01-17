@@ -800,11 +800,20 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
   }
 
   // Get parties where user is a host (co_hosts array contains their email)
-  const { data: hostParties, error: hostError } = await supabase
+  // Note: Using filter with text match because .contains() doesn't work well with JSONB arrays of objects
+  const { data: allPartiesForHost, error: hostError } = await supabase
     .from('parties')
     .select('*')
-    .contains('co_hosts', [{ email: userEmail }])
     .order('date', { ascending: true, nullsFirst: false });
+
+  // Filter client-side for parties where user is in co_hosts
+  const normalizedEmail = userEmail.toLowerCase();
+  const hostParties = (allPartiesForHost || []).filter((party: DbParty) => {
+    if (!party.co_hosts || !Array.isArray(party.co_hosts)) return false;
+    return party.co_hosts.some((host: any) =>
+      host.email?.toLowerCase() === normalizedEmail
+    );
+  });
 
   if (hostError) {
     console.error('Error fetching host parties:', hostError);
