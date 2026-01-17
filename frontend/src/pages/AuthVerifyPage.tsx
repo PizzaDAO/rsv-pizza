@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Check, Mail, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { IconInput } from '../components/IconInput';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -158,15 +159,14 @@ export function AuthVerifyPage() {
             </p>
 
             {isNewUser && (
-              <div className="relative mb-4">
-                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
+              <div className="mb-4">
+                <IconInput
                   ref={nameInputRef}
+                  icon={User}
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && name.trim()) {
                       inputRefs.current[0]?.focus();

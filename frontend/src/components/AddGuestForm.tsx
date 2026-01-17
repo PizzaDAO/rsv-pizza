@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
 import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User, X } from 'lucide-react';
+import { IconInput } from './IconInput';
 
 interface AddGuestFormProps {
   onClose?: () => void;
@@ -104,18 +105,15 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
 
       {shouldShowForm && (
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="relative">
-            <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full !pl-14"
-              placeholder="Guest Name"
-              required
-            />
-          </div>
+          <IconInput
+            icon={User}
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Guest Name"
+            required
+          />
 
           <div>
             <h3 className="text-sm font-medium text-white/60 mb-2">

@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
+import { IconInput } from '../components/IconInput';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -395,43 +396,34 @@ export function RSVPPage() {
 
           <form onSubmit={handleStep1Continue} className="space-y-3">
             {/* Name */}
-            <div className="relative">
-              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Name"
-                className="w-full !pl-14"
-                required
-                autoFocus
-              />
-            </div>
+            <IconInput
+              icon={User}
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name"
+              required
+              autoFocus
+            />
 
             {/* Email */}
-            <div className="relative">
-              <Mail size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                className="w-full !pl-14"
-                required
-              />
-            </div>
+            <IconInput
+              icon={Mail}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              required
+            />
 
             {/* Ethereum Address */}
-            <div className="relative">
-              <Wallet size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={ethereumAddress}
-                onChange={(e) => setEthereumAddress(e.target.value)}
-                placeholder="Wallet Address"
-                className="w-full !pl-14"
-              />
-            </div>
+            <IconInput
+              icon={Wallet}
+              type="text"
+              value={ethereumAddress}
+              onChange={(e) => setEthereumAddress(e.target.value)}
+              placeholder="Wallet Address"
+            />
 
             {/* What do you do? */}
             <div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { IconInput } from './IconInput';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -69,18 +70,15 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="relative">
-            <Mail size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full !pl-14"
-              required
-              autoFocus
-            />
-          </div>
+          <IconInput
+            icon={Mail}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            autoFocus
+          />
 
           {error && (
             <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
