@@ -22,8 +22,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="h-8 sm:h-10"
             />
             <span
-              className="text-lg sm:text-xl text-white/90"
-              style={{ fontFamily: "'Bangers', cursive" }}
+              className="text-white/90"
+              style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem' }}
             >
               RSV.Pizza
             </span>
