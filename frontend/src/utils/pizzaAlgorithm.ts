@@ -153,9 +153,9 @@ function splitByToppingPreferences(guests: Guest[], maxPerPizza: number): Guest[
 
 // Dietary restriction topping exclusions
 const DIETARY_EXCLUSIONS: Record<string, string[]> = {
-  'Vegetarian': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken'],
-  'Vegan': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'extra-cheese', 'feta'],
-  'Dairy-Free': ['extra-cheese', 'feta'],
+  'Vegetarian': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies'],
+  'Vegan': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies', 'extra-cheese'],
+  'Dairy-Free': ['extra-cheese'],
   'Gluten-Free': [], // Handled at crust level, not toppings
 };
 
@@ -526,9 +526,32 @@ function groupIdenticalPizzas(pizzas: PizzaRecommendation[]): PizzaRecommendatio
   return grouped;
 }
 
+// Filter guest topping preferences to only include allowed toppings
+function filterGuestToppings(guests: Guest[], allowedToppingIds: string[] | null): Guest[] {
+  if (!allowedToppingIds || allowedToppingIds.length === 0) {
+    return guests; // No filtering if no allowed toppings specified
+  }
+
+  const allowedSet = new Set(allowedToppingIds);
+
+  return guests.map(guest => ({
+    ...guest,
+    toppings: guest.toppings.filter(t => allowedSet.has(t)),
+    dislikedToppings: guest.dislikedToppings.filter(t => allowedSet.has(t)),
+  }));
+}
+
 // Main function to generate pizza recommendations
-export function generatePizzaRecommendations(guests: Guest[], style: PizzaStyle, expectedGuestCount?: number | null): PizzaRecommendation[] {
-  const guestGroups = findCompatibleGuests(guests, style);
+export function generatePizzaRecommendations(
+  guests: Guest[],
+  style: PizzaStyle,
+  expectedGuestCount?: number | null,
+  allowedToppingIds?: string[] | null
+): PizzaRecommendation[] {
+  // Filter guest preferences to only include allowed toppings
+  const filteredGuests = filterGuestToppings(guests, allowedToppingIds || null);
+
+  const guestGroups = findCompatibleGuests(filteredGuests, style);
 
   const recommendations = guestGroups.map((groupGuests, index) => {
     // Check if this group would benefit from half-and-half

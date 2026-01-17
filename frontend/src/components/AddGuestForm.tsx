@@ -12,7 +12,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
-  const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
+  const [dislikedToppings, setDislikedToppings] = useState<string[]>(['anchovies']);
   const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -22,7 +22,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
     setName('');
     setDietaryRestrictions([]);
     setToppings([]);
-    setDislikedToppings([]);
+    setDislikedToppings(['anchovies']);
     setLikedBeverages([]);
     setDislikedBeverages([]);
   };

@@ -83,9 +83,14 @@ export function generateWaveRecommendations(
   // Use override if provided, otherwise fall back to party.maxGuests
   const effectiveMaxGuests = expectedGuestsOverride ?? party.maxGuests;
 
+  // Get allowed toppings from party (if host has selected specific toppings)
+  const allowedToppingIds = party.availableToppings && party.availableToppings.length > 0
+    ? party.availableToppings
+    : null;
+
   // Backward compatibility: no date/duration → single wave
   if (!party.date || !party.duration) {
-    const pizzas = generatePizzaRecommendations(guests, style, effectiveMaxGuests);
+    const pizzas = generatePizzaRecommendations(guests, style, effectiveMaxGuests, allowedToppingIds);
     const beverages = party.availableBeverages && party.availableBeverages.length > 0
       ? generateBeverageRecommendations(
           guests,
@@ -134,7 +139,8 @@ export function generateWaveRecommendations(
     const wavePizzas = generatePizzaRecommendations(
       waveGuests,
       style,
-      wave.guestAllocation
+      wave.guestAllocation,
+      allowedToppingIds
     );
 
     // Generate beverage recommendations for this wave's guests

@@ -82,7 +82,7 @@ export function RSVPPage() {
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [likedToppings, setLikedToppings] = useState<string[]>([]);
-  const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
+  const [dislikedToppings, setDislikedToppings] = useState<string[]>(['anchovies']);
   const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [availableBeverages, setAvailableBeverages] = useState<string[]>([]);

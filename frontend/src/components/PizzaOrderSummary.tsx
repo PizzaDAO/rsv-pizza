@@ -192,6 +192,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
       .map(pizza => {
         const qty = pizza.quantity || 1;
+
+        // Handle half-and-half pizzas
+        if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
+          const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          return `${qty}x Half ${leftToppings} / Half ${rightToppings} (${pizza.size.diameter}" ${pizza.style.name}) - serves ${pizza.guestCount}`;
+        }
+
         const toppingsText = pizza.toppings.map(t => t.name).join(', ');
         const label = pizza.label || toppingsText;
         return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name}) - serves ${pizza.guestCount}`;
@@ -215,6 +223,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
       .map(pizza => {
         const qty = pizza.quantity || 1;
+
+        // Handle half-and-half pizzas
+        if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
+          const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+          return `${qty}x Half ${leftToppings} / Half ${rightToppings} (${pizza.size.diameter}" ${pizza.style.name})`;
+        }
+
         const toppingsText = pizza.toppings.map(t => t.name).join(', ');
         const label = pizza.label || toppingsText;
         return `${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name})`;
@@ -238,6 +254,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
         .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
         .map(pizza => {
           const qty = pizza.quantity || 1;
+
+          // Handle half-and-half pizzas
+          if (pizza.isHalfAndHalf && pizza.leftHalf && pizza.rightHalf) {
+            const leftToppings = pizza.leftHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+            const rightToppings = pizza.rightHalf.toppings.map(t => t.name).join(', ') || 'cheese';
+            return `  ${qty}x Half ${leftToppings} / Half ${rightToppings} (${pizza.size.diameter}" ${pizza.style.name})`;
+          }
+
           const toppingsText = pizza.toppings.map(t => t.name).join(', ');
           const label = pizza.label || toppingsText;
           return `  ${qty}x ${label} (${pizza.size.diameter}" ${pizza.style.name})`;

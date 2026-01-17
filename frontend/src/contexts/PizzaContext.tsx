@@ -52,7 +52,7 @@ export const availableToppings: Topping[] = [
   { id: 'spinach', name: 'Spinach', category: 'vegetable' },
   { id: 'pineapple', name: 'Pineapple', category: 'fruit' },
   { id: 'extra-cheese', name: 'Extra Cheese', category: 'cheese' },
-  { id: 'feta', name: 'Feta Cheese', category: 'cheese' },
+  { id: 'anchovies', name: 'Anchovies', category: 'meat' },
   { id: 'jalapenos', name: 'Jalapeños', category: 'vegetable' },
   { id: 'tomatoes', name: 'Tomatoes', category: 'vegetable' },
 ];
