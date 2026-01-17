@@ -6,8 +6,9 @@ import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { LocationAutocomplete } from '../components/LocationAutocomplete';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Loader2, Users, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
+import { Calendar, User, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage, getUserParties, UserParty } from '../lib/supabase';
+import { CustomUrlInput } from '../components/CustomUrlInput';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ export function HomePage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
+  const [customUrlValid, setCustomUrlValid] = useState(true);
+  const [customUrlError, setCustomUrlError] = useState<string | undefined>();
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
@@ -284,6 +287,13 @@ export function HomePage() {
       const password = partyPassword.trim() || undefined;
       const description = eventDescription.trim() || undefined;
       const urlSlug = customUrl.trim() || undefined;
+
+      // Check if custom URL is valid (already validated by CustomUrlInput)
+      if (urlSlug && !customUrlValid) {
+        setImageError(customUrlError || 'Invalid custom URL');
+        setCreating(false);
+        return;
+      }
 
       // Calculate duration from start/end times
       let duration: number | undefined;
@@ -779,21 +789,14 @@ export function HomePage() {
                   />
                 </div>
 
-                <div className="relative flex items-center">
-                  <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-                  <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
-                  <input
-                    type="text"
-                    value={customUrl}
-                    onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="custom-url"
-                    className="w-full font-mono text-sm"
-                    style={{ paddingLeft: '130px' }}
-                    pattern="[a-z0-9-]+"
-                    minLength={3}
-                    maxLength={50}
-                  />
-                </div>
+                <CustomUrlInput
+                  value={customUrl}
+                  onChange={setCustomUrl}
+                  onValidationChange={(isValid, error) => {
+                    setCustomUrlValid(isValid);
+                    setCustomUrlError(error);
+                  }}
+                />
               </div>
             )}
 

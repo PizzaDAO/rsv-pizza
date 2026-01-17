@@ -177,6 +177,71 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
   return data;
 }
 
+// Reserved slugs that can't be used as custom party URLs
+const RESERVED_SLUGS = [
+  'login',
+  'new',
+  'account',
+  'auth',
+  'parties',
+  'rsvp',
+  'host',
+  'api',
+  'admin',
+  'settings',
+  'profile',
+  'about',
+  'help',
+  'terms',
+  'privacy',
+  'contact',
+];
+
+export interface SlugValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+export async function validateCustomSlug(
+  slug: string,
+  currentPartyId?: string
+): Promise<SlugValidationResult> {
+  // Check if slug is empty
+  if (!slug || !slug.trim()) {
+    return { valid: true }; // Empty is fine, it just won't have a custom URL
+  }
+
+  const normalizedSlug = slug.toLowerCase().trim();
+
+  // Check minimum length
+  if (normalizedSlug.length < 3) {
+    return { valid: false, error: 'URL must be at least 3 characters' };
+  }
+
+  // Check format (only lowercase letters, numbers, and hyphens)
+  if (!/^[a-z0-9-]+$/.test(normalizedSlug)) {
+    return { valid: false, error: 'URL can only contain letters, numbers, and hyphens' };
+  }
+
+  // Check reserved slugs
+  if (RESERVED_SLUGS.includes(normalizedSlug)) {
+    return { valid: false, error: 'This URL is reserved' };
+  }
+
+  // Check if slug is already taken by another party
+  const { data: existingParty } = await supabase
+    .from('parties')
+    .select('id')
+    .eq('custom_url', normalizedSlug)
+    .maybeSingle();
+
+  if (existingParty && existingParty.id !== currentPartyId) {
+    return { valid: false, error: 'This URL is already taken' };
+  }
+
+  return { valid: true };
+}
+
 // Securely verify password without fetching it
 export async function verifyPartyPassword(partyId: string, passwordAttempt: string): Promise<boolean> {
   const { count, error } = await supabase

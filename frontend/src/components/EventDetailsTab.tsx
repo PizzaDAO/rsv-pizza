@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Link as LinkIcon, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
+import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
 
@@ -21,6 +22,8 @@ export const EventDetailsTab: React.FC = () => {
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
   const [customUrl, setCustomUrl] = useState('');
+  const [customUrlValid, setCustomUrlValid] = useState(true);
+  const [customUrlError, setCustomUrlError] = useState<string | undefined>();
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -402,6 +405,11 @@ export const EventDetailsTab: React.FC = () => {
         startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
       }
 
+      // Check if custom URL is valid (already validated by CustomUrlInput)
+      if (customUrl.trim() && !customUrlValid) {
+        throw new Error(customUrlError || 'Invalid custom URL');
+      }
+
       // Update party in database
       const success = await updateParty(party.id, {
         name: name.trim(),
@@ -710,21 +718,15 @@ export const EventDetailsTab: React.FC = () => {
                 />
               </div>
 
-              <div className="relative flex items-center">
-                <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-                <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
-                <input
-                  type="text"
-                  value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  placeholder="custom-url"
-                  className="w-full font-mono text-sm"
-                  style={{ paddingLeft: '130px' }}
-                  pattern="[a-z0-9-]+"
-                  minLength={3}
-                  maxLength={50}
-                />
-              </div>
+              <CustomUrlInput
+                value={customUrl}
+                onChange={setCustomUrl}
+                currentPartyId={party?.id}
+                onValidationChange={(isValid, error) => {
+                  setCustomUrlValid(isValid);
+                  setCustomUrlError(error);
+                }}
+              />
             </div>
           )}
         </div>
