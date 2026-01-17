@@ -179,10 +179,55 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
   }
 });
 
+// POST /api/rsvp/:inviteCode/send-confirmation - Send confirmation email for an RSVP
+router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+    const { guestId, guestEmail, guestName } = req.body;
+
+    if (!guestEmail || !guestName) {
+      throw new AppError('Guest email and name are required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Get party details
+    const party = await prisma.party.findUnique({
+      where: { inviteCode },
+      select: {
+        id: true,
+        name: true,
+        date: true,
+        address: true,
+        customUrl: true,
+      },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Send confirmation email
+    await sendRSVPConfirmationEmail({
+      guestEmail,
+      guestName,
+      guestId,
+      partyName: party.name,
+      partyDate: party.date,
+      partyAddress: party.address,
+      inviteCode,
+      customUrl: party.customUrl,
+    });
+
+    res.json({ success: true, message: 'Confirmation email sent' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Helper function to send RSVP confirmation email
 async function sendRSVPConfirmationEmail(params: {
   guestEmail: string;
   guestName: string;
+  guestId?: string;
   partyName: string;
   partyDate: Date | null;
   partyAddress: string | null;
@@ -196,9 +241,18 @@ async function sendRSVPConfirmationEmail(params: {
     return;
   }
 
+  const baseUrl = 'https://rsv.pizza';
   const eventUrl = params.customUrl
-    ? `https://rsvpizza.com/${params.customUrl}`
-    : `https://rsvpizza.com/${params.inviteCode}`;
+    ? `${baseUrl}/${params.customUrl}`
+    : `${baseUrl}/${params.inviteCode}`;
+
+  // Generate unique check-in URL with guest ID
+  const checkInUrl = params.guestId
+    ? `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`
+    : eventUrl;
+
+  // Generate QR code using a free QR code API (encoded check-in URL)
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
 
   const dateText = params.partyDate
     ? new Date(params.partyDate).toLocaleDateString('en-US', {
@@ -224,14 +278,21 @@ async function sendRSVPConfirmationEmail(params: {
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Going!</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Thanks for RSVPing</p>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP is confirmed</p>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
-          <h2 style="color: #1a1a2e; margin-top: 0;">Event Details</h2>
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
           <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
           <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
@@ -240,9 +301,6 @@ async function sendRSVPConfirmationEmail(params: {
 
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
           <p>See you there, ${params.guestName}!</p>
-          <p style="margin-top: 20px;">
-            <a href="${eventUrl}" style="color: #ff393a; text-decoration: none;">View Full Event Details</a>
-          </p>
         </div>
       </body>
     </html>
@@ -255,7 +313,7 @@ async function sendRSVPConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsvpizza.com>',
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
       to: [params.guestEmail],
       subject: `You're going to ${params.partyName}! 🍕`,
       html: emailHtml,

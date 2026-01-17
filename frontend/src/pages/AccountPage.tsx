@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save } from 'lucide-react';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -28,6 +28,32 @@ export function AccountPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Track original values to detect changes
+  const [originalValues, setOriginalValues] = useState({
+    name: '',
+    username: '',
+    bio: '',
+    instagram: '',
+    twitter: '',
+    youtube: '',
+    tiktok: '',
+    linkedin: '',
+    website: '',
+  });
+
+  // Check if any field has changed
+  const hasChanges =
+    name !== originalValues.name ||
+    username !== originalValues.username ||
+    bio !== originalValues.bio ||
+    instagram !== originalValues.instagram ||
+    twitter !== originalValues.twitter ||
+    youtube !== originalValues.youtube ||
+    tiktok !== originalValues.tiktok ||
+    linkedin !== originalValues.linkedin ||
+    website !== originalValues.website ||
+    profilePictureFile !== null;
+
   // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
@@ -38,7 +64,9 @@ export function AccountPage() {
   // Load user data
   useEffect(() => {
     if (user) {
-      setName(user.name || '');
+      const userName = user.name || '';
+      setName(userName);
+      setOriginalValues(prev => ({ ...prev, name: userName }));
       // TODO: Load other profile data from database when available
     }
   }, [user]);
@@ -67,6 +95,20 @@ export function AccountPage() {
     // TODO: Save profile data to database
     // For now, just simulate a save
     await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Update original values to current values
+    setOriginalValues({
+      name,
+      username,
+      bio,
+      instagram,
+      twitter,
+      youtube,
+      tiktok,
+      linkedin,
+      website,
+    });
+    setProfilePictureFile(null);
 
     setSaving(false);
     setSaved(true);
@@ -299,28 +341,30 @@ export function AccountPage() {
               </div>
             </div>
 
-            {/* Save Button */}
-            <div className="flex items-center gap-4">
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary flex items-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : saved ? (
-                  'Saved!'
-                ) : (
-                  <>
-                    <Upload size={18} />
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Save Button - only show when there are changes */}
+            {(hasChanges || saving || saved) && (
+              <div className="flex items-center gap-4">
+                <button
+                  type="submit"
+                  disabled={saving || !hasChanges}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : saved ? (
+                    'Saved!'
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      Save
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Logout Section */}

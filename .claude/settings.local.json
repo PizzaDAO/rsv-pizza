@@ -73,7 +73,9 @@
       "Bash(code \"C:\\\\Users\\\\samgo\\\\OneDrive\\\\Documents\\\\PizzaDAO\\\\Code\\\\rsvpizza\\\\backend\\\\sql\")",
       "Bash(npx vercel:*)",
       "Bash(vercel --prod:*)",
-      "Bash(timeout 10 npx vercel logs:*)"
+      "Bash(timeout 10 npx vercel logs:*)",
+      "Bash(vercel env add:*)",
+      "Bash(vercel env:*)"
     ]
   }
 }

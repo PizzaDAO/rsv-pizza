@@ -119,9 +119,12 @@ export function HomePage() {
 
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
 
+      // Use logged-in user's name as host if available
+      const effectiveHostName = user?.name || formData.hostName?.trim() || undefined;
+
       const party = await createPartyAPI(
         formData.partyName.trim(),
-        formData.hostName?.trim() || undefined,
+        effectiveHostName,
         startDateTime,
         'new-york',
         guestCount,
@@ -132,7 +135,8 @@ export function HomePage() {
         imageUrl,
         description,
         urlSlug,
-        formData.timezone || undefined
+        formData.timezone || undefined,
+        user?.email
       );
 
       setCreating(false);
@@ -307,9 +311,12 @@ export function HomePage() {
         }
       }
 
+      // Use logged-in user's name as host if available
+      const effectiveHostName = user?.name || hostName.trim() || undefined;
+
       const party = await createPartyAPI(
         partyName.trim(),
-        hostName.trim() || undefined,
+        effectiveHostName,
         startDateTime,
         'new-york',
         guestCount,
@@ -320,7 +327,8 @@ export function HomePage() {
         imageUrl,
         description,
         urlSlug,
-        timezone || undefined
+        timezone || undefined,
+        user?.email
       );
 
       setCreating(false);
@@ -452,6 +460,20 @@ export function HomePage() {
               />
             </div>
 
+            {/* Host Name - only show if user is not logged in or doesn't have a name */}
+            {(!user || !user.name) && (
+              <div className="relative">
+                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="text"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="Host Name"
+                  className="w-full !pl-14"
+                />
+              </div>
+            )}
+
             {/* Mobile: Date/Time Button */}
             <button
               type="button"
@@ -559,17 +581,6 @@ export function HomePage() {
                 placeholder="Add Description"
                 className="w-full !pl-14"
                 rows={3}
-              />
-            </div>
-
-            <div className="relative">
-              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => setHostName(e.target.value)}
-                placeholder="Host Name"
-                className="w-full !pl-14"
               />
             </div>
 

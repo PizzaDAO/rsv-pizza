@@ -1,61 +1,42 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { GuestBasicCard } from './GuestBasicCard';
-import { InviteGuestsModal } from './InviteGuestsModal';
-import { UserRoundX, UserPlus } from 'lucide-react';
+import { UserRoundX } from 'lucide-react';
+
+// TODO: Re-enable invite functionality when email invites are implemented
+// import { InviteGuestsModal } from './InviteGuestsModal';
 
 export const GuestList: React.FC = () => {
   const { guests } = usePizza();
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (guests.length === 0) {
     return (
-      <>
-        <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
-          <UserRoundX size={48} className="text-white/30 mb-4" />
-          <h3 className="text-xl font-medium text-white/80">No Guests Added Yet</h3>
-          <p className="text-white/50 mt-2 mb-4">
-            Start inviting guests to your party.
-          </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <UserPlus size={18} />
-            <span>Invite Guest</span>
-          </button>
-        </div>
-        <InviteGuestsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      </>
+      <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
+        <UserRoundX size={48} className="text-white/30 mb-4" />
+        <h3 className="text-xl font-medium text-white/80">No Guests Yet</h3>
+        <p className="text-white/50 mt-2">
+          Share your event link to start receiving RSVPs.
+        </p>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="card p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-white">Guests</h2>
-            <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
-              {guests.length}
-            </span>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <UserPlus size={18} />
-            <span>Invite Guest</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {guests.map(guest => (
-            <GuestBasicCard key={guest.id} guest={guest} />
-          ))}
+    <div className="card p-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-white">Guests</h2>
+          <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
+            {guests.length}
+          </span>
         </div>
       </div>
-      <InviteGuestsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {guests.map(guest => (
+          <GuestBasicCard key={guest.id} guest={guest} />
+        ))}
+      </div>
+    </div>
   );
 };

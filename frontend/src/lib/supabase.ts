@@ -83,6 +83,7 @@ export interface DbGuest {
   disliked_toppings: string[];
   liked_beverages: string[];
   disliked_beverages: string[];
+  pizzeria_rankings?: string[];
   submitted_at: string;
   submitted_via: string;
 }
@@ -101,8 +102,12 @@ export async function createParty(
   eventImageUrl?: string,
   description?: string,
   customUrl?: string,
-  timezone?: string
+  timezone?: string,
+  hostEmail?: string
 ): Promise<DbParty | null> {
+  // If host email is provided, add them as a co-host so they're linked to the event
+  const coHosts = hostEmail ? [{ id: crypto.randomUUID(), name: hostName || '', email: hostEmail, showOnEvent: false }] : [];
+
   const { data, error } = await supabase
     .from('parties')
     .insert({
@@ -119,6 +124,7 @@ export async function createParty(
       description: description || null,
       custom_url: customUrl || null,
       address: address || null,
+      co_hosts: coHosts,
     })
     .select()
     .single();
@@ -244,6 +250,8 @@ export async function updatePartyToppings(partyId: string, availableToppings: st
 }
 
 // Guest operations
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
+
 export async function addGuestToParty(
   partyId: string,
   name: string,
@@ -255,7 +263,9 @@ export async function addGuestToParty(
   email?: string,
   ethereumAddress?: string,
   roles?: string[],
-  mailingListOptIn?: boolean
+  mailingListOptIn?: boolean,
+  inviteCode?: string,
+  pizzeriaRankings?: string[]
 ): Promise<DbGuest | null> {
   const { data, error } = await supabase
     .from('guests')
@@ -271,6 +281,7 @@ export async function addGuestToParty(
       disliked_toppings: dislikedToppings,
       liked_beverages: likedBeverages,
       disliked_beverages: dislikedBeverages,
+      pizzeria_rankings: pizzeriaRankings || [],
       submitted_via: 'link',
     })
     .select()
@@ -280,6 +291,25 @@ export async function addGuestToParty(
     console.error('Error adding guest:', error);
     return null;
   }
+
+  // Send confirmation email via backend API if email provided
+  if (email && inviteCode) {
+    try {
+      await fetch(`${API_URL}/api/rsvp/${inviteCode}/send-confirmation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestId: data.id,
+          guestEmail: email,
+          guestName: name,
+        }),
+      });
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Don't fail the RSVP if email fails
+    }
+  }
+
   return data;
 }
 

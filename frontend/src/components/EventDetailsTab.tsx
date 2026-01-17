@@ -547,7 +547,7 @@ export const EventDetailsTab: React.FC = () => {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <FileText size={18} className="text-white/40 flex-shrink-0" />
               {description ? (
-                <p className="text-white truncate">{description}</p>
+                <p className="text-white line-clamp-2">{description}</p>
               ) : (
                 <span className="text-white/60">Add Description</span>
               )}
@@ -590,178 +590,101 @@ export const EventDetailsTab: React.FC = () => {
           <p className="text-xs text-red-400 mt-1">{imageError}</p>
         )}
 
-        {/* Options - Show filled options in main section */}
-        {(() => {
-          const hasRequireApproval = requireApproval;
-          const hasLimitGuests = limitGuests;
-          const hasPassword = !!password;
-          const hasCustomUrl = !!customUrl;
-          const hasUnfilledOptions = !hasRequireApproval || !hasLimitGuests || !hasPassword || !hasCustomUrl;
+        {/* Options Section */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowOptionalFields(!showOptionalFields)}
+            className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+          >
+            <span className="text-sm font-medium text-white/80">Options</span>
+            {showOptionalFields ? (
+              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+          </button>
 
-          return (
-            <>
-              {/* Filled options shown in main section */}
-              {(hasRequireApproval || hasLimitGuests || hasPassword || hasCustomUrl) && (
-                <div className="space-y-3">
-                  {hasRequireApproval && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setRequireApproval(!requireApproval)}
-                        className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      >
-                        <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                        <span className="text-sm font-medium text-white/80">Require Approval</span>
-                      </button>
-                    </div>
+          {showOptionalFields && (
+            <div className="space-y-3 border-l-2 border-white/10 pl-4 mt-3">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setRequireApproval(!requireApproval)}
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {requireApproval ? (
+                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                  ) : (
+                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                   )}
+                  <span className="text-sm font-medium text-white/80">Require Approval</span>
+                </button>
+              </div>
 
-                  {hasLimitGuests && (
-                    <>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setLimitGuests(!limitGuests)}
-                          className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                        >
-                          <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                          <span className="text-sm font-medium text-white/80">Limit Guests</span>
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                        <input
-                          type="number"
-                          min="1"
-                          value={maxGuests}
-                          onChange={(e) => setMaxGuests(e.target.value)}
-                          placeholder="Capacity"
-                          className="w-full !pl-14"
-                        />
-                      </div>
-                    </>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setLimitGuests(!limitGuests)}
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {limitGuests ? (
+                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                  ) : (
+                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                   )}
+                  <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                </button>
+              </div>
 
-                  {hasPassword && (
-                    <div className="relative">
-                      <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Event Password"
-                        className="w-full !pl-14"
-                        autoComplete="new-password"
-                      />
-                    </div>
-                  )}
-
-                  {hasCustomUrl && (
-                    <div className="relative flex items-center">
-                      <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-                      <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
-                      <input
-                        type="text"
-                        value={customUrl}
-                        onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                        placeholder="custom-url"
-                        className="w-full font-mono text-sm"
-                        style={{ paddingLeft: '130px' }}
-                        pattern="[a-z0-9-]+"
-                        minLength={3}
-                        maxLength={50}
-                      />
-                    </div>
-                  )}
+              {limitGuests && (
+                <div className="relative">
+                  <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                  <input
+                    type="number"
+                    min="1"
+                    value={maxGuests}
+                    onChange={(e) => setMaxGuests(e.target.value)}
+                    placeholder="Capacity"
+                    className="w-full !pl-14"
+                  />
                 </div>
               )}
 
-              {/* Options collapse section - only show if there are unfilled options */}
-              {hasUnfilledOptions && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowOptionalFields(!showOptionalFields)}
-                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
-                  >
-                    <span className="text-sm font-medium text-white/80">Options</span>
-                    {showOptionalFields ? (
-                      <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    )}
-                  </button>
+              <div className="relative">
+                <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Event Password"
+                  className="w-full !pl-14"
+                  autoComplete="new-password"
+                />
+              </div>
 
-                  {showOptionalFields && (
-                    <div className="space-y-3 border-l-2 border-white/10 pl-4">
-                      {!hasRequireApproval && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => setRequireApproval(!requireApproval)}
-                            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                          >
-                            <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                            <span className="text-sm font-medium text-white/80">Require Approval</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {!hasLimitGuests && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => setLimitGuests(!limitGuests)}
-                            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                          >
-                            <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                            <span className="text-sm font-medium text-white/80">Limit Guests</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {!hasPassword && (
-                        <div className="relative">
-                          <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                          <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Event Password"
-                            className="w-full !pl-14"
-                            autoComplete="new-password"
-                          />
-                        </div>
-                      )}
-
-                      {!hasCustomUrl && (
-                        <div className="relative flex items-center">
-                          <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-                          <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
-                          <input
-                            type="text"
-                            value={customUrl}
-                            onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                            placeholder="custom-url"
-                            className="w-full font-mono text-sm"
-                            style={{ paddingLeft: '130px' }}
-                            pattern="[a-z0-9-]+"
-                            minLength={3}
-                            maxLength={50}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          );
-        })()}
+              <div className="relative flex items-center">
+                <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
+                <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+                <input
+                  type="text"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="custom-url"
+                  className="w-full font-mono text-sm"
+                  style={{ paddingLeft: '130px' }}
+                  pattern="[a-z0-9-]+"
+                  minLength={3}
+                  maxLength={50}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Hosts Section */}
         <div>
@@ -1327,7 +1250,7 @@ export const EventDetailsTab: React.FC = () => {
       {showDescriptionModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
           <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Event Description</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">Description</h2>
 
             <textarea
               value={description}

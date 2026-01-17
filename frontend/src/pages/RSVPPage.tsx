@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
+import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { Pizzeria } from '../types';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -39,6 +41,11 @@ export function RSVPPage() {
   const [availableToppings, setAvailableToppings] = useState<string[]>([]);
   const [saveToProfile, setSaveToProfile] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
+  // Pizzeria rankings
+  const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
+  const [pizzeriaRankings, setPizzeriaRankings] = useState<string[]>([]); // Array of pizzeria IDs in rank order
+  const [loadingPizzerias, setLoadingPizzerias] = useState(false);
 
   // Load saved preferences when user is logged in or when email matches a saved profile
   useEffect(() => {
@@ -111,6 +118,41 @@ export function RSVPPage() {
     loadParty();
   }, [inviteCode]);
 
+  // Fetch nearby pizzerias when party has an address
+  useEffect(() => {
+    async function fetchPizzerias() {
+      if (!party?.address) return;
+
+      setLoadingPizzerias(true);
+      try {
+        const location = await geocodeAddress(party.address);
+        if (location) {
+          const results = await searchPizzerias(location.lat, location.lng);
+          // Take only top 3
+          setNearbyPizzerias(results.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('Failed to fetch pizzerias:', err);
+      } finally {
+        setLoadingPizzerias(false);
+      }
+    }
+    fetchPizzerias();
+  }, [party?.address]);
+
+  const handlePizzeriaClick = (pizzeriaId: string) => {
+    setPizzeriaRankings(prev => {
+      const currentIndex = prev.indexOf(pizzeriaId);
+      if (currentIndex === -1) {
+        // Not ranked yet, add to end
+        return [...prev, pizzeriaId];
+      } else {
+        // Already ranked, remove it (toggle off)
+        return prev.filter(id => id !== pizzeriaId);
+      }
+    });
+  };
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -162,7 +204,9 @@ export function RSVPPage() {
         email.trim() || undefined,
         ethereumAddress.trim() || undefined,
         roles,
-        mailingListOptIn
+        mailingListOptIn,
+        inviteCode,
+        pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined
       );
 
       if (guest) {
@@ -454,7 +498,7 @@ export function RSVPPage() {
           {/* Dietary Restrictions */}
           <div>
             <label className="block text-sm font-medium text-white/80 mb-3">
-              Dietary Restrictions
+              Diet
             </label>
             <div className="flex flex-wrap gap-2">
               {DIETARY_OPTIONS.map((option) => (
@@ -477,7 +521,7 @@ export function RSVPPage() {
           {/* Toppings */}
           <div>
             <label className="block text-sm font-medium text-white/80 mb-3">
-              Topping Preferences
+              Toppings
             </label>
             <div className="flex flex-wrap gap-2">
               {TOPPINGS.filter(t => availableToppings.length === 0 || availableToppings.includes(t.id)).map((topping) => {
@@ -577,6 +621,66 @@ export function RSVPPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Pizzeria Rankings - only show if party has location and pizzerias found */}
+          {nearbyPizzerias.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-3">
+                Favorite Pizzerias <span className="text-white/50 font-normal">(click to rank 1-3)</span>
+              </label>
+              {loadingPizzerias ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={20} className="animate-spin text-white/40" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {nearbyPizzerias.map((pizzeria) => {
+                    const rankIndex = pizzeriaRankings.indexOf(pizzeria.id);
+                    const rank = rankIndex !== -1 ? rankIndex + 1 : null;
+
+                    return (
+                      <button
+                        key={pizzeria.id}
+                        type="button"
+                        onClick={() => handlePizzeriaClick(pizzeria.id)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                          rank
+                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        {/* Rank badge or empty circle */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${
+                          rank
+                            ? 'bg-[#ff393a] text-white'
+                            : 'bg-white/10 text-white/30'
+                        }`}>
+                          {rank || '—'}
+                        </div>
+
+                        {/* Pizzeria info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-white truncate">{pizzeria.name}</span>
+                            {pizzeria.rating && (
+                              <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
+                                <Star size={10} className="fill-yellow-400" />
+                                {pizzeria.rating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-white/50">
+                            <MapPin size={10} />
+                            <span className="truncate">{pizzeria.address}</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
