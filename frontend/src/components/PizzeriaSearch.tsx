@@ -19,7 +19,17 @@ import {
   Navigation,
   ShoppingCart,
   Clock,
+  X,
+  ChevronRight,
 } from 'lucide-react';
+
+interface PizzeriaRanking {
+  id: string;
+  first: number;
+  second: number;
+  third: number;
+  total: number;
+}
 
 interface PizzeriaSearchProps {
   onSelectPizzeria: (pizzeria: Pizzeria, option: OrderingOption) => void;
@@ -27,6 +37,7 @@ interface PizzeriaSearchProps {
   initialPizzerias?: Pizzeria[];
   initialSearchAddress?: string;
   className?: string; // Allow overriding styles (e.g. for modals)
+  rankings?: PizzeriaRanking[]; // Guest vote rankings
 }
 
 export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
@@ -34,7 +45,8 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   partyAddress,
   initialPizzerias,
   initialSearchAddress,
-  className = "card p-6"
+  className = "card p-6",
+  rankings = [],
 }) => {
   const [pizzerias, setPizzerias] = useState<Pizzeria[]>(initialPizzerias || []);
   const [loading, setLoading] = useState(false);
@@ -42,6 +54,9 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   const [searchAddress, setSearchAddress] = useState(initialSearchAddress || partyAddress || '');
   const [hasSearched, setHasSearched] = useState(!!initialPizzerias?.length);
   const [autoSearched, setAutoSearched] = useState(!!initialPizzerias?.length);
+  const [showAllModal, setShowAllModal] = useState(false);
+
+  const DISPLAY_LIMIT = 3;
 
   // Auto-search if party address is provided and no initial pizzerias
   React.useEffect(() => {
@@ -244,86 +259,148 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
             Found {pizzerias.length} pizzeria{pizzerias.length !== 1 ? 's' : ''} nearby
           </p>
 
-          {pizzerias.map((pizzeria) => {
-            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`;
+          {pizzerias.slice(0, DISPLAY_LIMIT).map((pizzeria) => renderPizzeriaCard(pizzeria, googleMapsApiKey, rankings.find(r => r.id === pizzeria.id)))}
 
-            // Construct static map URL
-            const staticMapUrl = googleMapsApiKey && pizzeria.location
-              ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${googleMapsApiKey}&style=feature:all|element:all|saturation:-100|lightness:-20`
-              : null;
+          {/* View All Pizzerias button */}
+          {pizzerias.length > DISPLAY_LIMIT && (
+            <button
+              onClick={() => setShowAllModal(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/80 hover:text-white transition-all"
+            >
+              View All {pizzerias.length} Pizzerias
+              <ChevronRight size={18} />
+            </button>
+          )}
+        </div>
+      )}
 
-            return (
-              <div
-                key={pizzeria.id}
-                className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/[0.07] transition-all"
+      {/* View All Modal */}
+      {showAllModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowAllModal(false)}
+        >
+          <div
+            className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">All Pizzerias Nearby</h2>
+              <button
+                onClick={() => setShowAllModal(false)}
+                className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
               >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <a
-                        href={googleMapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
-                      >
-                        {pizzeria.name}
-                        <ExternalLink size={12} className="opacity-50" />
-                      </a>
-                      {renderStars(pizzeria.rating)}
-                      {pizzeria.reviewCount && (
-                        <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-white/60 mt-1">{pizzeria.address}</p>
-                    <div className="flex items-center gap-3 mt-2 text-sm">
-                      {pizzeria.distance && (
-                        <span className="text-white/50">
-                          {formatDistance(pizzeria.distance)}
-                        </span>
-                      )}
-                      {pizzeria.isOpen !== undefined && (
-                        <span className={`flex items-center gap-1 ${pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}`}>
-                          <Clock size={12} />
-                          {pizzeria.isOpen ? 'Open' : 'Closed'}
-                        </span>
-                      )}
-                      {pizzeria.priceLevel && (
-                        <span className="text-white/50">
-                          {'$'.repeat(pizzeria.priceLevel)}
-                        </span>
-                      )}
-                    </div>
+                <X size={20} />
+              </button>
+            </div>
 
-                    {renderOrderingOptions(pizzeria)}
-                  </div>
-
-                  {/* Right side: Map Thumbnail */}
-                  <a
-                    href={googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
-                    title="View on Google Maps"
-                  >
-                    {staticMapUrl ? (
-                      <img
-                        src={staticMapUrl}
-                        alt="Map"
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                      />
-                    ) : (
-                      <>
-                        <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
-                      </>
-                    )}
-                  </a>
-                </div>
-              </div>
-            );
-          })}
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {pizzerias.map((pizzeria) => renderPizzeriaCard(pizzeria, googleMapsApiKey, rankings.find(r => r.id === pizzeria.id)))}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
+
+  function renderPizzeriaCard(pizzeria: Pizzeria, apiKey: string | undefined, ranking?: PizzeriaRanking) {
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`;
+
+    // Construct static map URL
+    const staticMapUrl = apiKey && pizzeria.location
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${apiKey}&style=feature:all|element:all|saturation:-100|lightness:-20`
+      : null;
+
+    return (
+      <div
+        key={pizzeria.id}
+        className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/[0.07] transition-all"
+      >
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
+              >
+                {pizzeria.name}
+                <ExternalLink size={12} className="opacity-50" />
+              </a>
+              {renderStars(pizzeria.rating)}
+              {pizzeria.reviewCount && (
+                <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
+              )}
+              {/* Guest vote badges */}
+              {ranking && ranking.total > 0 && (
+                <div className="flex items-center gap-1 ml-1">
+                  {ranking.first > 0 && (
+                    <span className="px-1.5 py-0.5 bg-yellow-400/20 text-yellow-400 rounded text-xs">
+                      🥇{ranking.first}
+                    </span>
+                  )}
+                  {ranking.second > 0 && (
+                    <span className="px-1.5 py-0.5 bg-gray-300/20 text-gray-300 rounded text-xs">
+                      🥈{ranking.second}
+                    </span>
+                  )}
+                  {ranking.third > 0 && (
+                    <span className="px-1.5 py-0.5 bg-amber-600/20 text-amber-500 rounded text-xs">
+                      🥉{ranking.third}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-white/60 mt-1">{pizzeria.address}</p>
+            <div className="flex items-center gap-3 mt-2 text-sm">
+              {pizzeria.distance && (
+                <span className="text-white/50">
+                  {formatDistance(pizzeria.distance)}
+                </span>
+              )}
+              {pizzeria.isOpen !== undefined && (
+                <span className={`flex items-center gap-1 ${pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}`}>
+                  <Clock size={12} />
+                  {pizzeria.isOpen ? 'Open' : 'Closed'}
+                </span>
+              )}
+              {pizzeria.priceLevel && (
+                <span className="text-white/50">
+                  {'$'.repeat(pizzeria.priceLevel)}
+                </span>
+              )}
+            </div>
+
+            {renderOrderingOptions(pizzeria)}
+          </div>
+
+          {/* Right side: Map Thumbnail */}
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
+            title="View on Google Maps"
+          >
+            {staticMapUrl ? (
+              <img
+                src={staticMapUrl}
+                alt="Map"
+                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+              />
+            ) : (
+              <>
+                <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+              </>
+            )}
+          </a>
+        </div>
+      </div>
+    );
+  }
 };

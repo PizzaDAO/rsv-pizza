@@ -248,6 +248,7 @@ function HostPageContent() {
                         window.open(option.deepLink, '_blank');
                       }
                     }}
+                    rankings={pizzeriaRankings}
                   />
                 ) : (
                   <div className="card p-6">

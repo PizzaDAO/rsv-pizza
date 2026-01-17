@@ -6,7 +6,7 @@ import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { LocationAutocomplete } from '../components/LocationAutocomplete';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
+import { Calendar, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play, Plus, MapPin, Crown } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage, getUserParties, UserParty } from '../lib/supabase';
 import { CustomUrlInput } from '../components/CustomUrlInput';
 
@@ -23,7 +23,6 @@ export function HomePage() {
 
   // Form state
   const [partyName, setPartyName] = useState('');
-  const [hostName, setHostName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -123,12 +122,9 @@ export function HomePage() {
 
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
 
-      // Use logged-in user's name as host if available
-      const effectiveHostName = user?.name || formData.hostName?.trim() || undefined;
-
       const party = await createPartyAPI(
         formData.partyName?.trim() || undefined,
-        effectiveHostName,
+        user?.name || undefined,
         startDateTime,
         'new-york',
         guestCount,
@@ -270,7 +266,7 @@ export function HomePage() {
     if (!user) {
       // Save form data to restore after auth
       const formData = {
-        partyName, hostName, startDate, startTime, endDate, endTime, timezone,
+        partyName, startDate, startTime, endDate, endTime, timezone,
         expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests
       };
@@ -321,12 +317,9 @@ export function HomePage() {
         }
       }
 
-      // Use logged-in user's name as host if available
-      const effectiveHostName = user?.name || hostName.trim() || undefined;
-
       const party = await createPartyAPI(
         partyName.trim() || undefined,
-        effectiveHostName,
+        user?.name || undefined,
         startDateTime,
         'new-york',
         guestCount,
@@ -517,19 +510,6 @@ export function HomePage() {
               />
             </div>
 
-            {/* Host Name - only show if user is not logged in or doesn't have a name */}
-            {(!user || !user.name) && (
-              <div className="relative">
-                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="text"
-                  value={hostName}
-                  onChange={(e) => setHostName(e.target.value)}
-                  placeholder="Host Name"
-                  className="w-full !pl-14"
-                />
-              </div>
-            )}
 
             {/* Mobile: Date/Time Button */}
             <button

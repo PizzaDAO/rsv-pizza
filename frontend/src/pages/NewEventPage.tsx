@@ -6,7 +6,7 @@ import { TimezonePickerInput } from '../components/TimezonePickerInput';
 import { LocationAutocomplete } from '../components/LocationAutocomplete';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
+import { Calendar, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from '../components/CustomUrlInput';
 
@@ -18,7 +18,6 @@ export function NewEventPage() {
 
   // Form state
   const [partyName, setPartyName] = useState('');
-  const [hostName, setHostName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -97,7 +96,7 @@ export function NewEventPage() {
 
       const party = await createPartyAPI(
         formData.partyName?.trim() || undefined,
-        formData.hostName?.trim() || undefined,
+        user?.name || undefined,
         startDateTime,
         'new-york',
         guestCount,
@@ -212,7 +211,7 @@ export function NewEventPage() {
 
     if (!user) {
       const formData = {
-        partyName, hostName, startDate, startTime, endDate, endTime, timezone,
+        partyName, startDate, startTime, endDate, endTime, timezone,
         expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests
       };
@@ -263,7 +262,7 @@ export function NewEventPage() {
 
       const party = await createPartyAPI(
         partyName.trim() || undefined,
-        hostName.trim() || undefined,
+        user?.name || undefined,
         startDateTime,
         'new-york',
         guestCount,
@@ -415,16 +414,6 @@ export function NewEventPage() {
               />
             </div>
 
-            <div className="relative">
-              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => setHostName(e.target.value)}
-                placeholder="Host Name"
-                className="w-full !pl-14"
-              />
-            </div>
 
             <div>
               {imagePreview ? (
