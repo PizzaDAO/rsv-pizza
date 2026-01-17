@@ -567,8 +567,8 @@ export interface UserPreferences {
 
 export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
   const { data, error } = await supabase
-    .from('users')
-    .select('default_dietary_restrictions, default_liked_toppings, default_disliked_toppings, default_liked_beverages, default_disliked_beverages')
+    .from('user_preferences')
+    .select('dietary_restrictions, liked_toppings, disliked_toppings, liked_beverages, disliked_beverages')
     .eq('email', email)
     .maybeSingle();
 
@@ -577,11 +577,11 @@ export async function getUserPreferences(email: string): Promise<UserPreferences
   }
 
   return {
-    dietary_restrictions: data.default_dietary_restrictions || [],
-    liked_toppings: data.default_liked_toppings || [],
-    disliked_toppings: data.default_disliked_toppings || [],
-    liked_beverages: data.default_liked_beverages || [],
-    disliked_beverages: data.default_disliked_beverages || [],
+    dietary_restrictions: data.dietary_restrictions || [],
+    liked_toppings: data.liked_toppings || [],
+    disliked_toppings: data.disliked_toppings || [],
+    liked_beverages: data.liked_beverages || [],
+    disliked_beverages: data.disliked_beverages || [],
   };
 }
 
@@ -589,47 +589,24 @@ export async function saveUserPreferences(
   email: string,
   preferences: UserPreferences
 ): Promise<boolean> {
-  // Try to update first, if no rows affected then insert
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle();
+  // Use upsert to insert or update based on email
+  const { error } = await supabase
+    .from('user_preferences')
+    .upsert({
+      email,
+      dietary_restrictions: preferences.dietary_restrictions,
+      liked_toppings: preferences.liked_toppings,
+      disliked_toppings: preferences.disliked_toppings,
+      liked_beverages: preferences.liked_beverages,
+      disliked_beverages: preferences.disliked_beverages,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'email',
+    });
 
-  if (existingUser) {
-    // Update existing user
-    const { error } = await supabase
-      .from('users')
-      .update({
-        default_dietary_restrictions: preferences.dietary_restrictions,
-        default_liked_toppings: preferences.liked_toppings,
-        default_disliked_toppings: preferences.disliked_toppings,
-        default_liked_beverages: preferences.liked_beverages,
-        default_disliked_beverages: preferences.disliked_beverages,
-      })
-      .eq('email', email);
-
-    if (error) {
-      console.error('Error updating user preferences:', error);
-      return false;
-    }
-  } else {
-    // Insert new user with preferences
-    const { error } = await supabase
-      .from('users')
-      .insert({
-        email,
-        default_dietary_restrictions: preferences.dietary_restrictions,
-        default_liked_toppings: preferences.liked_toppings,
-        default_disliked_toppings: preferences.disliked_toppings,
-        default_liked_beverages: preferences.liked_beverages,
-        default_disliked_beverages: preferences.disliked_beverages,
-      });
-
-    if (error) {
-      console.error('Error creating user with preferences:', error);
-      return false;
-    }
+  if (error) {
+    console.error('Error saving user preferences:', error);
+    return false;
   }
 
   return true;

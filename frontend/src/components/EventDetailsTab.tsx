@@ -45,6 +45,7 @@ export const EventDetailsTab: React.FC = () => {
   const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
@@ -412,8 +413,8 @@ export const EventDetailsTab: React.FC = () => {
       });
 
       if (success) {
-        setMessage({ type: 'success', text: 'Event details updated successfully!' });
-        // Reload the page to reflect changes
+        setSaved(true);
+        // Reload the page to reflect changes after showing saved state
         setTimeout(() => window.location.reload(), 1500);
       } else {
         throw new Error('Failed to update party');
@@ -809,12 +810,9 @@ export const EventDetailsTab: React.FC = () => {
           </button>
         </div>
 
-        {/* Message */}
-        {message && (
-          <div className={`p-3 rounded-xl text-sm ${message.type === 'success'
-            ? 'bg-[#39d98a]/10 border border-[#39d98a]/30 text-[#39d98a]'
-            : 'bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a]'
-            }`}>
+        {/* Error Message */}
+        {message && message.type === 'error' && (
+          <div className="p-3 rounded-xl text-sm bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a]">
             {message.text}
           </div>
         )}
@@ -822,18 +820,24 @@ export const EventDetailsTab: React.FC = () => {
         {/* Save Button */}
         <button
           type="submit"
-          disabled={saving}
-          className="w-full btn-primary flex items-center justify-center gap-2"
+          disabled={saving || saved}
+          className={`w-full flex items-center justify-center gap-2 font-medium px-6 py-3 rounded-xl transition-all ${
+            saved
+              ? 'bg-[#39d98a] text-white'
+              : 'btn-primary'
+          }`}
         >
           {saving ? (
             <>
               <Loader2 size={18} className="animate-spin" />
               Saving...
             </>
+          ) : saved ? (
+            'Saved'
           ) : (
             <>
               <Save size={18} />
-              Save Settings
+              Save
             </>
           )}
         </button>
