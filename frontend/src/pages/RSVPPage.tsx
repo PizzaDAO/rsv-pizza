@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
@@ -100,11 +100,15 @@ export function RSVPPage() {
           setAvailableToppings(foundParty.available_toppings || []);
 
           // Check if party has password protection
-          if (foundParty.password) {
+          if (foundParty.has_password) {
             const authKey = `rsvpizza_auth_${inviteCode}`;
             const storedAuth = sessionStorage.getItem(authKey);
-            if (storedAuth === foundParty.password) {
-              setIsAuthenticated(true);
+
+            if (storedAuth) {
+              const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
+              if (isValid) {
+                setIsAuthenticated(true);
+              }
             }
           } else {
             setIsAuthenticated(true);
@@ -153,16 +157,18 @@ export function RSVPPage() {
     });
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!party?.password) return;
+    if (!party?.has_password) return;
 
-    if (passwordInput === party.password) {
+    const isValid = await verifyPartyPassword(party.id, passwordInput);
+
+    if (isValid) {
       setIsAuthenticated(true);
       setPasswordError(null);
       const authKey = `rsvpizza_auth_${inviteCode}`;
-      sessionStorage.setItem(authKey, party.password);
+      sessionStorage.setItem(authKey, passwordInput);
     } else {
       setPasswordError('Incorrect password. Please try again.');
       setPasswordInput('');
@@ -295,7 +301,7 @@ export function RSVPPage() {
   }
 
   // Password protection UI
-  if (!isAuthenticated && party?.password) {
+  if (!isAuthenticated && party?.has_password) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md w-full">
@@ -427,11 +433,10 @@ export function RSVPPage() {
                     key={role}
                     type="button"
                     onClick={() => toggleRole(role)}
-                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      roles.includes(role)
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${roles.includes(role)
                         ? 'bg-[#ff393a] text-white'
                         : 'bg-white/10 text-white/70 hover:bg-white/20'
-                    }`}
+                      }`}
                   >
                     {role}
                   </button>
@@ -506,11 +511,10 @@ export function RSVPPage() {
                   key={option}
                   type="button"
                   onClick={() => toggleDietary(option)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    dietaryRestrictions.includes(option)
+                  className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
                       ? 'bg-[#ff393a] text-white'
                       : 'bg-white/10 text-white/70 hover:bg-white/20'
-                  }`}
+                    }`}
                 >
                   {option}
                 </button>
@@ -531,13 +535,12 @@ export function RSVPPage() {
                 return (
                   <div
                     key={topping.id}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                      isLiked
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
                         ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                         : isDisliked
-                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                        : 'bg-white/5 border-white/10'
-                    }`}
+                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                          : 'bg-white/5 border-white/10'
+                      }`}
                   >
                     <button
                       type="button"
@@ -546,9 +549,8 @@ export function RSVPPage() {
                     >
                       <ThumbsUp
                         size={12}
-                        className={`transition-all ${
-                          isLiked ? 'text-[#39d98a]' : 'text-white/20'
-                        }`}
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                          }`}
                       />
                       <span className="text-white text-xs">{topping.name}</span>
                     </button>
@@ -559,9 +561,8 @@ export function RSVPPage() {
                     >
                       <ThumbsDown
                         size={12}
-                        className={`transition-all ${
-                          isDisliked ? 'text-[#ff393a]' : 'text-white/20'
-                        }`}
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                          }`}
                       />
                     </button>
                   </div>
@@ -584,13 +585,12 @@ export function RSVPPage() {
                   return (
                     <div
                       key={drink.id}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                        isLiked
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
                           ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                           : isDisliked
-                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                          : 'bg-white/5 border-white/10'
-                      }`}
+                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                            : 'bg-white/5 border-white/10'
+                        }`}
                     >
                       <button
                         type="button"
@@ -599,9 +599,8 @@ export function RSVPPage() {
                       >
                         <ThumbsUp
                           size={12}
-                          className={`transition-all ${
-                            isLiked ? 'text-[#39d98a]' : 'text-white/20'
-                          }`}
+                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                            }`}
                         />
                         <span className="text-white text-xs">{drink.name}</span>
                       </button>
@@ -612,9 +611,8 @@ export function RSVPPage() {
                       >
                         <ThumbsDown
                           size={12}
-                          className={`transition-all ${
-                            isDisliked ? 'text-[#ff393a]' : 'text-white/20'
-                          }`}
+                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                            }`}
                         />
                       </button>
                     </div>
@@ -645,18 +643,16 @@ export function RSVPPage() {
                         key={pizzeria.id}
                         type="button"
                         onClick={() => handlePizzeriaClick(pizzeria.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                          rank
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${rank
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
                             : 'bg-white/5 border-white/10 hover:bg-white/10'
-                        }`}
+                          }`}
                       >
                         {/* Rank badge or empty circle */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${
-                          rank
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${rank
                             ? 'bg-[#ff393a] text-white'
                             : 'bg-white/10 text-white/30'
-                        }`}>
+                          }`}>
                           {rank || '—'}
                         </div>
 

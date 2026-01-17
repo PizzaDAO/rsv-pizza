@@ -23,7 +23,7 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
     const filePath = fileName;
 
     // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -62,7 +62,8 @@ export interface DbParty {
   available_toppings: string[];
   max_guests: number | null;
   hide_guests: boolean;
-  password: string | null;
+  password?: string | null;
+  has_password?: boolean;
   event_image_url: string | null;
   description: string | null;
   address: string | null;
@@ -176,33 +177,73 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
   return data;
 }
 
+// Securely verify password without fetching it
+export async function verifyPartyPassword(partyId: string, passwordAttempt: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('parties')
+    .select('*', { count: 'exact', head: true })
+    .eq('id', partyId)
+    .eq('password', passwordAttempt);
+
+  if (error) {
+    console.error('Error verifying password:', error);
+    return false;
+  }
+  return count === 1;
+}
+
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
+  // Define safe columns to fetch (excluding password)
+  const safeColumns = `
+    id, name, invite_code, custom_url, host_name, date, duration, timezone, 
+    pizza_style, available_beverages, available_toppings, max_guests, hide_guests, 
+    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at
+  `;
+
+  let party: DbParty | null = null;
+  let error = null;
+
   // Try custom URL first
   const { data: customUrlData, error: customUrlError } = await supabase
     .from('parties')
-    .select('*')
+    .select(safeColumns)
     .eq('custom_url', slug)
     .maybeSingle();
 
   if (customUrlData) {
-    return customUrlData;
+    party = customUrlData as DbParty;
+  } else {
+    // If not found by custom URL, try invite code
+    const { data: inviteCodeData, error: inviteCodeError } = await supabase
+      .from('parties')
+      .select(safeColumns)
+      .eq('invite_code', slug)
+      .maybeSingle();
+
+    if (inviteCodeData) {
+      party = inviteCodeData as DbParty;
+    } else {
+      if (customUrlError) error = customUrlError;
+      if (inviteCodeError) error = inviteCodeError;
+    }
   }
 
-  // If not found by custom URL, try invite code
-  const { data: inviteCodeData, error: inviteCodeError } = await supabase
-    .from('parties')
-    .select('*')
-    .eq('invite_code', slug)
-    .maybeSingle();
+  if (party) {
+    // Check if password exists (without fetching it)
+    const { count } = await supabase
+      .from('parties')
+      .select('*', { count: 'exact', head: true })
+      .eq('id', party.id)
+      .not('password', 'is', null);
 
-  if (inviteCodeData) {
-    return inviteCodeData;
+    party.has_password = count === 1;
   }
 
-  // Neither found
-  if (customUrlError) console.error('Error fetching party by custom URL:', customUrlError);
-  if (inviteCodeError) console.error('Error fetching party by invite code:', inviteCodeError);
-  return null;
+  if (!party && error) {
+    console.error('Error fetching party:', error);
+  }
+
+  return party;
 }
 
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {

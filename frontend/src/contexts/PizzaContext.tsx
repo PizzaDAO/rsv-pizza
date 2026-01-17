@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings, Party, Beverage, BeverageRecommendation, WaveRecommendation } from '../types';
-import { generatePizzaRecommendations } from '../utils/pizzaAlgorithm';
+
 import { generateBeverageRecommendations } from '../utils/beverageAlgorithm';
 import { generateWaveRecommendations } from '../utils/waveAlgorithm';
 import { TOPPINGS, DRINK_CATEGORIES, DIETARY_OPTIONS, PIZZA_STYLES, PIZZA_SIZES } from '../constants/options';
@@ -81,6 +81,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     maxGuests: dbParty.max_guests,
     hideGuests: dbParty.hide_guests || false,
     password: dbParty.password,
+    hasPassword: dbParty.has_password,
     eventImageUrl: dbParty.event_image_url,
     description: dbParty.description,
     address: dbParty.address,

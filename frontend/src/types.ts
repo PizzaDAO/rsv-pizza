@@ -114,7 +114,8 @@ export interface Party {
   availableToppings?: string[];
   maxGuests: number | null;
   hideGuests: boolean;
-  password: string | null;
+  password?: string | null;
+  hasPassword?: boolean;
   eventImageUrl: string | null;
   description: string | null;
   address: string | null;

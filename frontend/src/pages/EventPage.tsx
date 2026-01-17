@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, getGuestsByPartyId, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, getGuestsByPartyId, verifyPartyPassword, DbParty } from '../lib/supabase';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 
 export function EventPage() {
@@ -36,13 +36,17 @@ export function EventPage() {
           setGuestCount(guests.length);
 
           // Check if party has password protection
-          if (foundParty.password) {
+          if (foundParty.has_password) {
             // Check if already authenticated in this session
             // Use invite_code as key to be consistent with RSVPPage
             const authKey = `rsvpizza_auth_${foundParty.invite_code}`;
             const storedAuth = sessionStorage.getItem(authKey);
-            if (storedAuth === foundParty.password) {
-              setIsAuthenticated(true);
+
+            if (storedAuth) {
+              const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
+              if (isValid) {
+                setIsAuthenticated(true);
+              }
             }
           } else {
             // No password, automatically authenticated
@@ -57,19 +61,21 @@ export function EventPage() {
     loadParty();
   }, [slug]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!party?.password) return;
+    if (!party?.has_password) return;
 
-    if (passwordInput === party.password) {
+    const isValid = await verifyPartyPassword(party.id, passwordInput);
+
+    if (isValid) {
       // Correct password
       setIsAuthenticated(true);
       setPasswordError(null);
       // Store in session storage to avoid re-prompting
       // Use invite_code as key to be consistent with RSVPPage
       const authKey = `rsvpizza_auth_${party.invite_code}`;
-      sessionStorage.setItem(authKey, party.password);
+      sessionStorage.setItem(authKey, passwordInput);
     } else {
       // Wrong password
       setPasswordError('Incorrect password. Please try again.');
@@ -88,7 +94,7 @@ export function EventPage() {
     if (!party) return;
 
     // If no password, just navigate to host page
-    if (!party.password) {
+    if (!party.has_password) {
       navigate(`/host/${party.invite_code}`);
       return;
     }
@@ -97,12 +103,14 @@ export function EventPage() {
     setShowEditPasswordPrompt(true);
   };
 
-  const handleEditPasswordSubmit = (e: React.FormEvent) => {
+  const handleEditPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!party?.password) return;
+    if (!party?.has_password) return;
 
-    if (editPasswordInput === party.password) {
+    const isValid = await verifyPartyPassword(party.id, editPasswordInput);
+
+    if (isValid) {
       // Correct password - navigate to host page
       navigate(`/host/${party.invite_code}`);
     } else {
@@ -136,7 +144,7 @@ export function EventPage() {
   }
 
   // Show password prompt if party is password-protected and not authenticated
-  if (party.password && !isAuthenticated) {
+  if (party.has_password && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md">
