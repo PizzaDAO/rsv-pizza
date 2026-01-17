@@ -75,7 +75,10 @@
       "Bash(vercel --prod:*)",
       "Bash(timeout 10 npx vercel logs:*)",
       "Bash(vercel env add:*)",
-      "Bash(vercel env:*)"
+      "Bash(vercel env:*)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__get_logs"
     ]
   }
 }

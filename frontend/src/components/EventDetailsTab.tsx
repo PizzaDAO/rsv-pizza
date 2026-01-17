@@ -336,7 +336,7 @@ export const EventDetailsTab: React.FC = () => {
 
     return (
       name !== originalValues.name ||
-      hostName !== originalValues.hostName ||
+      // hostName is no longer editable - it comes from the user account
       startDate !== originalValues.startDate ||
       startTime !== originalValues.startTime ||
       endDate !== originalValues.endDate ||
@@ -360,7 +360,7 @@ export const EventDetailsTab: React.FC = () => {
     if (!originalValues) return;
 
     setName(originalValues.name);
-    setHostName(originalValues.hostName);
+    // hostName is not reset - it's display-only from user account
     setStartDate(originalValues.startDate);
     setStartTime(originalValues.startTime);
     setEndDate(originalValues.endDate);
@@ -769,7 +769,7 @@ export const EventDetailsTab: React.FC = () => {
 
           {/* Hosts List (Main Host + Co-Hosts) */}
           <div className="space-y-2 mb-3">
-            {/* Main Host */}
+            {/* Main Host (display only - name comes from user account) */}
             {hostName && (
               <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
                 <div className="flex items-center gap-3 flex-1">
@@ -783,13 +783,6 @@ export const EventDetailsTab: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={startEditingMainHost}
-                  className="text-white/50 hover:text-white text-sm font-medium"
-                >
-                  Edit
-                </button>
               </div>
             )}
 

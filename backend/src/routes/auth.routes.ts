@@ -125,9 +125,13 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
       }
     }
 
+    // Check if user is new (no name set)
+    const isNewUser = !user || !user.name;
+
     res.json({
       success: true,
       message: 'Magic link sent to your email',
+      isNewUser,
       // Only include in development
       ...(process.env.NODE_ENV !== 'production' && { devLink: magicLinkUrl }),
     });
@@ -245,7 +249,7 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
 // POST /api/auth/verify-code - Verify 6-digit code
 router.post('/verify-code', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { code } = req.body;
+    const { code, name } = req.body;
 
     if (!code || typeof code !== 'string') {
       throw new AppError('Code is required', 400, 'VALIDATION_ERROR');
@@ -287,11 +291,20 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       data: { used: true },
     });
 
-    // Create user if doesn't exist
+    // Create user if doesn't exist, or update name if provided
     let user = magicLink.user;
     if (!user) {
       user = await prisma.user.create({
-        data: { email: magicLink.email },
+        data: {
+          email: magicLink.email,
+          name: name?.trim() || null,
+        },
+      });
+    } else if (name?.trim() && !user.name) {
+      // Update name if user exists but has no name set
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { name: name.trim() },
       });
     }
 

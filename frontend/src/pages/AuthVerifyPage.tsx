@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, Check, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, Check, Mail, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -12,21 +12,41 @@ export function AuthVerifyPage() {
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [name, setName] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Focus first input on mount
+  // Check if this is a new user on mount
   useEffect(() => {
-    inputRefs.current[0]?.focus();
+    const newUser = sessionStorage.getItem('isNewUser') === 'true';
+    setIsNewUser(newUser);
+    // Focus name input if new user, otherwise focus code input
+    if (newUser) {
+      setTimeout(() => nameInputRef.current?.focus(), 100);
+    } else {
+      inputRefs.current[0]?.focus();
+    }
   }, []);
 
   async function verifyCode(fullCode: string) {
+    // Validate name for new users
+    if (isNewUser && !name.trim()) {
+      setStatus('error');
+      setError('Please enter your name');
+      return;
+    }
+
     setStatus('verifying');
     setLastSubmittedCode(fullCode);
     try {
       const response = await fetch(`${API_URL}/api/auth/verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: fullCode }),
+        body: JSON.stringify({
+          code: fullCode,
+          ...(isNewUser && name.trim() && { name: name.trim() }),
+        }),
       });
 
       if (!response.ok) {
@@ -35,6 +55,8 @@ export function AuthVerifyPage() {
       }
 
       const data = await response.json();
+      // Clean up session storage
+      sessionStorage.removeItem('isNewUser');
       handleSuccess(data);
     } catch (err: any) {
       setStatus('error');
@@ -126,8 +148,33 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Mail className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Enter Your Code</h1>
-            <p className="text-white/60 mb-6">We sent a 6-digit code to your email</p>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              {isNewUser ? 'Complete Your Profile' : 'Enter Your Code'}
+            </h1>
+            <p className="text-white/60 mb-6">
+              {isNewUser
+                ? 'Enter your name and the 6-digit code we sent'
+                : 'We sent a 6-digit code to your email'}
+            </p>
+
+            {isNewUser && (
+              <div className="relative mb-4">
+                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && name.trim()) {
+                      inputRefs.current[0]?.focus();
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
               {code.map((digit, index) => (
@@ -141,7 +188,7 @@ export function AuthVerifyPage() {
                   onChange={(e) => handleCodeChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
-                  autoFocus={index === 0}
+                  autoFocus={!isNewUser && index === 0}
                 />
               ))}
             </div>

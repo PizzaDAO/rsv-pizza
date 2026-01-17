@@ -23,7 +23,13 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setLoading(true);
 
     try {
-      await signIn(email);
+      const result = await signIn(email);
+      // Store whether this is a new user (no name set) for the verify page
+      if (result.isNewUser) {
+        sessionStorage.setItem('isNewUser', 'true');
+      } else {
+        sessionStorage.removeItem('isNewUser');
+      }
       // Store return URL and navigate directly to code entry
       sessionStorage.setItem('authReturnUrl', window.location.pathname);
       onClose();

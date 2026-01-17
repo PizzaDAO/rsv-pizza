@@ -26,7 +26,13 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      await signIn(email);
+      const result = await signIn(email);
+      // Store whether this is a new user (no name set) for the verify page
+      if (result.isNewUser) {
+        sessionStorage.setItem('isNewUser', 'true');
+      } else {
+        sessionStorage.removeItem('isNewUser');
+      }
       // Navigate directly to code entry
       navigate('/auth/verify');
     } catch (err: any) {
