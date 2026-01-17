@@ -50,6 +50,7 @@ export const EventDetailsTab: React.FC = () => {
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showAddHostModal, setShowAddHostModal] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -537,16 +538,25 @@ export const EventDetailsTab: React.FC = () => {
         />
 
         {/* Description */}
-        <div className="relative">
-          <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add Description"
-            className="w-full !pl-14 min-h-[100px]"
-            rows={3}
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowDescriptionModal(true)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <FileText size={18} className="text-white/40 flex-shrink-0" />
+              {description ? (
+                <p className="text-white truncate">{description}</p>
+              ) : (
+                <span className="text-white/60">Add Description</span>
+              )}
+            </div>
+            <span className="text-sm font-medium text-[#ff393a] hover:text-[#ff5a5b] flex-shrink-0 ml-2">
+              {description ? 'Edit' : 'Add'}
+            </span>
+          </div>
+        </button>
 
         {/* Event Image - Change Image Button */}
         <button
@@ -1309,6 +1319,31 @@ export const EventDetailsTab: React.FC = () => {
                 Add Host
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Description Modal */}
+      {showDescriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">Event Description</h2>
+
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe your event..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
+              autoFocus
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowDescriptionModal(false)}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

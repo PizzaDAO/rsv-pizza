@@ -46,7 +46,7 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: str
     body: JSON.stringify({
       from: 'RSV.Pizza <noreply@rsv.pizza>',
       to: [email],
-      subject: `RSV.Pizza Code [${code}]`,
+      subject: `RSV.Pizza Code ${code}`,
       html: emailHtml,
     }),
   });
