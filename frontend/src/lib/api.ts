@@ -141,6 +141,7 @@ export async function addGuestByHostApi(
   partyId: string,
   data: {
     name: string;
+    email?: string;
     dietaryRestrictions?: string[];
     likedToppings?: string[];
     dislikedToppings?: string[];
@@ -148,7 +149,7 @@ export async function addGuestByHostApi(
     dislikedBeverages?: string[];
   }
 ) {
-  return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests`, {
+  return apiRequest<{ guest: any; alreadyExists?: boolean }>(`/api/parties/${partyId}/guests`, {
     method: 'POST',
     body: data,
   });

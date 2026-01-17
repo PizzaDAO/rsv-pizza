@@ -315,7 +315,7 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
 router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
+    const { name, email, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
 
     // Verify ownership
     const party = await prisma.party.findFirst({
@@ -330,9 +330,22 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
+    // Check if guest with this email already exists for this party
+    if (email) {
+      const existingGuest = await prisma.guest.findFirst({
+        where: { partyId: id, email: email.toLowerCase() },
+      });
+      if (existingGuest) {
+        // Guest already exists, return success without creating duplicate
+        res.status(200).json({ guest: existingGuest, alreadyExists: true });
+        return;
+      }
+    }
+
     const guest = await prisma.guest.create({
       data: {
         name: name.trim(),
+        email: email ? email.toLowerCase() : null,
         dietaryRestrictions: dietaryRestrictions || [],
         likedToppings: likedToppings || [],
         dislikedToppings: dislikedToppings || [],

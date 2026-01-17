@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza } from 'lucide-react';
 import { uploadEventImage } from '../lib/supabase';
+import { IconInput } from './IconInput';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
@@ -328,15 +329,12 @@ export const PartyHeader: React.FC = () => {
                   <label className="block text-sm font-medium text-white/80 mb-2">
                     Party Date
                   </label>
-                  <div className="relative">
-                    <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                    <input
-                      type="date"
-                      value={partyDate}
-                      onChange={(e) => setPartyDate(e.target.value)}
-                      className="w-full !pl-14"
-                    />
-                  </div>
+                  <IconInput
+                    icon={Calendar}
+                    type="date"
+                    value={partyDate}
+                    onChange={(e) => setPartyDate(e.target.value)}
+                  />
                 </div>
 
                 <div>

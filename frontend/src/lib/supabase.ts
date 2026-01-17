@@ -564,13 +564,15 @@ export async function addGuestByHost(
   likedToppings: string[],
   dislikedToppings: string[],
   likedBeverages: string[],
-  dislikedBeverages: string[]
+  dislikedBeverages: string[],
+  email?: string
 ): Promise<DbGuest | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
     try {
       const result = await addGuestByHostApi(partyId, {
         name,
+        email,
         dietaryRestrictions,
         likedToppings,
         dislikedToppings,
@@ -604,6 +606,7 @@ export async function addGuestByHost(
     .insert({
       party_id: partyId,
       name,
+      email: email ? email.toLowerCase() : null,
       dietary_restrictions: dietaryRestrictions,
       liked_toppings: likedToppings,
       disliked_toppings: dislikedToppings,
