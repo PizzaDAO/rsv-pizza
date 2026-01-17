@@ -49,6 +49,7 @@ export const EventDetailsTab: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showAddHostModal, setShowAddHostModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -224,12 +225,13 @@ export const EventDetailsTab: React.FC = () => {
 
     setCoHosts([...coHosts, newCoHost]);
 
-    // Reset form
+    // Reset form and close modal
     setNewCoHostName('');
     setNewCoHostWebsite('');
     setNewCoHostTwitter('');
     setNewCoHostInstagram('');
     setNewCoHostAvatarUrl('');
+    setShowAddHostModal(false);
   };
 
   const startEditingHost = (host: CoHost) => {
@@ -578,99 +580,178 @@ export const EventDetailsTab: React.FC = () => {
           <p className="text-xs text-red-400 mt-1">{imageError}</p>
         )}
 
-        {/* Custom URL and Password in Options */}
-        <button
-          type="button"
-          onClick={() => setShowOptionalFields(!showOptionalFields)}
-          className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
-        >
-          <span className="text-sm font-medium text-white/80">Options</span>
-          {showOptionalFields ? (
-            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          )}
-        </button>
+        {/* Options - Show filled options in main section */}
+        {(() => {
+          const hasRequireApproval = requireApproval;
+          const hasLimitGuests = limitGuests;
+          const hasPassword = !!password;
+          const hasCustomUrl = !!customUrl;
+          const hasUnfilledOptions = !hasRequireApproval || !hasLimitGuests || !hasPassword || !hasCustomUrl;
 
-        {showOptionalFields && (
-          <div className="space-y-3 border-l-2 border-white/10 pl-4">
-            <div>
-              <button
-                type="button"
-                onClick={() => setRequireApproval(!requireApproval)}
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {requireApproval ? (
-                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                ) : (
-                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                )}
-                <span className="text-sm font-medium text-white/80">Require Approval</span>
-              </button>
-            </div>
+          return (
+            <>
+              {/* Filled options shown in main section */}
+              {(hasRequireApproval || hasLimitGuests || hasPassword || hasCustomUrl) && (
+                <div className="space-y-3">
+                  {hasRequireApproval && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setRequireApproval(!requireApproval)}
+                        className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                        <span className="text-sm font-medium text-white/80">Require Approval</span>
+                      </button>
+                    </div>
+                  )}
 
-            <div>
-              <button
-                type="button"
-                onClick={() => setLimitGuests(!limitGuests)}
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {limitGuests ? (
-                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                ) : (
-                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                )}
-                <span className="text-sm font-medium text-white/80">Limit Guests</span>
-              </button>
-            </div>
+                  {hasLimitGuests && (
+                    <>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setLimitGuests(!limitGuests)}
+                          className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                          <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                        <input
+                          type="number"
+                          min="1"
+                          value={maxGuests}
+                          onChange={(e) => setMaxGuests(e.target.value)}
+                          placeholder="Capacity"
+                          className="w-full !pl-14"
+                        />
+                      </div>
+                    </>
+                  )}
 
-            {limitGuests && (
-              <div className="relative">
-                <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="number"
-                  min="1"
-                  value={maxGuests}
-                  onChange={(e) => setMaxGuests(e.target.value)}
-                  placeholder="Capacity"
-                  className="w-full !pl-14"
-                />
-              </div>
-            )}
+                  {hasPassword && (
+                    <div className="relative">
+                      <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Event Password"
+                        className="w-full !pl-14"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  )}
 
-            <div className="relative">
-              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Event Password"
-                className="w-full !pl-14"
-                autoComplete="new-password"
-              />
-            </div>
+                  {hasCustomUrl && (
+                    <div className="relative flex items-center">
+                      <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
+                      <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+                      <input
+                        type="text"
+                        value={customUrl}
+                        onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                        placeholder="custom-url"
+                        className="w-full font-mono text-sm"
+                        style={{ paddingLeft: '130px' }}
+                        pattern="[a-z0-9-]+"
+                        minLength={3}
+                        maxLength={50}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <div className="relative flex items-center">
-              <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-              <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
-              <input
-                type="text"
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                placeholder="custom-url"
-                className="w-full font-mono text-sm"
-                style={{ paddingLeft: '130px' }}
-                pattern="[a-z0-9-]+"
-                minLength={3}
-                maxLength={50}
-              />
-            </div>
-          </div>
-        )}
+              {/* Options collapse section - only show if there are unfilled options */}
+              {hasUnfilledOptions && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowOptionalFields(!showOptionalFields)}
+                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+                  >
+                    <span className="text-sm font-medium text-white/80">Options</span>
+                    {showOptionalFields ? (
+                      <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {showOptionalFields && (
+                    <div className="space-y-3 border-l-2 border-white/10 pl-4">
+                      {!hasRequireApproval && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setRequireApproval(!requireApproval)}
+                            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                          >
+                            <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                            <span className="text-sm font-medium text-white/80">Require Approval</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {!hasLimitGuests && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setLimitGuests(!limitGuests)}
+                            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                          >
+                            <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                            <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {!hasPassword && (
+                        <div className="relative">
+                          <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                          <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Event Password"
+                            className="w-full !pl-14"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                      )}
+
+                      {!hasCustomUrl && (
+                        <div className="relative flex items-center">
+                          <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
+                          <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+                          <input
+                            type="text"
+                            value={customUrl}
+                            onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                            placeholder="custom-url"
+                            className="w-full font-mono text-sm"
+                            style={{ paddingLeft: '130px' }}
+                            pattern="[a-z0-9-]+"
+                            minLength={3}
+                            maxLength={50}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          );
+        })()}
 
         {/* Hosts Section */}
         <div>
@@ -784,60 +865,15 @@ export const EventDetailsTab: React.FC = () => {
             ))}
           </div>
 
-          {/* Add New Host Form */}
-          <div className="border border-white/20 rounded-xl p-4 space-y-3">
-            <input
-              type="text"
-              value={newCoHostName}
-              onChange={(e) => setNewCoHostName(e.target.value)}
-              placeholder="Name *"
-              className="w-full"
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="url"
-                value={newCoHostWebsite}
-                onChange={(e) => setNewCoHostWebsite(e.target.value)}
-                placeholder="Website"
-                className="w-full"
-              />
-              <input
-                type="url"
-                value={newCoHostAvatarUrl}
-                onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
-                placeholder="Avatar URL"
-                className="w-full"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={newCoHostTwitter}
-                onChange={(e) => setNewCoHostTwitter(e.target.value)}
-                placeholder="Twitter username (no @)"
-                className="w-full"
-              />
-              <input
-                type="text"
-                value={newCoHostInstagram}
-                onChange={(e) => setNewCoHostInstagram(e.target.value)}
-                placeholder="Instagram username (no @)"
-                className="w-full"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={addCoHost}
-              disabled={!newCoHostName.trim()}
-              className="w-full btn-secondary flex items-center justify-center gap-2"
-            >
-              <UserPlus size={16} />
-              Add Host
-            </button>
-          </div>
+          {/* Add Host Button */}
+          <button
+            type="button"
+            onClick={() => setShowAddHostModal(true)}
+            className="w-full btn-secondary flex items-center justify-center gap-2"
+          >
+            <UserPlus size={16} />
+            Add Host
+          </button>
         </div>
 
         {/* Message */}
@@ -1199,6 +1235,78 @@ export const EventDetailsTab: React.FC = () => {
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Host Modal */}
+      {showAddHostModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddHostModal(false)}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">Add Host</h2>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={newCoHostName}
+                onChange={(e) => setNewCoHostName(e.target.value)}
+                placeholder="Name *"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="url"
+                  value={newCoHostWebsite}
+                  onChange={(e) => setNewCoHostWebsite(e.target.value)}
+                  placeholder="Website"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+                <input
+                  type="url"
+                  value={newCoHostAvatarUrl}
+                  onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
+                  placeholder="Avatar URL"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={newCoHostTwitter}
+                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                  placeholder="Twitter (no @)"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+                <input
+                  type="text"
+                  value={newCoHostInstagram}
+                  onChange={(e) => setNewCoHostInstagram(e.target.value)}
+                  placeholder="Instagram (no @)"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowAddHostModal(false)}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addCoHost}
+                disabled={!newCoHostName.trim()}
+                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <UserPlus size={16} />
+                Add Host
               </button>
             </div>
           </div>
