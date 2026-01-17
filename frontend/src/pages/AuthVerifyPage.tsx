@@ -54,7 +54,7 @@ export function AuthVerifyPage() {
     setTimeout(() => {
       const returnUrl = sessionStorage.getItem('authReturnUrl');
       sessionStorage.removeItem('authReturnUrl');
-      navigate(returnUrl || '/host/');
+      navigate(returnUrl || '/');
     }, 2000);
   }
 
