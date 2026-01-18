@@ -26,6 +26,7 @@ function App() {
             <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
+            <Route path="/host/:inviteCode/:tab" element={<HostPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

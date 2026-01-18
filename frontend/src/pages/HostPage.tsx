@@ -14,12 +14,22 @@ import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 type TabType = 'details' | 'pizza' | 'guests';
 
 function HostPageContent() {
-  const { inviteCode } = useParams<{ inviteCode: string }>();
+  const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('details');
+
+  // Derive active tab from URL
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza') ? tab : 'details';
+
+  const setActiveTab = (newTab: TabType) => {
+    if (newTab === 'details') {
+      navigate(`/host/${inviteCode}`);
+    } else {
+      navigate(`/host/${inviteCode}/${newTab}`);
+    }
+  };
 
   useEffect(() => {
     async function load() {
