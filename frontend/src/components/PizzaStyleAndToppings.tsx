@@ -102,26 +102,33 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
         <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Available Toppings</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
           {availableToppings.map(topping => (
-            <button
-              key={topping.id}
-              type="button"
-              onClick={() => toggleTopping(topping.id)}
-              className={`chip ${selectedToppings.includes(topping.id) ? 'active' : ''}`}
-            >
-              {topping.name}
-            </button>
+            <label key={topping.id} className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={selectedToppings.includes(topping.id)}
+                onChange={() => toggleTopping(topping.id)}
+                className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
+              />
+              <span className="text-white/80 group-hover:text-white text-sm">{topping.name}</span>
+            </label>
           ))}
           {customToppings.map((custom, index) => (
-            <div key={`custom-${index}`} className="chip active relative pr-8">
-              {custom}
+            <label key={`custom-${index}`} className="flex items-center gap-2 group">
+              <input
+                type="checkbox"
+                checked={true}
+                readOnly
+                className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
+              />
+              <span className="text-white/80 text-sm flex-1">{custom}</span>
               <button
                 type="button"
                 onClick={() => removeCustomTopping(index)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                className="text-white/40 hover:text-white"
               >
                 <X size={14} />
               </button>
-            </div>
+            </label>
           ))}
         </div>
 

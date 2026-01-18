@@ -370,8 +370,8 @@ export function HomePage() {
             <p className="text-white/60">Events you're hosting or attending</p>
           </div>
 
-          {/* Upcoming/Past Toggle */}
-          <div className="flex mb-6">
+          {/* Upcoming/Past Toggle + Create Party Button */}
+          <div className="flex items-center justify-between mb-6">
             <div className="inline-flex bg-white/5 border border-white/10 rounded-xl p-1">
               <button
                 type="button"
@@ -396,6 +396,13 @@ export function HomePage() {
                 Past
               </button>
             </div>
+            <Link
+              to="/new"
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Create Party
+            </Link>
           </div>
 
           {partiesLoading ? (
@@ -479,15 +486,6 @@ export function HomePage() {
               })()}
             </div>
           )}
-
-          {/* Create Party Button */}
-          <Link
-            to="/new"
-            className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
-          >
-            <Plus size={20} />
-            Create Party
-          </Link>
         </div>
       </Layout>
     );

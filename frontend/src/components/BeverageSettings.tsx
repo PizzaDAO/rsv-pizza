@@ -42,26 +42,33 @@ export const BeverageSettings: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
         {availableBeverages.map(beverage => (
-          <button
-            key={beverage.id}
-            type="button"
-            onClick={() => toggleBeverage(beverage.id)}
-            className={`chip ${selectedBeverages.includes(beverage.id) ? 'active' : ''}`}
-          >
-            {beverage.name}
-          </button>
+          <label key={beverage.id} className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={selectedBeverages.includes(beverage.id)}
+              onChange={() => toggleBeverage(beverage.id)}
+              className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
+            />
+            <span className="text-white/80 group-hover:text-white text-sm">{beverage.name}</span>
+          </label>
         ))}
         {customBeverages.map((custom, index) => (
-          <div key={`custom-${index}`} className="chip active relative pr-8">
-            {custom}
+          <label key={`custom-${index}`} className="flex items-center gap-2 group">
+            <input
+              type="checkbox"
+              checked={true}
+              readOnly
+              className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
+            />
+            <span className="text-white/80 text-sm flex-1">{custom}</span>
             <button
               type="button"
               onClick={() => removeCustomBeverage(index)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+              className="text-white/40 hover:text-white"
             >
               <X size={14} />
             </button>
-          </div>
+          </label>
         ))}
       </div>
 
