@@ -9,7 +9,8 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
   try {
     const { inviteCode } = req.params;
 
-    const party = await prisma.party.findUnique({
+    // Find party by invite code OR custom URL
+    let party = await prisma.party.findUnique({
       where: { inviteCode },
       select: {
         id: true,
@@ -24,6 +25,25 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         },
       },
     });
+
+    // If not found by invite code, try custom URL
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: inviteCode },
+        select: {
+          id: true,
+          name: true,
+          date: true,
+          availableBeverages: true,
+          rsvpClosedAt: true,
+          maxGuests: true,
+          user: { select: { name: true } },
+          _count: {
+            select: { guests: true },
+          },
+        },
+      });
+    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -96,8 +116,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
-    // Find party with more details for email
-    const party = await prisma.party.findUnique({
+    // Find party by invite code OR custom URL (frontend supports both)
+    let party = await prisma.party.findUnique({
       where: { inviteCode },
       select: {
         id: true,
@@ -111,6 +131,24 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         _count: { select: { guests: true } },
       },
     });
+
+    // If not found by invite code, try custom URL
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: inviteCode },
+        select: {
+          id: true,
+          name: true,
+          date: true,
+          address: true,
+          customUrl: true,
+          rsvpClosedAt: true,
+          maxGuests: true,
+          user: { select: { name: true } },
+          _count: { select: { guests: true } },
+        },
+      });
+    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -209,8 +247,8 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
       throw new AppError('Guest email and name are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Get party details
-    const party = await prisma.party.findUnique({
+    // Get party details (try invite code first, then custom URL)
+    let party = await prisma.party.findUnique({
       where: { inviteCode },
       select: {
         id: true,
@@ -220,6 +258,19 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
         customUrl: true,
       },
     });
+
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: inviteCode },
+        select: {
+          id: true,
+          name: true,
+          date: true,
+          address: true,
+          customUrl: true,
+        },
+      });
+    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
