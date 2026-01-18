@@ -414,7 +414,7 @@ export function NewEventPage() {
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Add Description"
-                className="w-full !pl-14"
+                className="w-full !pl-14 text-left"
                 rows={3}
               />
             </div>

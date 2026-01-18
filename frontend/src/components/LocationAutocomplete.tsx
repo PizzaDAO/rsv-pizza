@@ -100,7 +100,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full !pl-11 ${className}`}
+        className={`w-full !pl-11 text-left ${className}`}
       />
     </div>
   );
