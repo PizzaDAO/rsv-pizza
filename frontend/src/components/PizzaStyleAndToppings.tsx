@@ -130,7 +130,12 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
             type="text"
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addCustomTopping()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustomTopping();
+              }
+            }}
             placeholder="Add custom topping"
             className="flex-1"
           />

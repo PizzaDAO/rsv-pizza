@@ -93,14 +93,14 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
 
   return (
     <div className="relative">
-      <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
+      <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
       <input
         ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full !pl-11 text-left ${className}`}
+        className={`w-full !pl-9 text-left ${className}`}
       />
     </div>
   );

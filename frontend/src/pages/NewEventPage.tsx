@@ -409,12 +409,12 @@ export function NewEventPage() {
             />
 
             <div className="relative">
-              <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
+              <FileText size={18} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
               <textarea
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Add Description"
-                className="w-full !pl-14 text-left"
+                className="w-full !pl-9 text-left"
                 rows={3}
               />
             </div>

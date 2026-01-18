@@ -70,7 +70,12 @@ export const BeverageSettings: React.FC = () => {
           type="text"
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addCustomBeverage()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addCustomBeverage();
+            }
+          }}
           placeholder="Add custom drink"
           className="flex-1"
         />

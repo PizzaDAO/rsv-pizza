@@ -98,6 +98,16 @@ select:focus {
 input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
+  text-align: left !important;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="password"],
+input[type="url"],
+textarea {
+  text-align: left !important;
 }
 
 /* Textarea specific */
