@@ -36,6 +36,7 @@ export function NewEventPage() {
   const [customUrlError, setCustomUrlError] = useState<string | undefined>();
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
+  const [hideGuests, setHideGuests] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
@@ -107,7 +108,9 @@ export function NewEventPage() {
         imageUrl,
         description,
         urlSlug,
-        formData.timezone || undefined
+        formData.timezone || undefined,
+        undefined, // hostEmail
+        formData.hideGuests || false
       );
 
       setCreating(false);
@@ -213,7 +216,7 @@ export function NewEventPage() {
       const formData = {
         partyName, startDate, startTime, endDate, endTime, timezone,
         expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
-        customUrl, requireApproval, limitGuests
+        customUrl, requireApproval, limitGuests, hideGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
       sessionStorage.setItem('authReturnUrl', '/new');
@@ -273,7 +276,9 @@ export function NewEventPage() {
         imageUrl,
         description,
         urlSlug,
-        timezone || undefined
+        timezone || undefined,
+        undefined, // hostEmail
+        hideGuests
       );
 
       setCreating(false);
@@ -531,6 +536,21 @@ export function NewEventPage() {
                       <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
                     )}
                     <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                  </button>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setHideGuests(!hideGuests)}
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {hideGuests ? (
+                      <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                    ) : (
+                      <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                    )}
+                    <span className="text-sm font-medium text-white/80">Hide Guests</span>
                   </button>
                 </div>
 

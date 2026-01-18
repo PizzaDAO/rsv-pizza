@@ -154,7 +154,8 @@ export async function createParty(
   description?: string,
   customUrl?: string,
   timezone?: string,
-  hostEmail?: string
+  hostEmail?: string,
+  hideGuests?: boolean
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -173,6 +174,7 @@ export async function createParty(
         description,
         customUrl,
         timezone,
+        hideGuests,
       });
 
       // Convert API response to DbParty format
