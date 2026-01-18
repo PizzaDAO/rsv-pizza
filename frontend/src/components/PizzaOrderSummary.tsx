@@ -323,13 +323,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
               <h3 className="font-medium text-[#ffb347] mb-2">Order Summary</h3>
               <div className="space-y-2 text-sm">
-                {waveRecommendations.length > 1 ? (
-                  // Multi-wave summary
+                <p className="text-white/80">
+                  <span className="text-white/60">Total pizzas:</span>{' '}
+                  <span className="font-semibold text-white text-base">{totalPizzas}</span>
+                </p>
+                {waveRecommendations.length > 1 && (
                   <>
-                    <p className="text-white/80">
-                      <span className="text-white/60">Waves:</span>{' '}
-                      <span className="font-semibold text-white">{waveRecommendations.length}</span>
-                    </p>
                     {waveRecommendations.map((waveRec) => (
                       <p key={waveRec.wave.id} className="text-white/80 pl-3 border-l-2 border-white/20">
                         <span className="text-white/60">{waveRec.wave.label}:</span>{' '}
@@ -337,24 +336,23 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                         <span className="text-white/50"> at {format(waveRec.wave.arrivalTime, 'h:mm a')}</span>
                       </p>
                     ))}
-                    <p className="text-white/80 pt-1 border-t border-white/10 mt-2">
-                      <span className="text-white/60">Total pizzas:</span>{' '}
-                      <span className="font-semibold text-white text-base">{totalPizzas}</span>
-                    </p>
                   </>
-                ) : (
-                  <p className="text-white/80">
-                    <span className="text-white/60">Total pizzas:</span>{' '}
-                    <span className="font-semibold text-white text-base">{totalPizzas}</span>
-                  </p>
                 )}
                 {beverageRecommendations.length > 0 && (
-                  <p className="text-white/80">
-                    <span className="text-white/60">Total beverages:</span>{' '}
-                    <span className="font-semibold text-white text-base">
-                      {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
-                    </span>
-                  </p>
+                  <>
+                    <p className="text-white/80 pt-1 border-t border-white/10 mt-2">
+                      <span className="text-white/60">Total drinks:</span>{' '}
+                      <span className="font-semibold text-white text-base">
+                        {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
+                      </span>
+                    </p>
+                    {beverageRecommendations.map((rec) => (
+                      <p key={rec.id} className="text-white/80 pl-3 border-l-2 border-blue-500/30">
+                        <span className="font-semibold text-white">{rec.quantity}x</span>{' '}
+                        <span className="text-white/80">{rec.beverage.name}</span>
+                      </p>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
