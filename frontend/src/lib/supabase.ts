@@ -111,6 +111,7 @@ export interface DbParty {
   available_toppings: string[];
   max_guests: number | null;
   hide_guests: boolean;
+  require_approval: boolean;
   password?: string | null;
   has_password?: boolean;
   event_image_url: string | null;
@@ -137,6 +138,7 @@ export interface DbGuest {
   pizzeria_rankings?: string[];
   submitted_at: string;
   submitted_via: string;
+  approved?: boolean | null; // null = pending, true = approved, false = declined
 }
 
 // Party operations
@@ -648,6 +650,19 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
 
   if (error) {
     console.error('Error removing guest:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function updateGuestApproval(guestId: string, approved: boolean): Promise<boolean> {
+  const { error } = await supabase
+    .from('guests')
+    .update({ approved })
+    .eq('id', guestId);
+
+  if (error) {
+    console.error('Error updating guest approval:', error);
     return false;
   }
   return true;

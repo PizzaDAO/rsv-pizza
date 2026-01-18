@@ -49,6 +49,7 @@ model Party {
   address            String?
   maxGuests          Int?      @map("max_guests")
   hideGuests         Boolean   @default(false) @map("hide_guests")
+  requireApproval    Boolean   @default(false) @map("require_approval")
   coHosts            Json      @default("[]") @map("co_hosts")
   password           String?
   eventImageUrl      String?   @map("event_image_url")
@@ -81,6 +82,7 @@ model Guest {
   pizzeriaRankings    String[] @map("pizzeria_rankings")
   submittedAt         DateTime @default(now()) @map("submitted_at") @db.Timestamptz
   submittedVia        String   @default("link") @map("submitted_via")
+  approved            Boolean? // null = pending, true = approved, false = declined
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)

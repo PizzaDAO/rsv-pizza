@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { PizzaCard } from './PizzaCard';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { TableRow } from './TableRow';
 import { Pizzeria, OrderingOption } from '../types';
 import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
 import { format } from 'date-fns';
@@ -370,11 +370,13 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       </button>
                     </div>
 
-                    {/* Pizza Grid */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {waveRec.pizzas.map((pizza, pizzaIndex) => (
-                        <PizzaCard key={pizza.id} pizza={pizza} index={pizzaIndex} compact />
-                      ))}
+                    {/* Pizza List */}
+                    <div className="divide-y divide-white/10">
+                      {waveRec.pizzas
+                        .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
+                        .map((pizza, pizzaIndex) => (
+                          <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={pizzaIndex} variant="pizza" />
+                        ))}
                     </div>
                   </div>
                 ))}
@@ -394,27 +396,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                         </span>
                       </p>
                     </div>
-                    <div className="space-y-2">
+                    <div className="divide-y divide-white/10">
                       {beverageRecommendations.map(rec => (
-                        <div
-                          key={rec.id}
-                          className="p-2 bg-white/5 border border-white/10 rounded-lg"
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
-                              <span className="text-white/50 text-xs ml-2">
-                                ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
-                              </span>
-                            </div>
-                            <span className="text-blue-400 font-bold text-sm">
-                              {rec.quantity}x
-                            </span>
-                          </div>
-                          {rec.isForNonRespondents && (
-                            <p className="text-xs text-white/40 mt-1">For non-respondents</p>
-                          )}
-                        </div>
+                        <TableRow key={rec.id} beverageRec={rec} variant="beverage" />
                       ))}
                     </div>
                   </div>
@@ -430,13 +414,13 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 </button>
               </div>
             ) : (
-              // Single wave display (existing grid)
+              // Single wave display (row-based)
               <>
-                <div className="grid grid-cols-3 gap-1.5 mb-4">
+                <div className="divide-y divide-white/10 mb-4">
                   {[...recommendations]
                     .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                     .map((pizza, index) => (
-                      <PizzaCard key={pizza.id} pizza={pizza} index={index} compact />
+                      <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={index} variant="pizza" />
                     ))}
                 </div>
 
@@ -455,27 +439,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                         </span>
                       </p>
                     </div>
-                    <div className="space-y-2">
+                    <div className="divide-y divide-white/10">
                       {beverageRecommendations.map(rec => (
-                        <div
-                          key={rec.id}
-                          className="p-2 bg-white/5 border border-white/10 rounded-lg"
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-medium text-white text-sm">{rec.beverage.name}</span>
-                              <span className="text-white/50 text-xs ml-2">
-                                ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
-                              </span>
-                            </div>
-                            <span className="text-blue-400 font-bold text-sm">
-                              {rec.quantity}x
-                            </span>
-                          </div>
-                          {rec.isForNonRespondents && (
-                            <p className="text-xs text-white/40 mt-1">For non-respondents</p>
-                          )}
-                        </div>
+                        <TableRow key={rec.id} beverageRec={rec} variant="beverage" />
                       ))}
                     </div>
                   </div>
