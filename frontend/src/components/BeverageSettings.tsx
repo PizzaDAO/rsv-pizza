@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Beer, Plus, X } from 'lucide-react';
+import { Checkbox } from './Checkbox';
 
 export const BeverageSettings: React.FC = () => {
   const { party, availableBeverages, updatePartyBeverages } = usePizza();
@@ -42,33 +43,29 @@ export const BeverageSettings: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
         {availableBeverages.map(beverage => (
-          <label key={beverage.id} className="flex items-center gap-2 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={selectedBeverages.includes(beverage.id)}
-              onChange={() => toggleBeverage(beverage.id)}
-              className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
-            />
-            <span className="text-white/80 group-hover:text-white text-sm">{beverage.name}</span>
-          </label>
+          <Checkbox
+            key={beverage.id}
+            checked={selectedBeverages.includes(beverage.id)}
+            onChange={() => toggleBeverage(beverage.id)}
+            label={beverage.name}
+          />
         ))}
         {customBeverages.map((custom, index) => (
-          <label key={`custom-${index}`} className="flex items-center gap-2 group">
-            <input
-              type="checkbox"
-              checked={true}
-              readOnly
-              className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
-            />
-            <span className="text-white/80 text-sm flex-1">{custom}</span>
+          <Checkbox
+            key={`custom-${index}`}
+            checked={true}
+            onChange={() => {}}
+            label={custom}
+            disabled
+          >
             <button
               type="button"
               onClick={() => removeCustomBeverage(index)}
-              className="text-white/40 hover:text-white"
+              className="text-white/40 hover:text-white ml-auto"
             >
               <X size={14} />
             </button>
-          </label>
+          </Checkbox>
         ))}
       </div>
 

@@ -7,6 +7,7 @@ import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../l
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { CoHost } from '../types';
+import { Checkbox } from './Checkbox';
 
 export const EventDetailsTab: React.FC = () => {
   const { party, loadParty } = usePizza();
@@ -677,50 +678,23 @@ export const EventDetailsTab: React.FC = () => {
 
           {showOptionalFields && (
             <div className="space-y-3 border-l-2 border-white/10 pl-4 mt-3">
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setRequireApproval(!requireApproval)}
-                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  {requireApproval ? (
-                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                  ) : (
-                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-white/80">Require Approval</span>
-                </button>
-              </div>
+              <Checkbox
+                checked={requireApproval}
+                onChange={() => setRequireApproval(!requireApproval)}
+                label="Require Approval"
+              />
 
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setHideGuests(!hideGuests)}
-                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  {hideGuests ? (
-                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                  ) : (
-                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-white/80">Hide Guests</span>
-                </button>
-              </div>
+              <Checkbox
+                checked={hideGuests}
+                onChange={() => setHideGuests(!hideGuests)}
+                label="Hide Guests"
+              />
 
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setLimitGuests(!limitGuests)}
-                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  {limitGuests ? (
-                    <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
-                  ) : (
-                    <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-white/80">Limit Guests</span>
-                </button>
-              </div>
+              <Checkbox
+                checked={limitGuests}
+                onChange={() => setLimitGuests(!limitGuests)}
+                label="Limit Guests"
+              />
 
               {limitGuests && (
                 <IconInput
@@ -832,18 +806,13 @@ export const EventDetailsTab: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleCoHostShowOnEvent(coHost.id)}
-                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    {coHost.showOnEvent !== false ? (
-                      <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
-                    ) : (
-                      <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
-                    )}
-                    <span className="text-xs font-medium text-white/60">Show</span>
-                  </button>
+                  <Checkbox
+                    checked={coHost.showOnEvent !== false}
+                    onChange={() => toggleCoHostShowOnEvent(coHost.id)}
+                    label="Show"
+                    size={16}
+                    labelClassName="text-xs font-medium text-white/60"
+                  />
                   <button
                     type="button"
                     onClick={() => startEditingHost(coHost)}

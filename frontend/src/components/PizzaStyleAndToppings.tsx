@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Pizza, Plus, X } from 'lucide-react';
+import { Checkbox } from './Checkbox';
 
 interface PizzaStyleAndToppingsProps {
   children?: React.ReactNode;
@@ -102,33 +103,29 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
         <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Available Toppings</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
           {availableToppings.map(topping => (
-            <label key={topping.id} className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={selectedToppings.includes(topping.id)}
-                onChange={() => toggleTopping(topping.id)}
-                className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
-              />
-              <span className="text-white/80 group-hover:text-white text-sm">{topping.name}</span>
-            </label>
+            <Checkbox
+              key={topping.id}
+              checked={selectedToppings.includes(topping.id)}
+              onChange={() => toggleTopping(topping.id)}
+              label={topping.name}
+            />
           ))}
           {customToppings.map((custom, index) => (
-            <label key={`custom-${index}`} className="flex items-center gap-2 group">
-              <input
-                type="checkbox"
-                checked={true}
-                readOnly
-                className="w-4 h-4 rounded text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0"
-              />
-              <span className="text-white/80 text-sm flex-1">{custom}</span>
+            <Checkbox
+              key={`custom-${index}`}
+              checked={true}
+              onChange={() => {}}
+              label={custom}
+              disabled
+            >
               <button
                 type="button"
                 onClick={() => removeCustomTopping(index)}
-                className="text-white/40 hover:text-white"
+                className="text-white/40 hover:text-white ml-auto"
               >
                 <X size={14} />
               </button>
-            </label>
+            </Checkbox>
           ))}
         </div>
 
