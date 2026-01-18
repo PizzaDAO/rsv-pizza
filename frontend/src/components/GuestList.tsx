@@ -1,13 +1,25 @@
 import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { GuestBasicCard } from './GuestBasicCard';
-import { UserRoundX } from 'lucide-react';
+import { UserRoundX, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
 
-// TODO: Re-enable invite functionality when email invites are implemented
-// import { InviteGuestsModal } from './InviteGuestsModal';
+// Generate a consistent color based on name
+const getAvatarColor = (name: string) => {
+  const colors = [
+    'bg-red-400', 'bg-orange-400', 'bg-amber-400', 'bg-yellow-400',
+    'bg-lime-400', 'bg-green-400', 'bg-emerald-400', 'bg-teal-400',
+    'bg-cyan-400', 'bg-sky-400', 'bg-blue-400', 'bg-indigo-400',
+    'bg-violet-400', 'bg-purple-400', 'bg-fuchsia-400', 'bg-pink-400',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
 
 export const GuestList: React.FC = () => {
-  const { guests } = usePizza();
+  const { guests, removeGuest } = usePizza();
 
   if (guests.length === 0) {
     return (
@@ -32,9 +44,50 @@ export const GuestList: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="divide-y divide-white/10">
         {guests.map(guest => (
-          <GuestBasicCard key={guest.id} guest={guest} />
+          <div
+            key={guest.id}
+            className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors"
+          >
+            {/* Avatar */}
+            <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-white text-sm font-medium flex-shrink-0`}>
+              {guest.name.charAt(0).toUpperCase()}
+            </div>
+
+            {/* Name & Email */}
+            <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-white">{guest.name}</span>
+              {guest.email && (
+                <span className="text-white/50 text-sm truncate">{guest.email}</span>
+              )}
+              {guest.roles && guest.roles.length > 0 && (
+                <div className="flex gap-1">
+                  {guest.roles.map(role => (
+                    <span key={role} className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[10px] rounded">
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Date */}
+            {guest.submittedAt && (
+              <span className="text-white/40 text-sm hidden sm:block">
+                {format(new Date(guest.submittedAt), 'MMM d, yyyy')}
+              </span>
+            )}
+
+            {/* Delete */}
+            <button
+              onClick={() => guest.id && removeGuest(guest.id)}
+              className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+              aria-label="Remove guest"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ))}
       </div>
     </div>
