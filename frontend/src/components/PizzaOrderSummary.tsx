@@ -483,6 +483,61 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               </>
             )}
 
+            {/* Copy Order & Call Script buttons */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={handleCopyOrder}
+                disabled={recommendations.length === 0}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm transition-all ${isCopied
+                  ? 'bg-[#39d98a] text-white'
+                  : 'btn-secondary'
+                  }`}
+              >
+                {isCopied ? (
+                  <>
+                    <Check size={16} />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={16} />
+                    <span>Copy Order</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowCallScript(!showCallScript)}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm btn-secondary"
+              >
+                <Phone size={16} />
+                <span>Call Script</span>
+                {showCallScript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+
+            {/* Expandable Call Script */}
+            {showCallScript && (
+              <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-white text-sm">Phone Order Script</h3>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateCallScript());
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                  >
+                    Copy script
+                  </button>
+                </div>
+                <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
+                  {generateCallScript()}
+                </pre>
+              </div>
+            )}
+
             {/* Inline Pizzeria Search/Results */}
             <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
               {!hasSearched || pizzerias.length === 0 ? (
@@ -614,61 +669,6 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 </div>
               )}
             </div>
-
-            {/* Copy Order & Call Script buttons */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={handleCopyOrder}
-                disabled={recommendations.length === 0}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm transition-all ${isCopied
-                  ? 'bg-[#39d98a] text-white'
-                  : 'btn-secondary'
-                  }`}
-              >
-                {isCopied ? (
-                  <>
-                    <Check size={16} />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 size={16} />
-                    <span>Copy Order</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => setShowCallScript(!showCallScript)}
-                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm btn-secondary"
-              >
-                <Phone size={16} />
-                <span>Call Script</span>
-                {showCallScript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-            </div>
-
-            {/* Expandable Call Script */}
-            {showCallScript && (
-              <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-white text-sm">Phone Order Script</h3>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(generateCallScript());
-                      setIsCopied(true);
-                      setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
-                  >
-                    Copy script
-                  </button>
-                </div>
-                <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
-                  {generateCallScript()}
-                </pre>
-              </div>
-            )}
           </>
         )}
       </div>
