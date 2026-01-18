@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, Beer, Pizza } from 'lucide-react';
+import { Trash2, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 
@@ -101,9 +101,9 @@ export const TableRow: React.FC<TableRowProps> = ({
 
     return (
       <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-        {/* Icon */}
-        <div className={`w-8 h-8 rounded-full ${pizzaRec.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} flex items-center justify-center text-white flex-shrink-0`}>
-          <Pizza size={16} />
+        {/* Quantity badge */}
+        <div className={`w-8 h-8 rounded-full ${pizzaRec.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+          {quantity}
         </div>
 
         {/* Content */}
@@ -135,11 +135,6 @@ export const TableRow: React.FC<TableRowProps> = ({
         <span className="text-white/50 text-xs flex-shrink-0">
           {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
         </span>
-
-        {/* Quantity */}
-        <span className="text-[#ff393a] font-bold text-sm flex-shrink-0">
-          {quantity}x
-        </span>
       </div>
     );
   }
@@ -148,9 +143,9 @@ export const TableRow: React.FC<TableRowProps> = ({
   if (variant === 'beverage' && beverageRec) {
     return (
       <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-        {/* Icon */}
-        <div className={`w-8 h-8 rounded-full ${getAvatarColor(beverageRec.beverage.name)} flex items-center justify-center text-white flex-shrink-0`}>
-          <Beer size={16} />
+        {/* Quantity badge */}
+        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {beverageRec.quantity}
         </div>
 
         {/* Content */}
@@ -165,11 +160,6 @@ export const TableRow: React.FC<TableRowProps> = ({
             </span>
           )}
         </div>
-
-        {/* Quantity */}
-        <span className="text-blue-400 font-bold text-sm flex-shrink-0">
-          {beverageRec.quantity}x
-        </span>
       </div>
     );
   }
@@ -203,19 +193,15 @@ export const TableRow: React.FC<TableRowProps> = ({
           )}
         </div>
       ) : (
-        // Requests variant: Name & Preferences
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white">{guest.name}</span>
-            {/* Dietary restrictions */}
+        // Requests variant: Name on left, Preferences on right
+        <>
+          <span className="font-semibold text-white flex-shrink-0">{guest.name}</span>
+          <div className="flex-1 min-w-0 flex flex-wrap gap-1 justify-end">
             {guest.dietaryRestrictions.map(restriction => (
               <span key={restriction} className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] rounded border border-purple-500/30">
                 {restriction}
               </span>
             ))}
-          </div>
-          {/* Toppings & Beverages on second line */}
-          <div className="flex flex-wrap gap-1 mt-1">
             {guest.toppings.map(toppingId => {
               const name = toppingNameById(toppingId);
               return (
@@ -249,7 +235,7 @@ export const TableRow: React.FC<TableRowProps> = ({
               );
             })}
           </div>
-        </div>
+        </>
       )}
 
       {/* Approve/Decline buttons */}
@@ -280,8 +266,8 @@ export const TableRow: React.FC<TableRowProps> = ({
         <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
       )}
 
-      {/* Date */}
-      {guest.submittedAt && (
+      {/* Date - only for basic variant */}
+      {variant === 'basic' && guest.submittedAt && (
         <span className="text-white/40 text-sm hidden sm:block flex-shrink-0">
           {format(new Date(guest.submittedAt), 'MMM d, yyyy')}
         </span>
