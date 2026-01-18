@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { Beer, Check, Plus, X } from 'lucide-react';
+import { Beer, Plus, X } from 'lucide-react';
 
 export const BeverageSettings: React.FC = () => {
   const { party, availableBeverages, updatePartyBeverages } = usePizza();
@@ -9,33 +9,22 @@ export const BeverageSettings: React.FC = () => {
   );
   const [customBeverages, setCustomBeverages] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
-
-  const hasChanges = JSON.stringify(selectedBeverages.sort()) !==
-                     JSON.stringify((party?.availableBeverages || []).sort());
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updatePartyBeverages(selectedBeverages);
-    setIsSaving(false);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 2000);
-  };
 
   const toggleBeverage = (beverageId: string) => {
-    setSelectedBeverages(prev =>
-      prev.includes(beverageId)
-        ? prev.filter(id => id !== beverageId)
-        : [...prev, beverageId]
-    );
+    const newSelection = selectedBeverages.includes(beverageId)
+      ? selectedBeverages.filter(id => id !== beverageId)
+      : [...selectedBeverages, beverageId];
+    setSelectedBeverages(newSelection);
+    updatePartyBeverages(newSelection);
   };
 
   const addCustomBeverage = () => {
     if (customInput.trim()) {
       const customId = `custom-${Date.now()}`;
       setCustomBeverages(prev => [...prev, customInput.trim()]);
-      setSelectedBeverages(prev => [...prev, customId]);
+      const newSelection = [...selectedBeverages, customId];
+      setSelectedBeverages(newSelection);
+      updatePartyBeverages(newSelection);
       setCustomInput('');
     }
   };
@@ -76,7 +65,7 @@ export const BeverageSettings: React.FC = () => {
         ))}
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2">
         <input
           type="text"
           value={customInput}
@@ -94,25 +83,6 @@ export const BeverageSettings: React.FC = () => {
           Add
         </button>
       </div>
-
-      {hasChanges && (
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className={`btn-primary w-full flex items-center justify-center gap-2 ${
-            justSaved ? 'bg-[#39d98a]' : ''
-          }`}
-        >
-          {justSaved ? (
-            <>
-              <Check size={18} />
-              <span>Saved!</span>
-            </>
-          ) : (
-            <span>{isSaving ? 'Saving...' : 'Save Beverage Selection'}</span>
-          )}
-        </button>
-      )}
     </div>
   );
 };

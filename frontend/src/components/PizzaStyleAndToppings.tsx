@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { Pizza, Check, Plus, X } from 'lucide-react';
+import { Pizza, Plus, X } from 'lucide-react';
 
 interface PizzaStyleAndToppingsProps {
   children?: React.ReactNode;
@@ -34,8 +34,6 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
 
   const [customToppings, setCustomToppings] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     if (party?.availableToppings && party.availableToppings.length > 0) {
@@ -43,30 +41,21 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
     }
   }, [party?.availableToppings]);
 
-  const hasChanges = JSON.stringify(selectedToppings.sort()) !==
-                     JSON.stringify((party?.availableToppings || availableToppings.map(t => t.id)).sort());
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updatePartyToppings(selectedToppings);
-    setIsSaving(false);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 2000);
-  };
-
   const toggleTopping = (toppingId: string) => {
-    setSelectedToppings(prev =>
-      prev.includes(toppingId)
-        ? prev.filter(id => id !== toppingId)
-        : [...prev, toppingId]
-    );
+    const newSelection = selectedToppings.includes(toppingId)
+      ? selectedToppings.filter(id => id !== toppingId)
+      : [...selectedToppings, toppingId];
+    setSelectedToppings(newSelection);
+    updatePartyToppings(newSelection);
   };
 
   const addCustomTopping = () => {
     if (customInput.trim()) {
       const customId = `custom-${Date.now()}`;
       setCustomToppings(prev => [...prev, customInput.trim()]);
-      setSelectedToppings(prev => [...prev, customId]);
+      const newSelection = [...selectedToppings, customId];
+      setSelectedToppings(newSelection);
+      updatePartyToppings(newSelection);
       setCustomInput('');
     }
   };
@@ -136,7 +125,7 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
           ))}
         </div>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2">
           <input
             type="text"
             value={customInput}
@@ -154,25 +143,6 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
             Add
           </button>
         </div>
-
-        {hasChanges && (
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`btn-primary w-full flex items-center justify-center gap-2 ${
-              justSaved ? 'bg-[#39d98a]' : ''
-            }`}
-          >
-            {justSaved ? (
-              <>
-                <Check size={18} />
-                <span>Saved!</span>
-              </>
-            ) : (
-              <span>{isSaving ? 'Saving...' : 'Save Topping Selection'}</span>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Additional content passed as children */}
