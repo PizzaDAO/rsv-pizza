@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { AddGuestForm } from './AddGuestForm';
-import { UserRoundX, UserPlus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { UserRoundX, UserPlus, ChevronDown, ChevronUp, Trash2, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 
@@ -23,7 +23,7 @@ const getAvatarColor = (name: string) => {
 };
 
 export const GuestPreferencesList: React.FC = () => {
-  const { guests, removeGuest, availableToppings, availableBeverages } = usePizza();
+  const { guests, removeGuest, approveGuest, declineGuest, party, availableToppings, availableBeverages } = usePizza();
   const [showAddForm, setShowAddForm] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -52,6 +52,7 @@ export const GuestPreferencesList: React.FC = () => {
 
   const hiddenCount = guestsWithRequests.length - INITIAL_VISIBLE_COUNT;
   const hasMore = hiddenCount > 0;
+  const requireApproval = party?.requireApproval || false;
 
   if (guestsWithRequests.length === 0) {
     return (
@@ -162,6 +163,34 @@ export const GuestPreferencesList: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              {/* Approve/Decline buttons */}
+              {requireApproval && guest.approved === null && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => guest.id && approveGuest(guest.id)}
+                    className="flex items-center gap-1 text-[#39d98a] hover:bg-[#39d98a]/10 px-2 py-1 rounded transition-colors text-sm"
+                  >
+                    <Check size={14} />
+                    <span>Approve</span>
+                  </button>
+                  <button
+                    onClick={() => guest.id && declineGuest(guest.id)}
+                    className="flex items-center gap-1 text-[#ff393a] hover:bg-[#ff393a]/10 px-2 py-1 rounded transition-colors text-sm"
+                  >
+                    <X size={14} />
+                    <span>Decline</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Status badge for approved/declined */}
+              {requireApproval && guest.approved === true && (
+                <span className="text-[#39d98a] text-xs flex-shrink-0">Approved</span>
+              )}
+              {requireApproval && guest.approved === false && (
+                <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+              )}
 
               {/* Date */}
               {guest.submittedAt && (

@@ -23,6 +23,8 @@ export interface Guest {
   likedBeverages?: string[];
   dislikedBeverages?: string[];
   pizzeriaRankings?: string[];
+  submittedAt?: string;
+  approved?: boolean | null; // null = pending, true = approved, false = declined
 }
 
 export interface PizzaStyle {
@@ -116,6 +118,7 @@ export interface Party {
   availableToppings?: string[];
   maxGuests: number | null;
   hideGuests: boolean;
+  requireApproval: boolean;
   password?: string | null;
   hasPassword?: boolean;
   eventImageUrl: string | null;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { UserRoundX, Trash2 } from 'lucide-react';
+import { UserRoundX, Trash2, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Generate a consistent color based on name
@@ -19,7 +19,7 @@ const getAvatarColor = (name: string) => {
 };
 
 export const GuestList: React.FC = () => {
-  const { guests, removeGuest } = usePizza();
+  const { guests, removeGuest, approveGuest, declineGuest, party } = usePizza();
 
   if (guests.length === 0) {
     return (
@@ -32,6 +32,8 @@ export const GuestList: React.FC = () => {
       </div>
     );
   }
+
+  const requireApproval = party?.requireApproval || false;
 
   return (
     <div className="card p-6">
@@ -72,9 +74,37 @@ export const GuestList: React.FC = () => {
               )}
             </div>
 
+            {/* Approve/Decline buttons */}
+            {requireApproval && guest.approved === null && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => guest.id && approveGuest(guest.id)}
+                  className="flex items-center gap-1 text-[#39d98a] hover:bg-[#39d98a]/10 px-2 py-1 rounded transition-colors text-sm"
+                >
+                  <Check size={14} />
+                  <span>Approve</span>
+                </button>
+                <button
+                  onClick={() => guest.id && declineGuest(guest.id)}
+                  className="flex items-center gap-1 text-[#ff393a] hover:bg-[#ff393a]/10 px-2 py-1 rounded transition-colors text-sm"
+                >
+                  <X size={14} />
+                  <span>Decline</span>
+                </button>
+              </div>
+            )}
+
+            {/* Status badge for approved/declined */}
+            {requireApproval && guest.approved === true && (
+              <span className="text-[#39d98a] text-xs flex-shrink-0">Approved</span>
+            )}
+            {requireApproval && guest.approved === false && (
+              <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+            )}
+
             {/* Date */}
             {guest.submittedAt && (
-              <span className="text-white/40 text-sm hidden sm:block">
+              <span className="text-white/40 text-sm hidden sm:block flex-shrink-0">
                 {format(new Date(guest.submittedAt), 'MMM d, yyyy')}
               </span>
             )}
@@ -82,7 +112,7 @@ export const GuestList: React.FC = () => {
             {/* Delete */}
             <button
               onClick={() => guest.id && removeGuest(guest.id)}
-              className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+              className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
               aria-label="Remove guest"
             >
               <Trash2 size={14} />

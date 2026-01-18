@@ -21,6 +21,8 @@ interface PizzaContextType {
   guests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
   removeGuest: (id: string) => Promise<void>;
+  approveGuest: (id: string) => Promise<void>;
+  declineGuest: (id: string) => Promise<void>;
   // Recommendations
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
@@ -62,6 +64,8 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     likedBeverages: dbGuest.liked_beverages || [],
     dislikedBeverages: dbGuest.disliked_beverages || [],
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
+    submittedAt: dbGuest.submitted_at,
+    approved: (dbGuest as any).approved ?? null,
   };
 }
 
@@ -81,6 +85,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableToppings: dbParty.available_toppings || [],
     maxGuests: dbParty.max_guests,
     hideGuests: dbParty.hide_guests || false,
+    requireApproval: (dbParty as any).require_approval || false,
     password: dbParty.password,
     hasPassword: dbParty.has_password,
     eventImageUrl: dbParty.event_image_url,
@@ -222,6 +227,26 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const approveGuest = async (id: string) => {
+    // TODO: Implement backend API call when database supports approval
+    // For now, update local state
+    setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: true } : g));
+    setParty(prev => prev ? {
+      ...prev,
+      guests: prev.guests.map(g => g.id === id ? { ...g, approved: true } : g)
+    } : null);
+  };
+
+  const declineGuest = async (id: string) => {
+    // TODO: Implement backend API call when database supports approval
+    // For now, update local state
+    setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: false } : g));
+    setParty(prev => prev ? {
+      ...prev,
+      guests: prev.guests.map(g => g.id === id ? { ...g, approved: false } : g)
+    } : null);
+  };
+
   const updatePizzaSettings = (settings: PizzaSettings) => {
     setPizzaSettings(settings);
   };
@@ -285,6 +310,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       guests,
       addGuest,
       removeGuest,
+      approveGuest,
+      declineGuest,
       recommendations,
       generateRecommendations,
       beverageRecommendations,
