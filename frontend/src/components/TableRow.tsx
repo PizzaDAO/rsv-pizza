@@ -59,20 +59,19 @@ export const TableRow: React.FC<TableRowProps> = ({
     if (pizzaRec.isHalfAndHalf && pizzaRec.leftHalf && pizzaRec.rightHalf) {
       const leftLabel = pizzaRec.leftHalf.toppings.map(t => t.name).join(', ') || 'Cheese';
       const rightLabel = pizzaRec.rightHalf.toppings.map(t => t.name).join(', ') || 'Cheese';
+      const combinedLabel = `½ ${leftLabel} / ½ ${rightLabel}`;
 
       return (
         <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-          {/* Quantity badge */}
-          <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-            ½+½
-          </div>
+          {/* Quantity */}
+          <span className="text-[#ff393a] font-bold text-sm flex-shrink-0 w-8 text-center">
+            {quantity}x
+          </span>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-white">{leftLabel}</span>
-              <span className="text-white/40">/</span>
-              <span className="font-semibold text-white">{rightLabel}</span>
+              <span className="font-semibold text-white">{combinedLabel}</span>
             </div>
             <div className="flex flex-wrap gap-1 mt-1">
               {pizzaRec.dietaryRestrictions.map(r => (
@@ -90,21 +89,16 @@ export const TableRow: React.FC<TableRowProps> = ({
           <span className="text-white/50 text-xs flex-shrink-0">
             {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
           </span>
-
-          {/* Quantity */}
-          <span className="text-[#ff393a] font-bold text-sm flex-shrink-0">
-            {quantity}x
-          </span>
         </div>
       );
     }
 
     return (
       <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-        {/* Quantity badge */}
-        <div className={`w-8 h-8 rounded-full ${pizzaRec.isForNonRespondents ? 'bg-[#6b7280]' : 'bg-[#ff393a]'} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-          {quantity}
-        </div>
+        {/* Quantity */}
+        <span className={`font-bold text-sm flex-shrink-0 w-8 text-center ${pizzaRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-[#ff393a]'}`}>
+          {quantity}x
+        </span>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -143,10 +137,10 @@ export const TableRow: React.FC<TableRowProps> = ({
   if (variant === 'beverage' && beverageRec) {
     return (
       <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-        {/* Quantity badge */}
-        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-          {beverageRec.quantity}
-        </div>
+        {/* Quantity */}
+        <span className={`font-bold text-sm flex-shrink-0 w-8 text-center ${beverageRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-blue-500'}`}>
+          {beverageRec.quantity}x
+        </span>
 
         {/* Content */}
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
