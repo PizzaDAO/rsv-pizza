@@ -55,6 +55,7 @@ export interface CreatePartyData {
   address?: string;
   maxGuests?: number;
   hideGuests?: boolean;
+  requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
   password?: string;
@@ -73,6 +74,7 @@ export interface UpdatePartyData {
   address?: string | null;
   maxGuests?: number | null;
   hideGuests?: boolean;
+  requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
   password?: string | null;
@@ -96,6 +98,7 @@ export async function createPartyApi(data: CreatePartyData) {
       address: data.address,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
+      requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
       password: data.password,
@@ -119,6 +122,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       address: data.address,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
+      requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
       password: data.password,

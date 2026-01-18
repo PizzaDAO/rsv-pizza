@@ -763,6 +763,7 @@ export async function updateParty(
     event_image_url?: string | null;
     max_guests?: number | null;
     hide_guests?: boolean;
+    require_approval?: boolean;
     co_hosts?: any[];
     timezone?: string | null;
     available_beverages?: string[];
@@ -780,6 +781,7 @@ export async function updateParty(
         address: updates.address,
         maxGuests: updates.max_guests,
         hideGuests: updates.hide_guests,
+        requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
         password: updates.password,

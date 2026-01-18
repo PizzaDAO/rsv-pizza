@@ -119,6 +119,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyMaxGuests = party.maxGuests?.toString() || '';
       const partyLimitGuests = !!party.maxGuests;
       const partyHideGuests = party.hideGuests || false;
+      const partyRequireApproval = party.requireApproval || false;
       const partyCoHosts = party.coHosts || [];
 
       // Set form values
@@ -138,6 +139,7 @@ export const EventDetailsTab: React.FC = () => {
       setMaxGuests(partyMaxGuests);
       setLimitGuests(partyLimitGuests);
       setHideGuests(partyHideGuests);
+      setRequireApproval(partyRequireApproval);
       setCoHosts(partyCoHosts);
 
       // Store original values
@@ -157,6 +159,7 @@ export const EventDetailsTab: React.FC = () => {
         maxGuests: partyMaxGuests,
         limitGuests: partyLimitGuests,
         hideGuests: partyHideGuests,
+        requireApproval: partyRequireApproval,
         coHosts: JSON.stringify(partyCoHosts),
       });
     }
@@ -432,6 +435,7 @@ export const EventDetailsTab: React.FC = () => {
         event_image_url: imageUrl || null,
         max_guests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
         hide_guests: hideGuests,
+        require_approval: requireApproval,
         co_hosts: coHosts,
       });
 
@@ -475,6 +479,7 @@ export const EventDetailsTab: React.FC = () => {
           maxGuests,
           limitGuests,
           hideGuests,
+          requireApproval,
           coHosts: JSON.stringify(coHosts),
         });
         // Clear the image file since it's been uploaded

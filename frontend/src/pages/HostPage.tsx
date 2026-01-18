@@ -177,10 +177,10 @@ function HostPageContent() {
                     const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
                     const minValue = 0;
                     // Scale max dynamically based on data - use smaller max for low guest counts
-                    // Cap at 100x the number of RSVPs
+                    // Cap at 5x the number of RSVPs
                     const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
                     const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
-                    const maxCap = guests.length > 0 ? guests.length * 100 : 100;
+                    const maxCap = guests.length > 0 ? guests.length * 5 : 100;
                     const maxValue = Math.min(dynamicMax, maxCap);
                     const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
                     const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;

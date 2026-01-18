@@ -39,7 +39,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const {
       name, date, endTime, duration, pizzaStyle, address, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, coHosts
+      customUrl, timezone, hideGuests, requireApproval, coHosts
     } = req.body;
 
     // Generate default party name if not provided
@@ -85,6 +85,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         address: address || null,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
+        requireApproval: requireApproval || false,
         password: password || null,
         eventImageUrl: eventImageUrl || null,
         description: description || null,
@@ -166,7 +167,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const {
       name, date, endTime, duration, pizzaStyle, address, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, coHosts
+      customUrl, timezone, hideGuests, requireApproval, coHosts
     } = req.body;
 
     // Verify ownership
@@ -200,6 +201,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(address !== undefined && { address }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(hideGuests !== undefined && { hideGuests }),
+        ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
         ...(password !== undefined && { password: password || null }),
