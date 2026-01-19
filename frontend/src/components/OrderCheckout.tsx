@@ -3,11 +3,15 @@ import { Pizzeria, OrderingOption, PizzaRecommendation, OrderItem } from '../typ
 import {
   createSquareOrder,
   createAIPhoneOrder,
+  initiateAIPhoneCall,
+  retryAIPhoneCall,
   generatePhoneOrderScript,
   getProviderName,
   getProviderColor,
   supportsDirectOrdering,
 } from '../lib/ordering';
+import { AICallStatus, CallStatusData } from './AICallStatus';
+import { CallTranscript } from './CallTranscript';
 import {
   hasStoredPaymentMethod,
   estimateOrderTotal,
@@ -42,16 +46,18 @@ interface OrderCheckoutProps {
   pizzeria: Pizzeria;
   orderingOption: OrderingOption;
   recommendations: PizzaRecommendation[];
+  partyId?: string;
   onClose: () => void;
   onOrderComplete: (orderId: string, checkoutUrl?: string) => void;
 }
 
-type CheckoutStep = 'details' | 'payment' | 'confirm';
+type CheckoutStep = 'details' | 'payment' | 'confirm' | 'calling' | 'complete';
 
 export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   pizzeria,
   orderingOption,
   recommendations,
+  partyId,
   onClose,
   onOrderComplete,
 }) => {
@@ -68,6 +74,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   const [step, setStep] = useState<CheckoutStep>('details');
   const [hasPaymentMethod, setHasPaymentMethod] = useState(hasStoredPaymentMethod());
   const [payWithCard, setPayWithCard] = useState(false);
+
+  // AI Phone Call state
+  const [aiPhoneCallId, setAiPhoneCallId] = useState<string | null>(null);
+  const [callData, setCallData] = useState<CallStatusData | null>(null);
 
   // Convert recommendations to order items
   const orderItems: OrderItem[] = recommendations.map((pizza) => ({
@@ -164,54 +174,78 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
 
     try {
-      let virtualCardDetails = undefined;
-
-      // If paying with card, create virtual card
-      if (payWithCard && hasPaymentMethod) {
-        const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-        // Create pre-authorization on customer's card
-        const customerId = getStoredCustomerId();
-        if (customerId) {
-          await createPaymentIntent(
-            estimatedTotal,
-            customerId,
-            customerEmail,
-            {
-              orderId,
-              pizzeriaName: pizzeria.name,
-              pizzeriaPhone: pizzeria.phone,
-            }
-          );
-        }
-
-        // Create virtual card for this order
-        const card = await createVirtualCard(
-          estimatedTotal,
-          orderId,
-          pizzeria.name
+      // Use backend API if partyId is available (enables call tracking)
+      if (partyId) {
+        const result = await initiateAIPhoneCall(
+          partyId,
+          pizzeria.name,
+          pizzeria.phone,
+          orderItems,
+          customerName,
+          customerPhone,
+          fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
+          deliveryAddress || undefined,
+          partySize,
+          estimatedTotal
         );
 
-        // Get full card details for AI
-        virtualCardDetails = await getVirtualCardDetails(card.cardId);
-      }
-
-      const result = await createAIPhoneOrder(
-        pizzeria.name,
-        pizzeria.phone,
-        orderItems,
-        customerName,
-        customerPhone,
-        fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
-        deliveryAddress || undefined,
-        partySize,
-        virtualCardDetails
-      );
-
-      if (result.success && result.callId) {
-        onOrderComplete(result.callId, undefined);
+        if (result.success && result.aiPhoneCallId) {
+          setAiPhoneCallId(result.aiPhoneCallId);
+          setStep('calling');
+        } else {
+          setError(result.error || 'Failed to initiate AI call');
+        }
       } else {
-        setError(result.error || 'Failed to initiate AI call');
+        // Fallback to Supabase edge function (legacy flow without call tracking)
+        let virtualCardDetails = undefined;
+
+        // If paying with card, create virtual card
+        if (payWithCard && hasPaymentMethod) {
+          const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+          // Create pre-authorization on customer's card
+          const customerId = getStoredCustomerId();
+          if (customerId) {
+            await createPaymentIntent(
+              estimatedTotal,
+              customerId,
+              customerEmail,
+              {
+                orderId,
+                pizzeriaName: pizzeria.name,
+                pizzeriaPhone: pizzeria.phone,
+              }
+            );
+          }
+
+          // Create virtual card for this order
+          const card = await createVirtualCard(
+            estimatedTotal,
+            orderId,
+            pizzeria.name
+          );
+
+          // Get full card details for AI
+          virtualCardDetails = await getVirtualCardDetails(card.cardId);
+        }
+
+        const result = await createAIPhoneOrder(
+          pizzeria.name,
+          pizzeria.phone,
+          orderItems,
+          customerName,
+          customerPhone,
+          fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
+          deliveryAddress || undefined,
+          partySize,
+          virtualCardDetails
+        );
+
+        if (result.success && result.callId) {
+          onOrderComplete(result.callId, undefined);
+        } else {
+          setError(result.error || 'Failed to initiate AI call');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate AI call');
@@ -240,6 +274,36 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   const handlePaymentMethodSaved = () => {
     setHasPaymentMethod(true);
     setStep('confirm');
+  };
+
+  // Handle call completion
+  const handleCallComplete = (data: CallStatusData) => {
+    setCallData(data);
+    if (data.orderConfirmed) {
+      setStep('complete');
+    }
+  };
+
+  // Handle retry call
+  const handleRetryCall = async () => {
+    if (!aiPhoneCallId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await retryAIPhoneCall(aiPhoneCallId);
+      if (result.success && result.aiPhoneCallId) {
+        setAiPhoneCallId(result.aiPhoneCallId);
+        setCallData(null);
+      } else {
+        setError(result.error || 'Failed to retry call');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retry call');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Render payment step
@@ -385,6 +449,120 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               disabled={loading}
             >
               Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render calling step
+  if (step === 'calling' && aiPhoneCallId) {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">AI Phone Order</h2>
+              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white p-1"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <AICallStatus
+            aiPhoneCallId={aiPhoneCallId}
+            pizzeriaName={pizzeria.name}
+            onComplete={handleCallComplete}
+            onRetry={handleRetryCall}
+            onCancel={onClose}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Render complete step
+  if (step === 'complete' && callData) {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Order Complete</h2>
+              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white p-1"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Success Message */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-[#39d98a]" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Order Confirmed!</h3>
+            <p className="text-white/60">
+              Your order has been placed with {pizzeria.name}
+            </p>
+          </div>
+
+          {/* Order Details */}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+            <h4 className="font-medium text-white mb-3">Order Details</h4>
+            <div className="space-y-2 text-sm">
+              {callData.confirmedTotal && (
+                <div className="flex justify-between">
+                  <span className="text-white/60">Total:</span>
+                  <span className="text-white font-medium">
+                    ${(callData.confirmedTotal / 100).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {callData.estimatedTime && (
+                <div className="flex justify-between">
+                  <span className="text-white/60">Ready:</span>
+                  <span className="text-white font-medium">{callData.estimatedTime}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-white/60">Pickup/Delivery:</span>
+                <span className="text-white font-medium capitalize">{fulfillmentType.toLowerCase()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Call Transcript */}
+          {aiPhoneCallId && (
+            <div className="mb-4">
+              <CallTranscript
+                aiPhoneCallId={aiPhoneCallId}
+                initialData={{
+                  transcript: null,
+                  summary: callData.summary,
+                  recordingUrl: null,
+                  callDuration: callData.callDuration,
+                }}
+              />
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button
+              onClick={() => onOrderComplete(callData.id)}
+              className="w-full btn-primary flex items-center justify-center gap-2"
+            >
+              <Check size={18} />
+              Done
             </button>
           </div>
         </div>

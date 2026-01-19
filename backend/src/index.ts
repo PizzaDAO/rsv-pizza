@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes.js';
 import partyRoutes from './routes/party.routes.js';
 import rsvpRoutes from './routes/rsvp.routes.js';
 import userRoutes from './routes/user.routes.js';
+import aiPhoneRoutes from './routes/ai-phone.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -45,6 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/parties', partyRoutes);
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/ai-phone', aiPhoneRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

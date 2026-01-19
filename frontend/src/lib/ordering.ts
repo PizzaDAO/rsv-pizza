@@ -237,3 +237,96 @@ export function getProviderColor(provider: OrderingProvider): string {
 export function supportsDirectOrdering(provider: OrderingProvider): boolean {
   return ['square', 'toast', 'chownow', 'ai_phone'].includes(provider);
 }
+
+// --- Backend API AI Phone Call Functions ---
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3006';
+
+// Initiate AI phone call via backend API
+export async function initiateAIPhoneCall(
+  partyId: string,
+  pizzeriaName: string,
+  pizzeriaPhone: string,
+  items: OrderItem[],
+  customerName: string,
+  customerPhone: string,
+  fulfillmentType: 'pickup' | 'delivery',
+  deliveryAddress?: string,
+  partySize?: number,
+  estimatedTotal?: number
+): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
+  const token = localStorage.getItem('auth_token');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/initiate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      partyId,
+      pizzeriaName,
+      pizzeriaPhone,
+      items,
+      customerName,
+      customerPhone,
+      fulfillmentType,
+      deliveryAddress,
+      partySize,
+      estimatedTotal,
+    }),
+  });
+
+  return response.json();
+}
+
+// Retry a failed AI phone call
+export async function retryAIPhoneCall(
+  aiPhoneCallId: string
+): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
+  const token = localStorage.getItem('auth_token');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/retry`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.json();
+}
+
+// Get AI phone call status
+export async function getAIPhoneCallStatus(aiPhoneCallId: string) {
+  const token = localStorage.getItem('auth_token');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/status`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch call status');
+  }
+
+  return response.json();
+}
+
+// Get AI phone call transcript
+export async function getAIPhoneCallTranscript(aiPhoneCallId: string) {
+  const token = localStorage.getItem('auth_token');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/transcript`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch transcript');
+  }
+
+  return response.json();
+}

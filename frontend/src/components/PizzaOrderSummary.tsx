@@ -685,6 +685,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
           pizzeria={selectedPizzeria}
           orderingOption={selectedOption}
           recommendations={recommendations}
+          partyId={party?.id}
           onClose={handleCloseCheckout}
           onOrderComplete={handleOrderComplete}
         />
