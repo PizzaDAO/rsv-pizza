@@ -23,6 +23,7 @@ import budgetRoutes from './routes/budget.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
+import aiPhoneRoutes from './routes/ai-phone.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -109,6 +110,7 @@ app.use('/api/v1', v1Routes);
 
 // Swagger documentation
 setupSwagger(app);
+app.use('/api/ai-phone', aiPhoneRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

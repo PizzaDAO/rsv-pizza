@@ -29,10 +29,11 @@ model User {
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 
-  parties    Party[]
-  orders     Order[]
-  magicLinks MagicLink[]
-  apiKeys    ApiKey[]
+  parties      Party[]
+  orders       Order[]
+  magicLinks   MagicLink[]
+  apiKeys      ApiKey[]
+  aiPhoneCalls AIPhoneCall[]
 }
 
 model Party {
@@ -126,20 +127,21 @@ model Party {
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests      Guest[]
-  orders      Order[]
-  photos      Photo[]
-  partyKit    PartyKit?
-  donations   Donation[]
-  raffles     Raffle[]
-  displays    Display[]
-  staff       Staff[]
-  performers  Performer[]
-  venues      Venue[]
+  guests           Guest[]
+  orders           Order[]
+  photos           Photo[]
+  partyKit         PartyKit?
+  donations        Donation[]
+  raffles          Raffle[]
+  displays         Display[]
+  staff            Staff[]
+  performers       Performer[]
+  venues           Venue[]
   sponsors         Sponsor[]
   budgetItems      BudgetItem[]
   socialPosts      SocialPost[]
   notableAttendees NotableAttendee[]
+  aiPhoneCalls     AIPhoneCall[]
 
   @@map("parties")
 }
@@ -275,6 +277,7 @@ model Order {
 
   orderItems    OrderItem[]
   guestMappings GuestPizzaMapping[]
+  aiPhoneCall   AIPhoneCall?
 }
 
 // Individual pizza items in an order (for ML training)
@@ -800,4 +803,48 @@ model BudgetItem {
 
   @@index([partyId, category])
   @@map("budget_items")
+
+model AIPhoneCall {
+  id     String @id @default(cuid())
+  callId String @unique // Bland AI call_id
+  status String @default("initiated") // initiated, ringing, in_progress, completed, failed, no_answer
+
+  // Call metadata
+  pizzeriaPhone   String
+  pizzeriaName    String
+  customerName    String
+  customerPhone   String
+  fulfillmentType String // pickup, delivery
+  deliveryAddress String?
+
+  // Order details sent
+  orderItems     String @default("[]") // JSON array as string
+  estimatedTotal Int? // In cents
+
+  // Extracted from call
+  confirmedTotal Int? // Actual total from pizzeria (cents)
+  estimatedTime  String? // "30-45 minutes"
+  orderConfirmed Boolean @default(false)
+
+  // Call artifacts
+  transcript   String?
+  summary      String?
+  recordingUrl String?
+  callDuration Int? // seconds
+
+  // Timestamps
+  callStartedAt DateTime?
+  callEndedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  partyId String @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 }
