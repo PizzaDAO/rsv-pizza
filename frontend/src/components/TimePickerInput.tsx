@@ -4,9 +4,10 @@ interface TimePickerInputProps {
   value: string; // 24-hour format "HH:MM"
   onChange: (value: string) => void;
   placeholder?: string;
+  className?: string;
 }
 
-export function TimePickerInput({ value, onChange, placeholder = '12:00 PM' }: TimePickerInputProps) {
+export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', className }: TimePickerInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -111,7 +112,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM' }: T
         onClick={handleInputClick}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-32 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 cursor-pointer"
+        className={className || "w-32 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 cursor-pointer"}
       />
 
       {isOpen && (

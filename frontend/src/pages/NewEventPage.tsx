@@ -629,13 +629,11 @@ export function NewEventPage() {
                   className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
-                <input
-                  type="time"
+                <TimePickerInput
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
-                  style={{ colorScheme: 'dark' }}
+                  onChange={setStartTime}
+                  placeholder="12:00 PM"
+                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
@@ -649,13 +647,11 @@ export function NewEventPage() {
                   className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
-                <input
-                  type="time"
+                <TimePickerInput
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
-                  style={{ colorScheme: 'dark' }}
+                  onChange={setEndTime}
+                  placeholder="1:00 PM"
+                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
