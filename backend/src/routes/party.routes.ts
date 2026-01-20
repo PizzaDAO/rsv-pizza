@@ -1,7 +1,49 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+
+// Helper function to check if user can access/edit a party
+async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
+  // Super admin can edit any party
+  if (isSuperAdmin(userEmail)) {
+    return true;
+  }
+
+  // Otherwise, must be the party owner
+  const party = await prisma.party.findFirst({
+    where: { id: partyId, userId },
+  });
+
+  return !!party;
+}
+
+// Helper function to get party with ownership check
+async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
+  // Super admin can access any party
+  if (isSuperAdmin(userEmail)) {
+    return prisma.party.findUnique({
+      where: { id: partyId },
+      include: {
+        user: { select: { name: true } },
+        guests: {
+          orderBy: { submittedAt: 'desc' },
+        },
+      },
+    });
+  }
+
+  // Otherwise, must be the party owner
+  return prisma.party.findFirst({
+    where: { id: partyId, userId },
+    include: {
+      user: { select: { name: true } },
+      guests: {
+        orderBy: { submittedAt: 'desc' },
+      },
+    },
+  });
+}
 
 const router = Router();
 
@@ -133,21 +175,13 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
   try {
     const { id } = req.params;
 
-    const party = await prisma.party.findFirst({
-      where: { id, userId: req.userId },
-      include: {
-        user: { select: { name: true } },
-        guests: {
-          orderBy: { submittedAt: 'desc' },
-        },
-      },
-    });
+    const party = await getPartyWithOwnershipCheck(id, req.userId, req.userEmail);
 
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    // Return with hostName for backwards compatibility
+    // Return with hostName and userId for ownership checks
     res.json({
       party: {
         ...party,
@@ -170,12 +204,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       customUrl, timezone, hideGuests, requireApproval, coHosts
     } = req.body;
 
-    // Verify ownership
-    const existing = await prisma.party.findFirst({
-      where: { id, userId: req.userId },
-    });
-
-    if (!existing) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
@@ -233,12 +264,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
   try {
     const { id } = req.params;
 
-    // Verify ownership
-    const existing = await prisma.party.findFirst({
-      where: { id, userId: req.userId },
-    });
-
-    if (!existing) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
@@ -255,8 +283,14 @@ router.get('/:id/invite-link', async (req: AuthRequest, res: Response, next: Nex
   try {
     const { id } = req.params;
 
-    const party = await prisma.party.findFirst({
-      where: { id, userId: req.userId },
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const party = await prisma.party.findUnique({
+      where: { id },
       select: { inviteCode: true },
     });
 
@@ -278,14 +312,16 @@ router.post('/:id/close-rsvp', async (req: AuthRequest, res: Response, next: Nex
   try {
     const { id } = req.params;
 
-    const party = await prisma.party.updateMany({
-      where: { id, userId: req.userId },
-      data: { rsvpClosedAt: new Date() },
-    });
-
-    if (party.count === 0) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
+
+    await prisma.party.update({
+      where: { id },
+      data: { rsvpClosedAt: new Date() },
+    });
 
     res.json({ success: true, message: 'RSVPs closed' });
   } catch (error) {
@@ -298,14 +334,16 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
   try {
     const { id } = req.params;
 
-    const party = await prisma.party.updateMany({
-      where: { id, userId: req.userId },
-      data: { rsvpClosedAt: null },
-    });
-
-    if (party.count === 0) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
+
+    await prisma.party.update({
+      where: { id },
+      data: { rsvpClosedAt: null },
+    });
 
     res.json({ success: true, message: 'RSVPs reopened' });
   } catch (error) {
@@ -319,12 +357,9 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
     const { id } = req.params;
     const { name, email, dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages, dislikedBeverages } = req.body;
 
-    // Verify ownership
-    const party = await prisma.party.findFirst({
-      where: { id, userId: req.userId },
-    });
-
-    if (!party) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
@@ -369,12 +404,9 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
   try {
     const { partyId, guestId } = req.params;
 
-    // Verify ownership
-    const party = await prisma.party.findFirst({
-      where: { id: partyId, userId: req.userId },
-    });
-
-    if (!party) {
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
@@ -383,6 +415,33 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
     });
 
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/parties/:partyId/guests/:guestId/approve - Approve or decline guest
+router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, guestId } = req.params;
+    const { approved } = req.body;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    if (typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    const guest = await prisma.guest.update({
+      where: { id: guestId, partyId },
+      data: { approved },
+    });
+
+    res.json({ guest });
   } catch (error) {
     next(error);
   }

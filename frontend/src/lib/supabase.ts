@@ -5,6 +5,7 @@ import {
   deletePartyApi,
   addGuestByHostApi,
   removeGuestApi,
+  updateGuestApprovalApi,
 } from './api';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -103,6 +104,7 @@ export interface DbParty {
   invite_code: string;
   custom_url: string | null;
   host_name?: string | null; // Optional - comes from API (User.name), not DB column
+  user_id: string | null; // Owner's user ID for access control
   date: string | null;
   duration: number | null;
   timezone: string | null;
@@ -187,6 +189,7 @@ export async function createParty(
         invite_code: party.inviteCode,
         custom_url: party.customUrl,
         host_name: party.hostName,
+        user_id: party.userId,
         date: party.date,
         duration: party.duration,
         timezone: party.timezone,
@@ -655,7 +658,19 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
   return true;
 }
 
-export async function updateGuestApproval(guestId: string, approved: boolean): Promise<boolean> {
+export async function updateGuestApproval(guestId: string, approved: boolean, partyId?: string): Promise<boolean> {
+  // Use API if authenticated and partyId provided (secure path)
+  if (isAuthenticated() && partyId) {
+    try {
+      await updateGuestApprovalApi(partyId, guestId, approved);
+      return true;
+    } catch (error) {
+      console.error('Error updating guest approval via API:', error);
+      return false;
+    }
+  }
+
+  // Fallback to direct Supabase (will fail after RLS lockdown)
   const { error } = await supabase
     .from('guests')
     .update({ approved })

@@ -2,9 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './error.js';
 
+// Super admin email that can edit any party
+export const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
+
 export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
+}
+
+// Check if the user is the super admin
+export function isSuperAdmin(email?: string): boolean {
+  return email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 }
 
 export const requireAuth = (

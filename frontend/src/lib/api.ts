@@ -165,6 +165,13 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
+export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean) {
+  return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
+    method: 'PATCH',
+    body: { approved },
+  });
+}
+
 // Public RSVP API (no auth required)
 export async function submitRsvpApi(
   inviteCode: string,

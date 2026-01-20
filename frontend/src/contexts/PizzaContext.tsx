@@ -80,6 +80,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     duration: dbParty.duration,
     timezone: dbParty.timezone,
     hostName: dbParty.host_name,
+    userId: dbParty.user_id,
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
@@ -228,7 +229,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const approveGuest = async (id: string) => {
-    const success = await db.updateGuestApproval(id, true);
+    const success = await db.updateGuestApproval(id, true, party?.id);
     if (success) {
       setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: true } : g));
       setParty(prev => prev ? {
@@ -239,7 +240,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const declineGuest = async (id: string) => {
-    const success = await db.updateGuestApproval(id, false);
+    const success = await db.updateGuestApproval(id, false, party?.id);
     if (success) {
       setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: false } : g));
       setParty(prev => prev ? {

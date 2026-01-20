@@ -113,6 +113,7 @@ export interface Party {
   duration: number | null;
   timezone: string | null;
   hostName: string | null;
+  userId: string | null; // Owner's user ID for access control
   pizzaStyle: string;
   availableBeverages?: string[];
   availableToppings?: string[];

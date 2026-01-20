@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Settings, Pizza, Users } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
@@ -11,14 +12,34 @@ import { GuestPreferencesList } from '../components/GuestPreferencesList';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 
+// Super admin email that can edit any party
+const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
+
 type TabType = 'details' | 'pizza' | 'guests';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
+
+  // Check if current user can edit this party (only valid after auth and party have loaded)
+  const canEdit = useMemo(() => {
+    if (!party || !user) return false;
+    // Super admin can edit any party
+    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+    // Party owner can edit
+    return party.userId === user.id;
+  }, [party, user]);
+
+  // Redirect unauthorized users to RSVP page after auth and party have loaded
+  useEffect(() => {
+    if (!authLoading && !partyLoading && party && !canEdit) {
+      navigate(`/rsvp/${inviteCode}`, { replace: true });
+    }
+  }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
   const activeTab: TabType = (tab === 'guests' || tab === 'pizza') ? tab : 'details';
@@ -91,7 +112,8 @@ function HostPageContent() {
     }
   }, [party, guests.length, orderExpectedGuests, guestsWithRequests, generateRecommendations]);
 
-  if (partyLoading || (inviteCode && inviteCode !== loadedCode)) {
+  // Wait for both auth and party to finish loading
+  if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
         <div className="min-h-[60vh] flex items-center justify-center">
@@ -113,6 +135,17 @@ function HostPageContent() {
               Go to Home
             </button>
           </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show loading while redirect is pending for unauthorized users
+  if (!canEdit) {
+    return (
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
         </div>
       </Layout>
     );
