@@ -72,6 +72,7 @@ export interface UpdatePartyData {
   duration?: number | null;
   timezone?: string | null;
   address?: string | null;
+  venueName?: string | null;
   maxGuests?: number | null;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -120,6 +121,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       duration: data.duration,
       timezone: data.timezone,
       address: data.address,
+      venueName: data.venueName,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -224,6 +226,7 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   address: string | null;
+  venueName: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;

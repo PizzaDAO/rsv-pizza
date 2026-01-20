@@ -23,6 +23,7 @@ export const EventDetailsTab: React.FC = () => {
   const [endTime, setEndTime] = useState('');
   const [timezone, setTimezone] = useState('');
   const [address, setAddress] = useState('');
+  const [venueName, setVenueName] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
   const [customUrl, setCustomUrl] = useState('');
@@ -115,6 +116,7 @@ export const EventDetailsTab: React.FC = () => {
       }
 
       const partyAddress = party.address || '';
+      const partyVenueName = party.venueName || null;
       const partyDescription = party.description || '';
       const partyPassword = party.password || '';
       const partyCustomUrl = party.customUrl || '';
@@ -134,6 +136,7 @@ export const EventDetailsTab: React.FC = () => {
       setEndDate(partyEndDate);
       setEndTime(partyEndTime);
       setAddress(partyAddress);
+      setVenueName(partyVenueName);
       setDescription(partyDescription);
       setPassword(partyPassword);
       setCustomUrl(partyCustomUrl);
@@ -432,6 +435,7 @@ export const EventDetailsTab: React.FC = () => {
         duration: calculatedDuration,
         timezone: timezone || null,
         address: address.trim() || null,
+        venue_name: venueName || null,
         description: description.trim() || null,
         password: password.trim() || null,
         custom_url: customUrl.trim() || null,
@@ -475,6 +479,7 @@ export const EventDetailsTab: React.FC = () => {
           endTime,
           timezone,
           address: address.trim(),
+          venueName: venueName,
           description: description.trim(),
           password: password.trim(),
           customUrl: customUrl.trim(),
@@ -579,6 +584,7 @@ export const EventDetailsTab: React.FC = () => {
         <LocationAutocomplete
           value={address}
           onChange={setAddress}
+          onVenueNameChange={setVenueName}
           onTimezoneChange={setTimezone}
           placeholder="Add Event Location"
         />

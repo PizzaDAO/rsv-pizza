@@ -478,7 +478,10 @@ export function EventPage() {
                   >
                     <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.address}</p>
+                      {event.venueName && (
+                        <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                      )}
+                      <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
                     </div>
                   </a>
                 )}
@@ -566,7 +569,10 @@ export function EventPage() {
                 {event.address && (
                   <div className="md:hidden border-t border-white/10 pt-6 mt-6">
                     <h3 className="font-semibold text-white mb-4">Location</h3>
-                    <p className="text-white font-medium mb-3">{event.address}</p>
+                    {event.venueName && (
+                      <p className="text-white font-medium mb-1">{event.venueName}</p>
+                    )}
+                    <p className={`${event.venueName ? 'text-white/60 text-sm' : 'text-white font-medium'} mb-3`}>{event.address}</p>
                     {/* Google Maps Link */}
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}

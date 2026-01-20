@@ -132,6 +132,7 @@ export interface DbParty {
   event_image_url: string | null;
   description: string | null;
   address: string | null;
+  venue_name: string | null;
   rsvp_closed_at: string | null;
   co_hosts: any[];
   created_at: string;
@@ -785,6 +786,7 @@ export async function updateParty(
     date?: string | null;
     duration?: number | null;
     address?: string | null;
+    venue_name?: string | null;
     description?: string | null;
     password?: string | null;
     custom_url?: string | null;
@@ -807,6 +809,7 @@ export async function updateParty(
         duration: updates.duration,
         timezone: updates.timezone,
         address: updates.address,
+        venueName: updates.venue_name,
         maxGuests: updates.max_guests,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,

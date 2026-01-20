@@ -47,6 +47,7 @@ model Party {
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
   address            String?
+  venueName          String?   @map("venue_name")
   maxGuests          Int?      @map("max_guests")
   hideGuests         Boolean   @default(false) @map("hide_guests")
   requireApproval    Boolean   @default(false) @map("require_approval")

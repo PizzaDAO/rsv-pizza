@@ -138,6 +138,7 @@ export interface Party {
   eventImageUrl: string | null;
   description: string | null;
   address: string | null;
+  venueName: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   createdAt: string;

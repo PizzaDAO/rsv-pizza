@@ -80,7 +80,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts
     } = req.body;
@@ -126,6 +126,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         availableBeverages: availableBeverages || [],
         availableToppings: availableToppings || [],
         address: address || null,
+        venueName: venueName || null,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
         requireApproval: requireApproval || false,
@@ -200,7 +201,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts
     } = req.body;
@@ -231,6 +232,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(timezone !== undefined && { timezone }),
         ...(pizzaStyle && { pizzaStyle }),
         ...(address !== undefined && { address }),
+        ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(hideGuests !== undefined && { hideGuests }),
         ...(requireApproval !== undefined && { requireApproval }),
