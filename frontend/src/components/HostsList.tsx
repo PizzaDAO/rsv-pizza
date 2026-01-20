@@ -87,7 +87,7 @@ export const HostsList: React.FC<HostsListProps> = ({
       <div className="space-y-3">
         {/* Primary Host */}
         {displayHostName && (
-          <div className={`flex items-start ${config.gap}`}>
+          <div className={`flex items-center ${config.gap}`}>
             {hostProfile?.avatar_url ? (
               <img
                 src={hostProfile.avatar_url}
@@ -99,79 +99,77 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className={`text-white font-medium ${config.text}`}>{displayHostName}</p>
-              {showSocialLinks && hostHasSocials && (
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {hostProfile.website && (
-                    <a
-                      href={hostProfile.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Globe size={config.socialIcon} />
-                    </a>
-                  )}
-                  {hostProfile.twitter && (
-                    <a
-                      href={`https://twitter.com/${hostProfile.twitter}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <XIcon size={config.socialIcon} />
-                    </a>
-                  )}
-                  {hostProfile.instagram && (
-                    <a
-                      href={`https://instagram.com/${hostProfile.instagram}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Instagram size={config.socialIcon} />
-                    </a>
-                  )}
-                  {hostProfile.youtube && (
-                    <a
-                      href={`https://youtube.com/@${hostProfile.youtube}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Youtube size={config.socialIcon} />
-                    </a>
-                  )}
-                  {hostProfile.tiktok && (
-                    <a
-                      href={`https://tiktok.com/@${hostProfile.tiktok}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <TikTokIcon size={config.socialIcon} />
-                    </a>
-                  )}
-                  {hostProfile.linkedin && (
-                    <a
-                      href={`https://linkedin.com/in/${hostProfile.linkedin}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Linkedin size={config.socialIcon} />
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
+            <p className={`text-white font-medium ${config.text}`}>{displayHostName}</p>
+            {showSocialLinks && hostHasSocials && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {hostProfile.website && (
+                  <a
+                    href={hostProfile.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Globe size={config.socialIcon} />
+                  </a>
+                )}
+                {hostProfile.twitter && (
+                  <a
+                    href={`https://twitter.com/${hostProfile.twitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <XIcon size={config.socialIcon} />
+                  </a>
+                )}
+                {hostProfile.instagram && (
+                  <a
+                    href={`https://instagram.com/${hostProfile.instagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Instagram size={config.socialIcon} />
+                  </a>
+                )}
+                {hostProfile.youtube && (
+                  <a
+                    href={`https://youtube.com/@${hostProfile.youtube}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Youtube size={config.socialIcon} />
+                  </a>
+                )}
+                {hostProfile.tiktok && (
+                  <a
+                    href={`https://tiktok.com/@${hostProfile.tiktok}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <TikTokIcon size={config.socialIcon} />
+                  </a>
+                )}
+                {hostProfile.linkedin && (
+                  <a
+                    href={`https://linkedin.com/in/${hostProfile.linkedin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Linkedin size={config.socialIcon} />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* Co-Hosts */}
         {visibleCoHosts.map((coHost) => (
-          <div key={coHost.id} className={`flex items-start ${config.gap}`}>
+          <div key={coHost.id} className={`flex items-center ${config.gap}`}>
             {coHost.avatar_url ? (
               <img
                 src={coHost.avatar_url}
@@ -183,43 +181,41 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className={`text-white font-medium ${config.text}`}>{coHost.name}</p>
-              {showSocialLinks && (coHost.website || coHost.twitter || coHost.instagram) && (
-                <div className="flex items-center gap-2 mt-1">
-                  {coHost.website && (
-                    <a
-                      href={coHost.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Globe size={config.socialIcon} />
-                    </a>
-                  )}
-                  {coHost.twitter && (
-                    <a
-                      href={`https://twitter.com/${coHost.twitter}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <XIcon size={config.socialIcon} />
-                    </a>
-                  )}
-                  {coHost.instagram && (
-                    <a
-                      href={`https://instagram.com/${coHost.instagram}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/50 hover:text-white transition-colors"
-                    >
-                      <Instagram size={config.socialIcon} />
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
+            <p className={`text-white font-medium ${config.text}`}>{coHost.name}</p>
+            {showSocialLinks && (coHost.website || coHost.twitter || coHost.instagram) && (
+              <div className="flex items-center gap-2">
+                {coHost.website && (
+                  <a
+                    href={coHost.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Globe size={config.socialIcon} />
+                  </a>
+                )}
+                {coHost.twitter && (
+                  <a
+                    href={`https://twitter.com/${coHost.twitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <XIcon size={config.socialIcon} />
+                  </a>
+                )}
+                {coHost.instagram && (
+                  <a
+                    href={`https://instagram.com/${coHost.instagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/50 hover:text-white transition-colors"
+                  >
+                    <Instagram size={config.socialIcon} />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

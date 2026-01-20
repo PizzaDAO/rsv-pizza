@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza } from 'lucide-react';
 import { IconInput } from '../components/IconInput';
-import { uploadProfilePicture } from '../lib/supabase';
+import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
+import { DIETARY_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -25,6 +26,15 @@ export function AccountPage() {
   const [linkedin, setLinkedin] = useState('');
   const [website, setWebsite] = useState('');
 
+  // Pizza preferences
+  const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
+  const [likedToppings, setLikedToppings] = useState<string[]>([]);
+  const [dislikedToppings, setDislikedToppings] = useState<string[]>([]);
+  const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
+  const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [originalPreferences, setOriginalPreferences] = useState<UserPreferences | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,6 +52,23 @@ export function AccountPage() {
     website: '',
   });
 
+  // Helper to compare arrays
+  const arraysEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((v, i) => b.includes(v)) && b.every((v) => a.includes(v));
+
+  // Check if preferences have changed
+  const preferencesChanged = originalPreferences
+    ? !arraysEqual(dietaryRestrictions, originalPreferences.dietary_restrictions) ||
+      !arraysEqual(likedToppings, originalPreferences.liked_toppings) ||
+      !arraysEqual(dislikedToppings, originalPreferences.disliked_toppings) ||
+      !arraysEqual(likedBeverages, originalPreferences.liked_beverages) ||
+      !arraysEqual(dislikedBeverages, originalPreferences.disliked_beverages)
+    : dietaryRestrictions.length > 0 ||
+      likedToppings.length > 0 ||
+      dislikedToppings.length > 0 ||
+      likedBeverages.length > 0 ||
+      dislikedBeverages.length > 0;
+
   // Check if any field has changed
   const hasChanges =
     name !== originalValues.name ||
@@ -52,7 +79,8 @@ export function AccountPage() {
     tiktok !== originalValues.tiktok ||
     linkedin !== originalValues.linkedin ||
     website !== originalValues.website ||
-    profilePictureFile !== null;
+    profilePictureFile !== null ||
+    preferencesChanged;
 
   // Redirect if not logged in
   useEffect(() => {
@@ -90,6 +118,25 @@ export function AccountPage() {
     }
   }, [user]);
 
+  // Load user preferences
+  useEffect(() => {
+    async function loadPreferences() {
+      if (user?.email && !preferencesLoaded) {
+        const prefs = await getUserPreferences(user.email);
+        if (prefs) {
+          setDietaryRestrictions(prefs.dietary_restrictions);
+          setLikedToppings(prefs.liked_toppings);
+          setDislikedToppings(prefs.disliked_toppings);
+          setLikedBeverages(prefs.liked_beverages);
+          setDislikedBeverages(prefs.disliked_beverages);
+          setOriginalPreferences(prefs);
+        }
+        setPreferencesLoaded(true);
+      }
+    }
+    loadPreferences();
+  }, [user?.email, preferencesLoaded]);
+
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -105,6 +152,51 @@ export function AccountPage() {
     const objectUrl = URL.createObjectURL(file);
     setProfilePictureFile(file);
     setProfilePicture(objectUrl);
+  };
+
+  // Pizza preference handlers
+  const toggleDietary = (option: string) => {
+    setDietaryRestrictions(prev =>
+      prev.includes(option)
+        ? prev.filter(d => d !== option)
+        : [...prev, option]
+    );
+  };
+
+  const handleToppingLike = (id: string) => {
+    if (likedToppings.includes(id)) {
+      setLikedToppings(prev => prev.filter(t => t !== id));
+    } else {
+      setLikedToppings(prev => [...prev, id]);
+      setDislikedToppings(prev => prev.filter(t => t !== id));
+    }
+  };
+
+  const handleToppingDislike = (id: string) => {
+    if (dislikedToppings.includes(id)) {
+      setDislikedToppings(prev => prev.filter(t => t !== id));
+    } else {
+      setDislikedToppings(prev => [...prev, id]);
+      setLikedToppings(prev => prev.filter(t => t !== id));
+    }
+  };
+
+  const handleDrinkLike = (id: string) => {
+    if (likedBeverages.includes(id)) {
+      setLikedBeverages(prev => prev.filter(d => d !== id));
+    } else {
+      setLikedBeverages(prev => [...prev, id]);
+      setDislikedBeverages(prev => prev.filter(d => d !== id));
+    }
+  };
+
+  const handleDrinkDislike = (id: string) => {
+    if (dislikedBeverages.includes(id)) {
+      setDislikedBeverages(prev => prev.filter(d => d !== id));
+    } else {
+      setDislikedBeverages(prev => [...prev, id]);
+      setLikedBeverages(prev => prev.filter(d => d !== id));
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -133,6 +225,24 @@ export function AccountPage() {
         website: website.trim() || undefined,
         ...(newProfilePictureUrl && { profilePictureUrl: newProfilePictureUrl }),
       });
+
+      // Save pizza preferences if changed
+      if (preferencesChanged && user?.email) {
+        await saveUserPreferences(user.email, {
+          dietary_restrictions: dietaryRestrictions,
+          liked_toppings: likedToppings,
+          disliked_toppings: dislikedToppings,
+          liked_beverages: likedBeverages,
+          disliked_beverages: dislikedBeverages,
+        });
+        setOriginalPreferences({
+          dietary_restrictions: dietaryRestrictions,
+          liked_toppings: likedToppings,
+          disliked_toppings: dislikedToppings,
+          liked_beverages: likedBeverages,
+          disliked_beverages: dislikedBeverages,
+        });
+      }
 
       // Update original values to current values
       setOriginalValues({
@@ -363,6 +473,134 @@ export function AccountPage() {
                     placeholder="https://yourwebsite.com"
                     className="flex-1 min-w-0"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Pizza Preferences */}
+            <div className="pt-6 border-t border-white/10">
+              <div className="flex items-center gap-3 mb-6">
+                <Pizza className="w-6 h-6 text-[#ff393a]" />
+                <h2 className="text-lg font-semibold text-white">Pizza Preferences</h2>
+              </div>
+
+              {/* Dietary Restrictions */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-white/80 mb-3">
+                  Diet
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DIETARY_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => toggleDietary(option)}
+                      className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
+                          ? 'bg-[#ff393a] text-white'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Toppings */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-white/80 mb-3">
+                  Toppings
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {TOPPINGS.map((topping) => {
+                    const isLiked = likedToppings.includes(topping.id);
+                    const isDisliked = dislikedToppings.includes(topping.id);
+
+                    return (
+                      <div
+                        key={topping.id}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
+                            ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                            : isDisliked
+                              ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                              : 'bg-white/5 border-white/10'
+                          }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleToppingLike(topping.id)}
+                          className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsUp
+                            size={12}
+                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                              }`}
+                          />
+                          <span className="text-white text-xs">{topping.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToppingDislike(topping.id)}
+                          className="p-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsDown
+                            size={12}
+                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                              }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Drinks */}
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-3">
+                  Drink Preferences
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DRINKS.map((drink) => {
+                    const isLiked = likedBeverages.includes(drink.id);
+                    const isDisliked = dislikedBeverages.includes(drink.id);
+
+                    return (
+                      <div
+                        key={drink.id}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
+                            ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                            : isDisliked
+                              ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                              : 'bg-white/5 border-white/10'
+                          }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleDrinkLike(drink.id)}
+                          className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsUp
+                            size={12}
+                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                              }`}
+                          />
+                          <span className="text-white text-xs">{drink.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDrinkDislike(drink.id)}
+                          className="p-0.5 hover:opacity-70 transition-opacity"
+                        >
+                          <ThumbsDown
+                            size={12}
+                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                              }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
