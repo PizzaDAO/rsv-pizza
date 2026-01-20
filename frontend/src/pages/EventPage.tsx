@@ -301,7 +301,7 @@ export function EventPage() {
               className="h-8 sm:h-10"
             />
           </Link>
-          {user?.id === event?.userId && (
+          {(user?.id === event?.userId || user?.email?.toLowerCase() === 'hello@rarepizzas.com') && (
             <button
               onClick={handleEditEvent}
               className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
@@ -419,11 +419,11 @@ export function EventPage() {
               <div className="md:hidden">
                 {/* Square Image - Mobile */}
                 {event.eventImageUrl ? (
-                  <div className="relative aspect-square bg-black/30">
+                  <div className="relative aspect-square">
                     <img
                       src={event.eventImageUrl}
                       alt={event.name}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 ) : (
@@ -433,7 +433,7 @@ export function EventPage() {
                 )}
 
                 {/* Host Button - Mobile */}
-                {user?.id === event.userId && (
+                {(user?.id === event.userId || user?.email?.toLowerCase() === 'hello@rarepizzas.com') && (
                   <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
                     <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                     <button
