@@ -6,6 +6,7 @@ import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 
@@ -992,51 +993,10 @@ export const EventDetailsTab: React.FC = () => {
 
               {/* Timezone */}
               <div className="pt-2 border-t border-white/10">
-                <select
+                <TimezonePickerInput
                   value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] appearance-none"
-                  style={{
-                    colorScheme: 'dark',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffffff80'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.5rem center',
-                    backgroundSize: '1.2em 1.2em',
-                    paddingRight: '2rem'
-                  }}
-                >
-                  <option value="">Select timezone</option>
-                  <optgroup label="Popular">
-                    <option value="America/Los_Angeles">Los Angeles (GMT-08:00)</option>
-                    <option value="America/Chicago">Chicago (GMT-06:00)</option>
-                    <option value="America/New_York">New York (GMT-05:00)</option>
-                    <option value="Europe/London">London (GMT+00:00)</option>
-                    <option value="Europe/Paris">Paris (GMT+01:00)</option>
-                    <option value="Asia/Tokyo">Tokyo (GMT+09:00)</option>
-                  </optgroup>
-                  <optgroup label="Americas">
-                    <option value="America/Anchorage">Anchorage</option>
-                    <option value="America/Phoenix">Phoenix</option>
-                    <option value="America/Denver">Denver</option>
-                    <option value="America/Toronto">Toronto</option>
-                    <option value="America/Mexico_City">Mexico City</option>
-                    <option value="America/Sao_Paulo">São Paulo</option>
-                  </optgroup>
-                  <optgroup label="Europe">
-                    <option value="Europe/Madrid">Madrid</option>
-                    <option value="Europe/Berlin">Berlin</option>
-                    <option value="Europe/Rome">Rome</option>
-                    <option value="Europe/Moscow">Moscow</option>
-                  </optgroup>
-                  <optgroup label="Asia & Pacific">
-                    <option value="Asia/Dubai">Dubai</option>
-                    <option value="Asia/Kolkata">Kolkata</option>
-                    <option value="Asia/Singapore">Singapore</option>
-                    <option value="Asia/Hong_Kong">Hong Kong</option>
-                    <option value="Asia/Shanghai">Shanghai</option>
-                    <option value="Australia/Sydney">Sydney</option>
-                  </optgroup>
-                </select>
+                  onChange={setTimezone}
+                />
               </div>
             </div>
 
