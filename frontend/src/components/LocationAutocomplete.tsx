@@ -20,6 +20,15 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
 
+  // Use refs to avoid stale closures in the event listener
+  const onChangeRef = useRef(onChange);
+  const onTimezoneChangeRef = useRef(onTimezoneChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onTimezoneChangeRef.current = onTimezoneChange;
+  }, [onChange, onTimezoneChange]);
+
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -61,10 +70,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     };
 
     const fetchTimezone = async (lat: number, lng: number) => {
-      if (!onTimezoneChange) return;
-
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) return;
+      if (!onTimezoneChangeRef.current) return;
 
       try {
         const timestamp = Math.floor(Date.now() / 1000);
@@ -74,7 +80,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         const data = await response.json();
 
         if (data.status === 'OK' && data.timeZoneId) {
-          onTimezoneChange(data.timeZoneId);
+          onTimezoneChangeRef.current(data.timeZoneId);
         }
       } catch (error) {
         console.error('Error fetching timezone:', error);
@@ -94,9 +100,9 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         autocompleteInstance.addListener('place_changed', () => {
           const place = autocompleteInstance.getPlace();
           if (place.formatted_address) {
-            onChange(place.formatted_address);
+            onChangeRef.current(place.formatted_address);
           } else if (place.name) {
-            onChange(place.name);
+            onChangeRef.current(place.name);
           }
 
           // Fetch timezone based on location coordinates
