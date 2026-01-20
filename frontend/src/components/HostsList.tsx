@@ -99,9 +99,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <p className={`text-white font-medium ${config.text}`}>{displayHostName}</p>
+            <p className={`text-white font-medium ${config.text} flex-1`}>{displayHostName}</p>
             {showSocialLinks && hostHasSocials && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {hostProfile.website && (
                   <a
                     href={hostProfile.website}
@@ -181,9 +181,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <p className={`text-white font-medium ${config.text}`}>{coHost.name}</p>
+            <p className={`text-white font-medium ${config.text} flex-1`}>{coHost.name}</p>
             {showSocialLinks && (coHost.website || coHost.twitter || coHost.instagram) && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {coHost.website && (
                   <a
                     href={coHost.website}
