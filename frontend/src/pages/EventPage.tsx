@@ -185,6 +185,12 @@ export function EventPage() {
     );
   }
 
+  // Debug logging
+  console.log('DEBUG - user:', user);
+  console.log('DEBUG - user.id:', user?.id);
+  console.log('DEBUG - event.userId:', event.userId);
+  console.log('DEBUG - match:', user?.id === event.userId);
+
   // Generate meta tags for social sharing
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rsv.pizza';
   const pageUrl = `${baseUrl}/${slug}`;
