@@ -198,3 +198,57 @@ export async function submitRsvpApi(
     }
   );
 }
+
+// Host profile type for API responses
+export interface HostProfile {
+  name: string | null;
+  avatar_url: string | null;
+  website: string | null;
+  twitter: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  tiktok: string | null;
+  linkedin: string | null;
+}
+
+// Public event data type
+export interface PublicEvent {
+  id: string;
+  name: string;
+  inviteCode: string;
+  customUrl: string | null;
+  date: string | null;
+  duration: number | null;
+  timezone: string | null;
+  pizzaStyle: string;
+  availableBeverages: string[];
+  availableToppings: string[];
+  address: string | null;
+  maxGuests: number | null;
+  hideGuests: boolean;
+  eventImageUrl: string | null;
+  description: string | null;
+  rsvpClosedAt: string | null;
+  coHosts: any[];
+  hasPassword: boolean;
+  hostName: string | null;
+  hostProfile: HostProfile | null;
+  guestCount: number;
+}
+
+// Public Event API (no auth required)
+export async function getEventBySlug(slug: string): Promise<PublicEvent | null> {
+  try {
+    const response = await apiRequest<{ event: PublicEvent }>(
+      `/api/events/${slug}`,
+      {
+        method: 'GET',
+        requireAuth: false,
+      }
+    );
+    return response.event;
+  } catch (error) {
+    console.error('Error fetching event:', error);
+    return null;
+  }
+}

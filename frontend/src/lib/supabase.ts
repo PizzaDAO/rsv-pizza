@@ -98,12 +98,25 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
 }
 
 // Types for database tables
+// Host profile from user account
+export interface DbHostProfile {
+  name: string | null;
+  avatar_url: string | null;
+  website: string | null;
+  twitter: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  tiktok: string | null;
+  linkedin: string | null;
+}
+
 export interface DbParty {
   id: string;
   name: string;
   invite_code: string;
   custom_url: string | null;
   host_name?: string | null; // Optional - comes from API (User.name), not DB column
+  host_profile?: DbHostProfile | null; // Full host profile from user account
   user_id: string | null; // Owner's user ID for access control
   date: string | null;
   duration: number | null;

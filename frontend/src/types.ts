@@ -99,6 +99,18 @@ export interface CoHost {
   showOnEvent?: boolean;
 }
 
+// Host profile from the user account
+export interface HostProfile {
+  name: string | null;
+  avatar_url: string | null;
+  website: string | null;
+  twitter: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  tiktok: string | null;
+  linkedin: string | null;
+}
+
 export interface PizzaSettings {
   size: PizzaSize;
   style: PizzaStyle;
@@ -113,6 +125,7 @@ export interface Party {
   duration: number | null;
   timezone: string | null;
   hostName: string | null;
+  hostProfile?: HostProfile | null; // Full host profile from user account
   userId: string | null; // Owner's user ID for access control
   pizzaStyle: string;
   availableBeverages?: string[];

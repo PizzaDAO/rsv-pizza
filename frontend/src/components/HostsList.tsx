@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Globe, Instagram } from 'lucide-react';
+import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
 
 interface CoHost {
   id: string;
@@ -11,8 +11,21 @@ interface CoHost {
   showOnEvent?: boolean;
 }
 
+// Host profile from user account (matches API response)
+interface HostProfile {
+  name: string | null;
+  avatar_url: string | null;
+  website: string | null;
+  twitter: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  tiktok: string | null;
+  linkedin: string | null;
+}
+
 interface HostsListProps {
   hostName?: string | null;
+  hostProfile?: HostProfile | null;
   coHosts?: CoHost[];
   size?: 'sm' | 'md' | 'lg';
   showTitle?: boolean;
@@ -26,8 +39,16 @@ const XIcon: React.FC<{ size: number }> = ({ size }) => (
   </svg>
 );
 
+// TikTok icon component
+const TikTokIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+  </svg>
+);
+
 export const HostsList: React.FC<HostsListProps> = ({
   hostName,
+  hostProfile,
   coHosts,
   size = 'md',
   showTitle = true,
@@ -44,9 +65,18 @@ export const HostsList: React.FC<HostsListProps> = ({
 
   const config = sizeConfig[size];
 
-  if (!hostName && visibleCoHosts.length === 0) {
+  // Use hostProfile name if available, otherwise fall back to hostName
+  const displayHostName = hostProfile?.name || hostName;
+
+  if (!displayHostName && visibleCoHosts.length === 0) {
     return null;
   }
+
+  // Check if host has any social links
+  const hostHasSocials = hostProfile && (
+    hostProfile.website || hostProfile.twitter || hostProfile.instagram ||
+    hostProfile.youtube || hostProfile.tiktok || hostProfile.linkedin
+  );
 
   return (
     <div>
@@ -56,12 +86,86 @@ export const HostsList: React.FC<HostsListProps> = ({
 
       <div className="space-y-3">
         {/* Primary Host */}
-        {hostName && (
-          <div className={`flex items-center ${config.gap}`}>
-            <div className={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}>
-              <User className={`${config.icon} text-[#ff393a]`} />
+        {displayHostName && (
+          <div className={`flex items-start ${config.gap}`}>
+            {hostProfile?.avatar_url ? (
+              <img
+                src={hostProfile.avatar_url}
+                alt={displayHostName}
+                className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
+              />
+            ) : (
+              <div className={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}>
+                <User className={`${config.icon} text-[#ff393a]`} />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className={`text-white font-medium ${config.text}`}>{displayHostName}</p>
+              {showSocialLinks && hostHasSocials && (
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {hostProfile.website && (
+                    <a
+                      href={hostProfile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <Globe size={config.socialIcon} />
+                    </a>
+                  )}
+                  {hostProfile.twitter && (
+                    <a
+                      href={`https://twitter.com/${hostProfile.twitter}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <XIcon size={config.socialIcon} />
+                    </a>
+                  )}
+                  {hostProfile.instagram && (
+                    <a
+                      href={`https://instagram.com/${hostProfile.instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <Instagram size={config.socialIcon} />
+                    </a>
+                  )}
+                  {hostProfile.youtube && (
+                    <a
+                      href={`https://youtube.com/@${hostProfile.youtube}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <Youtube size={config.socialIcon} />
+                    </a>
+                  )}
+                  {hostProfile.tiktok && (
+                    <a
+                      href={`https://tiktok.com/@${hostProfile.tiktok}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <TikTokIcon size={config.socialIcon} />
+                    </a>
+                  )}
+                  {hostProfile.linkedin && (
+                    <a
+                      href={`https://linkedin.com/in/${hostProfile.linkedin}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white transition-colors"
+                    >
+                      <Linkedin size={config.socialIcon} />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
-            <span className={`text-white font-medium ${config.text}`}>{hostName}</span>
           </div>
         )}
 
@@ -126,12 +230,14 @@ export const HostsList: React.FC<HostsListProps> = ({
 // Compact version showing overlapping avatars (for mobile summary)
 interface HostsAvatarsProps {
   hostName?: string | null;
+  hostProfile?: HostProfile | null;
   coHosts?: CoHost[];
   maxVisible?: number;
 }
 
 export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
   hostName,
+  hostProfile,
   coHosts,
   maxVisible = 6,
 }) => {
@@ -139,18 +245,30 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
   const displayCoHosts = visibleCoHosts.slice(0, maxVisible);
   const remainingCount = visibleCoHosts.length > maxVisible ? visibleCoHosts.length - maxVisible : 0;
 
+  // Use hostProfile name if available, otherwise fall back to hostName
+  const displayHostName = hostProfile?.name || hostName;
+
   return (
     <div className="flex items-center gap-3">
       {/* Overlapping avatars */}
       <div className="flex items-center" style={{ marginLeft: '8px' }}>
         {/* Primary host avatar */}
-        {hostName && (
-          <div
-            className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative"
-            style={{ zIndex: 10, marginLeft: '-8px' }}
-          >
-            <User className="w-4 h-4 text-white" />
-          </div>
+        {displayHostName && (
+          hostProfile?.avatar_url ? (
+            <img
+              src={hostProfile.avatar_url}
+              alt={displayHostName}
+              className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
+              style={{ zIndex: 10, marginLeft: '-8px' }}
+            />
+          ) : (
+            <div
+              className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative"
+              style={{ zIndex: 10, marginLeft: '-8px' }}
+            >
+              <User className="w-4 h-4 text-white" />
+            </div>
+          )
         )}
         {/* Co-host avatars */}
         {displayCoHosts.map((coHost, index) => (
@@ -173,7 +291,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
       {/* Host text */}
       <div className="flex-1 min-w-0">
         <p className="text-sm text-white">
-          Hosted by <span className="font-medium">{hostName}</span>
+          Hosted by <span className="font-medium">{displayHostName}</span>
           {visibleCoHosts.length > 0 && (
             <> & {visibleCoHosts.length} other{visibleCoHosts.length > 1 ? 's' : ''}</>
           )}

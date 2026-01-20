@@ -4,7 +4,8 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, getGuestsByPartyId, verifyPartyPassword, DbParty } from '../lib/supabase';
+import { verifyPartyPassword } from '../lib/supabase';
+import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 
 export function EventPage() {
@@ -13,8 +14,7 @@ export function EventPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [party, setParty] = useState<DbParty | null>(null);
-  const [guestCount, setGuestCount] = useState(0);
+  const [event, setEvent] = useState<PublicEvent | null>(null);
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -25,25 +25,21 @@ export function EventPage() {
   const [editPasswordError, setEditPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadParty() {
+    async function loadEvent() {
       if (slug) {
-        const foundParty = await getPartyByInviteCodeOrCustomUrl(slug);
-        if (foundParty) {
-          setParty(foundParty);
+        const foundEvent = await getEventBySlug(slug);
+        if (foundEvent) {
+          setEvent(foundEvent);
 
-          // Fetch guest count
-          const guests = await getGuestsByPartyId(foundParty.id);
-          setGuestCount(guests.length);
-
-          // Check if party has password protection
-          if (foundParty.has_password) {
+          // Check if event has password protection
+          if (foundEvent.hasPassword) {
             // Check if already authenticated in this session
-            // Use invite_code as key to be consistent with RSVPPage
-            const authKey = `rsvpizza_auth_${foundParty.invite_code}`;
+            // Use inviteCode as key to be consistent with RSVPPage
+            const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
             const storedAuth = sessionStorage.getItem(authKey);
 
             if (storedAuth) {
-              const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
+              const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
               if (isValid) {
                 setIsAuthenticated(true);
               }
@@ -58,23 +54,23 @@ export function EventPage() {
       }
       setLoading(false);
     }
-    loadParty();
+    loadEvent();
   }, [slug]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!party?.has_password) return;
+    if (!event?.hasPassword) return;
 
-    const isValid = await verifyPartyPassword(party.id, passwordInput);
+    const isValid = await verifyPartyPassword(event.id, passwordInput);
 
     if (isValid) {
       // Correct password
       setIsAuthenticated(true);
       setPasswordError(null);
       // Store in session storage to avoid re-prompting
-      // Use invite_code as key to be consistent with RSVPPage
-      const authKey = `rsvpizza_auth_${party.invite_code}`;
+      // Use inviteCode as key to be consistent with RSVPPage
+      const authKey = `rsvpizza_auth_${event.inviteCode}`;
       sessionStorage.setItem(authKey, passwordInput);
     } else {
       // Wrong password
@@ -84,18 +80,18 @@ export function EventPage() {
   };
 
   const handleRSVP = () => {
-    const rsvpUrl = party?.custom_url
-      ? `/rsvp/${party.custom_url}`
-      : `/rsvp/${party?.invite_code}`;
+    const rsvpUrl = event?.customUrl
+      ? `/rsvp/${event.customUrl}`
+      : `/rsvp/${event?.inviteCode}`;
     navigate(rsvpUrl);
   };
 
   const handleEditEvent = () => {
-    if (!party) return;
+    if (!event) return;
 
     // If no password, just navigate to host page
-    if (!party.has_password) {
-      navigate(`/host/${party.invite_code}`);
+    if (!event.hasPassword) {
+      navigate(`/host/${event.inviteCode}`);
       return;
     }
 
@@ -106,13 +102,13 @@ export function EventPage() {
   const handleEditPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!party?.has_password) return;
+    if (!event?.hasPassword) return;
 
-    const isValid = await verifyPartyPassword(party.id, editPasswordInput);
+    const isValid = await verifyPartyPassword(event.id, editPasswordInput);
 
     if (isValid) {
       // Correct password - navigate to host page
-      navigate(`/host/${party.invite_code}`);
+      navigate(`/host/${event.inviteCode}`);
     } else {
       // Wrong password
       setEditPasswordError('Incorrect password. Please try again.');
@@ -128,7 +124,7 @@ export function EventPage() {
     );
   }
 
-  if (error || !party) {
+  if (error || !event) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
@@ -143,8 +139,8 @@ export function EventPage() {
     );
   }
 
-  // Show password prompt if party is password-protected and not authenticated
-  if (party.has_password && !isAuthenticated) {
+  // Show password prompt if event is password-protected and not authenticated
+  if (event.hasPassword && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md">
@@ -191,32 +187,32 @@ export function EventPage() {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rsv.pizza';
   const pageUrl = `${baseUrl}/${slug}`;
   const ogImageUrl = (() => {
-    if (!party.event_image_url) return `${baseUrl}/logo.png`;
-    if (party.event_image_url.startsWith('http')) return party.event_image_url;
-    if (party.event_image_url.startsWith('/')) return `${baseUrl}${party.event_image_url}`;
-    return `${baseUrl}/${party.event_image_url}`;
+    if (!event.eventImageUrl) return `${baseUrl}/logo.png`;
+    if (event.eventImageUrl.startsWith('http')) return event.eventImageUrl;
+    if (event.eventImageUrl.startsWith('/')) return `${baseUrl}${event.eventImageUrl}`;
+    return `${baseUrl}/${event.eventImageUrl}`;
   })();
 
-  const eventDate = party.date ? new Date(party.date) : null;
+  const eventDate = event.date ? new Date(event.date) : null;
   const formattedDate = eventDate?.toLocaleDateString(undefined, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: party.timezone || undefined,
+    timeZone: event.timezone || undefined,
   });
   const formattedTime = eventDate?.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: party.timezone || undefined,
+    timeZone: event.timezone || undefined,
   });
 
   // Get timezone abbreviation for display
   const getTimezoneAbbr = () => {
-    if (!party.timezone || !eventDate) return '';
+    if (!event.timezone || !eventDate) return '';
     try {
       const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: party.timezone,
+        timeZone: event.timezone,
         timeZoneName: 'short'
       });
       const parts = formatter.formatToParts(eventDate);
@@ -228,24 +224,24 @@ export function EventPage() {
   };
   const timezoneAbbr = getTimezoneAbbr();
 
-  const metaTitle = party.name;
+  const metaTitle = event.name;
 
   // Construct description: Host • Date @ Time • Location. Description
   const detailsParts: string[] = [];
-  if (party.host_name) detailsParts.push(`Hosted by ${party.host_name}`);
+  if (event.hostName) detailsParts.push(`Hosted by ${event.hostName}`);
   if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
-  if (party.address) detailsParts.push(party.address);
+  if (event.address) detailsParts.push(event.address);
 
   const details = detailsParts.join(' • ');
   let metaDescription = details;
 
-  if (party.description) {
+  if (event.description) {
     const remainingChars = 300 - details.length;
     if (remainingChars > 10) {
-      metaDescription += `. ${party.description.substring(0, remainingChars)}${party.description.length > remainingChars ? '...' : ''}`;
+      metaDescription += `. ${event.description.substring(0, remainingChars)}${event.description.length > remainingChars ? '...' : ''}`;
     }
   } else if (!metaDescription) {
-    metaDescription = `Join us for ${party.name}! RSVP now.`;
+    metaDescription = `Join us for ${event.name}! RSVP now.`;
   }
 
   return (
@@ -276,15 +272,15 @@ export function EventPage() {
         {eventDate && (
           <>
             <meta property="event:start_time" content={eventDate.toISOString()} />
-            {party.duration && (
+            {event.duration && (
               <meta
                 property="event:end_time"
-                content={new Date(eventDate.getTime() + party.duration * 3600000).toISOString()}
+                content={new Date(eventDate.getTime() + event.duration * 3600000).toISOString()}
               />
             )}
           </>
         )}
-        {party.address && <meta property="event:location" content={party.address} />}
+        {event.address && <meta property="event:location" content={event.address} />}
       </Helmet>
 
       {/* Header with Logo */}
@@ -371,11 +367,11 @@ export function EventPage() {
             {/* Left Column - Image and Host Info (Desktop only) */}
             <div className="hidden md:flex flex-col">
               {/* Square Image */}
-              {party.event_image_url ? (
+              {event.eventImageUrl ? (
                 <div className="relative aspect-square bg-black/30">
                   <img
-                    src={party.event_image_url}
-                    alt={party.name}
+                    src={event.eventImageUrl}
+                    alt={event.name}
                     className="w-full h-full object-contain"
                   />
                 </div>
@@ -388,8 +384,9 @@ export function EventPage() {
               {/* Host and Guest Info */}
               <div className="p-6 border-t border-white/10">
                 <HostsList
-                  hostName={party.host_name}
-                  coHosts={party.co_hosts}
+                  hostName={event.hostName}
+                  hostProfile={event.hostProfile}
+                  coHosts={event.coHosts}
                   size="md"
                 />
 
@@ -398,8 +395,8 @@ export function EventPage() {
                   <div className="flex items-center gap-2 text-white/60 text-sm">
                     <Users className="w-4 h-4" />
                     <span>
-                      {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
-                      {party.max_guests && ` • ${party.max_guests} expected`}
+                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                      {event.maxGuests && ` • ${event.maxGuests} expected`}
                     </span>
                   </div>
                 </div>
@@ -411,11 +408,11 @@ export function EventPage() {
               {/* Mobile-only sections */}
               <div className="md:hidden">
                 {/* Square Image - Mobile */}
-                {party.event_image_url ? (
+                {event.eventImageUrl ? (
                   <div className="relative aspect-square bg-black/30">
                     <img
-                      src={party.event_image_url}
-                      alt={party.name}
+                      src={event.eventImageUrl}
+                      alt={event.name}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -440,21 +437,22 @@ export function EventPage() {
 
               {/* Event Title */}
               <div className="p-6 md:border-b md:border-white/10">
-                <h1 className="text-3xl font-bold text-white mb-2">{party.name}</h1>
+                <h1 className="text-3xl font-bold text-white mb-2">{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
               <div className="md:hidden px-6 pt-3 pb-2">
                 <HostsAvatars
-                  hostName={party.host_name}
-                  coHosts={party.co_hosts}
+                  hostName={event.hostName}
+                  hostProfile={event.hostProfile}
+                  coHosts={event.coHosts}
                 />
               </div>
 
               {/* Event Details */}
               <div className="p-6 space-y-3 flex-1">
                 {/* Date & Time */}
-                {party.date && (
+                {event.date && (
                   <div className="flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
@@ -464,18 +462,18 @@ export function EventPage() {
                       <p className="text-sm text-white/60">
                         {formattedTime}
                         {timezoneAbbr && ` ${timezoneAbbr}`}
-                        {party.duration && ` • ${party.duration} hour${party.duration !== 1 ? 's' : ''}`}
+                        {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
                       </p>
                     </div>
                   </div>
                 )}
 
                 {/* Location - Desktop only */}
-                {party.address && (
+                {event.address && (
                   <div className="hidden md:flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium text-white">{party.address}</p>
+                      <p className="font-medium text-white">{event.address}</p>
                     </div>
                   </div>
                 )}
@@ -489,7 +487,7 @@ export function EventPage() {
                     <Pizza size={20} />
                     RSVP
                   </button>
-                  {party.rsvp_closed_at && (
+                  {event.rsvpClosedAt && (
                     <p className="text-center text-white/50 text-sm mt-3">
                       RSVPs are closed for this event
                     </p>
@@ -501,14 +499,14 @@ export function EventPage() {
                   <div className="flex items-center gap-2 text-white/60 text-sm">
                     <Users className="w-4 h-4" />
                     <span>
-                      {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
-                      {party.max_guests && ` • ${party.max_guests} expected`}
+                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                      {event.maxGuests && ` • ${event.maxGuests} expected`}
                     </span>
                   </div>
                 </div>
 
                 {/* Description */}
-                {party.description && (
+                {event.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
                     <h3 className="font-semibold text-white mb-2">About This Event</h3>
                     <div className="text-white/70 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
@@ -553,20 +551,20 @@ export function EventPage() {
                             ),
                         }}
                       >
-                        {party.description}
+                        {event.description}
                       </ReactMarkdown>
                     </div>
                   </div>
                 )}
 
                 {/* Mobile: Location Section */}
-                {party.address && (
+                {event.address && (
                   <div className="md:hidden border-t border-white/10 pt-6 mt-6">
                     <h3 className="font-semibold text-white mb-4">Location</h3>
-                    <p className="text-white font-medium mb-3">{party.address}</p>
+                    <p className="text-white font-medium mb-3">{event.address}</p>
                     {/* Google Maps Link */}
                     <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(party.address)}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full h-48 bg-white/5 rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
@@ -584,8 +582,9 @@ export function EventPage() {
                 {/* Mobile: Full Host Section */}
                 <div className="md:hidden border-t border-white/10 pt-6 mt-6">
                   <HostsList
-                    hostName={party.host_name}
-                    coHosts={party.co_hosts}
+                    hostName={event.hostName}
+                    hostProfile={event.hostProfile}
+                    coHosts={event.coHosts}
                     size="lg"
                     showTitle={true}
                   />
