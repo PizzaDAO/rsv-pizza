@@ -470,12 +470,17 @@ export function EventPage() {
 
                 {/* Location - Desktop only */}
                 {event.address && (
-                  <div className="hidden md:flex items-start gap-3">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden md:flex items-start gap-3 group"
+                  >
                     <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium text-white">{event.address}</p>
+                      <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.address}</p>
                     </div>
-                  </div>
+                  </a>
                 )}
 
                 {/* RSVP Button */}

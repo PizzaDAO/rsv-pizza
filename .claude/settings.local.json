@@ -89,7 +89,8 @@
       "mcp__puppeteer__puppeteer_click",
       "mcp__supabase__list_migrations",
       "Bash(not found\" errors when RSVPing to events accessed via custom URL.\n\nNow all three RSVP endpoints check both inviteCode and customUrl.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(vercel ls:*)"
     ]
   }
 }
