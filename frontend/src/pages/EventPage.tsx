@@ -513,13 +513,13 @@ export function EventPage() {
                 {/* Description */}
                 {event.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
-                    <h3 className="font-semibold text-white mb-2">About This Event</h3>
+                    <h3 className="font-semibold text-white mb-2">About Event</h3>
                     <div className="text-white/70 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
                           a: ({ node, ...props }) => (
-                            <a {...props} className="text-[#ff393a] hover:text-[#ff5a5b] underline" target="_blank" rel="noopener noreferrer" />
+                            <a {...props} className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline" target="_blank" rel="noopener noreferrer" />
                           ),
                           p: ({ node, ...props }) => (
                             <p {...props} className="mb-3 last:mb-0" />
