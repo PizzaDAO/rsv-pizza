@@ -507,7 +507,7 @@ export async function addGuestToParty(
   mailingListOptIn?: boolean,
   inviteCode?: string,
   pizzeriaRankings?: string[]
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean } | null> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     return null;
@@ -559,7 +559,7 @@ export async function addGuestToParty(
       submitted_at: new Date().toISOString(),
     } as DbGuest;
 
-    return { guest, alreadyRegistered: data.alreadyRegistered || false };
+    return { guest, alreadyRegistered: data.alreadyRegistered || false, requireApproval: data.requireApproval || false };
   } catch (error) {
     console.error('Error adding guest:', error);
     return null;

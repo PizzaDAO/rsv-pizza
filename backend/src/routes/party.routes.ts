@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { sendApprovalEmail } from './rsvp.routes.js';
 
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
@@ -440,6 +441,39 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       where: { id: guestId, partyId },
       data: { approved },
     });
+
+    // Send approval email with QR code if guest is approved and has an email
+    if (approved && guest.email) {
+      try {
+        // Get party details for the email
+        const party = await prisma.party.findUnique({
+          where: { id: partyId },
+          select: {
+            name: true,
+            date: true,
+            address: true,
+            inviteCode: true,
+            customUrl: true,
+          },
+        });
+
+        if (party) {
+          await sendApprovalEmail({
+            guestEmail: guest.email,
+            guestName: guest.name,
+            guestId: guest.id,
+            partyName: party.name,
+            partyDate: party.date,
+            partyAddress: party.address,
+            inviteCode: party.inviteCode,
+            customUrl: party.customUrl,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send approval email:', emailError);
+        // Don't fail the approval if email fails
+      }
+    }
 
     res.json({ guest });
   } catch (error) {

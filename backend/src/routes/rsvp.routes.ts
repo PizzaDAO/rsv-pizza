@@ -127,6 +127,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         customUrl: true,
         rsvpClosedAt: true,
         maxGuests: true,
+        requireApproval: true,
         user: { select: { name: true } },
         _count: { select: { guests: true } },
       },
@@ -144,6 +145,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           customUrl: true,
           rsvpClosedAt: true,
           maxGuests: true,
+          requireApproval: true,
           user: { select: { name: true } },
           _count: { select: { guests: true } },
         },
@@ -212,11 +214,13 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         await sendRSVPConfirmationEmail({
           guestEmail: email.trim(),
           guestName: name.trim(),
+          guestId: guest.id,
           partyName: party.name,
           partyDate: party.date,
           partyAddress: party.address,
           inviteCode,
           customUrl: party.customUrl,
+          requireApproval: party.requireApproval,
         });
       } catch (emailError) {
         console.error('Failed to send confirmation email:', emailError);
@@ -230,7 +234,10 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         id: guest.id,
         name: guest.name,
       },
-      message: 'Your preferences have been saved!',
+      requireApproval: party.requireApproval,
+      message: party.requireApproval
+        ? 'Your RSVP has been submitted and is pending approval from the host.'
+        : 'Your preferences have been saved!',
     });
   } catch (error) {
     next(error);
@@ -304,6 +311,7 @@ async function sendRSVPConfirmationEmail(params: {
   partyAddress: string | null;
   inviteCode: string;
   customUrl: string | null;
+  requireApproval?: boolean;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -338,18 +346,146 @@ async function sendRSVPConfirmationEmail(params: {
 
   const addressText = params.partyAddress || 'Location TBD';
 
+  // Different email content based on whether approval is required
+  const isPendingApproval = params.requireApproval;
+
+  const qrCodeSection = !isPendingApproval ? `
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
+        </div>
+  ` : `
+        <div style="background: #fff3cd; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #ffc107;">
+          <h3 style="color: #856404; margin-top: 0; margin-bottom: 15px;">Pending Host Approval</h3>
+          <p style="color: #856404; font-size: 14px; margin: 0;">Your RSVP is pending approval from the host. You'll receive another email with your check-in QR code once approved.</p>
+        </div>
+  `;
+
+  const headerTitle = isPendingApproval ? '🍕 RSVP Submitted!' : '🍕 You\'re Going!';
+  const headerSubtitle = isPendingApproval ? 'Awaiting host approval' : 'Your RSVP is confirmed';
+  const footerText = isPendingApproval
+    ? `We'll let you know once the host approves your RSVP, ${params.guestName}!`
+    : `See you there, ${params.guestName}!`;
+  const emailSubject = isPendingApproval
+    ? `RSVP Submitted for ${params.partyName} - Pending Approval`
+    : `You're going to ${params.partyName}! 🍕`;
+
   const emailHtml = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>RSVP Confirmed</title>
+        <title>${isPendingApproval ? 'RSVP Pending' : 'RSVP Confirmed'}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Going!</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP is confirmed</p>
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">${headerTitle}</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">${headerSubtitle}</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+        </div>
+
+        ${qrCodeSection}
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>${footerText}</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      to: [params.guestEmail],
+      subject: emailSubject,
+      html: emailHtml,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+
+  return response.json();
+}
+
+// Helper function to send approval notification email with QR code
+export async function sendApprovalEmail(params: {
+  guestEmail: string;
+  guestName: string;
+  guestId: string;
+  partyName: string;
+  partyDate: Date | null;
+  partyAddress: string | null;
+  inviteCode: string;
+  customUrl: string | null;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email');
+    return;
+  }
+
+  const baseUrl = 'https://rsv.pizza';
+  const eventUrl = params.customUrl
+    ? `${baseUrl}/${params.customUrl}`
+    : `${baseUrl}/${params.inviteCode}`;
+
+  // Generate unique check-in URL with guest ID
+  const checkInUrl = `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`;
+
+  // Generate QR code using a free QR code API (encoded check-in URL)
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
+
+  const dateText = params.partyDate
+    ? new Date(params.partyDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'Date TBD';
+
+  const addressText = params.partyAddress || 'Location TBD';
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RSVP Approved</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Approved!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP has been confirmed</p>
+        </div>
+
+        <div style="background: #d4edda; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #28a745;">
+          <p style="color: #155724; font-size: 16px; margin: 0; font-weight: 600;">Great news! The host has approved your RSVP.</p>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
@@ -386,7 +522,7 @@ async function sendRSVPConfirmationEmail(params: {
     body: JSON.stringify({
       from: 'RSV.Pizza <noreply@rsv.pizza>',
       to: [params.guestEmail],
-      subject: `You're going to ${params.partyName}! 🍕`,
+      subject: `You're approved for ${params.partyName}! 🍕`,
       html: emailHtml,
     }),
   });

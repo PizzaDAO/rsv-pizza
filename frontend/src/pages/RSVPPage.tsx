@@ -19,6 +19,7 @@ export function RSVPPage() {
   const [party, setParty] = useState<DbParty | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [step, setStep] = useState(1); // 1 or 2
 
   // Password protection state
@@ -240,6 +241,7 @@ export function RSVPPage() {
           });
         }
         setAlreadyRegistered(result.alreadyRegistered);
+        setPendingApproval(result.requireApproval);
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -357,26 +359,41 @@ export function RSVPPage() {
 
   // Success screen
   if (submitted) {
+    const getSuccessIcon = () => {
+      if (alreadyRegistered) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
+      if (pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
+      return 'bg-[#39d98a]/20 border-[#39d98a]/30';
+    };
+
+    const getSuccessTitle = () => {
+      if (alreadyRegistered) return "You're already registered!";
+      if (pendingApproval) return "RSVP Submitted!";
+      return `See you at ${party?.name}!`;
+    };
+
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${
-            alreadyRegistered
-              ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-              : 'bg-[#39d98a]/20 border-[#39d98a]/30'
-          }`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
             {alreadyRegistered ? (
               <AlertCircle className="w-8 h-8 text-[#ff393a]" />
+            ) : pendingApproval ? (
+              <Loader2 className="w-8 h-8 text-[#ffc107]" />
             ) : (
               <Check className="w-8 h-8 text-[#39d98a]" />
             )}
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            {alreadyRegistered ? "You're already registered!" : `See you at ${party?.name}!`}
+            {getSuccessTitle()}
           </h1>
           {alreadyRegistered && (
             <p className="text-white/60 mb-4">
               This email has already been used to RSVP to this event.
+            </p>
+          )}
+          {pendingApproval && !alreadyRegistered && (
+            <p className="text-white/60 mb-4">
+              Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
           <button
