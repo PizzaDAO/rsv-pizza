@@ -313,6 +313,13 @@ export function NewEventPage() {
               />
             </div>
 
+            <LocationAutocomplete
+              value={partyAddress}
+              onChange={setPartyAddress}
+              onTimezoneChange={setTimezone}
+              placeholder="Add Event Location"
+            />
+
             {/* Mobile: Date/Time Button */}
             <button
               type="button"
@@ -401,12 +408,6 @@ export function NewEventPage() {
                 />
               </div>
             </div>
-
-            <LocationAutocomplete
-              value={partyAddress}
-              onChange={setPartyAddress}
-              placeholder="Add Event Location"
-            />
 
             <div className="relative">
               <FileText size={18} className="absolute left-3 top-3 text-white/40 pointer-events-none" />

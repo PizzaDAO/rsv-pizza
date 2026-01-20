@@ -573,6 +573,14 @@ export const EventDetailsTab: React.FC = () => {
           />
         </div>
 
+        {/* Address */}
+        <LocationAutocomplete
+          value={address}
+          onChange={setAddress}
+          onTimezoneChange={setTimezone}
+          placeholder="Add Event Location"
+        />
+
         {/* Change Date Button */}
         <button
           type="button"
@@ -600,13 +608,6 @@ export const EventDetailsTab: React.FC = () => {
             </div>
           </div>
         </button>
-
-        {/* Address */}
-        <LocationAutocomplete
-          value={address}
-          onChange={setAddress}
-          placeholder="Add Event Location"
-        />
 
         {/* Description */}
         <button

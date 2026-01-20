@@ -4,6 +4,7 @@ import { MapPin } from 'lucide-react';
 interface LocationAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
+  onTimezoneChange?: (timezone: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -11,6 +12,7 @@ interface LocationAutocompleteProps {
 export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   value,
   onChange,
+  onTimezoneChange,
   placeholder = 'Add Event Location',
   className = ''
 }) => {
@@ -58,13 +60,34 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       }
     };
 
+    const fetchTimezone = async (lat: number, lng: number) => {
+      if (!onTimezoneChange) return;
+
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) return;
+
+      try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${timestamp}&key=${apiKey}`
+        );
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.timeZoneId) {
+          onTimezoneChange(data.timeZoneId);
+        }
+      } catch (error) {
+        console.error('Error fetching timezone:', error);
+      }
+    };
+
     const initAutocomplete = () => {
       if (inputRef.current && window.google?.maps?.places) {
         const autocompleteInstance = new window.google.maps.places.Autocomplete(
           inputRef.current,
           {
             types: ['geocode', 'establishment'],
-            fields: ['formatted_address', 'name', 'place_id']
+            fields: ['formatted_address', 'name', 'place_id', 'geometry']
           }
         );
 
@@ -74,6 +97,13 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             onChange(place.formatted_address);
           } else if (place.name) {
             onChange(place.name);
+          }
+
+          // Fetch timezone based on location coordinates
+          if (place.geometry?.location) {
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            fetchTimezone(lat, lng);
           }
         });
 
