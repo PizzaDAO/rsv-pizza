@@ -237,6 +237,7 @@ export interface PublicEvent {
   hostName: string | null;
   hostProfile: HostProfile | null;
   guestCount: number;
+  userId: string | null;
 }
 
 // Public Event API (no auth required)

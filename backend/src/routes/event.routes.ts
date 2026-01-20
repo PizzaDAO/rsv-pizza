@@ -32,6 +32,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         rsvpClosedAt: true,
         coHosts: true,
         password: true, // Just to check if it exists
+        userId: true,
         user: {
           select: {
             name: true,
@@ -74,6 +75,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           rsvpClosedAt: true,
           coHosts: true,
           password: true,
+          userId: true,
           user: {
             select: {
               name: true,
@@ -133,6 +135,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hostName: party.user?.name || null,
         hostProfile,
         guestCount: party._count.guests,
+        userId: party.userId,
       },
     });
   } catch (error) {

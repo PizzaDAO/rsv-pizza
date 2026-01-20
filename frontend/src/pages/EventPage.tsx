@@ -7,10 +7,12 @@ import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } 
 import { verifyPartyPassword } from '../lib/supabase';
 import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
+import { useAuth } from '../contexts/AuthContext';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -293,13 +295,15 @@ export function EventPage() {
               className="h-8 sm:h-10"
             />
           </Link>
-          <button
-            onClick={handleEditEvent}
-            className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
-          >
-            <Settings size={16} />
-            <span className="hidden sm:inline">Edit Event</span>
-          </button>
+          {user?.id === event?.userId && (
+            <button
+              onClick={handleEditEvent}
+              className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <Settings size={16} />
+              <span className="hidden sm:inline">Edit Event</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -423,16 +427,18 @@ export function EventPage() {
                 )}
 
                 {/* Host Button - Mobile */}
-                <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
-                  <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
-                  <button
-                    onClick={handleEditEvent}
-                    className="btn-secondary w-full flex items-center justify-center gap-2"
-                  >
-                    Host Dashboard
-                    <Settings size={16} />
-                  </button>
-                </div>
+                {user?.id === event.userId && (
+                  <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
+                    <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
+                    <button
+                      onClick={handleEditEvent}
+                      className="btn-secondary w-full flex items-center justify-center gap-2"
+                    >
+                      Host Dashboard
+                      <Settings size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Event Title */}
