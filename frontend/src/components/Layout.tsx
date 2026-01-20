@@ -13,7 +13,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <nav className="border-b border-white/10">
+      <nav className="sticky top-0 z-50 bg-[#1a1a2e] border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img
