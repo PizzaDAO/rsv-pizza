@@ -141,6 +141,7 @@ export interface Party {
   venueName: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
+  selectedPizzerias?: Pizzeria[];
   createdAt: string;
   guests: Guest[];
 }
@@ -154,6 +155,7 @@ export interface Pizzeria {
   name: string;
   address: string;
   phone?: string;
+  url?: string; // Website or ordering link
   rating?: number;
   reviewCount?: number;
   priceLevel?: number; // 1-4

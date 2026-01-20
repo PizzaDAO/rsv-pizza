@@ -136,9 +136,16 @@ export function RSVPPage() {
     loadParty();
   }, [inviteCode, user?.email]);
 
-  // Fetch nearby pizzerias when party has an address
+  // Use host-selected pizzerias if available, otherwise fetch nearby pizzerias
   useEffect(() => {
     async function fetchPizzerias() {
+      // If host has selected specific pizzerias, use those
+      if (party?.selectedPizzerias && party.selectedPizzerias.length > 0) {
+        setNearbyPizzerias(party.selectedPizzerias);
+        return;
+      }
+
+      // Otherwise, fall back to auto-fetching based on address
       if (!party?.address) return;
 
       setLoadingPizzerias(true);
@@ -156,7 +163,7 @@ export function RSVPPage() {
       }
     }
     fetchPizzerias();
-  }, [party?.address]);
+  }, [party?.address, party?.selectedPizzerias]);
 
   const handlePizzeriaClick = (pizzeriaId: string) => {
     setPizzeriaRankings(prev => {

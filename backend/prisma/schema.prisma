@@ -52,6 +52,7 @@ model Party {
   hideGuests         Boolean   @default(false) @map("hide_guests")
   requireApproval    Boolean   @default(false) @map("require_approval")
   coHosts            Json      @default("[]") @map("co_hosts")
+  selectedPizzerias  Json?     @map("selected_pizzerias")
   password           String?
   eventImageUrl      String?   @map("event_image_url")
   description        String?

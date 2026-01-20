@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play, MapPin, Star, Plus, Link as LinkIcon, Phone } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../lib/supabase';
@@ -8,8 +8,10 @@ import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
-import { CoHost } from '../types';
+import { CoHost, Pizzeria } from '../types';
 import { Checkbox } from './Checkbox';
+import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 
 export const EventDetailsTab: React.FC = () => {
   const { party, loadParty } = usePizza();
@@ -67,6 +69,16 @@ export const EventDetailsTab: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  // Pizzeria selection state
+  const [selectedPizzerias, setSelectedPizzerias] = useState<Pizzeria[]>([]);
+  const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
+  const [loadingPizzerias, setLoadingPizzerias] = useState(false);
+  const [showAddPizzeriaModal, setShowAddPizzeriaModal] = useState(false);
+  const [customPizzeriaName, setCustomPizzeriaName] = useState('');
+  const [customPizzeriaAddress, setCustomPizzeriaAddress] = useState('');
+  const [customPizzeriaPhone, setCustomPizzeriaPhone] = useState('');
+  const [customPizzeriaUrl, setCustomPizzeriaUrl] = useState('');
+
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
 
@@ -89,27 +101,27 @@ export const EventDetailsTab: React.FC = () => {
       let partyEndTime = '';
 
       // Parse date and duration into start/end date/time fields
+      // Convert from UTC to event's timezone so times display correctly
       if (party.date) {
         const startDateTime = new Date(party.date);
-        // Use local date formatting to avoid timezone shift
-        const startYear = startDateTime.getFullYear();
-        const startMonth = (startDateTime.getMonth() + 1).toString().padStart(2, '0');
-        const startDay = startDateTime.getDate().toString().padStart(2, '0');
-        partyStartDate = `${startYear}-${startMonth}-${startDay}`;
-        const hours = startDateTime.getHours().toString().padStart(2, '0');
-        const minutes = startDateTime.getMinutes().toString().padStart(2, '0');
-        partyStartTime = `${hours}:${minutes}`;
+
+        // Use the event's timezone to get the correct local date/time
+        const { dateStr: startDateStr, timeStr: startTimeStr } = getDateTimeInTimezone(
+          startDateTime,
+          partyTimezone
+        );
+        partyStartDate = startDateStr;
+        partyStartTime = startTimeStr;
 
         // Calculate end date/time if duration exists
         if (party.duration) {
           const endDateTime = new Date(startDateTime.getTime() + party.duration * 60 * 60 * 1000);
-          const endYear = endDateTime.getFullYear();
-          const endMonth = (endDateTime.getMonth() + 1).toString().padStart(2, '0');
-          const endDay = endDateTime.getDate().toString().padStart(2, '0');
-          partyEndDate = `${endYear}-${endMonth}-${endDay}`;
-          const endHours = endDateTime.getHours().toString().padStart(2, '0');
-          const endMinutes = endDateTime.getMinutes().toString().padStart(2, '0');
-          partyEndTime = `${endHours}:${endMinutes}`;
+          const { dateStr: endDateStr, timeStr: endTimeStr } = getDateTimeInTimezone(
+            endDateTime,
+            partyTimezone
+          );
+          partyEndDate = endDateStr;
+          partyEndTime = endTimeStr;
         } else {
           partyEndDate = partyStartDate;
           partyEndTime = '';
@@ -127,6 +139,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyHideGuests = party.hideGuests || false;
       const partyRequireApproval = party.requireApproval || false;
       const partyCoHosts = party.coHosts || [];
+      const partySelectedPizzerias = party.selectedPizzerias || [];
 
       // Set form values
       setName(partyName);
@@ -148,6 +161,7 @@ export const EventDetailsTab: React.FC = () => {
       setHideGuests(partyHideGuests);
       setRequireApproval(partyRequireApproval);
       setCoHosts(partyCoHosts);
+      setSelectedPizzerias(partySelectedPizzerias);
 
       // Store original values
       setOriginalValues({
@@ -171,6 +185,31 @@ export const EventDetailsTab: React.FC = () => {
       });
     }
   }, [party]);
+
+  // Fetch nearby pizzerias when address changes
+  useEffect(() => {
+    async function fetchNearbyPizzerias() {
+      if (!address) {
+        setNearbyPizzerias([]);
+        return;
+      }
+
+      setLoadingPizzerias(true);
+      try {
+        const location = await geocodeAddress(address);
+        if (location) {
+          const results = await searchPizzerias(location.lat, location.lng);
+          setNearbyPizzerias(results);
+        }
+      } catch (err) {
+        console.error('Failed to fetch pizzerias:', err);
+      } finally {
+        setLoadingPizzerias(false);
+      }
+    }
+
+    fetchNearbyPizzerias();
+  }, [address]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -426,16 +465,18 @@ export const EventDetailsTab: React.FC = () => {
       }
 
       // Calculate duration from start/end times
+      // Use the event's timezone when parsing the entered date/time
+      const tz = timezone || 'UTC';
       let calculatedDuration: number | null = null;
       let startDateTime: string | null = null;
       if (startDate && startTime && endDate && endTime) {
-        const start = new Date(`${startDate}T${startTime}`);
-        const end = new Date(`${endDate}T${endTime}`);
+        const start = parseDateTimeInTimezone(startDate, startTime, tz);
+        const end = parseDateTimeInTimezone(endDate, endTime, tz);
         const durationMs = end.getTime() - start.getTime();
         calculatedDuration = durationMs / (1000 * 60 * 60); // Convert to hours
         startDateTime = start.toISOString();
       } else if (startDate && startTime) {
-        startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+        startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
       }
 
       // Check if custom URL is valid (already validated by CustomUrlInput)
@@ -595,14 +636,18 @@ export const EventDetailsTab: React.FC = () => {
   const saveDateTime = async () => {
     let calculatedDuration: number | null = null;
     let startDateTime: string | null = null;
+
+    // Use the event's timezone when parsing the entered date/time
+    const tz = timezone || 'UTC';
+
     if (startDate && startTime && endDate && endTime) {
-      const start = new Date(`${startDate}T${startTime}`);
-      const end = new Date(`${endDate}T${endTime}`);
+      const start = parseDateTimeInTimezone(startDate, startTime, tz);
+      const end = parseDateTimeInTimezone(endDate, endTime, tz);
       const durationMs = end.getTime() - start.getTime();
       calculatedDuration = durationMs / (1000 * 60 * 60);
       startDateTime = start.toISOString();
     } else if (startDate && startTime) {
-      startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
     }
 
     const success = await saveField('dateTime', {
@@ -690,6 +735,57 @@ export const EventDetailsTab: React.FC = () => {
         }
       }
       setOriginalValues((prev: any) => ({ ...prev, coHosts: JSON.stringify(coHostsToSave) }));
+    }
+  };
+
+  // Pizzeria selection functions
+  const selectPizzeria = async (pizzeria: Pizzeria) => {
+    if (selectedPizzerias.length >= 3) return;
+    if (selectedPizzerias.some(p => p.id === pizzeria.id)) return;
+
+    const newSelected = [...selectedPizzerias, pizzeria];
+    setSelectedPizzerias(newSelected);
+    await savePizzerias(newSelected);
+  };
+
+  const removePizzeria = async (pizzeriaId: string) => {
+    const newSelected = selectedPizzerias.filter(p => p.id !== pizzeriaId);
+    setSelectedPizzerias(newSelected);
+    await savePizzerias(newSelected);
+  };
+
+  const addCustomPizzeria = async () => {
+    if (!customPizzeriaName.trim()) return;
+    if (selectedPizzerias.length >= 3) return;
+
+    const customPizzeria: Pizzeria = {
+      id: `custom-${crypto.randomUUID()}`,
+      placeId: '',
+      name: customPizzeriaName.trim(),
+      address: customPizzeriaAddress.trim() || '',
+      phone: customPizzeriaPhone.trim() || undefined,
+      url: customPizzeriaUrl.trim() || undefined,
+      location: { lat: 0, lng: 0 },
+      orderingOptions: [],
+    };
+
+    const newSelected = [...selectedPizzerias, customPizzeria];
+    setSelectedPizzerias(newSelected);
+
+    // Reset form and close modal
+    setCustomPizzeriaName('');
+    setCustomPizzeriaAddress('');
+    setCustomPizzeriaPhone('');
+    setCustomPizzeriaUrl('');
+    setShowAddPizzeriaModal(false);
+
+    await savePizzerias(newSelected);
+  };
+
+  const savePizzerias = async (pizzeriasToSave: Pizzeria[]) => {
+    const success = await saveField('pizzerias', { selected_pizzerias: pizzeriasToSave });
+    if (success) {
+      setOriginalValues((prev: any) => ({ ...prev, selectedPizzerias: JSON.stringify(pizzeriasToSave) }));
     }
   };
 
@@ -959,6 +1055,137 @@ export const EventDetailsTab: React.FC = () => {
                 }}
               />
             </div>
+          )}
+        </div>
+
+        {/* Pizzeria Selection Section */}
+        <div>
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-white/80">
+              <MapPin size={16} className="inline mr-2" />
+              Pizzeria Selection
+            </label>
+            <p className="text-xs text-white/50 mt-1">
+              Choose up to 3 pizzerias for guests to rank when they RSVP
+            </p>
+          </div>
+
+          {/* Selected Pizzerias */}
+          {selectedPizzerias.length > 0 && (
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
+              {selectedPizzerias.map((pizzeria) => (
+                <div
+                  key={pizzeria.id}
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-[#ff393a]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                      {pizzeria.address && (
+                        <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                      )}
+                      {(pizzeria.url || pizzeria.phone) && (
+                        <div className="flex items-center gap-2 mt-1">
+                          {pizzeria.url && (
+                            <a
+                              href={pizzeria.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <LinkIcon size={10} />
+                              Website
+                            </a>
+                          )}
+                          {pizzeria.phone && (
+                            <a
+                              href={`tel:${pizzeria.phone}`}
+                              className="text-white/50 hover:text-white text-xs flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone size={10} />
+                              {pizzeria.phone}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removePizzeria(pizzeria.id)}
+                    className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Nearby Pizzerias (only show unselected ones) */}
+          {address && (
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-white/60 font-medium">
+                {loadingPizzerias ? 'Searching nearby...' : 'Nearby pizzerias:'}
+              </p>
+              {loadingPizzerias && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={20} className="animate-spin text-white/50" />
+                </div>
+              )}
+              {!loadingPizzerias && nearbyPizzerias
+                .filter(p => !selectedPizzerias.some(s => s.id === p.id))
+                .slice(0, 5)
+                .map((pizzeria) => (
+                  <button
+                    key={pizzeria.id}
+                    type="button"
+                    onClick={() => selectPizzeria(pizzeria)}
+                    disabled={selectedPizzerias.length >= 3}
+                    className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-white/60" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                          {pizzeria.rating && (
+                            <span className="flex items-center gap-1 text-xs text-yellow-400">
+                              <Star size={12} className="fill-yellow-400" />
+                              {pizzeria.rating.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                      </div>
+                    </div>
+                    <Plus size={18} className="text-white/40 flex-shrink-0" />
+                  </button>
+                ))}
+              {!loadingPizzerias && nearbyPizzerias.length === 0 && address && (
+                <p className="text-white/40 text-sm py-2">No pizzerias found nearby</p>
+              )}
+            </div>
+          )}
+
+          {/* Add Custom Pizzeria Button */}
+          {selectedPizzerias.length < 3 && (
+            <button
+              type="button"
+              onClick={() => setShowAddPizzeriaModal(true)}
+              className="w-full btn-secondary flex items-center justify-center gap-2"
+            >
+              <Plus size={16} />
+              Add Custom Pizzeria
+            </button>
           )}
         </div>
 
@@ -1508,6 +1735,69 @@ export const EventDetailsTab: React.FC = () => {
                 'Done'
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Custom Pizzeria Modal */}
+      {showAddPizzeriaModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddPizzeriaModal(false)}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">Add Custom Pizzeria</h2>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={customPizzeriaName}
+                onChange={(e) => setCustomPizzeriaName(e.target.value)}
+                placeholder="Pizzeria Name *"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                autoFocus
+              />
+
+              <input
+                type="text"
+                value={customPizzeriaAddress}
+                onChange={(e) => setCustomPizzeriaAddress(e.target.value)}
+                placeholder="Address (optional)"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+
+              <input
+                type="tel"
+                value={customPizzeriaPhone}
+                onChange={(e) => setCustomPizzeriaPhone(e.target.value)}
+                placeholder="Phone (optional)"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+
+              <input
+                type="url"
+                value={customPizzeriaUrl}
+                onChange={(e) => setCustomPizzeriaUrl(e.target.value)}
+                placeholder="Website URL (optional)"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowAddPizzeriaModal(false)}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addCustomPizzeria}
+                disabled={!customPizzeriaName.trim()}
+                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Plus size={16} />
+                Add Pizzeria
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -203,7 +203,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts
+      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias
     } = req.body;
 
     // Verify ownership or super admin
@@ -243,6 +243,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(coHosts !== undefined && { coHosts }),
+        ...(selectedPizzerias !== undefined && { selectedPizzerias }),
       },
       include: {
         user: { select: { name: true } },
