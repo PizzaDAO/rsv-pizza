@@ -6,6 +6,7 @@ interface LocationAutocompleteProps {
   onChange: (value: string) => void;
   onVenueNameChange?: (venueName: string | null) => void;
   onTimezoneChange?: (timezone: string) => void;
+  onPlaceSelected?: (address: string, venueName: string | null) => void;
   placeholder?: string;
   className?: string;
 }
@@ -15,6 +16,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   onChange,
   onVenueNameChange,
   onTimezoneChange,
+  onPlaceSelected,
   placeholder = 'Add Event Location',
   className = ''
 }) => {
@@ -26,12 +28,14 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const onChangeRef = useRef(onChange);
   const onVenueNameChangeRef = useRef(onVenueNameChange);
   const onTimezoneChangeRef = useRef(onTimezoneChange);
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
 
   useEffect(() => {
     onChangeRef.current = onChange;
     onVenueNameChangeRef.current = onVenueNameChange;
     onTimezoneChangeRef.current = onTimezoneChange;
-  }, [onChange, onVenueNameChange, onTimezoneChange]);
+    onPlaceSelectedRef.current = onPlaceSelected;
+  }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -105,21 +109,27 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           const place = autocompleteInstance.getPlace();
 
           // Set the address (formatted_address or fallback to name)
-          if (place.formatted_address) {
-            onChangeRef.current(place.formatted_address);
-          } else if (place.name) {
-            onChangeRef.current(place.name);
+          const selectedAddress = place.formatted_address || place.name || '';
+          if (selectedAddress) {
+            onChangeRef.current(selectedAddress);
           }
 
           // Set the venue name if it's different from the address (i.e., it's a named place)
-          if (onVenueNameChangeRef.current) {
-            // Only set venue name if it's a named establishment (not just a street address)
-            // Check if name exists and is different from the start of formatted_address
-            const hasDistinctName = place.name &&
-              place.formatted_address &&
-              !place.formatted_address.startsWith(place.name);
+          // Only set venue name if it's a named establishment (not just a street address)
+          // Check if name exists and is different from the start of formatted_address
+          const hasDistinctName = place.name &&
+            place.formatted_address &&
+            !place.formatted_address.startsWith(place.name);
 
-            onVenueNameChangeRef.current(hasDistinctName ? place.name : null);
+          const selectedVenueName = hasDistinctName ? place.name : null;
+
+          if (onVenueNameChangeRef.current) {
+            onVenueNameChangeRef.current(selectedVenueName);
+          }
+
+          // Call onPlaceSelected callback for auto-save
+          if (onPlaceSelectedRef.current && selectedAddress) {
+            onPlaceSelectedRef.current(selectedAddress, selectedVenueName);
           }
 
           // Fetch timezone based on location coordinates

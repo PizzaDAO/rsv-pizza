@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Save, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, CheckSquare2, Trash2, Calendar, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../lib/supabase';
@@ -56,6 +56,7 @@ export const EventDetailsTab: React.FC = () => {
   const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [savingField, setSavingField] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -231,7 +232,7 @@ export const EventDetailsTab: React.FC = () => {
     setEventImageUrl('');
   };
 
-  const addCoHost = () => {
+  const addCoHost = async () => {
     if (!newCoHostName.trim()) return;
 
     const newCoHost: CoHost = {
@@ -245,7 +246,8 @@ export const EventDetailsTab: React.FC = () => {
       showOnEvent: true,
     };
 
-    setCoHosts([...coHosts, newCoHost]);
+    const newCoHosts = [...coHosts, newCoHost];
+    setCoHosts(newCoHosts);
 
     // Reset form and close modal
     setNewCoHostName('');
@@ -255,6 +257,9 @@ export const EventDetailsTab: React.FC = () => {
     setNewCoHostInstagram('');
     setNewCoHostAvatarUrl('');
     setShowAddHostModal(false);
+
+    // Auto-save
+    await saveCoHostsArray(newCoHosts);
   };
 
   const startEditingHost = (host: CoHost) => {
@@ -286,13 +291,13 @@ export const EventDetailsTab: React.FC = () => {
     setEditHostAvatarUrl('');
   };
 
-  const saveHostEdit = () => {
+  const saveHostEdit = async () => {
     if (!editHostName.trim()) return;
 
     if (editingHostId === 'main-host') {
       setHostName(editHostName.trim());
     } else {
-      setCoHosts(coHosts.map(h =>
+      const newCoHosts = coHosts.map(h =>
         h.id === editingHostId
           ? {
             ...h,
@@ -304,19 +309,28 @@ export const EventDetailsTab: React.FC = () => {
             avatar_url: editHostAvatarUrl.trim() || undefined,
           }
           : h
-      ));
+      );
+      setCoHosts(newCoHosts);
+      // Auto-save
+      await saveCoHostsArray(newCoHosts);
     }
     cancelEditingHost();
   };
 
-  const removeCoHost = (id: string) => {
-    setCoHosts(coHosts.filter(h => h.id !== id));
+  const removeCoHost = async (id: string) => {
+    const newCoHosts = coHosts.filter(h => h.id !== id);
+    setCoHosts(newCoHosts);
+    // Auto-save
+    await saveCoHostsArray(newCoHosts);
   };
 
-  const toggleCoHostShowOnEvent = (id: string) => {
-    setCoHosts(coHosts.map(h =>
+  const toggleCoHostShowOnEvent = async (id: string) => {
+    const newCoHosts = coHosts.map(h =>
       h.id === id ? { ...h, showOnEvent: !h.showOnEvent } : h
-    ));
+    );
+    setCoHosts(newCoHosts);
+    // Auto-save
+    await saveCoHostsArray(newCoHosts);
   };
 
   const handleDragStart = (index: number) => {
@@ -336,8 +350,10 @@ export const EventDetailsTab: React.FC = () => {
     setDraggedIndex(index);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = async () => {
     setDraggedIndex(null);
+    // Auto-save after reordering
+    await saveCoHostsArray(coHosts);
   };
 
   // Check if any values have changed
@@ -529,6 +545,160 @@ export const EventDetailsTab: React.FC = () => {
     }
   };
 
+  // Save individual field
+  const saveField = async (fieldName: string, updates: Record<string, any>) => {
+    if (!party) return false;
+
+    setSavingField(fieldName);
+    setMessage(null);
+
+    try {
+      const success = await updateParty(party.id, updates);
+      if (success) {
+        // Refresh party data from server
+        if (party?.inviteCode) {
+          await loadParty(party.inviteCode);
+        }
+        // Update original values for the saved fields
+        setOriginalValues((prev: any) => ({
+          ...prev,
+          ...Object.fromEntries(
+            Object.entries(updates).map(([key, value]) => {
+              // Map snake_case to camelCase for original values
+              const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+              return [camelKey, value];
+            })
+          ),
+        }));
+        return true;
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (error) {
+      console.error(`Error saving ${fieldName}:`, error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Failed to save ${fieldName}` });
+      return false;
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  // Save event name
+  const saveName = async () => {
+    const success = await saveField('name', { name: name.trim() });
+    if (success) {
+      setOriginalValues((prev: any) => ({ ...prev, name: name.trim() }));
+    }
+  };
+
+  // Save date/time
+  const saveDateTime = async () => {
+    let calculatedDuration: number | null = null;
+    let startDateTime: string | null = null;
+    if (startDate && startTime && endDate && endTime) {
+      const start = new Date(`${startDate}T${startTime}`);
+      const end = new Date(`${endDate}T${endTime}`);
+      const durationMs = end.getTime() - start.getTime();
+      calculatedDuration = durationMs / (1000 * 60 * 60);
+      startDateTime = start.toISOString();
+    } else if (startDate && startTime) {
+      startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+    }
+
+    const success = await saveField('dateTime', {
+      date: startDateTime,
+      duration: calculatedDuration,
+      timezone: timezone || null,
+    });
+    if (success) {
+      setOriginalValues((prev: any) => ({
+        ...prev,
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        timezone,
+      }));
+    }
+  };
+
+  // Save description
+  const saveDescription = async () => {
+    const success = await saveField('description', { description: description.trim() || null });
+    if (success) {
+      setOriginalValues((prev: any) => ({ ...prev, description: description.trim() }));
+    }
+  };
+
+  // Save location
+  const saveLocation = async (newAddress: string, newVenueName: string | null) => {
+    const success = await saveField('location', {
+      address: newAddress.trim() || null,
+      venue_name: newVenueName || null,
+    });
+    if (success) {
+      setOriginalValues((prev: any) => ({
+        ...prev,
+        address: newAddress.trim(),
+        venueName: newVenueName,
+      }));
+    }
+  };
+
+  // Save image
+  const saveImage = async () => {
+    let imageUrl = eventImageUrl.trim() || undefined;
+    if (eventImageFile) {
+      const uploadedUrl = await uploadEventImage(eventImageFile);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        setMessage({ type: 'error', text: 'Failed to upload image' });
+        return;
+      }
+    }
+
+    const success = await saveField('image', { event_image_url: imageUrl || null });
+    if (success) {
+      setOriginalValues((prev: any) => ({ ...prev, eventImageUrl: imageUrl || '' }));
+      setEventImageFile(null);
+    }
+  };
+
+  // Save options (checkbox changes)
+  const saveOptions = async (updates: Record<string, any>) => {
+    await saveField('options', updates);
+  };
+
+  // Save co-hosts (takes array parameter for immediate save after state update)
+  const saveCoHostsArray = async (coHostsToSave: CoHost[]) => {
+    const success = await saveField('coHosts', { co_hosts: coHostsToSave });
+    if (success) {
+      // Add co-hosts with emails to guests table
+      for (const coHost of coHostsToSave) {
+        if (coHost.email) {
+          await addGuestByHost(
+            party!.id,
+            coHost.name,
+            [],
+            [],
+            [],
+            [],
+            [],
+            coHost.email
+          );
+        }
+      }
+      setOriginalValues((prev: any) => ({ ...prev, coHosts: JSON.stringify(coHostsToSave) }));
+    }
+  };
+
+  // Check if name has changed
+  const nameHasChanged = () => {
+    if (!originalValues) return false;
+    return name.trim() !== originalValues.name;
+  };
+
   // Format date for display
   const formatDateDisplay = (date: string) => {
     if (!date) return '';
@@ -567,25 +737,46 @@ export const EventDetailsTab: React.FC = () => {
 
   return (
     <div className="card p-8">
-      <form onSubmit={handleSave} className="space-y-3">
+      <div className="space-y-3">
         {/* Name */}
-        <div>
+        <div className="relative">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Party Name *"
-            className="w-full"
-            required
+            className={`w-full ${nameHasChanged() ? 'pr-20' : ''}`}
           />
+          {nameHasChanged() && (
+            <button
+              type="button"
+              onClick={saveName}
+              disabled={savingField === 'name'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {savingField === 'name' ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                'Save'
+              )}
+            </button>
+          )}
         </div>
 
         {/* Address */}
         <LocationAutocomplete
           value={address}
-          onChange={setAddress}
-          onVenueNameChange={setVenueName}
+          onChange={(newAddress) => {
+            setAddress(newAddress);
+          }}
+          onVenueNameChange={(newVenueName) => {
+            setVenueName(newVenueName);
+          }}
           onTimezoneChange={setTimezone}
+          onPlaceSelected={(newAddress, newVenueName) => {
+            // Save when a place is selected from autocomplete
+            saveLocation(newAddress, newVenueName);
+          }}
           placeholder="Add Event Location"
         />
 
@@ -689,41 +880,69 @@ export const EventDetailsTab: React.FC = () => {
             <div className="space-y-3 border-l-2 border-white/10 pl-4 mt-3">
               <Checkbox
                 checked={requireApproval}
-                onChange={() => setRequireApproval(!requireApproval)}
+                onChange={() => {
+                  const newValue = !requireApproval;
+                  setRequireApproval(newValue);
+                  saveOptions({ require_approval: newValue });
+                }}
                 label="Require Approval"
               />
 
               <Checkbox
                 checked={hideGuests}
-                onChange={() => setHideGuests(!hideGuests)}
+                onChange={() => {
+                  const newValue = !hideGuests;
+                  setHideGuests(newValue);
+                  saveOptions({ hide_guests: newValue });
+                }}
                 label="Hide Guests"
               />
 
               <Checkbox
                 checked={limitGuests}
-                onChange={() => setLimitGuests(!limitGuests)}
+                onChange={() => {
+                  const newValue = !limitGuests;
+                  setLimitGuests(newValue);
+                  if (!newValue) {
+                    // If unchecking, clear max guests and save
+                    setMaxGuests('');
+                    saveOptions({ max_guests: null });
+                  }
+                }}
                 label="Limit Guests"
               />
 
               {limitGuests && (
-                <IconInput
-                  icon={User}
-                  type="number"
-                  min={1}
-                  value={maxGuests}
-                  onChange={(e) => setMaxGuests(e.target.value)}
-                  placeholder="Capacity"
-                />
+                <div className="relative">
+                  <IconInput
+                    icon={User}
+                    type="number"
+                    min={1}
+                    value={maxGuests}
+                    onChange={(e) => setMaxGuests(e.target.value)}
+                    onBlur={() => {
+                      if (maxGuests) {
+                        saveOptions({ max_guests: parseInt(maxGuests, 10) });
+                      }
+                    }}
+                    placeholder="Capacity"
+                  />
+                </div>
               )}
 
-              <IconInput
-                icon={Lock}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Event Password"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <IconInput
+                  icon={Lock}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => {
+                    saveOptions({ password: password.trim() || null });
+                  }}
+                  placeholder="Event Password"
+                  autoComplete="new-password"
+                />
+              </div>
 
               <CustomUrlInput
                 value={customUrl}
@@ -732,6 +951,11 @@ export const EventDetailsTab: React.FC = () => {
                 onValidationChange={(isValid, error) => {
                   setCustomUrlValid(isValid);
                   setCustomUrlError(error);
+                }}
+                onBlur={() => {
+                  if (customUrlValid) {
+                    saveOptions({ custom_url: customUrl.trim() || null });
+                  }
                 }}
               />
             </div>
@@ -859,43 +1083,6 @@ export const EventDetailsTab: React.FC = () => {
           </div>
         )}
 
-        {/* Save Button */}
-        <button
-          type="submit"
-          disabled={saving || saved}
-          className={`w-full flex items-center justify-center gap-2 font-medium px-6 py-3 rounded-xl transition-all ${
-            saved
-              ? 'bg-[#39d98a] text-white'
-              : 'btn-primary'
-          }`}
-        >
-          {saving ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            'Saved'
-          ) : (
-            <>
-              <Save size={18} />
-              Save
-            </>
-          )}
-        </button>
-
-        {/* Cancel Changes Button */}
-        {hasChanges() && (
-          <button
-            type="button"
-            onClick={handleCancelChanges}
-            className="w-full btn-secondary flex items-center justify-center gap-2"
-          >
-            <X size={18} />
-            Cancel Changes
-          </button>
-        )}
-
         {/* Cancel Event Button */}
         <button
           type="button"
@@ -906,7 +1093,7 @@ export const EventDetailsTab: React.FC = () => {
           <Trash2 size={18} />
           Cancel Event
         </button>
-      </form>
+      </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
@@ -1006,10 +1193,21 @@ export const EventDetailsTab: React.FC = () => {
             {/* Done Button */}
             <button
               type="button"
-              onClick={() => setShowDateTimeModal(false)}
-              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              onClick={async () => {
+                await saveDateTime();
+                setShowDateTimeModal(false);
+              }}
+              disabled={savingField === 'dateTime'}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
-              Done
+              {savingField === 'dateTime' ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Done'
+              )}
             </button>
           </div>
         </div>
@@ -1093,10 +1291,21 @@ export const EventDetailsTab: React.FC = () => {
             {/* Done Button */}
             <button
               type="button"
-              onClick={() => setShowImageModal(false)}
-              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              onClick={async () => {
+                await saveImage();
+                setShowImageModal(false);
+              }}
+              disabled={savingField === 'image'}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
-              Done
+              {savingField === 'image' ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Done'
+              )}
             </button>
           </div>
         </div>
@@ -1283,10 +1492,21 @@ export const EventDetailsTab: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setShowDescriptionModal(false)}
-              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              onClick={async () => {
+                await saveDescription();
+                setShowDescriptionModal(false);
+              }}
+              disabled={savingField === 'description'}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
-              Done
+              {savingField === 'description' ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Done'
+              )}
             </button>
           </div>
         </div>

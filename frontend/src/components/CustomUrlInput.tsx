@@ -7,6 +7,7 @@ interface CustomUrlInputProps {
   onChange: (value: string) => void;
   currentPartyId?: string;
   onValidationChange?: (isValid: boolean, error?: string) => void;
+  onBlur?: () => void;
 }
 
 export function CustomUrlInput({
@@ -14,6 +15,7 @@ export function CustomUrlInput({
   onChange,
   currentPartyId,
   onValidationChange,
+  onBlur,
 }: CustomUrlInputProps) {
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export function CustomUrlInput({
           type="text"
           value={value}
           onChange={handleChange}
+          onBlur={onBlur}
           placeholder="custom-url"
           className={`w-full font-mono text-sm ${
             validationError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
