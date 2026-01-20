@@ -365,7 +365,7 @@ export function EventPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 py-8 pt-24">
+      <div className="py-8 pt-24">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
             {/* Left Column - Image and Host Info (Desktop only) */}
@@ -442,12 +442,15 @@ export function EventPage() {
               </div>
 
               {/* Event Title */}
-              <div className="p-6 md:border-b md:border-white/10">
-                <h1 className="text-3xl font-bold text-white mb-2">{event.name}</h1>
+              <div className="p-6 pb-1 md:border-b md:border-white/10">
+                <h1 className="text-3xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
-              <div className="md:hidden px-6 pt-3 pb-2">
+              <div
+                className="md:hidden px-6 pt-1 pb-1 cursor-pointer"
+                onClick={() => document.getElementById('host-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 <HostsAvatars
                   hostName={event.hostName}
                   hostProfile={event.hostProfile}
@@ -456,7 +459,7 @@ export function EventPage() {
               </div>
 
               {/* Event Details */}
-              <div className="p-6 space-y-3 flex-1">
+              <div className="p-6 pt-2 space-y-3 flex-1">
                 {/* Date & Time */}
                 {event.date && (
                   <div className="flex items-start gap-3">
@@ -597,7 +600,7 @@ export function EventPage() {
                 )}
 
                 {/* Mobile: Full Host Section */}
-                <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                <div id="host-section" className="md:hidden border-t border-white/10 pt-6 mt-6">
                   <HostsList
                     hostName={event.hostName}
                     hostProfile={event.hostProfile}

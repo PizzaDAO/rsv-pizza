@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from '../components/CustomUrlInput';
+import { parseDateTimeInTimezone } from '../utils/dateUtils';
 
 export function NewEventPage() {
   const navigate = useNavigate();
@@ -81,16 +82,18 @@ export function NewEventPage() {
       const description = formData.eventDescription?.trim() || undefined;
       const urlSlug = formData.customUrl?.trim() || undefined;
 
+      // Use the event's timezone when parsing the entered date/time
+      const tz = formData.timezone || 'UTC';
       let duration: number | undefined;
       let startDateTime: string | undefined;
       if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
-        const start = new Date(`${formData.startDate}T${formData.startTime}`);
-        const end = new Date(`${formData.endDate}T${formData.endTime}`);
+        const start = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz);
+        const end = parseDateTimeInTimezone(formData.endDate, formData.endTime, tz);
         const durationMs = end.getTime() - start.getTime();
         duration = durationMs / (1000 * 60 * 60);
         startDateTime = start.toISOString();
       } else if (formData.startDate && formData.startTime) {
-        startDateTime = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
+        startDateTime = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz).toISOString();
       }
 
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
@@ -239,16 +242,18 @@ export function NewEventPage() {
         return;
       }
 
+      // Use the event's timezone when parsing the entered date/time
+      const tz = timezone || 'UTC';
       let duration: number | undefined;
       let startDateTime: string | undefined;
       if (startDate && startTime && endDate && endTime) {
-        const start = new Date(`${startDate}T${startTime}`);
-        const end = new Date(`${endDate}T${endTime}`);
+        const start = parseDateTimeInTimezone(startDate, startTime, tz);
+        const end = parseDateTimeInTimezone(endDate, endTime, tz);
         const durationMs = end.getTime() - start.getTime();
         duration = durationMs / (1000 * 60 * 60);
         startDateTime = start.toISOString();
       } else if (startDate && startTime) {
-        startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+        startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
       }
 
       let imageUrl = eventImageUrl.trim() || undefined;
