@@ -573,6 +573,24 @@ export function EventPage() {
                   </div>
                 )}
 
+                {/* Mobile: Location */}
+                {event.address && googleMapsUrl && (
+                  <a
+                    href={googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="md:hidden flex items-start gap-3 group"
+                  >
+                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                    <div>
+                      {event.venueName && (
+                        <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                      )}
+                      <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                    </div>
+                  </a>
+                )}
+
                 {/* RSVP Button */}
                 <div className="pt-4">
                   <button
@@ -654,7 +672,6 @@ export function EventPage() {
                 {/* Mobile: Location Section */}
                 {event.address && googleMapsUrl && (
                   <div className="md:hidden border-t border-white/10 pt-6 mt-6">
-                    <h3 className="font-semibold text-white mb-4">Location</h3>
                     {event.venueName && (
                       <p className="text-white font-medium mb-1">{event.venueName}</p>
                     )}
