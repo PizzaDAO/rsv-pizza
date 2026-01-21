@@ -310,7 +310,7 @@ export function EventPage() {
               className="h-8 sm:h-10"
             />
           </Link>
-          {(user?.id === event?.userId || user?.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+          {user && (user.id === event?.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
             <button
               onClick={handleEditEvent}
               className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
@@ -401,7 +401,7 @@ export function EventPage() {
               )}
 
               {/* Host Button - Desktop */}
-              {(user?.id === event.userId || user?.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+              {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
                 <div className="p-4 bg-[#39d98a]/10 border-t border-white/10">
                   <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                   <button
@@ -449,6 +449,28 @@ export function EventPage() {
                       className="w-full h-full object-cover"
                     />
                   </div>
+                ) : event.address && googleMapsUrl ? (
+                  <a
+                    href={googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative aspect-square block overflow-hidden"
+                  >
+                    {staticMapUrl ? (
+                      <img
+                        src={staticMapUrl}
+                        alt="Event location map"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center">
+                        <div className="text-center">
+                          <MapPin className="w-16 h-16 text-white/80 mx-auto mb-2" />
+                          <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                        </div>
+                      </div>
+                    )}
+                  </a>
                 ) : (
                   <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
                     <Pizza className="w-32 h-32 text-white/30" />
@@ -456,7 +478,7 @@ export function EventPage() {
                 )}
 
                 {/* Host Button - Mobile */}
-                {(user?.id === event.userId || user?.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+                {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
                   <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
                     <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                     <button
@@ -489,9 +511,73 @@ export function EventPage() {
 
               {/* Event Details */}
               <div className="p-6 pt-2 space-y-3 flex-1">
-                {/* Date & Time */}
+                {/* Desktop: Date, Location, and Map Thumbnail */}
+                <div className="hidden md:flex items-start gap-4">
+                  <div className="flex-1 space-y-3">
+                    {/* Date & Time */}
+                    {event.date && (
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-white">
+                            {formattedDate}
+                          </p>
+                          <p className="text-sm text-white/60">
+                            {formattedTime}
+                            {timezoneAbbr && ` ${timezoneAbbr}`}
+                            {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Location */}
+                    {event.address && googleMapsUrl && (
+                      <a
+                        href={googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-start gap-3 group"
+                      >
+                        <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                        <div>
+                          {event.venueName && (
+                            <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                          )}
+                          <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Map Thumbnail - Desktop */}
+                  {event.address && googleMapsUrl && (
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 w-24 h-24 bg-white/10 rounded-lg border border-white/10 hover:bg-white/20 transition-colors group overflow-hidden relative"
+                      title="View on Google Maps"
+                    >
+                      {staticMapUrl ? (
+                        <img
+                          src={staticMapUrl}
+                          alt="Map"
+                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center">
+                          <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
+                          <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                        </div>
+                      )}
+                    </a>
+                  )}
+                </div>
+
+                {/* Mobile: Date & Time */}
                 {event.date && (
-                  <div className="flex items-start gap-3">
+                  <div className="md:hidden flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-medium text-white">
@@ -504,24 +590,6 @@ export function EventPage() {
                       </p>
                     </div>
                   </div>
-                )}
-
-                {/* Location - Desktop only */}
-                {event.address && (
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hidden md:flex items-start gap-3 group"
-                  >
-                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
-                    <div>
-                      {event.venueName && (
-                        <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
-                      )}
-                      <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
-                    </div>
-                  </a>
                 )}
 
                 {/* RSVP Button */}
@@ -604,7 +672,7 @@ export function EventPage() {
                 )}
 
                 {/* Mobile: Location Section */}
-                {event.address && (
+                {event.address && googleMapsUrl && (
                   <div className="md:hidden border-t border-white/10 pt-6 mt-6">
                     <h3 className="font-semibold text-white mb-4">Location</h3>
                     {event.venueName && (
@@ -613,17 +681,25 @@ export function EventPage() {
                     <p className={`${event.venueName ? 'text-white/60 text-sm' : 'text-white font-medium'} mb-3`}>{event.address}</p>
                     {/* Google Maps Link */}
                     <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
+                      href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full h-48 bg-white/5 rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
                     >
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20">
-                        <div className="text-center">
-                          <MapPin className="w-12 h-12 text-white/80 mx-auto mb-2" />
-                          <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                      {staticMapUrl ? (
+                        <img
+                          src={staticMapUrl}
+                          alt="Event location map"
+                          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20">
+                          <div className="text-center">
+                            <MapPin className="w-12 h-12 text-white/80 mx-auto mb-2" />
+                            <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </a>
                   </div>
                 )}
