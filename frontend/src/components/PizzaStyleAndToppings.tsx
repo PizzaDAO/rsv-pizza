@@ -5,9 +5,10 @@ import { Checkbox } from './Checkbox';
 
 interface PizzaStyleAndToppingsProps {
   children?: React.ReactNode;
+  firstSection?: React.ReactNode;
 }
 
-export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ children }) => {
+export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ children, firstSection }) => {
   const {
     party,
     pizzaSettings,
@@ -71,6 +72,14 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
         <Pizza size={24} className="text-[#ff393a]" />
         <h2 className="text-xl font-bold text-white">Pizza Options</h2>
       </div>
+
+      {/* First Section (e.g., Pizzeria Selection) */}
+      {firstSection && (
+        <>
+          {firstSection}
+          <div className="border-t border-white/10 my-6" />
+        </>
+      )}
 
       {/* Pizza Style Section */}
       <div className="mb-6">

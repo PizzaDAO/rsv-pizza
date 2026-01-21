@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin } from 'lucide-react';
-import { addGuestToParty, getUserPreferences, saveUserPreferences } from '../lib/supabase';
+import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
@@ -12,9 +12,10 @@ interface RSVPModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: PublicEvent;
+  existingGuest?: ExistingGuestData | null;
 }
 
-export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
+export function RSVPModal({ isOpen, onClose, event, existingGuest }: RSVPModalProps) {
   const { user } = useAuth();
 
   const [submitting, setSubmitting] = useState(false);
@@ -22,7 +23,9 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
+  const [wasUpdated, setWasUpdated] = useState(false);
   const [step, setStep] = useState(1);
+  const isEditing = !!existingGuest;
 
   // Step 1 - Personal Info
   const [name, setName] = useState('');
@@ -51,8 +54,26 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
       setSubmitted(false);
       setAlreadyRegistered(false);
       setPendingApproval(false);
+      setWasUpdated(false);
       setStep(1);
       setError(null);
+
+      // Pre-fill form with existing guest data if editing
+      if (existingGuest) {
+        setName(existingGuest.name);
+        setEmail(existingGuest.email || '');
+        setEthereumAddress(existingGuest.ethereumAddress || '');
+        setRoles(existingGuest.roles);
+        setMailingListOptIn(existingGuest.mailingListOptIn);
+        setDietaryRestrictions(existingGuest.dietaryRestrictions);
+        setLikedToppings(existingGuest.likedToppings);
+        setDislikedToppings(existingGuest.dislikedToppings);
+        setLikedBeverages(existingGuest.likedBeverages);
+        setDislikedBeverages(existingGuest.dislikedBeverages);
+        setPizzeriaRankings(existingGuest.pizzeriaRankings);
+        setPreferencesLoaded(true); // Mark as loaded so we don't override with profile preferences
+      }
+
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
@@ -61,7 +82,7 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, existingGuest]);
 
   // Load saved preferences when user is logged in or when email matches a saved profile
   useEffect(() => {
@@ -187,7 +208,7 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
       );
 
       if (result) {
-        if (saveToProfile && email.trim() && !result.alreadyRegistered) {
+        if (saveToProfile && email.trim()) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
             liked_toppings: likedToppings,
@@ -198,6 +219,8 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
         }
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
+        // Check if this was an update (either we were editing or backend says it was updated)
+        setWasUpdated(isEditing || (result as any).updated === true);
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -257,12 +280,13 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
   // Success screen
   if (submitted) {
     const getSuccessIcon = () => {
-      if (alreadyRegistered) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
+      if (alreadyRegistered && !wasUpdated) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
       if (pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       return 'bg-[#39d98a]/20 border-[#39d98a]/30';
     };
 
     const getSuccessTitle = () => {
+      if (wasUpdated) return "RSVP Updated!";
       if (alreadyRegistered) return "You're already registered!";
       if (pendingApproval) return "RSVP Submitted!";
       return `See you at ${event.name}!`;
@@ -278,7 +302,7 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
-            {alreadyRegistered ? (
+            {alreadyRegistered && !wasUpdated ? (
               <AlertCircle className="w-8 h-8 text-[#ff393a]" />
             ) : pendingApproval ? (
               <Loader2 className="w-8 h-8 text-[#ffc107]" />
@@ -289,9 +313,14 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
           <h1 className="text-2xl font-bold text-white mb-2">
             {getSuccessTitle()}
           </h1>
-          {alreadyRegistered && (
+          {alreadyRegistered && !wasUpdated && (
             <p className="text-white/60 mb-4">
               This email has already been used to RSVP to this event.
+            </p>
+          )}
+          {wasUpdated && (
+            <p className="text-white/60 mb-4">
+              Your preferences have been saved.
             </p>
           )}
           {pendingApproval && !alreadyRegistered && (
@@ -332,7 +361,7 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
           <div className="flex items-center gap-3 mb-6">
             <Pizza className="w-10 h-10 text-[#ff393a]" />
             <div>
-              <h1 className="text-2xl font-bold text-white">RSVP to {event.name}</h1>
+              <h1 className="text-2xl font-bold text-white">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
               <p className="text-sm text-white/60">Step 1 of 2</p>
             </div>
           </div>
@@ -442,7 +471,7 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
         <div className="flex items-center gap-3 mb-6">
           <Pizza className="w-10 h-10 text-[#ff393a]" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Pizza Requests</h1>
+            <h1 className="text-2xl font-bold text-white">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
             <p className="text-sm text-white/60">Step 2 of 2</p>
           </div>
         </div>
@@ -663,12 +692,12 @@ export function RSVPModal({ isOpen, onClose, event }: RSVPModalProps) {
               {submitting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Submitting...
+                  {isEditing ? 'Updating...' : 'Submitting...'}
                 </>
               ) : (
                 <>
                   <Pizza size={18} />
-                  RSVP
+                  {isEditing ? 'Update RSVP' : 'RSVP'}
                 </>
               )}
             </button>

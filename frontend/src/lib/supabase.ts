@@ -580,6 +580,59 @@ export async function addGuestToParty(
   }
 }
 
+export interface ExistingGuestData {
+  id: string;
+  name: string;
+  email: string | null;
+  ethereumAddress: string | null;
+  roles: string[];
+  mailingListOptIn: boolean;
+  dietaryRestrictions: string[];
+  likedToppings: string[];
+  dislikedToppings: string[];
+  likedBeverages: string[];
+  dislikedBeverages: string[];
+  pizzeriaRankings: string[];
+}
+
+export async function getExistingGuest(
+  inviteCode: string,
+  email: string
+): Promise<ExistingGuestData | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest/${encodeURIComponent(email)}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      console.error('Error fetching guest:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const guest = data.guest;
+
+    return {
+      id: guest.id,
+      name: guest.name,
+      email: guest.email,
+      ethereumAddress: guest.ethereumAddress,
+      roles: guest.roles || [],
+      mailingListOptIn: guest.mailingListOptIn || false,
+      dietaryRestrictions: guest.dietaryRestrictions || [],
+      likedToppings: guest.likedToppings || [],
+      dislikedToppings: guest.dislikedToppings || [],
+      likedBeverages: guest.likedBeverages || [],
+      dislikedBeverages: guest.dislikedBeverages || [],
+      pizzeriaRankings: guest.pizzeriaRankings || [],
+    };
+  } catch (error) {
+    console.error('Error fetching guest:', error);
+    return null;
+  }
+}
+
 export async function addGuestByHost(
   partyId: string,
   name: string,

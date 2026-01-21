@@ -5,10 +5,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
-import { verifyPartyPassword } from '../lib/supabase';
+import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
+import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
 
@@ -29,6 +30,8 @@ export function EventPage() {
   const [editPasswordInput, setEditPasswordInput] = useState('');
   const [editPasswordError, setEditPasswordError] = useState<string | null>(null);
   const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [userHasRSVPd, setUserHasRSVPd] = useState(false);
+  const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
 
   useEffect(() => {
     async function loadEvent() {
@@ -36,6 +39,18 @@ export function EventPage() {
         const foundEvent = await getEventBySlug(slug);
         if (foundEvent) {
           setEvent(foundEvent);
+
+          // Check if logged-in user has already RSVP'd and fetch their data
+          if (user?.email) {
+            const hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
+            setUserHasRSVPd(hasRSVPd);
+
+            if (hasRSVPd) {
+              const inviteCode = foundEvent.customUrl || foundEvent.inviteCode;
+              const guestData = await getExistingGuest(inviteCode, user.email);
+              setExistingGuestData(guestData);
+            }
+          }
 
           // Check if event has password protection
           if (foundEvent.hasPassword) {
@@ -61,7 +76,7 @@ export function EventPage() {
       setLoading(false);
     }
     loadEvent();
-  }, [slug]);
+  }, [slug, user?.email]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,6 +392,7 @@ export function EventPage() {
           isOpen={showRSVPModal}
           onClose={() => setShowRSVPModal(false)}
           event={event}
+          existingGuest={existingGuestData}
         />
       )}
 
@@ -617,7 +633,7 @@ export function EventPage() {
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
-                    RSVP
+                    {userHasRSVPd ? "You RSVP'd. Edit RSVP?" : "RSVP"}
                   </button>
                   {event.rsvpClosedAt && (
                     <p className="text-center text-white/50 text-sm mt-3">
@@ -751,6 +767,8 @@ export function EventPage() {
           </a>
         </div>
       </div>
+
+      <CornerLinks />
     </div>
   );
 }

@@ -93,6 +93,60 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// GET /api/rsvp/:inviteCode/guest/:email - Get existing guest by email (public)
+router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, email } = req.params;
+
+    // Find party by invite code OR custom URL
+    let party = await prisma.party.findUnique({
+      where: { inviteCode },
+      select: { id: true },
+    });
+
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: inviteCode },
+        select: { id: true },
+      });
+    }
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find guest by party ID and email
+    const guest = await prisma.guest.findFirst({
+      where: {
+        partyId: party.id,
+        email: email.toLowerCase(),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        ethereumAddress: true,
+        roles: true,
+        mailingListOptIn: true,
+        dietaryRestrictions: true,
+        likedToppings: true,
+        dislikedToppings: true,
+        likedBeverages: true,
+        dislikedBeverages: true,
+        pizzeriaRankings: true,
+      },
+    });
+
+    if (!guest) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
+
+    res.json({ guest });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/rsvp/:inviteCode/guest - Submit guest preferences (public)
 router.post('/:inviteCode/guest', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -176,15 +230,31 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       });
 
       if (existingGuest) {
-        // Return success with existing guest info - they've already RSVP'd
+        // Update the existing guest record
+        const updatedGuest = await prisma.guest.update({
+          where: { id: existingGuest.id },
+          data: {
+            name: name.trim(),
+            ethereumAddress: ethereumAddress?.trim() || null,
+            roles: roles || [],
+            mailingListOptIn: mailingListOptIn || false,
+            dietaryRestrictions: dietaryRestrictions || [],
+            likedToppings: likedToppings || [],
+            dislikedToppings: dislikedToppings || [],
+            likedBeverages: likedBeverages || [],
+            dislikedBeverages: dislikedBeverages || [],
+            pizzeriaRankings: pizzeriaRankings || [],
+          },
+        });
+
         return res.status(200).json({
           success: true,
-          alreadyRegistered: true,
+          updated: true,
           guest: {
-            id: existingGuest.id,
-            name: existingGuest.name,
+            id: updatedGuest.id,
+            name: updatedGuest.name,
           },
-          message: 'You have already RSVP\'d to this party!',
+          message: 'Your RSVP has been updated!',
         });
       }
     }

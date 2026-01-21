@@ -5,7 +5,11 @@ import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 
-export const PizzeriaSelection: React.FC = () => {
+interface PizzeriaSelectionProps {
+  embedded?: boolean;
+}
+
+export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
   const { party, loadParty } = usePizza();
 
   // Pizzeria selection state
@@ -125,137 +129,146 @@ export const PizzeriaSelection: React.FC = () => {
 
   if (!party) return null;
 
-  return (
+  const innerContent = (
     <>
-      <div className="card p-6">
-        <div className="mb-3">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <MapPin size={20} />
-            Pizzeria Selection
-          </h2>
-          <p className="text-xs text-white/50 mt-1">
-            Choose up to 3 pizzerias for guests to rank when they RSVP
-          </p>
-        </div>
+      {/* Header */}
+      <div className="mb-3">
+        <h3 className={embedded ? "text-sm font-semibold text-white/70 uppercase tracking-wider mb-1" : "text-xl font-bold text-white flex items-center gap-2 mb-1"}>
+          {!embedded && <MapPin size={20} />}
+          Pizzeria Selection
+        </h3>
+        <p className="text-xs text-white/50">
+          Choose up to 3 pizzerias for guests to rank when they RSVP
+        </p>
+      </div>
 
-        {/* Selected Pizzerias */}
-        {selectedPizzerias.length > 0 && (
-          <div className="space-y-2 mb-3">
-            <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
-            {selectedPizzerias.map((pizzeria) => (
-              <div
+      {/* Selected Pizzerias */}
+      {selectedPizzerias.length > 0 && (
+        <div className="space-y-2 mb-3">
+          <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
+          {selectedPizzerias.map((pizzeria) => (
+            <div
+              key={pizzeria.id}
+              className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30"
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-[#ff393a]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                  {pizzeria.address && (
+                    <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                  )}
+                  {(pizzeria.url || pizzeria.phone) && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {pizzeria.url && (
+                        <a
+                          href={pizzeria.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <LinkIcon size={10} />
+                          Website
+                        </a>
+                      )}
+                      {pizzeria.phone && (
+                        <a
+                          href={`tel:${pizzeria.phone}`}
+                          className="text-white/50 hover:text-white text-xs flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Phone size={10} />
+                          {pizzeria.phone}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removePizzeria(pizzeria.id)}
+                className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Nearby Pizzerias (only show unselected ones) */}
+      {party.address && (
+        <div className="space-y-2 mb-3">
+          <p className="text-xs text-white/60 font-medium">
+            {loadingPizzerias ? 'Searching nearby...' : 'Nearby pizzerias:'}
+          </p>
+          {loadingPizzerias && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 size={20} className="animate-spin text-white/50" />
+            </div>
+          )}
+          {!loadingPizzerias && nearbyPizzerias
+            .filter(p => !selectedPizzerias.some(s => s.id === p.id))
+            .slice(0, 5)
+            .map((pizzeria) => (
+              <button
                 key={pizzeria.id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30"
+                type="button"
+                onClick={() => selectPizzeria(pizzeria)}
+                disabled={selectedPizzerias.length >= 3}
+                className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-[#ff393a]" />
+                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-white/60" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{pizzeria.name}</p>
-                    {pizzeria.address && (
-                      <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
-                    )}
-                    {(pizzeria.url || pizzeria.phone) && (
-                      <div className="flex items-center gap-2 mt-1">
-                        {pizzeria.url && (
-                          <a
-                            href={pizzeria.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <LinkIcon size={10} />
-                            Website
-                          </a>
-                        )}
-                        {pizzeria.phone && (
-                          <a
-                            href={`tel:${pizzeria.phone}`}
-                            className="text-white/50 hover:text-white text-xs flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Phone size={10} />
-                            {pizzeria.phone}
-                          </a>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                      {pizzeria.rating && (
+                        <span className="flex items-center gap-1 text-xs text-yellow-400">
+                          <Star size={12} className="fill-yellow-400" />
+                          {pizzeria.rating.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removePizzeria(pizzeria.id)}
-                  className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+                <Plus size={18} className="text-white/40 flex-shrink-0" />
+              </button>
             ))}
-          </div>
-        )}
+          {!loadingPizzerias && nearbyPizzerias.length === 0 && party.address && (
+            <p className="text-white/40 text-sm py-2">No pizzerias found nearby</p>
+          )}
+        </div>
+      )}
 
-        {/* Nearby Pizzerias (only show unselected ones) */}
-        {party.address && (
-          <div className="space-y-2 mb-3">
-            <p className="text-xs text-white/60 font-medium">
-              {loadingPizzerias ? 'Searching nearby...' : 'Nearby pizzerias:'}
-            </p>
-            {loadingPizzerias && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 size={20} className="animate-spin text-white/50" />
-              </div>
-            )}
-            {!loadingPizzerias && nearbyPizzerias
-              .filter(p => !selectedPizzerias.some(s => s.id === p.id))
-              .slice(0, 5)
-              .map((pizzeria) => (
-                <button
-                  key={pizzeria.id}
-                  type="button"
-                  onClick={() => selectPizzeria(pizzeria)}
-                  disabled={selectedPizzerias.length >= 3}
-                  className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-white/60" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-white font-medium truncate">{pizzeria.name}</p>
-                        {pizzeria.rating && (
-                          <span className="flex items-center gap-1 text-xs text-yellow-400">
-                            <Star size={12} className="fill-yellow-400" />
-                            {pizzeria.rating.toFixed(1)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
-                    </div>
-                  </div>
-                  <Plus size={18} className="text-white/40 flex-shrink-0" />
-                </button>
-              ))}
-            {!loadingPizzerias && nearbyPizzerias.length === 0 && party.address && (
-              <p className="text-white/40 text-sm py-2">No pizzerias found nearby</p>
-            )}
-          </div>
-        )}
+      {/* Add Custom Pizzeria Button */}
+      {selectedPizzerias.length < 3 && (
+        <button
+          type="button"
+          onClick={() => setShowAddPizzeriaModal(true)}
+          className="w-full btn-secondary flex items-center justify-center gap-2"
+        >
+          <Plus size={16} />
+          Add Custom Pizzeria
+        </button>
+      )}
+    </>
+  );
 
-        {/* Add Custom Pizzeria Button */}
-        {selectedPizzerias.length < 3 && (
-          <button
-            type="button"
-            onClick={() => setShowAddPizzeriaModal(true)}
-            className="w-full btn-secondary flex items-center justify-center gap-2"
-          >
-            <Plus size={16} />
-            Add Custom Pizzeria
-          </button>
-        )}
-      </div>
+  return (
+    <>
+      {embedded ? (
+        <div>{innerContent}</div>
+      ) : (
+        <div className="card p-6">{innerContent}</div>
+      )}
 
       {/* Add Custom Pizzeria Modal */}
       {showAddPizzeriaModal && (

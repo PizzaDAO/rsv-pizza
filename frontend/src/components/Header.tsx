@@ -1,7 +1,8 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, LogIn } from 'lucide-react';
+import { LoginModal } from './LoginModal';
 
 interface HeaderProps {
   rightContent?: ReactNode;
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   showBrandText = true
 }) => {
   const { user, loading } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const bgClass = variant === 'transparent'
     ? 'bg-[#0b0b10]/95'
@@ -50,17 +52,18 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-sm hidden sm:inline">{user.name || user.email}</span>
               </Link>
             ) : (
-              <Link
-                to="/login"
+              <button
+                onClick={() => setShowLoginModal(true)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/80 hover:text-white text-sm transition-all"
               >
                 <LogIn size={16} />
                 <span>Log In / Sign Up</span>
-              </Link>
+              </button>
             )
           )}
         </div>
       </div>
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </header>
   );
 };

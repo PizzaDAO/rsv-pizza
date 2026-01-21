@@ -280,8 +280,7 @@ function HostPageContent() {
                 {/* Recommended Order - always shown, auto-generated (includes Guest Requests) */}
                 <PizzaOrderSummary />
 
-                <PizzeriaSelection />
-                <PizzaStyleAndToppings />
+                <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                 <BeverageSettings />
               </>
             )}
