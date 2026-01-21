@@ -415,12 +415,12 @@ export function NewEventPage() {
             </div>
 
             <div className="relative">
-              <FileText size={18} className="absolute left-3 top-[14px] text-white/40 pointer-events-none" />
+              <FileText size={18} className="absolute left-4 top-[14px] text-white/40 pointer-events-none" />
               <textarea
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
                 placeholder="Description"
-                className="w-full !pl-9 text-left"
+                className="w-full !pl-11 text-left"
                 rows={3}
               />
             </div>
@@ -474,7 +474,7 @@ export function NewEventPage() {
               </div>
 
               <div className="relative">
-                <Image size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <Image size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="url"
                   value={eventImageUrl}
@@ -487,7 +487,7 @@ export function NewEventPage() {
                     }
                   }}
                   placeholder="Square Image URL"
-                  className="w-full !pl-14"
+                  className="w-full !pl-11"
                 />
               </div>
 
