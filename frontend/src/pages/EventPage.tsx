@@ -483,7 +483,7 @@ export function EventPage() {
 
               {/* Event Title */}
               <div className="p-6 pb-1 md:border-b md:border-white/10">
-                <h1 className="text-3xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+                <h1 className="text-4xl md:text-5xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
@@ -506,12 +506,12 @@ export function EventPage() {
                     {/* Date & Time */}
                     {event.date && (
                       <div className="flex items-start gap-3">
-                        <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                        <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div>
-                          <p className="font-medium text-white">
+                          <p className="text-lg font-medium text-white">
                             {formattedDate}
                           </p>
-                          <p className="text-sm text-white/60">
+                          <p className="text-base text-white/60">
                             {formattedTime}
                             {timezoneAbbr && ` ${timezoneAbbr}`}
                             {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
@@ -528,12 +528,12 @@ export function EventPage() {
                         rel="noopener noreferrer"
                         className="flex items-start gap-3 group"
                       >
-                        <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                        <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div>
                           {event.venueName && (
-                            <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                            <p className="text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
                           )}
-                          <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                          <p className={`${event.venueName ? 'text-base text-white/60' : 'text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
                         </div>
                       </a>
                     )}
@@ -567,12 +567,12 @@ export function EventPage() {
                 {/* Mobile: Date & Time */}
                 {event.date && (
                   <div className="md:hidden flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                    <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                     <div>
-                      <p className="font-medium text-white">
+                      <p className="text-lg font-medium text-white">
                         {formattedDate}
                       </p>
-                      <p className="text-sm text-white/60">
+                      <p className="text-base text-white/60">
                         {formattedTime}
                         {timezoneAbbr && ` ${timezoneAbbr}`}
                         {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
@@ -589,12 +589,12 @@ export function EventPage() {
                     rel="noopener noreferrer"
                     className="md:hidden flex items-start gap-3 group"
                   >
-                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
+                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                     <div>
                       {event.venueName && (
-                        <p className="font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                        <p className="text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
                       )}
-                      <p className={`${event.venueName ? 'text-sm text-white/60' : 'font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                      <p className={`${event.venueName ? 'text-base text-white/60' : 'text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
                     </div>
                   </a>
                 )}
@@ -629,7 +629,7 @@ export function EventPage() {
                 {/* Description */}
                 {event.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
-                    <div className="text-white/80 leading-relaxed prose prose-invert prose-base max-w-none">
+                    <div className="text-white/80 leading-relaxed prose prose-invert prose-lg max-w-none">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
