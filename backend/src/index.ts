@@ -7,6 +7,7 @@ import partyRoutes from './routes/party.routes.js';
 import rsvpRoutes from './routes/rsvp.routes.js';
 import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
+import nftRoutes from './routes/nft.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -14,9 +15,33 @@ const PORT = process.env.PORT || 3006;
 // Trust proxy for Vercel serverless (trust first proxy)
 app.set('trust proxy', 1);
 
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [
+      'https://rsv.pizza',
+      'https://www.rsv.pizza',
+      'http://localhost:5173',  // Vite dev server
+      'http://localhost:5176',  // Vite dev server (alt port)
+      'http://localhost:3000',
+    ];
+
 // Middleware
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    // Check against whitelist or Vercel preview URLs
+    if (
+      ALLOWED_ORIGINS.includes(origin) ||
+      origin.endsWith('.vercel.app')  // Allow Vercel preview deployments
+    ) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -47,6 +72,7 @@ app.use('/api/parties', partyRoutes);
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/nft', nftRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

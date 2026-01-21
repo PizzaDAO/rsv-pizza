@@ -7,6 +7,8 @@ import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
 import { PublicEvent } from '../lib/api';
+import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
+import { NFT_CONTRACT_ADDRESS } from '../lib/nftContract';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -32,8 +34,24 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [ethereumAddress, setEthereumAddress] = useState('');
+  const [walletValidation, setWalletValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [roles, setRoles] = useState<string[]>([]);
   const [mailingListOptIn, setMailingListOptIn] = useState(false);
+
+  // Validate wallet address or ENS name
+  const validateWalletAddress = (address: string) => {
+    if (!address.trim()) {
+      setWalletValidation('idle');
+      return;
+    }
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
+    if (ethAddressRegex.test(address.trim()) || ensRegex.test(address.trim())) {
+      setWalletValidation('valid');
+    } else {
+      setWalletValidation('invalid');
+    }
+  };
 
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -49,6 +67,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [pizzeriaRankings, setPizzeriaRankings] = useState<string[]>([]);
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
 
+  // NFT minting state
+  const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
+  const [mintResult, setMintResult] = useState<MintResult>({});
+  const { mint: mintNFT } = useMintNFT();
+
   // Reset state when modal opens and lock body scroll
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +81,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setWasUpdated(false);
       setStep(1);
       setError(null);
+      setMintStatus('idle');
+      setMintResult({});
 
       // Pre-fill form with existing guest data if editing
       if (existingGuest) {
@@ -225,6 +250,55 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setSubmitted(true);
         // Notify parent to refresh data
         onRSVPSuccess?.();
+
+        // Auto-mint NFT if wallet address provided and event has an image
+        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
+          setMintStatus('minting');
+          try {
+            const mintRes = await mintNFT({
+              recipient: ethereumAddress.trim(),
+              partyId: event.id,
+              guestId: result.guest.id,
+              guestName: name.trim(),
+              partyName: event.name,
+              partyDate: event.date ? new Date(event.date).toISOString().split('T')[0] : null,
+              partyVenue: event.venueName || null,
+              partyAddress: event.address || null,
+              imageUrl: event.eventImageUrl,
+              inviteCode: event.customUrl || event.inviteCode,
+            });
+            setMintResult({ txHash: mintRes.txHash, tokenId: mintRes.tokenId });
+            setMintStatus('success');
+
+            // Save NFT data to backend (requires email for verification)
+            if (mintRes.txHash && mintRes.tokenId && email.trim()) {
+              const API_URL = import.meta.env.VITE_API_URL || '';
+              try {
+                const saveResponse = await fetch(`${API_URL}/api/nft/guest/${result.guest.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tokenId: parseInt(mintRes.tokenId),
+                    transactionHash: mintRes.txHash,
+                    email: email.trim().toLowerCase(),
+                  }),
+                });
+
+                if (!saveResponse.ok) {
+                  const errorData = await saveResponse.json().catch(() => ({}));
+                  console.error('Failed to save NFT data:', errorData.error || saveResponse.statusText);
+                  // Don't fail the overall success - NFT is minted, just logging failed
+                }
+              } catch (saveError) {
+                console.error('Failed to save NFT data to database:', saveError);
+                // Don't fail the overall success - NFT is minted on-chain
+              }
+            }
+          } catch (err) {
+            setMintResult({ error: err instanceof Error ? err.message : 'Minting failed' });
+            setMintStatus('error');
+          }
+        }
       } else {
         setError('Failed to submit. Please try again.');
       }
@@ -331,9 +405,47 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
+          {ethereumAddress.trim() && event.eventImageUrl && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              {mintStatus === 'minting' && (
+                <div className="flex items-center gap-2 text-white/60 justify-center">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Minting your NFT...</span>
+                </div>
+              )}
+              {mintStatus === 'success' && mintResult.txHash && (
+                <div className="space-y-2">
+                  <p className="text-[#39d98a] font-medium">NFT Minted!</p>
+                  <div className="flex gap-3 justify-center">
+                    <a
+                      href={`https://basescan.org/tx/${mintResult.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-white/60 hover:text-white underline"
+                    >
+                      View on BaseScan
+                    </a>
+                    {mintResult.tokenId && NFT_CONTRACT_ADDRESS && (
+                      <a
+                        href={`https://opensea.io/assets/base/${NFT_CONTRACT_ADDRESS}/${mintResult.tokenId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-white/60 hover:text-white underline"
+                      >
+                        View on OpenSea
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+              {mintStatus === 'error' && (
+                <p className="text-[#ff393a] text-sm">{mintResult.error || 'NFT minting failed'}</p>
+              )}
+            </div>
+          )}
           <button
             onClick={handleClose}
-            className="btn-secondary"
+            className="btn-secondary mt-4"
           >
             Close
           </button>
@@ -389,13 +501,25 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               required
             />
 
-            <IconInput
-              icon={Wallet}
-              type="text"
-              value={ethereumAddress}
-              onChange={(e) => setEthereumAddress(e.target.value)}
-              placeholder="Wallet Address"
-            />
+            <div className="relative">
+              <IconInput
+                icon={Wallet}
+                type="text"
+                value={ethereumAddress}
+                onChange={(e) => {
+                  setEthereumAddress(e.target.value);
+                  validateWalletAddress(e.target.value);
+                }}
+                placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
+                className={walletValidation === 'valid' ? 'pr-10 border-[#39d98a]/50' : walletValidation === 'invalid' ? 'border-[#ff393a]/50' : ''}
+              />
+              {walletValidation === 'valid' && (
+                <Check size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#39d98a]" />
+              )}
+              {walletValidation === 'invalid' && ethereumAddress.trim() && (
+                <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
+              )}
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-white/80 mb-2">

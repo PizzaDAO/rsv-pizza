@@ -170,6 +170,24 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
+    // Validate Ethereum address or ENS name format if provided
+    if (ethereumAddress && ethereumAddress.trim()) {
+      const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+      const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
+      const trimmedAddress = ethereumAddress.trim();
+      if (!ethAddressRegex.test(trimmedAddress) && !ensRegex.test(trimmedAddress)) {
+        throw new AppError('Invalid Ethereum address or ENS name format', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    // Validate email format if provided
+    if (email && email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+      }
+    }
+
     // Find party by invite code OR custom URL (frontend supports both)
     let party = await prisma.party.findUnique({
       where: { inviteCode },

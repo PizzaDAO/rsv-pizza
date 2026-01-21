@@ -86,6 +86,11 @@ model Guest {
   submittedVia        String   @default("link") @map("submitted_via")
   approved            Boolean? // null = pending, true = approved, false = declined
 
+  // NFT minting fields
+  nftTokenId         Int?      @map("nft_token_id")
+  nftTransactionHash String?   @map("nft_transaction_hash")
+  nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
+
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
