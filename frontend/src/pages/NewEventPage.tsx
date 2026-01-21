@@ -322,7 +322,7 @@ export function NewEventPage() {
               value={partyAddress}
               onChange={setPartyAddress}
               onTimezoneChange={setTimezone}
-              placeholder="Add Event Location"
+              placeholder="Event Location"
             />
 
             {/* Mobile: Date/Time Button */}
@@ -415,11 +415,11 @@ export function NewEventPage() {
             </div>
 
             <div className="relative">
-              <FileText size={18} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
+              <FileText size={18} className="absolute left-3 top-[14px] text-white/40 pointer-events-none" />
               <textarea
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
-                placeholder="Add Description"
+                placeholder="Description"
                 className="w-full !pl-9 text-left"
                 rows={3}
               />
