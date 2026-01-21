@@ -36,7 +36,7 @@ app.use('/api', limiter);
 // Stricter rate limit for RSVP submissions (prevent spam)
 const rsvpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 RSVPs per hour per IP
+  max: 50, // 50 RSVPs per hour per IP
   message: { error: 'Too many RSVP submissions, please try again later' },
 });
 app.use('/api/rsvp', rsvpLimiter);
