@@ -17,7 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, loading } = useAuth();
 
   const bgClass = variant === 'transparent'
-    ? 'bg-black/20 backdrop-blur-sm'
+    ? 'bg-[#0b0b10]/95'
     : 'bg-[#1a1a2e]';
 
   return (
