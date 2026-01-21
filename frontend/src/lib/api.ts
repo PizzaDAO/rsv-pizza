@@ -1,3 +1,5 @@
+import { Pizzeria } from '../types';
+
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -238,6 +240,7 @@ export interface PublicEvent {
   hostProfile: HostProfile | null;
   guestCount: number;
   userId: string | null;
+  selectedPizzerias?: Pizzeria[];
 }
 
 // Public Event API (no auth required)

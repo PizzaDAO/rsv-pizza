@@ -9,6 +9,7 @@ import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
+import { RSVPModal } from '../components/RSVPModal';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -26,6 +27,7 @@ export function EventPage() {
   const [showEditPasswordPrompt, setShowEditPasswordPrompt] = useState(false);
   const [editPasswordInput, setEditPasswordInput] = useState('');
   const [editPasswordError, setEditPasswordError] = useState<string | null>(null);
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -83,10 +85,7 @@ export function EventPage() {
   };
 
   const handleRSVP = () => {
-    const rsvpUrl = event?.customUrl
-      ? `/rsvp/${event.customUrl}`
-      : `/rsvp/${event?.inviteCode}`;
-    navigate(rsvpUrl);
+    setShowRSVPModal(true);
   };
 
   const handleEditEvent = () => {
@@ -361,9 +360,18 @@ export function EventPage() {
         </div>
       )}
 
-      <div className="py-8">
+      {/* RSVP Modal */}
+      {event && (
+        <RSVPModal
+          isOpen={showRSVPModal}
+          onClose={() => setShowRSVPModal(false)}
+          event={event}
+        />
+      )}
+
+      <div className="py-8 md:px-8">
         <div className="card overflow-hidden">
-          <div className="grid md:grid-cols-[400px,1fr] gap-0">
+          <div className="grid md:grid-cols-[400px,1fr] gap-0 md:gap-8">
             {/* Left Column - Image and Host Info (Desktop only) */}
             <div className="hidden md:flex flex-col">
               {/* Square Image */}
