@@ -301,20 +301,7 @@ export function EventPage() {
         {event.address && <meta property="event:location" content={event.address} />}
       </Helmet>
 
-      <Header
-        variant="transparent"
-        rightContent={
-          user && (user.id === event?.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') ? (
-            <button
-              onClick={handleEditEvent}
-              className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
-            >
-              <Settings size={16} />
-              <span className="hidden sm:inline">Edit Event</span>
-            </button>
-          ) : undefined
-        }
-      />
+      <Header variant="transparent" />
 
       {/* Edit Password Prompt Modal */}
       {showEditPasswordPrompt && (
