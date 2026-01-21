@@ -7,6 +7,7 @@ import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } 
 import { verifyPartyPassword } from '../lib/supabase';
 import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
+import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
 
 export function EventPage() {
@@ -300,17 +301,10 @@ export function EventPage() {
         {event.address && <meta property="event:location" content={event.address} />}
       </Helmet>
 
-      {/* Header with Logo */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm fixed top-0 left-0 right-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img
-              src="/logo.png"
-              alt="RSV.Pizza"
-              className="h-8 sm:h-10"
-            />
-          </Link>
-          {user && (user.id === event?.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+      <Header
+        variant="transparent"
+        rightContent={
+          user && (user.id === event?.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') ? (
             <button
               onClick={handleEditEvent}
               className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
@@ -318,9 +312,9 @@ export function EventPage() {
               <Settings size={16} />
               <span className="hidden sm:inline">Edit Event</span>
             </button>
-          )}
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
 
       {/* Edit Password Prompt Modal */}
       {showEditPasswordPrompt && (

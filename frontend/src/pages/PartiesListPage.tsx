@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAllParties, DbParty } from '../lib/supabase';
 import { Calendar, Users, MapPin, ChevronRight, PartyPopper } from 'lucide-react';
+import { Header } from '../components/Header';
 
 export const PartiesListPage: React.FC = () => {
   const [parties, setParties] = useState<DbParty[]>([]);
@@ -37,14 +38,19 @@ export const PartiesListPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center">
-        <div className="text-white/60">Loading parties...</div>
+      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
+        <Header />
+        <div className="flex items-center justify-center pt-32">
+          <div className="text-white/60">Loading parties...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e] py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
+      <Header />
+      <div className="pt-20 pb-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -122,6 +128,7 @@ export const PartiesListPage: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

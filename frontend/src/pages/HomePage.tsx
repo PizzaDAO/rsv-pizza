@@ -433,7 +433,7 @@ export function HomePage() {
                 return filteredParties.map(party => (
                 <Link
                   key={party.id}
-                  to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/rsvp/${party.invite_code}`}
+                  to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/${party.invite_code}`}
                   className="block card p-4 hover:bg-white/10 transition-colors"
                 >
                   <div className="flex items-start gap-4">

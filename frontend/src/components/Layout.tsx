@@ -1,59 +1,17 @@
 import React, { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { User, LogIn } from 'lucide-react';
+import { Header } from './Header';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, loading } = useAuth();
-
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <nav className="sticky top-0 z-50 bg-[#1a1a2e] border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img
-              src="/logo.png"
-              alt="RSV.Pizza"
-              className="h-8 sm:h-10"
-            />
-            <span
-              className="text-white/90"
-              style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem' }}
-            >
-              RSV.Pizza
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            {!loading && (
-              user ? (
-                <Link
-                  to="/account"
-                  className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
-                >
-                  <User size={18} />
-                  <span className="text-sm hidden sm:inline">{user.name || user.email}</span>
-                </Link>
-              ) : (
-                <Link
-                  to="/login"
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/80 hover:text-white text-sm transition-all"
-                >
-                  <LogIn size={16} />
-                  <span>Log In / Sign Up</span>
-                </Link>
-              )
-            )}
-          </div>
-        </div>
-      </nav>
+      <Header />
 
-      {/* Main content */}
-      <main className="flex-1">
+      {/* Main content - add padding for fixed header */}
+      <main className="flex-1 pt-16">
         {children}
       </main>
 
