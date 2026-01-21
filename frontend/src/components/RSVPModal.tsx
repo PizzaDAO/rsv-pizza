@@ -416,26 +416,16 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               {mintStatus === 'success' && mintResult.txHash && (
                 <div className="space-y-2">
                   <p className="text-[#39d98a] font-medium">NFT Minted!</p>
-                  <div className="flex gap-3 justify-center">
+                  {mintResult.tokenId && NFT_CONTRACT_ADDRESS && (
                     <a
-                      href={`https://basescan.org/tx/${mintResult.txHash}`}
+                      href={`https://opensea.io/assets/base/${NFT_CONTRACT_ADDRESS}/${mintResult.tokenId}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-white/60 hover:text-white underline"
                     >
-                      View on BaseScan
+                      View on OpenSea
                     </a>
-                    {mintResult.tokenId && NFT_CONTRACT_ADDRESS && (
-                      <a
-                        href={`https://opensea.io/assets/base/${NFT_CONTRACT_ADDRESS}/${mintResult.tokenId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-white/60 hover:text-white underline"
-                      >
-                        View on OpenSea
-                      </a>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
               {mintStatus === 'error' && (
