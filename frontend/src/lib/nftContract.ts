@@ -1,3 +1,6 @@
+// Default contract address on Base mainnet
+const DEFAULT_CONTRACT_ADDRESS = '0x2344044DfE7685041B2e5E0Aa6DB5277CEA0f76b';
+
 const rawContractAddress = import.meta.env.VITE_NFT_CONTRACT_ADDRESS as string | undefined;
 
 // Validate contract address format
@@ -8,7 +11,7 @@ const isValidContractAddress = (address: string | undefined): address is string 
 
 export const NFT_CONTRACT_ADDRESS = isValidContractAddress(rawContractAddress)
   ? rawContractAddress
-  : '';
+  : DEFAULT_CONTRACT_ADDRESS;
 
 export const isNFTContractConfigured = (): boolean => {
   return isValidContractAddress(rawContractAddress);
