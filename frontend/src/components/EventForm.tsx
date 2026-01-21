@@ -1,0 +1,681 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { TimePickerInput } from './TimePickerInput';
+import { TimezonePickerInput } from './TimezonePickerInput';
+import { LocationAutocomplete } from './LocationAutocomplete';
+import { LoginModal } from './LoginModal';
+import { useAuth } from '../contexts/AuthContext';
+import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
+import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
+import { CustomUrlInput } from './CustomUrlInput';
+import { parseDateTimeInTimezone } from '../utils/dateUtils';
+
+export function EventForm() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
+
+  // Form state
+  const [partyName, setPartyName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [timezone, setTimezone] = useState('');
+  const [expectedGuests, setExpectedGuests] = useState('');
+  const [partyAddress, setPartyAddress] = useState('');
+  const [partyPassword, setPartyPassword] = useState('');
+  const [eventImageUrl, setEventImageUrl] = useState('');
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [eventDescription, setEventDescription] = useState('');
+  const [customUrl, setCustomUrl] = useState('');
+  const [customUrlValid, setCustomUrlValid] = useState(true);
+  const [customUrlError, setCustomUrlError] = useState<string | undefined>();
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [limitGuests, setLimitGuests] = useState(false);
+  const [hideGuests, setHideGuests] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [showDateTimeModal, setShowDateTimeModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Get user's timezone on mount
+  useEffect(() => {
+    try {
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setTimezone(userTimezone);
+    } catch (error) {
+      console.warn('Timezone detection failed, using UTC', error);
+      setTimezone('UTC');
+    }
+  }, []);
+
+  // Check for pending party form data after auth redirect
+  const pendingFormProcessed = useRef(false);
+  useEffect(() => {
+    if (!user || pendingFormProcessed.current) return;
+
+    const savedForm = sessionStorage.getItem('pendingPartyForm');
+    if (savedForm) {
+      pendingFormProcessed.current = true;
+      sessionStorage.removeItem('pendingPartyForm');
+
+      try {
+        const formData = JSON.parse(savedForm);
+        createPartyFromSavedData(formData);
+      } catch (err) {
+        console.error('Failed to restore form data:', err);
+      }
+    }
+  }, [user]);
+
+  const createPartyFromSavedData = async (formData: any) => {
+    setCreating(true);
+
+    try {
+      const guestCount = formData.expectedGuests ? parseInt(formData.expectedGuests, 10) : undefined;
+      const password = formData.partyPassword?.trim() || undefined;
+      const description = formData.eventDescription?.trim() || undefined;
+      const urlSlug = formData.customUrl?.trim() || undefined;
+
+      // Use the event's timezone when parsing the entered date/time
+      const tz = formData.timezone || 'UTC';
+      let duration: number | undefined;
+      let startDateTime: string | undefined;
+      if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
+        const start = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz);
+        const end = parseDateTimeInTimezone(formData.endDate, formData.endTime, tz);
+        const durationMs = end.getTime() - start.getTime();
+        duration = durationMs / (1000 * 60 * 60);
+        startDateTime = start.toISOString();
+      } else if (formData.startDate && formData.startTime) {
+        startDateTime = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz).toISOString();
+      }
+
+      const imageUrl = formData.eventImageUrl?.trim() || undefined;
+
+      const party = await createPartyAPI(
+        formData.partyName?.trim() || undefined,
+        user?.name || undefined,
+        startDateTime,
+        'new-york',
+        guestCount,
+        formData.partyAddress?.trim() || undefined,
+        [],
+        duration,
+        password,
+        imageUrl,
+        description,
+        urlSlug,
+        formData.timezone || undefined,
+        undefined, // hostEmail
+        formData.hideGuests || false
+      );
+
+      setCreating(false);
+
+      if (party?.invite_code) {
+        navigate(`/host/${party.invite_code}`);
+      }
+    } catch (error) {
+      console.error('Error creating party:', error);
+      setCreating(false);
+    }
+  };
+
+  const formatDateDisplay = (date: string) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const formatTimeDisplay = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  const getTimezoneAbbr = () => {
+    if (!timezone) return '';
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'short'
+      });
+      const parts = formatter.formatToParts(new Date());
+      const tzPart = parts.find(p => p.type === 'timeZoneName');
+      return tzPart?.value || '';
+    } catch {
+      return '';
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    setImageError(null);
+
+    if (!file.type.startsWith('image/')) {
+      setImageError('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image must be less than 5MB');
+      return;
+    }
+
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const aspectRatio = img.width / img.height;
+
+      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
+        setImageError('Image must be square (1:1 aspect ratio)');
+        setEventImageFile(null);
+        setImagePreview(null);
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      setEventImageFile(file);
+      setImagePreview(objectUrl);
+    };
+
+    img.onerror = () => {
+      setImageError('Failed to load image');
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    img.src = objectUrl;
+  };
+
+  const removeImage = () => {
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setEventImageFile(null);
+    setImagePreview(null);
+    setImageError(null);
+    setEventImageUrl('');
+  };
+
+  const handleCreate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+
+    if (!user) {
+      const formData = {
+        partyName, startDate, startTime, endDate, endTime, timezone,
+        expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
+        customUrl, requireApproval, limitGuests, hideGuests
+      };
+      sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
+      sessionStorage.setItem('authReturnUrl', window.location.pathname);
+      setShowLoginModal(true);
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      const guestCount = expectedGuests ? parseInt(expectedGuests, 10) : undefined;
+      const password = partyPassword.trim() || undefined;
+      const description = eventDescription.trim() || undefined;
+      const urlSlug = customUrl.trim() || undefined;
+
+      // Check if custom URL is valid (already validated by CustomUrlInput)
+      if (urlSlug && !customUrlValid) {
+        setImageError(customUrlError || 'Invalid custom URL');
+        setCreating(false);
+        return;
+      }
+
+      // Use the event's timezone when parsing the entered date/time
+      const tz = timezone || 'UTC';
+      let duration: number | undefined;
+      let startDateTime: string | undefined;
+      if (startDate && startTime && endDate && endTime) {
+        const start = parseDateTimeInTimezone(startDate, startTime, tz);
+        const end = parseDateTimeInTimezone(endDate, endTime, tz);
+        const durationMs = end.getTime() - start.getTime();
+        duration = durationMs / (1000 * 60 * 60);
+        startDateTime = start.toISOString();
+      } else if (startDate && startTime) {
+        startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
+      }
+
+      let imageUrl = eventImageUrl.trim() || undefined;
+      if (eventImageFile) {
+        const uploadedUrl = await uploadEventImage(eventImageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          setImageError('Failed to upload image. Please try again.');
+          setCreating(false);
+          return;
+        }
+      }
+
+      const party = await createPartyAPI(
+        partyName.trim() || undefined,
+        user?.name || undefined,
+        startDateTime,
+        'new-york',
+        guestCount,
+        partyAddress.trim() || undefined,
+        [],
+        duration,
+        password,
+        imageUrl,
+        description,
+        urlSlug,
+        timezone || undefined,
+        undefined, // hostEmail
+        hideGuests
+      );
+
+      setCreating(false);
+
+      if (party?.invite_code) {
+        navigate(`/host/${party.invite_code}`);
+      } else {
+        setImageError('Failed to create party. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating party:', error);
+      setImageError('Failed to create party. Please try again.');
+      setCreating(false);
+    }
+  };
+
+  return (
+    <>
+      <form onSubmit={handleCreate} className="space-y-3">
+        <div>
+          <input
+            type="text"
+            value={partyName}
+            onChange={(e) => setPartyName(e.target.value)}
+            placeholder="Party Name"
+            className="w-full pl-3"
+            autoFocus
+          />
+        </div>
+
+        <LocationAutocomplete
+          value={partyAddress}
+          onChange={setPartyAddress}
+          onTimezoneChange={setTimezone}
+          placeholder="Event Location"
+        />
+
+        {/* Mobile: Date/Time Button */}
+        <button
+          type="button"
+          onClick={() => setShowDateTimeModal(true)}
+          className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Play size={18} className="text-white/40 flex-shrink-0" />
+            {startDate && startTime && endDate && endTime ? (
+              <div>
+                <div className="text-white font-medium">
+                  {formatDateDisplay(startDate)}
+                </div>
+                <div className="text-white/60 text-sm mt-1">
+                  {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span className="text-white/60">Thursday, January 15</span>
+                <div className="text-white/40 text-sm mt-1">2:00 PM — 3:00 PM EST</div>
+              </div>
+            )}
+          </div>
+        </button>
+
+        {/* Desktop: Inline Date/Time Picker */}
+        <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className="relative flex-1 cursor-pointer"
+                  onClick={() => startDateInputRef.current?.showPicker?.()}
+                >
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Play size={21} className="text-white/40" />
+                  </div>
+                  <input
+                    ref={startDateInputRef}
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (!endDate) setEndDate(e.target.value);
+                    }}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+                <TimePickerInput
+                  value={startTime}
+                  onChange={setStartTime}
+                  placeholder="12:30 PM"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div
+                  className="relative flex-1 cursor-pointer"
+                  onClick={() => endDateInputRef.current?.showPicker?.()}
+                >
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <SquareIcon size={17} className="text-white/40" />
+                  </div>
+                  <input
+                    ref={endDateInputRef}
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+                <TimePickerInput
+                  value={endTime}
+                  onChange={setEndTime}
+                  placeholder="01:30 PM"
+                />
+              </div>
+            </div>
+
+            <TimezonePickerInput
+              value={timezone}
+              onChange={setTimezone}
+            />
+          </div>
+        </div>
+
+        <div className="relative">
+          <FileText size={18} className="absolute left-4 top-[14px] text-white/40 pointer-events-none" />
+          <textarea
+            value={eventDescription}
+            onChange={(e) => setEventDescription(e.target.value)}
+            placeholder="Description"
+            className="w-full !pl-11 text-left"
+            rows={3}
+          />
+        </div>
+
+
+        <div>
+          {imagePreview ? (
+            <div className="space-y-3 mb-3">
+              <div className="relative w-full max-w-xs mx-auto">
+                <img
+                  src={imagePreview}
+                  alt="Event flyer preview"
+                  className="w-full h-auto rounded-xl border-2 border-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative mb-3">
+              <input
+                type="file"
+                id="eventImage"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+                disabled={!!eventImageUrl.trim()}
+              />
+              <label
+                htmlFor="eventImage"
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
+                  eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Upload className="w-8 h-8 text-white/40 mb-2" />
+                <span className="text-sm text-white/60">Click to upload square image</span>
+                <span className="text-xs text-white/40 mt-1">Max 5MB - 1:1 aspect ratio</span>
+              </label>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-white/10"></div>
+            <span className="text-xs text-white/40">OR</span>
+            <div className="flex-1 h-px bg-white/10"></div>
+          </div>
+
+          <div className="relative">
+            <Image size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+            <input
+              type="url"
+              value={eventImageUrl}
+              onChange={(e) => {
+                setEventImageUrl(e.target.value);
+                if (e.target.value.trim()) {
+                  setEventImageFile(null);
+                  setImagePreview(null);
+                  setImageError(null);
+                }
+              }}
+              placeholder="Square Image URL"
+              className="w-full !pl-11"
+            />
+          </div>
+
+          {imageError && (
+            <p className="text-xs text-red-400 mt-2">{imageError}</p>
+          )}
+        </div>
+
+        {/* Options Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowOptionalFields(!showOptionalFields)}
+          className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+        >
+          <span className="text-sm font-medium text-white/80">
+            Options
+          </span>
+          {showOptionalFields ? (
+            <ChevronUp size={18} className="text-white/60" />
+          ) : (
+            <ChevronDown size={18} className="text-white/60" />
+          )}
+        </button>
+
+        {/* Collapsible Options */}
+        {showOptionalFields && (
+          <div className="space-y-3 border-l-2 border-white/10 pl-4">
+            <div>
+              <button
+                type="button"
+                onClick={() => setRequireApproval(!requireApproval)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {requireApproval ? (
+                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                ) : (
+                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                )}
+                <span className="text-sm font-medium text-white/80">Require Approval</span>
+              </button>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setLimitGuests(!limitGuests)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {limitGuests ? (
+                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                ) : (
+                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                )}
+                <span className="text-sm font-medium text-white/80">Limit Guests</span>
+              </button>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setHideGuests(!hideGuests)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {hideGuests ? (
+                  <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
+                ) : (
+                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                )}
+                <span className="text-sm font-medium text-white/80">Hide Guests</span>
+              </button>
+            </div>
+
+            {limitGuests && (
+              <div className="relative">
+                <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="number"
+                  min="1"
+                  value={expectedGuests}
+                  onChange={(e) => setExpectedGuests(e.target.value)}
+                  placeholder="Capacity"
+                  className="w-full !pl-14"
+                />
+              </div>
+            )}
+
+            <div className="relative">
+              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+              <input
+                type="password"
+                value={partyPassword}
+                onChange={(e) => setPartyPassword(e.target.value)}
+                placeholder="Event Password"
+                className="w-full !pl-14"
+              />
+            </div>
+
+            <CustomUrlInput
+              value={customUrl}
+              onChange={setCustomUrl}
+              onValidationChange={(isValid, error) => {
+                setCustomUrlValid(isValid);
+                setCustomUrlError(error);
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
+          disabled={creating}
+        >
+          {creating ? (
+            <>
+              <Loader2 size={20} className="animate-spin" />
+              Creating...
+            </>
+          ) : (
+            'Create Party'
+          )}
+        </button>
+      </form>
+
+      {/* Mobile Date/Time Modal */}
+      {showDateTimeModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Play size={18} className="text-white/40 flex-shrink-0" />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (!endDate) setEndDate(e.target.value);
+                  }}
+                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
+                />
+                <TimePickerInput
+                  value={startTime}
+                  onChange={setStartTime}
+                  placeholder="12:00 PM"
+                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
+                />
+                <TimePickerInput
+                  value={endTime}
+                  onChange={setEndTime}
+                  placeholder="1:00 PM"
+                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <TimezonePickerInput
+                  value={timezone}
+                  onChange={setTimezone}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDateTimeModal(false)}
+              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
+    </>
+  );
+}
