@@ -9,6 +9,7 @@ import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGues
 import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
+import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
@@ -758,21 +759,7 @@ export function EventPage() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-1 mt-8 pb-8">
-          <span className="text-white/40 text-sm">Powered by</span>
-          <a
-            href="https://pizzadao.xyz/join"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:opacity-80 transition-opacity"
-          >
-            <img
-              src="/pizzadao-logo.svg"
-              alt="PizzaDAO"
-              className="h-7"
-            />
-          </a>
-        </div>
+        <Footer className="mt-8 pb-2" />
       </div>
 
       <CornerLinks />
