@@ -640,7 +640,7 @@ export function EventPage() {
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
-                    {userHasRSVPd ? "Update RSVP?" : "RSVP"}
+                    {userHasRSVPd ? "Update RSVP" : "RSVP"}
                   </button>
                   {event.rsvpClosedAt && (
                     <p className="text-center text-white/50 text-sm mt-3">
