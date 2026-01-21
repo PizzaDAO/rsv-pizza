@@ -393,6 +393,15 @@ export function EventPage() {
           onClose={() => setShowRSVPModal(false)}
           event={event}
           existingGuest={existingGuestData}
+          onRSVPSuccess={async () => {
+            // Refetch guest data after successful RSVP/update
+            if (user?.email && event) {
+              setUserHasRSVPd(true);
+              const inviteCode = event.customUrl || event.inviteCode;
+              const guestData = await getExistingGuest(inviteCode, user.email);
+              setExistingGuestData(guestData);
+            }
+          }}
         />
       )}
 

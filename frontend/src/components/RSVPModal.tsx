@@ -13,9 +13,10 @@ interface RSVPModalProps {
   onClose: () => void;
   event: PublicEvent;
   existingGuest?: ExistingGuestData | null;
+  onRSVPSuccess?: () => void;
 }
 
-export function RSVPModal({ isOpen, onClose, event, existingGuest }: RSVPModalProps) {
+export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess }: RSVPModalProps) {
   const { user } = useAuth();
 
   const [submitting, setSubmitting] = useState(false);
@@ -222,6 +223,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest }: RSVPModalPr
         // Check if this was an update (either we were editing or backend says it was updated)
         setWasUpdated(isEditing || result.updated);
         setSubmitted(true);
+        // Notify parent to refresh data
+        onRSVPSuccess?.();
       } else {
         setError('Failed to submit. Please try again.');
       }
