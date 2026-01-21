@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
 import { verifyPartyPassword } from '../lib/supabase';
 import { getEventBySlug, PublicEvent } from '../lib/api';
@@ -210,6 +211,16 @@ export function EventPage() {
     timeZone: event.timezone || undefined,
   });
   const formattedTime = eventDate?.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: event.timezone || undefined,
+  });
+
+  // Calculate and format end time
+  const endDate = eventDate && event.duration
+    ? new Date(eventDate.getTime() + event.duration * 3600000)
+    : null;
+  const formattedEndTime = endDate?.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: event.timezone || undefined,
@@ -513,8 +524,8 @@ export function EventPage() {
                           </p>
                           <p className="text-base text-white/60">
                             {formattedTime}
+                            {formattedEndTime && ` - ${formattedEndTime}`}
                             {timezoneAbbr && ` ${timezoneAbbr}`}
-                            {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
                           </p>
                         </div>
                       </div>
@@ -574,8 +585,8 @@ export function EventPage() {
                       </p>
                       <p className="text-base text-white/60">
                         {formattedTime}
+                        {formattedEndTime && ` - ${formattedEndTime}`}
                         {timezoneAbbr && ` ${timezoneAbbr}`}
-                        {event.duration && ` • ${event.duration} hour${event.duration !== 1 ? 's' : ''}`}
                       </p>
                     </div>
                   </div>
@@ -631,7 +642,7 @@ export function EventPage() {
                   <div className="border-t border-white/10 pt-4 mt-4">
                     <div className="text-white/80 leading-relaxed prose prose-invert prose-lg max-w-none">
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
+                        remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
                           a: ({ node, ...props }) => (
                             <a {...props} className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline" target="_blank" rel="noopener noreferrer" />
