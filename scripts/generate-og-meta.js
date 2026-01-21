@@ -92,11 +92,11 @@ async function generateOGMetaPages() {
 
 
   <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="${pageUrl}">
-  <meta property="twitter:title" content="${escapeHtml(metaTitle)}">
-  <meta property="twitter:description" content="${escapeHtml(metaDescription)}">
-  <meta property="twitter:image" content="${ogImageUrl}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="${pageUrl}">
+  <meta name="twitter:title" content="${escapeHtml(metaTitle)}">
+  <meta name="twitter:description" content="${escapeHtml(metaDescription)}">
+  <meta name="twitter:image" content="${ogImageUrl}">
 
   ${eventDate ? `<meta property="event:start_time" content="${eventDate.toISOString()}">` : ''}
   ${party.duration && eventDate ? `<meta property="event:end_time" content="${new Date(eventDate.getTime() + party.duration * 3600000).toISOString()}">` : ''}
