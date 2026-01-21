@@ -419,7 +419,6 @@ export function EventPage() {
               {/* Host Button - Desktop */}
               {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
                 <div className="p-4 bg-[#39d98a]/10 border-t border-white/10">
-                  <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                   <button
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -496,7 +495,6 @@ export function EventPage() {
                 {/* Host Button - Mobile */}
                 {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
                   <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
-                    <p className="text-sm text-white/60 mb-2">You have host access for this event.</p>
                     <button
                       onClick={handleEditEvent}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
