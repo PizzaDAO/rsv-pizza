@@ -761,7 +761,7 @@ export function EventPage() {
         <div className="flex flex-col items-center gap-1 mt-8 pb-8">
           <span className="text-white/40 text-sm">Powered by</span>
           <a
-            href="https://pizzadao.xyz"
+            href="https://pizzadao.xyz/join"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"
