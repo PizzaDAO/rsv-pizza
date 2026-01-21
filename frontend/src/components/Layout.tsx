@@ -10,8 +10,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      {/* Main content - add padding for fixed header */}
-      <main className="flex-1 pt-16">
+      {/* Main content */}
+      <main className="flex-1">
         {children}
       </main>
 

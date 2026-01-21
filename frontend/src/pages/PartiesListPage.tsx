@@ -40,7 +40,7 @@ export const PartiesListPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
         <Header />
-        <div className="flex items-center justify-center pt-32">
+        <div className="flex items-center justify-center py-16">
           <div className="text-white/60">Loading parties...</div>
         </div>
       </div>
@@ -50,7 +50,7 @@ export const PartiesListPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
       <Header />
-      <div className="pt-20 pb-8 px-4">
+      <div className="py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">

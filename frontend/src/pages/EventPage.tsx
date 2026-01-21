@@ -361,7 +361,7 @@ export function EventPage() {
         </div>
       )}
 
-      <div className="py-8 pt-24">
+      <div className="py-8">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0">
             {/* Left Column - Image and Host Info (Desktop only) */}
