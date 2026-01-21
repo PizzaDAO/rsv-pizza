@@ -313,7 +313,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
     // Construct static map URL
     const staticMapUrl = apiKey && pizzeria.location
-      ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${apiKey}&style=feature:all|element:all|saturation:-100|lightness:-20`
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${apiKey}`
       : null;
 
     return (

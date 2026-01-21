@@ -235,7 +235,7 @@ export function EventPage() {
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = googleMapsApiKey && event.address
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=15&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}&style=feature:all|element:all|saturation:-100|lightness:-20`
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=15&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
     : null;
   const googleMapsUrl = event.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
@@ -622,8 +622,7 @@ export function EventPage() {
                 {/* Description */}
                 {event.description && (
                   <div className="border-t border-white/10 pt-4 mt-4">
-                    <h3 className="font-semibold text-white mb-2">About Event</h3>
-                    <div className="text-white/70 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                    <div className="text-white/80 leading-relaxed prose prose-invert prose-base max-w-none">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
