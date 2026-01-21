@@ -4,6 +4,7 @@ import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TableRow } from './TableRow';
+import { GuestPreferencesList } from './GuestPreferencesList';
 import { Pizzeria, OrderingOption } from '../types';
 import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
 import { format } from 'date-fns';
@@ -25,6 +26,7 @@ export const PizzaOrderSummary: React.FC = () => {
   const [selectedPizzeria, setSelectedPizzeria] = useState<Pizzeria | null>(null);
   const [selectedOption, setSelectedOption] = useState<OrderingOption | null>(null);
   const [orderComplete, setOrderComplete] = useState<{ orderId: string; checkoutUrl?: string } | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Inline pizzeria search state
   const [pizzerias, setPizzerias] = useState<Pizzeria[]>([]);
@@ -305,22 +307,45 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     setSelectedOption(null);
   };
 
+  // Calculate summary for header
+  const waveCount = waveRecommendations.length > 1 ? waveRecommendations.length : 1;
+  const summaryText = recommendations.length > 0
+    ? `${totalPizzas} pizza${totalPizzas !== 1 ? 's' : ''} over ${waveCount} wave${waveCount !== 1 ? 's' : ''}`
+    : '';
+
   return (
     <>
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-4">Recommended Order</h2>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Recommended Order</h2>
+            {summaryText && !isExpanded && (
+              <span className="text-sm text-white/60">: {summaryText}</span>
+            )}
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="text-white/60" size={20} />
+          ) : (
+            <ChevronDown className="text-white/60" size={20} />
+          )}
+        </button>
 
-        {recommendations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-white/5 rounded-xl border border-dashed border-white/20">
+        {isExpanded && recommendations.length === 0 && (
+          <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-white/5 rounded-xl border border-dashed border-white/20 mt-4">
             <ClipboardList size={48} className="text-white/30 mb-4" />
             <h3 className="text-lg font-medium text-white/80">No Recommendations Yet</h3>
             <p className="text-white/50 mt-2 text-sm">
               Add guests and generate recommendations to see your optimized pizza order here.
             </p>
           </div>
-        ) : (
+        )}
+
+        {isExpanded && recommendations.length > 0 && (
           <>
-            <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
+            <div className="mt-4 mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
               <h3 className="font-medium text-[#ffb347] mb-2">Order Summary</h3>
               <div className="space-y-2 text-sm">
                 <p className="text-white/80">
@@ -650,6 +675,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Guest Requests - embedded */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <GuestPreferencesList embedded />
             </div>
           </>
         )}

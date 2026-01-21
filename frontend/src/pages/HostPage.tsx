@@ -8,7 +8,6 @@ import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
-import { GuestPreferencesList } from '../components/GuestPreferencesList';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 
@@ -277,10 +276,9 @@ function HostPageContent() {
                   })()}
                 </div>
 
-                {/* Recommended Order - always shown, auto-generated */}
+                {/* Recommended Order - always shown, auto-generated (includes Guest Requests) */}
                 <PizzaOrderSummary />
 
-                <GuestPreferencesList />
                 <PizzaStyleAndToppings />
                 <BeverageSettings />
               </>

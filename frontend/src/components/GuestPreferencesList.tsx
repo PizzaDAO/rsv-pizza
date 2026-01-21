@@ -6,7 +6,11 @@ import { UserRoundX, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
 
 const INITIAL_VISIBLE_COUNT = 10;
 
-export const GuestPreferencesList: React.FC = () => {
+interface GuestPreferencesListProps {
+  embedded?: boolean;
+}
+
+export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embedded = false }) => {
   const { guests, removeGuest, approveGuest, declineGuest, party, availableToppings, availableBeverages } = usePizza();
   const [showAddForm, setShowAddForm] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -39,25 +43,28 @@ export const GuestPreferencesList: React.FC = () => {
   const requireApproval = party?.requireApproval || false;
 
   if (guestsWithRequests.length === 0) {
+    const content = (
+      <div className={embedded ? "flex flex-col items-center justify-center min-h-[150px] text-center py-4" : "card p-6 flex flex-col items-center justify-center min-h-[200px] text-center"}>
+        <UserRoundX size={embedded ? 32 : 48} className="text-white/30 mb-4" />
+        <h3 className={`font-medium text-white/80 ${embedded ? 'text-lg' : 'text-xl'}`}>No Guest Requests Yet</h3>
+        <p className="text-white/50 mt-2 mb-4 text-sm">
+          {guests.length > 0
+            ? `${guests.length} guests have RSVP'd but none have submitted pizza requests yet.`
+            : 'Guest requests will appear here once they RSVP.'}
+        </p>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <UserPlus size={18} />
+          <span>Add Request</span>
+        </button>
+      </div>
+    );
+
     return (
       <>
-        <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
-          <UserRoundX size={48} className="text-white/30 mb-4" />
-          <h3 className="text-xl font-medium text-white/80">No Guest Requests Yet</h3>
-          <p className="text-white/50 mt-2 mb-4">
-            {guests.length > 0
-              ? `${guests.length} guests have RSVP'd but none have submitted pizza requests yet.`
-              : 'Guest requests will appear here once they RSVP.'}
-          </p>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <UserPlus size={18} />
-            <span>Add Request</span>
-          </button>
-        </div>
-
+        {content}
         {/* Add Guest Form Modal */}
         {showAddForm && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -70,61 +77,64 @@ export const GuestPreferencesList: React.FC = () => {
     );
   }
 
-  return (
-    <>
-      <div className="card p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-white">Guest Requests</h2>
-            <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
-              {guestsWithRequests.length} {guestsWithRequests.length === 1 ? 'Request' : 'Requests'}
-            </span>
-          </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <UserPlus size={18} />
-            <span>Add Request</span>
-          </button>
+  const content = (
+    <div className={embedded ? "" : "card p-6"}>
+      <div className={`flex justify-between items-center ${embedded ? 'mb-3' : 'mb-4'}`}>
+        <div className="flex items-center gap-3">
+          <h2 className={`font-bold text-white ${embedded ? 'text-lg' : 'text-xl'}`}>Guest Requests</h2>
+          <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
+            {guestsWithRequests.length} {guestsWithRequests.length === 1 ? 'Request' : 'Requests'}
+          </span>
         </div>
-
-        <div className="divide-y divide-white/10">
-          {visibleGuests.map(guest => (
-            <TableRow
-              key={guest.id}
-              guest={guest}
-              variant="requests"
-              requireApproval={requireApproval}
-              onApprove={approveGuest}
-              onDecline={declineGuest}
-              onRemove={removeGuest}
-              toppingNameById={toppingNameById}
-              beverageNameById={beverageNameById}
-            />
-          ))}
-        </div>
-
-        {hasMore && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full mt-4 py-3 flex items-center justify-center gap-2 text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp size={18} />
-                <span>Show Less</span>
-              </>
-            ) : (
-              <>
-                <ChevronDown size={18} />
-                <span>Show {hiddenCount} More</span>
-              </>
-            )}
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddForm(true)}
+          className={embedded ? "btn-secondary flex items-center gap-2 text-sm px-3 py-1.5" : "btn-primary flex items-center gap-2"}
+        >
+          <UserPlus size={embedded ? 14 : 18} />
+          <span>Add Request</span>
+        </button>
       </div>
 
+      <div className="divide-y divide-white/10">
+        {visibleGuests.map(guest => (
+          <TableRow
+            key={guest.id}
+            guest={guest}
+            variant="requests"
+            requireApproval={requireApproval}
+            onApprove={approveGuest}
+            onDecline={declineGuest}
+            onRemove={removeGuest}
+            toppingNameById={toppingNameById}
+            beverageNameById={beverageNameById}
+          />
+        ))}
+      </div>
+
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full mt-4 py-3 flex items-center justify-center gap-2 text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp size={18} />
+              <span>Show Less</span>
+            </>
+          ) : (
+            <>
+              <ChevronDown size={18} />
+              <span>Show {hiddenCount} More</span>
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {content}
       {/* Add Guest Form Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
