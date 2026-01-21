@@ -220,7 +220,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest }: RSVPModalPr
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
         // Check if this was an update (either we were editing or backend says it was updated)
-        setWasUpdated(isEditing || (result as any).updated === true);
+        setWasUpdated(isEditing || result.updated);
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -692,12 +692,12 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest }: RSVPModalPr
               {submitting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  {isEditing ? 'Updating...' : 'Submitting...'}
+                  {isEditing ? 'Saving...' : 'Submitting...'}
                 </>
               ) : (
                 <>
                   <Pizza size={18} />
-                  {isEditing ? 'Update RSVP' : 'RSVP'}
+                  {isEditing ? 'Edit RSVP' : 'RSVP'}
                 </>
               )}
             </button>
