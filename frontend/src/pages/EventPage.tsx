@@ -395,9 +395,10 @@ export function EventPage() {
           event={event}
           existingGuest={existingGuestData}
           onRSVPSuccess={async () => {
-            // Refetch guest data after successful RSVP/update
+            // Always update the RSVP status after successful submission
+            setUserHasRSVPd(true);
+            // Refetch guest data if user is logged in
             if (user?.email && event) {
-              setUserHasRSVPd(true);
               const inviteCode = event.customUrl || event.inviteCode;
               const guestData = await getExistingGuest(inviteCode, user.email);
               setExistingGuestData(guestData);
