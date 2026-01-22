@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { triggerWebhook } from '../services/webhook.service.js';
 
 const router = Router();
 
@@ -200,6 +201,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         rsvpClosedAt: true,
         maxGuests: true,
         requireApproval: true,
+        userId: true,
         user: { select: { name: true } },
         _count: { select: { guests: true } },
       },
@@ -218,6 +220,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           rsvpClosedAt: true,
           maxGuests: true,
           requireApproval: true,
+          userId: true,
           user: { select: { name: true } },
           _count: { select: { guests: true } },
         },
@@ -265,6 +268,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           },
         });
 
+        // Trigger webhook for guest update (using party owner's webhooks)
+        await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
+
         return res.status(200).json({
           success: true,
           updated: true,
@@ -295,6 +301,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         partyId: party.id,
       },
     });
+
+    // Trigger webhook for guest registration (using party owner's webhooks)
+    await triggerWebhook('guest.registered', { guest, partyId: party.id }, party.userId!);
 
     // Send confirmation email if email provided
     if (email?.trim()) {

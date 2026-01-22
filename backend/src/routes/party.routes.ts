@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail } from './rsvp.routes.js';
+import { triggerWebhook } from '../services/webhook.service.js';
 
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
@@ -159,6 +160,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       });
     }
 
+    // Trigger webhook for party creation
+    await triggerWebhook('party.created', party, req.userId!);
+
     // Return with hostName for backwards compatibility
     res.status(201).json({
       party: {
@@ -250,6 +254,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       },
     });
 
+    // Trigger webhook for party update
+    await triggerWebhook('party.updated', party, req.userId!);
+
     // Return with hostName for backwards compatibility
     res.json({
       party: {
@@ -275,6 +282,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
     }
 
     await prisma.party.delete({ where: { id } });
+
+    // Trigger webhook for party deletion
+    await triggerWebhook('party.deleted', { id }, req.userId!);
 
     res.json({ success: true });
   } catch (error) {
@@ -322,10 +332,13 @@ router.post('/:id/close-rsvp', async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.party.update({
+    const party = await prisma.party.update({
       where: { id },
       data: { rsvpClosedAt: new Date() },
     });
+
+    // Trigger webhook for RSVP closed
+    await triggerWebhook('party.rsvp_closed', party, req.userId!);
 
     res.json({ success: true, message: 'RSVPs closed' });
   } catch (error) {
@@ -344,10 +357,13 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.party.update({
+    const party = await prisma.party.update({
       where: { id },
       data: { rsvpClosedAt: null },
     });
+
+    // Trigger webhook for RSVP reopened
+    await triggerWebhook('party.rsvp_opened', party, req.userId!);
 
     res.json({ success: true, message: 'RSVPs reopened' });
   } catch (error) {
@@ -397,6 +413,9 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
       },
     });
 
+    // Trigger webhook for guest registration
+    await triggerWebhook('guest.registered', { guest, partyId: id }, req.userId!);
+
     res.status(201).json({ guest });
   } catch (error) {
     next(error);
@@ -417,6 +436,9 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
     await prisma.guest.delete({
       where: { id: guestId, partyId },
     });
+
+    // Trigger webhook for guest removal
+    await triggerWebhook('guest.removed', { guestId, partyId }, req.userId!);
 
     res.json({ success: true });
   } catch (error) {
@@ -444,6 +466,10 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       where: { id: guestId, partyId },
       data: { approved },
     });
+
+    // Trigger appropriate webhook
+    const event = approved ? 'guest.approved' : 'guest.declined';
+    await triggerWebhook(event, { guest, partyId }, req.userId!);
 
     // Send approval email with QR code if guest is approved and has an email
     if (approved && guest.email) {
