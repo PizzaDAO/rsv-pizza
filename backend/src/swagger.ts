@@ -225,14 +225,21 @@ All errors follow a consistent format:
 const swaggerSpec = swaggerJsdoc(options);
 
 export function setupSwagger(app: Express): void {
-  // Serve Swagger UI
+  // Serve Swagger UI with CDN assets (required for serverless platforms like Vercel)
+  const swaggerUiOptions = {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'RSVPizza API Documentation',
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+    ],
+  };
+
   app.use(
     '/api/v1/docs',
     swaggerUi.serve,
-    swaggerUi.setup(swaggerSpec, {
-      customCss: '.swagger-ui .topbar { display: none }',
-      customSiteTitle: 'RSVPizza API Documentation',
-    })
+    swaggerUi.setup(swaggerSpec, swaggerUiOptions)
   );
 
   // Serve raw OpenAPI spec
