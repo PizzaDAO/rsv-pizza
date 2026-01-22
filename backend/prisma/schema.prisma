@@ -32,6 +32,7 @@ model User {
   parties    Party[]
   orders     Order[]
   magicLinks MagicLink[]
+  apiKeys    ApiKey[]
 }
 
 model Party {
@@ -177,4 +178,87 @@ model MagicLink {
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// Public API Models
+// ============================================
+
+model ApiKey {
+  id          String       @id @default(cuid())
+  name        String       // Friendly name for the API key
+  key         String       @unique // SHA-256 hash of the actual key
+  keyPrefix   String       @map("key_prefix") // First 8 chars for identification (e.g., "rsvp_sk_a1b2")
+  scopes      String[]     // Array of scopes: parties:read, parties:write, etc.
+  rateLimit   Int          @default(500) @map("rate_limit") // Requests per hour
+  expiresAt   DateTime?    @map("expires_at") @db.Timestamptz
+  revoked     Boolean      @default(false)
+  revokedAt   DateTime?    @map("revoked_at") @db.Timestamptz
+  status      String       @default("pending") // pending, approved, rejected
+  requestedAt DateTime     @default(now()) @map("requested_at") @db.Timestamptz
+  approvedAt  DateTime?    @map("approved_at") @db.Timestamptz
+  approvedBy  String?      @map("approved_by") // Admin user ID who approved
+  lastUsedAt  DateTime?    @map("last_used_at") @db.Timestamptz
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  webhooks    Webhook[]
+  apiRequests ApiRequest[]
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String   // Webhook endpoint URL
+  secret    String   // Secret for HMAC-SHA256 signature
+  events    String[] // Array of events: party.created, guest.registered, etc.
+  active    Boolean  @default(true)
+  failCount Int      @default(0) @map("fail_count") // Consecutive failures
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  apiKeyId String @map("api_key_id")
+  apiKey   ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  event        String   // Event type (e.g., party.created)
+  payload      Json     // Payload sent to webhook
+  status       String   @default("pending") // pending, success, failed
+  statusCode   Int?     @map("status_code") // HTTP response code
+  responseBody String?  @map("response_body") // Response from webhook
+  attempts     Int      @default(0)
+  lastAttempt  DateTime? @map("last_attempt") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  webhookId String  @map("webhook_id")
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_deliveries")
+}
+
+model ApiRequest {
+  id           String   @id @default(cuid())
+  method       String   // HTTP method (GET, POST, etc.)
+  path         String   // Request path
+  statusCode   Int      @map("status_code") // Response status code
+  responseTime Int      @map("response_time") // Response time in ms
+  ip           String?  // Client IP address
+  userAgent    String?  @map("user_agent") // User agent string
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  apiKeyId String @map("api_key_id")
+  apiKey   ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@map("api_requests")
 }
