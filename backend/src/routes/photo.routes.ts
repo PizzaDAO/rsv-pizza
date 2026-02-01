@@ -86,6 +86,51 @@ router.get('/:partyId/photos', async (req: AuthRequest, res: Response, next: Nex
   }
 });
 
+// GET /api/parties/:partyId/photos/stats - Get photo statistics for a party
+// NOTE: This route MUST be defined before /:partyId/photos/:photoId to avoid "stats" being matched as photoId
+router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Get party to check existence
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, photosEnabled: true },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const totalPhotos = await prisma.photo.count({ where: { partyId } });
+    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
+
+    // Get unique tags
+    const photos = await prisma.photo.findMany({
+      where: { partyId },
+      select: { tags: true },
+    });
+    const allTags = photos.flatMap(p => p.tags);
+    const uniqueTags = [...new Set(allTags)];
+
+    // Get unique uploaders count
+    const uniqueUploaders = await prisma.photo.groupBy({
+      by: ['uploaderEmail'],
+      where: { partyId, uploaderEmail: { not: null } },
+    });
+
+    res.json({
+      totalPhotos,
+      starredPhotos,
+      uniqueTags,
+      uniqueUploadersCount: uniqueUploaders.length,
+      photosEnabled: party.photosEnabled,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/parties/:partyId/photos - Upload a new photo (requires guest identity or auth)
 router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -291,50 +336,6 @@ router.delete('/:partyId/photos/:photoId', async (req: AuthRequest, res: Respons
     });
 
     res.json({ success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/parties/:partyId/photos/stats - Get photo statistics for a party
-router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { partyId } = req.params;
-
-    // Get party to check existence
-    const party = await prisma.party.findUnique({
-      where: { id: partyId },
-      select: { id: true, photosEnabled: true },
-    });
-
-    if (!party) {
-      throw new AppError('Party not found', 404, 'NOT_FOUND');
-    }
-
-    const totalPhotos = await prisma.photo.count({ where: { partyId } });
-    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
-
-    // Get unique tags
-    const photos = await prisma.photo.findMany({
-      where: { partyId },
-      select: { tags: true },
-    });
-    const allTags = photos.flatMap(p => p.tags);
-    const uniqueTags = [...new Set(allTags)];
-
-    // Get unique uploaders count
-    const uniqueUploaders = await prisma.photo.groupBy({
-      by: ['uploaderEmail'],
-      where: { partyId, uploaderEmail: { not: null } },
-    });
-
-    res.json({
-      totalPhotos,
-      starredPhotos,
-      uniqueTags,
-      uniqueUploadersCount: uniqueUploaders.length,
-      photosEnabled: party.photosEnabled,
-    });
   } catch (error) {
     next(error);
   }

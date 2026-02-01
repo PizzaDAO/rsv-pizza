@@ -4,15 +4,17 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Camera } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
+import { PhotoGallery } from '../components/photos';
+import { PhotoStats } from '../types';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -33,6 +35,8 @@ export function EventPage() {
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [userHasRSVPd, setUserHasRSVPd] = useState(false);
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
+  const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
+  const [showPhotos, setShowPhotos] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -69,6 +73,12 @@ export function EventPage() {
           } else {
             // No password, automatically authenticated
             setIsAuthenticated(true);
+          }
+
+          // Load photo stats to see if photos are enabled and have content
+          const stats = await getPhotoStats(foundEvent.id);
+          if (stats) {
+            setPhotoStats(stats);
           }
         } else {
           setError('Event not found. The link may be invalid or expired.');
@@ -755,6 +765,33 @@ export function EventPage() {
                     showTitle={true}
                   />
                 </div>
+
+                {/* Photo Gallery Section */}
+                {photoStats?.photosEnabled && (
+                  <div className="border-t border-white/10 pt-6 mt-6">
+                    {showPhotos ? (
+                      <PhotoGallery
+                        partyId={event.id}
+                        isHost={false}
+                        uploaderName={existingGuestData?.name || user?.name || undefined}
+                        uploaderEmail={existingGuestData?.email || user?.email}
+                        guestId={existingGuestData?.id}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setShowPhotos(true)}
+                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/10"
+                      >
+                        <Camera className="w-5 h-5 text-[#ff393a]" />
+                        <span className="text-white font-medium">
+                          {photoStats.totalPhotos > 0
+                            ? `View Photos (${photoStats.totalPhotos})`
+                            : 'Share Photos'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
