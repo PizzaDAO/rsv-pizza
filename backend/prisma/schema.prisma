@@ -65,12 +65,17 @@ model Party {
   photosEnabled Boolean @default(true) @map("photos_enabled")
   photosPublic  Boolean @default(true) @map("photos_public")
 
+  // Budget settings
+  budgetEnabled Boolean  @default(false) @map("budget_enabled")
+  budgetTotal   Decimal? @map("budget_total") @db.Decimal(10, 2) // Total budget amount
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests Guest[]
-  orders Order[]
-  photos Photo[]
+  guests      Guest[]
+  orders      Order[]
+  photos      Photo[]
+  budgetItems BudgetItem[]
 
   @@map("parties")
 }
@@ -267,6 +272,34 @@ model ApiRequest {
 
   @@index([apiKeyId, createdAt])
   @@map("api_requests")
+}
+
+// ============================================
+// Budget Models
+// ============================================
+
+model BudgetItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Core fields
+  name        String   // Item description (e.g., "Pizza from Joe's")
+  category    String   // pizza, drinks, venue, supplies, entertainment, tips, other
+  cost        Decimal  @db.Decimal(10, 2)
+  status      String   @default("pending") // pending, paid
+
+  // Tracking
+  pointPerson String?  @map("point_person") // Who's responsible
+  notes       String?  // Additional notes
+  receiptUrl  String?  @map("receipt_url") // Link to receipt/invoice
+
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, category])
+  @@map("budget_items")
 }
 
 // ============================================

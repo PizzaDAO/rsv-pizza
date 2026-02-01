@@ -250,3 +250,49 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Budget types
+export type BudgetCategory = 'pizza' | 'drinks' | 'venue' | 'supplies' | 'entertainment' | 'tips' | 'other';
+export type BudgetStatus = 'pending' | 'paid';
+
+export const BUDGET_CATEGORIES: { id: BudgetCategory; label: string; icon: string }[] = [
+  { id: 'pizza', label: 'Pizza', icon: 'Pizza' },
+  { id: 'drinks', label: 'Drinks', icon: 'Wine' },
+  { id: 'venue', label: 'Venue', icon: 'Home' },
+  { id: 'supplies', label: 'Supplies', icon: 'Package' },
+  { id: 'entertainment', label: 'Entertainment', icon: 'Music' },
+  { id: 'tips', label: 'Tips', icon: 'Heart' },
+  { id: 'other', label: 'Other', icon: 'MoreHorizontal' },
+];
+
+export interface BudgetItem {
+  id: string;
+  partyId: string;
+  name: string;
+  category: BudgetCategory;
+  cost: number;
+  status: BudgetStatus;
+  pointPerson: string | null;
+  notes: string | null;
+  receiptUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategoryTotal {
+  total: number;
+  paid: number;
+  pending: number;
+  count: number;
+}
+
+export interface BudgetOverview {
+  budgetEnabled: boolean;
+  budgetTotal: number | null;
+  totalSpent: number;
+  totalPaid: number;
+  totalPending: number;
+  remaining: number | null;
+  categoryTotals: Record<BudgetCategory, BudgetCategoryTotal>;
+  items: BudgetItem[];
+}

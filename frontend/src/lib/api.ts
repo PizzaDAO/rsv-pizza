@@ -1,4 +1,4 @@
-import { Pizzeria, Photo, PhotoStats } from '../types';
+import { Pizzeria, Photo, PhotoStats, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -396,6 +396,124 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
     });
   } catch (error) {
     console.error('Error fetching photo stats:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Budget API functions
+// ============================================
+
+// Get budget overview and items
+export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
+  try {
+    return await apiRequest<BudgetOverview>(`/api/parties/${partyId}/budget`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching budget:', error);
+    return null;
+  }
+}
+
+// Update budget settings
+export async function updateBudgetSettings(
+  partyId: string,
+  data: { budgetEnabled?: boolean; budgetTotal?: number | null }
+): Promise<{ budgetEnabled: boolean; budgetTotal: number | null } | null> {
+  try {
+    return await apiRequest<{ budgetEnabled: boolean; budgetTotal: number | null }>(
+      `/api/parties/${partyId}/budget/settings`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating budget settings:', error);
+    return null;
+  }
+}
+
+// Create budget item
+export interface CreateBudgetItemData {
+  name: string;
+  category: BudgetCategory;
+  cost: number;
+  status?: BudgetStatus;
+  pointPerson?: string;
+  notes?: string;
+  receiptUrl?: string;
+}
+
+export async function createBudgetItem(
+  partyId: string,
+  data: CreateBudgetItemData
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(`/api/parties/${partyId}/budget/items`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating budget item:', error);
+    return null;
+  }
+}
+
+// Update budget item
+export async function updateBudgetItem(
+  partyId: string,
+  itemId: string,
+  data: Partial<CreateBudgetItemData>
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(
+      `/api/parties/${partyId}/budget/items/${itemId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating budget item:', error);
+    return null;
+  }
+}
+
+// Delete budget item
+export async function deleteBudgetItem(partyId: string, itemId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/budget/items/${itemId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting budget item:', error);
+    return false;
+  }
+}
+
+// Toggle budget item status
+export async function toggleBudgetItemStatus(
+  partyId: string,
+  itemId: string
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(
+      `/api/parties/${partyId}/budget/items/${itemId}/toggle-status`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling budget item status:', error);
     return null;
   }
 }
