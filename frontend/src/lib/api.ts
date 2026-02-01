@@ -1,4 +1,4 @@
-import { Pizzeria } from '../types';
+import { Pizzeria, Donation, DonationPublicStats } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -85,6 +85,11 @@ export interface UpdatePartyData {
   description?: string | null;
   customUrl?: string | null;
   coHosts?: any[];
+  donationEnabled?: boolean;
+  donationGoal?: number | null;
+  donationMessage?: string | null;
+  suggestedAmounts?: number[];
+  donationRecipient?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -134,6 +139,11 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      donationEnabled: data.donationEnabled,
+      donationGoal: data.donationGoal,
+      donationMessage: data.donationMessage,
+      suggestedAmounts: data.suggestedAmounts,
+      donationRecipient: data.donationRecipient,
     },
   });
 }
@@ -256,6 +266,95 @@ export async function getEventBySlug(slug: string): Promise<PublicEvent | null> 
     return response.event;
   } catch (error) {
     console.error('Error fetching event:', error);
+    return null;
+  }
+}
+
+// Donation API functions
+
+// Get donation stats for a party (public)
+export async function getDonationStats(partyId: string): Promise<DonationPublicStats | null> {
+  try {
+    const response = await apiRequest<DonationPublicStats>(
+      `/api/parties/${partyId}/donations/public`,
+      {
+        method: 'GET',
+        requireAuth: false,
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error('Error fetching donation stats:', error);
+    return null;
+  }
+}
+
+// Get donations list for a party (host only)
+export async function getDonations(partyId: string): Promise<{
+  donations: Donation[];
+  summary: { totalAmount: number; totalCount: number; currency: string };
+} | null> {
+  try {
+    return await apiRequest<{
+      donations: Donation[];
+      summary: { totalAmount: number; totalCount: number; currency: string };
+    }>(`/api/parties/${partyId}/donations`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching donations:', error);
+    return null;
+  }
+}
+
+// Create a donation record
+export async function createDonation(
+  partyId: string,
+  data: {
+    amount: number;
+    currency?: string;
+    paymentIntentId?: string;
+    chargeId?: string;
+    donorName?: string;
+    donorEmail?: string;
+    isAnonymous?: boolean;
+    message?: string;
+    guestId?: string;
+  }
+): Promise<{ donation: Donation } | null> {
+  try {
+    return await apiRequest<{ donation: Donation }>(
+      `/api/parties/${partyId}/donations`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: false, // Public endpoint for guests
+      }
+    );
+  } catch (error) {
+    console.error('Error creating donation:', error);
+    return null;
+  }
+}
+
+// Update donation status (after webhook or payment confirmation)
+export async function updateDonationStatus(
+  partyId: string,
+  donationId: string,
+  data: { status?: string; chargeId?: string }
+): Promise<{ donation: Donation } | null> {
+  try {
+    return await apiRequest<{ donation: Donation }>(
+      `/api/parties/${partyId}/donations/${donationId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: false, // Called from client after payment
+      }
+    );
+  } catch (error) {
+    console.error('Error updating donation status:', error);
     return null;
   }
 }

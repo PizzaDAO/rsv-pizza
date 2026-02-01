@@ -144,6 +144,44 @@ export interface Party {
   selectedPizzerias?: Pizzeria[];
   createdAt: string;
   guests: Guest[];
+  // Donation settings
+  donationEnabled?: boolean;
+  donationGoal?: number | null;
+  donationMessage?: string | null;
+  suggestedAmounts?: number[];
+  donationRecipient?: string | null;
+}
+
+export interface Donation {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+  paymentIntentId?: string;
+  chargeId?: string;
+  donorName?: string;
+  donorEmail?: string;
+  isAnonymous: boolean;
+  message?: string;
+  partyId: string;
+  guestId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DonationPublicStats {
+  enabled: boolean;
+  totalAmount?: number;
+  donorCount?: number;
+  goal?: number | null;
+  message?: string | null;
+  recipient?: string | null;
+  suggestedAmounts?: number[];
+  recentDonors?: {
+    name: string | null;
+    message: string | null;
+    createdAt: string;
+  }[];
 }
 
 // Ordering types

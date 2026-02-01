@@ -8,6 +8,7 @@ import rsvpRoutes from './routes/rsvp.routes.js';
 import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
+import donationRoutes from './routes/donation.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -75,6 +76,7 @@ app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
+app.use('/api/parties', donationRoutes);
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
