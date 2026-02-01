@@ -23,6 +23,7 @@ interface PizzaContextType {
   removeGuest: (id: string) => Promise<void>;
   approveGuest: (id: string) => Promise<void>;
   declineGuest: (id: string) => Promise<void>;
+  promoteGuest: (id: string) => Promise<void>;
   // Recommendations
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
@@ -66,6 +67,9 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
     submittedAt: dbGuest.submitted_at,
     approved: dbGuest.approved ?? null,
+    status: dbGuest.status || 'CONFIRMED',
+    waitlistPosition: dbGuest.waitlist_position || null,
+    promotedAt: dbGuest.promoted_at || null,
   };
 }
 
@@ -250,6 +254,30 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const promoteGuest = async (id: string) => {
+    if (!party) return;
+    const success = await db.promoteGuest(id, party.id);
+    if (success) {
+      setGuests(prev => prev.map(g =>
+        g.id === id
+          ? { ...g, status: 'CONFIRMED', waitlistPosition: null, promotedAt: new Date().toISOString() }
+          : g.status === 'WAITLISTED' && g.waitlistPosition && g.waitlistPosition > (prev.find(p => p.id === id)?.waitlistPosition || 0)
+            ? { ...g, waitlistPosition: g.waitlistPosition - 1 }
+            : g
+      ));
+      setParty(prev => prev ? {
+        ...prev,
+        guests: prev.guests.map(g =>
+          g.id === id
+            ? { ...g, status: 'CONFIRMED', waitlistPosition: null, promotedAt: new Date().toISOString() }
+            : g.status === 'WAITLISTED' && g.waitlistPosition && g.waitlistPosition > (prev.guests.find(p => p.id === id)?.waitlistPosition || 0)
+              ? { ...g, waitlistPosition: g.waitlistPosition - 1 }
+              : g
+        )
+      } : null);
+    }
+  };
+
   const updatePizzaSettings = (settings: PizzaSettings) => {
     setPizzaSettings(settings);
   };
@@ -315,6 +343,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       removeGuest,
       approveGuest,
       declineGuest,
+      promoteGuest,
       recommendations,
       generateRecommendations,
       beverageRecommendations,

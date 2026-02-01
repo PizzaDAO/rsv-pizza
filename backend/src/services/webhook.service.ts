@@ -13,6 +13,8 @@ export const WEBHOOK_EVENTS = [
   'guest.approved',
   'guest.declined',
   'guest.removed',
+  'guest.waitlisted',
+  'guest.promoted',
 ] as const;
 
 export type WebhookEvent = typeof WEBHOOK_EVENTS[number];
