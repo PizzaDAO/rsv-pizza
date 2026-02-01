@@ -120,25 +120,18 @@ export function AuthVerifyPage() {
     }
   }
 
-  function handleRetry() {
-    if (lastSubmittedCode) {
-      // Resubmit the same code
-      verifyCode(lastSubmittedCode);
-    } else {
-      // Fallback: reset to idle state
-      setStatus('idle');
-      setError(null);
-      setCode(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
-    }
-  }
-
   function handleEnterNewCode() {
     setStatus('idle');
     setError(null);
     setCode(['', '', '', '', '', '']);
     setLastSubmittedCode(null);
-    inputRefs.current[0]?.focus();
+    setTimeout(() => {
+      if (isNewUser) {
+        nameInputRef.current?.focus();
+      } else {
+        inputRefs.current[0]?.focus();
+      }
+    }, 100);
   }
 
   return (
@@ -196,10 +189,10 @@ export function AuthVerifyPage() {
             <p className="text-white/40 text-sm">
               Didn't receive a code?{' '}
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/login')}
                 className="text-[#ff393a] hover:underline"
               >
-                Try again
+                Request a new code
               </button>
             </p>
           </>
@@ -230,16 +223,16 @@ export function AuthVerifyPage() {
             <p className="text-white/60 mb-6">{error}</p>
             <div className="flex flex-col gap-3">
               <button
-                onClick={handleRetry}
+                onClick={handleEnterNewCode}
                 className="btn-primary"
               >
-                Try Again
+                Enter Different Code
               </button>
               <button
-                onClick={handleEnterNewCode}
+                onClick={() => navigate('/login')}
                 className="btn-secondary"
               >
-                Enter New Code
+                Request New Code
               </button>
             </div>
           </>
