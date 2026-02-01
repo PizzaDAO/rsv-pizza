@@ -71,12 +71,12 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/parties', partyRoutes);
+app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', partyRoutes); // Party routes have global auth
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
-app.use('/api/parties', photoRoutes);
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
