@@ -70,22 +70,34 @@ model Party {
   @@map("parties")
 }
 
+enum GuestStatus {
+  PENDING     // Awaiting approval
+  CONFIRMED   // Confirmed guest
+  DECLINED    // Declined by host
+  WAITLISTED  // On waitlist
+}
+
 model Guest {
-  id                  String   @id @default(uuid()) @db.Uuid
+  id                  String      @id @default(uuid()) @db.Uuid
   name                String
-  email               String?  @db.VarChar
-  ethereumAddress     String?  @map("ethereum_address") @db.VarChar
+  email               String?     @db.VarChar
+  ethereumAddress     String?     @map("ethereum_address") @db.VarChar
   roles               String[]
-  mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
-  dietaryRestrictions String[] @map("dietary_restrictions")
-  likedToppings       String[] @map("liked_toppings")
-  dislikedToppings    String[] @map("disliked_toppings")
-  likedBeverages      String[] @map("liked_beverages")
-  dislikedBeverages   String[] @map("disliked_beverages")
-  pizzeriaRankings    String[] @map("pizzeria_rankings")
-  submittedAt         DateTime @default(now()) @map("submitted_at") @db.Timestamptz
-  submittedVia        String   @default("link") @map("submitted_via")
-  approved            Boolean? // null = pending, true = approved, false = declined
+  mailingListOptIn    Boolean     @default(false) @map("mailing_list_opt_in")
+  dietaryRestrictions String[]    @map("dietary_restrictions")
+  likedToppings       String[]    @map("liked_toppings")
+  dislikedToppings    String[]    @map("disliked_toppings")
+  likedBeverages      String[]    @map("liked_beverages")
+  dislikedBeverages   String[]    @map("disliked_beverages")
+  pizzeriaRankings    String[]    @map("pizzeria_rankings")
+  submittedAt         DateTime    @default(now()) @map("submitted_at") @db.Timestamptz
+  submittedVia        String      @default("link") @map("submitted_via")
+  approved            Boolean?    // null = pending, true = approved, false = declined (legacy, use status)
+
+  // Waitlist fields
+  status              GuestStatus @default(CONFIRMED)
+  waitlistPosition    Int?        @map("waitlist_position")
+  promotedAt          DateTime?   @map("promoted_at") @db.Timestamptz
 
   // NFT minting fields
   nftTokenId         Int?      @map("nft_token_id")

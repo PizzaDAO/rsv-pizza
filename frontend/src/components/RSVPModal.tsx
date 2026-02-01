@@ -27,6 +27,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
   const [wasUpdated, setWasUpdated] = useState(false);
+  const [waitlisted, setWaitlisted] = useState(false);
+  const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [step, setStep] = useState(1);
   const isEditing = !!existingGuest;
 
@@ -79,6 +81,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setAlreadyRegistered(false);
       setPendingApproval(false);
       setWasUpdated(false);
+      setWaitlisted(false);
+      setWaitlistPosition(null);
       setStep(1);
       setError(null);
       setMintStatus('idle');
@@ -247,6 +251,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setPendingApproval(result.requireApproval);
         // Check if this was an update (either we were editing or backend says it was updated)
         setWasUpdated(isEditing || result.updated);
+        setWaitlisted(result.waitlisted);
+        setWaitlistPosition(result.waitlistPosition);
         setSubmitted(true);
         // Notify parent to refresh data
         onRSVPSuccess?.();
@@ -358,6 +364,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   if (submitted) {
     const getSuccessIcon = () => {
       if (alreadyRegistered && !wasUpdated) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
+      if (waitlisted) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       if (pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       return 'bg-[#39d98a]/20 border-[#39d98a]/30';
     };
@@ -365,8 +372,22 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     const getSuccessTitle = () => {
       if (wasUpdated) return "RSVP Updated!";
       if (alreadyRegistered) return "You're already registered!";
+      if (waitlisted) return "You're on the Waitlist!";
       if (pendingApproval) return "RSVP Submitted!";
       return `See you at ${event.name}!`;
+    };
+
+    const getSuccessIconComponent = () => {
+      if (alreadyRegistered && !wasUpdated) {
+        return <AlertCircle className="w-8 h-8 text-[#ff393a]" />;
+      }
+      if (waitlisted) {
+        return <span className="text-2xl font-bold text-[#ffc107]">#{waitlistPosition}</span>;
+      }
+      if (pendingApproval) {
+        return <Loader2 className="w-8 h-8 text-[#ffc107]" />;
+      }
+      return <Check className="w-8 h-8 text-[#39d98a]" />;
     };
 
     return (
@@ -379,13 +400,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
-            {alreadyRegistered && !wasUpdated ? (
-              <AlertCircle className="w-8 h-8 text-[#ff393a]" />
-            ) : pendingApproval ? (
-              <Loader2 className="w-8 h-8 text-[#ffc107]" />
-            ) : (
-              <Check className="w-8 h-8 text-[#39d98a]" />
-            )}
+            {getSuccessIconComponent()}
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
             {getSuccessTitle()}
@@ -400,7 +415,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               Your preferences have been saved.
             </p>
           )}
-          {pendingApproval && !alreadyRegistered && (
+          {waitlisted && !wasUpdated && (
+            <p className="text-white/60 mb-4">
+              This event is currently at capacity, but you're #{waitlistPosition} on the waitlist!
+              We'll notify you if a spot opens up.
+            </p>
+          )}
+          {pendingApproval && !alreadyRegistered && !waitlisted && (
             <p className="text-white/60 mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>

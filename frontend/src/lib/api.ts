@@ -176,6 +176,12 @@ export async function updateGuestApprovalApi(partyId: string, guestId: string, a
   });
 }
 
+export async function promoteGuestApi(partyId: string, guestId: string) {
+  return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/promote`, {
+    method: 'POST',
+  });
+}
+
 // Public RSVP API (no auth required)
 export async function submitRsvpApi(
   inviteCode: string,

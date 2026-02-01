@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { sendApprovalEmail } from './rsvp.routes.js';
+import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 
 // Helper function to check if user can access/edit a party
@@ -505,6 +505,123 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
     }
 
     res.json({ guest });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:id/waitlist - Get waitlist for party
+router.get('/:id/waitlist', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const waitlistedGuests = await prisma.guest.findMany({
+      where: {
+        partyId: id,
+        status: 'WAITLISTED',
+      },
+      orderBy: { waitlistPosition: 'asc' },
+    });
+
+    res.json({ guests: waitlistedGuests });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/guests/:guestId/promote - Promote guest from waitlist
+router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, guestId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Get the guest
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, partyId },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'NOT_FOUND');
+    }
+
+    if (guest.status !== 'WAITLISTED') {
+      throw new AppError('Guest is not on the waitlist', 400, 'NOT_WAITLISTED');
+    }
+
+    const currentPosition = guest.waitlistPosition;
+
+    // Update guest to CONFIRMED status
+    const updatedGuest = await prisma.guest.update({
+      where: { id: guestId },
+      data: {
+        status: 'CONFIRMED',
+        waitlistPosition: null,
+        promotedAt: new Date(),
+      },
+    });
+
+    // Reorder remaining waitlist positions
+    if (currentPosition !== null) {
+      await prisma.guest.updateMany({
+        where: {
+          partyId,
+          status: 'WAITLISTED',
+          waitlistPosition: { gt: currentPosition },
+        },
+        data: {
+          waitlistPosition: { decrement: 1 },
+        },
+      });
+    }
+
+    // Trigger webhook for guest promotion
+    await triggerWebhook('guest.promoted', { guest: updatedGuest, partyId }, req.userId!);
+
+    // Send promotion email if guest has email
+    if (guest.email) {
+      try {
+        // Get party details for the email
+        const party = await prisma.party.findUnique({
+          where: { id: partyId },
+          select: {
+            name: true,
+            date: true,
+            address: true,
+            inviteCode: true,
+            customUrl: true,
+          },
+        });
+
+        if (party) {
+          await sendPromotionEmail({
+            guestEmail: guest.email,
+            guestName: guest.name,
+            guestId: guest.id,
+            partyName: party.name,
+            partyDate: party.date,
+            partyAddress: party.address,
+            inviteCode: party.inviteCode,
+            customUrl: party.customUrl,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send promotion email:', emailError);
+        // Don't fail the promotion if email fails
+      }
+    }
+
+    res.json({ guest: updatedGuest });
   } catch (error) {
     next(error);
   }

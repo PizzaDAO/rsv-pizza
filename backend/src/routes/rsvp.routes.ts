@@ -21,8 +21,8 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         rsvpClosedAt: true,
         maxGuests: true,
         user: { select: { name: true } },
-        _count: {
-          select: { guests: true },
+        guests: {
+          select: { status: true },
         },
       },
     });
@@ -39,8 +39,8 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
           rsvpClosedAt: true,
           maxGuests: true,
           user: { select: { name: true } },
-          _count: {
-            select: { guests: true },
+          guests: {
+            select: { status: true },
           },
         },
       });
@@ -51,6 +51,17 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
     }
 
     const hostName = party.user?.name || null;
+
+    // Count confirmed guests (CONFIRMED or PENDING status)
+    const confirmedCount = party.guests.filter(
+      g => g.status === 'CONFIRMED' || g.status === 'PENDING'
+    ).length;
+
+    // Count waitlisted guests
+    const waitlistCount = party.guests.filter(g => g.status === 'WAITLISTED').length;
+
+    // Check if at capacity
+    const isAtCapacity = party.maxGuests ? confirmedCount >= party.maxGuests : false;
 
     // Check if RSVPs are closed
     if (party.rsvpClosedAt) {
@@ -65,27 +76,16 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    // Check if max guests reached
-    if (party.maxGuests && party._count.guests >= party.maxGuests) {
-      return res.json({
-        party: {
-          name: party.name,
-          date: party.date,
-          hostName,
-        },
-        rsvpClosed: true,
-        message: 'This party has reached its maximum number of guests',
-      });
-    }
-
     res.json({
       party: {
         name: party.name,
         date: party.date,
         hostName,
         availableBeverages: party.availableBeverages,
-        guestCount: party._count.guests,
+        guestCount: confirmedCount,
+        waitlistCount,
         maxGuests: party.maxGuests,
+        isAtCapacity,
       },
       rsvpClosed: false,
     });
@@ -236,10 +236,16 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('RSVPs are closed for this party', 400, 'RSVP_CLOSED');
     }
 
-    // Check max guests
-    if (party.maxGuests && party._count.guests >= party.maxGuests) {
-      throw new AppError('Party has reached maximum guests', 400, 'MAX_GUESTS_REACHED');
-    }
+    // Count confirmed guests to check capacity
+    const confirmedGuestCount = await prisma.guest.count({
+      where: {
+        partyId: party.id,
+        status: { in: ['CONFIRMED', 'PENDING'] },
+      },
+    });
+
+    // Determine if guest should be waitlisted
+    const isAtCapacity = party.maxGuests ? confirmedGuestCount >= party.maxGuests : false;
 
     // Check for duplicate email if email is provided
     if (email?.trim()) {
@@ -283,6 +289,27 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       }
     }
 
+    // If at capacity, get next waitlist position
+    let waitlistPosition: number | null = null;
+    if (isAtCapacity) {
+      const maxPosition = await prisma.guest.aggregate({
+        where: {
+          partyId: party.id,
+          status: 'WAITLISTED',
+        },
+        _max: { waitlistPosition: true },
+      });
+      waitlistPosition = (maxPosition._max.waitlistPosition || 0) + 1;
+    }
+
+    // Determine guest status
+    let guestStatus: 'CONFIRMED' | 'PENDING' | 'WAITLISTED' = 'CONFIRMED';
+    if (isAtCapacity) {
+      guestStatus = 'WAITLISTED';
+    } else if (party.requireApproval) {
+      guestStatus = 'PENDING';
+    }
+
     // Create guest
     const guest = await prisma.guest.create({
       data: {
@@ -299,30 +326,56 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         pizzeriaRankings: pizzeriaRankings || [],
         submittedVia: 'link',
         partyId: party.id,
+        status: guestStatus,
+        waitlistPosition: waitlistPosition,
       },
     });
 
-    // Trigger webhook for guest registration (using party owner's webhooks)
-    await triggerWebhook('guest.registered', { guest, partyId: party.id }, party.userId!);
+    // Trigger webhook for guest registration or waitlist (using party owner's webhooks)
+    if (isAtCapacity) {
+      await triggerWebhook('guest.waitlisted', { guest, partyId: party.id, waitlistPosition }, party.userId!);
+    } else {
+      await triggerWebhook('guest.registered', { guest, partyId: party.id }, party.userId!);
+    }
 
-    // Send confirmation email if email provided
+    // Send appropriate email if email provided
     if (email?.trim()) {
       try {
-        await sendRSVPConfirmationEmail({
-          guestEmail: email.trim(),
-          guestName: name.trim(),
-          guestId: guest.id,
-          partyName: party.name,
-          partyDate: party.date,
-          partyAddress: party.address,
-          inviteCode,
-          customUrl: party.customUrl,
-          requireApproval: party.requireApproval,
-        });
+        if (isAtCapacity) {
+          await sendWaitlistConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            partyName: party.name,
+            partyDate: party.date,
+            waitlistPosition: waitlistPosition!,
+            inviteCode,
+            customUrl: party.customUrl,
+          });
+        } else {
+          await sendRSVPConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            guestId: guest.id,
+            partyName: party.name,
+            partyDate: party.date,
+            partyAddress: party.address,
+            inviteCode,
+            customUrl: party.customUrl,
+            requireApproval: party.requireApproval,
+          });
+        }
       } catch (emailError) {
         console.error('Failed to send confirmation email:', emailError);
         // Don't fail the RSVP if email fails
       }
+    }
+
+    // Build response message
+    let message = 'Your preferences have been saved!';
+    if (isAtCapacity) {
+      message = `You're #${waitlistPosition} on the waitlist! We'll notify you if a spot opens up.`;
+    } else if (party.requireApproval) {
+      message = 'Your RSVP has been submitted and is pending approval from the host.';
     }
 
     res.status(201).json({
@@ -330,11 +383,13 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       guest: {
         id: guest.id,
         name: guest.name,
+        status: guestStatus,
+        waitlistPosition,
       },
       requireApproval: party.requireApproval,
-      message: party.requireApproval
-        ? 'Your RSVP has been submitted and is pending approval from the host.'
-        : 'Your preferences have been saved!',
+      waitlisted: isAtCapacity,
+      waitlistPosition,
+      message,
     });
   } catch (error) {
     next(error);
@@ -620,6 +675,215 @@ export async function sendApprovalEmail(params: {
       from: 'RSV.Pizza <noreply@rsv.pizza>',
       to: [params.guestEmail],
       subject: `You're approved for ${params.partyName}! 🍕`,
+      html: emailHtml,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+
+  return response.json();
+}
+
+// Helper function to send waitlist confirmation email
+async function sendWaitlistConfirmationEmail(params: {
+  guestEmail: string;
+  guestName: string;
+  partyName: string;
+  partyDate: Date | null;
+  waitlistPosition: number;
+  inviteCode: string;
+  customUrl: string | null;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email');
+    return;
+  }
+
+  const baseUrl = 'https://rsv.pizza';
+  const eventUrl = params.customUrl
+    ? `${baseUrl}/${params.customUrl}`
+    : `${baseUrl}/${params.inviteCode}`;
+
+  const dateText = params.partyDate
+    ? new Date(params.partyDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'Date TBD';
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>You're on the Waitlist</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">You're on the Waitlist!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Position #${params.waitlistPosition}</p>
+        </div>
+
+        <div style="background: #fff3cd; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #ffc107;">
+          <p style="color: #856404; font-size: 16px; margin: 0;">
+            ${params.partyName} is currently at capacity, but you're #${params.waitlistPosition} on the waitlist!
+          </p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">What Happens Next?</h3>
+          <p style="color: #666; font-size: 14px; margin: 0;">
+            We'll send you an email with your check-in QR code if a spot opens up.
+            Keep an eye on your inbox!
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>Fingers crossed, ${params.guestName}!</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      to: [params.guestEmail],
+      subject: `You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`,
+      html: emailHtml,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+
+  return response.json();
+}
+
+// Helper function to send promotion email (guest moved from waitlist to confirmed)
+export async function sendPromotionEmail(params: {
+  guestEmail: string;
+  guestName: string;
+  guestId: string;
+  partyName: string;
+  partyDate: Date | null;
+  partyAddress: string | null;
+  inviteCode: string;
+  customUrl: string | null;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email');
+    return;
+  }
+
+  const baseUrl = 'https://rsv.pizza';
+  const eventUrl = params.customUrl
+    ? `${baseUrl}/${params.customUrl}`
+    : `${baseUrl}/${params.inviteCode}`;
+
+  // Generate unique check-in URL with guest ID
+  const checkInUrl = `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`;
+
+  // Generate QR code using a free QR code API
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
+
+  const dateText = params.partyDate
+    ? new Date(params.partyDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'Date TBD';
+
+  const addressText = params.partyAddress || 'Location TBD';
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>You're In!</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">You're In!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">A spot opened up just for you</p>
+        </div>
+
+        <div style="background: #d4edda; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #28a745;">
+          <p style="color: #155724; font-size: 16px; margin: 0; font-weight: 600;">
+            Great news! You've been moved from the waitlist to confirmed!
+          </p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>See you there, ${params.guestName}!</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      to: [params.guestEmail],
+      subject: `You're in! A spot opened up at ${params.partyName}`,
       html: emailHtml,
     }),
   });

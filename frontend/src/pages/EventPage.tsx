@@ -455,8 +455,16 @@ export function EventPage() {
                     <Users className="w-4 h-4" />
                     <span>
                       {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      {event.maxGuests && ` / ${event.maxGuests}`}
                     </span>
+                    {event.maxGuests && event.guestCount >= event.maxGuests && (
+                      <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                    )}
+                    {event.maxGuests && event.guestCount < event.maxGuests && (
+                      <span className="text-white/40 text-xs">
+                        ({event.maxGuests - event.guestCount} spots left)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -657,8 +665,16 @@ export function EventPage() {
                     <Users className="w-4 h-4" />
                     <span>
                       {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      {event.maxGuests && ` / ${event.maxGuests}`}
                     </span>
+                    {event.maxGuests && event.guestCount >= event.maxGuests && (
+                      <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                    )}
+                    {event.maxGuests && event.guestCount < event.maxGuests && (
+                      <span className="text-white/40 text-xs">
+                        ({event.maxGuests - event.guestCount} spots left)
+                      </span>
+                    )}
                   </div>
                 </div>
 
