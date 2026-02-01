@@ -7,6 +7,8 @@ import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/op
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { IconInput } from '../components/IconInput';
+import { DonationStep } from '../components/DonationStep';
+import { getDonationStats } from '../lib/api';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -20,7 +22,10 @@ export function RSVPPage() {
   const [submitted, setSubmitted] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
-  const [step, setStep] = useState(1); // 1 or 2
+  const [step, setStep] = useState(1); // 1, 2, or 3 (donation)
+  const [showDonationStep, setShowDonationStep] = useState(false);
+  const [guestId, setGuestId] = useState<string | null>(null);
+  const [donationsEnabled, setDonationsEnabled] = useState(false);
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -101,6 +106,10 @@ export function RSVPPage() {
           setParty(foundParty);
           setAvailableBeverages(foundParty.available_beverages || []);
           setAvailableToppings(foundParty.available_toppings || []);
+
+          // Check if donations are enabled
+          const donationStats = await getDonationStats(foundParty.id);
+          setDonationsEnabled(donationStats?.enabled || false);
 
           // Check if party has password protection
           if (foundParty.has_password) {
@@ -249,7 +258,15 @@ export function RSVPPage() {
         }
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
-        setSubmitted(true);
+        setGuestId(result.guest?.id || null);
+
+        // Show donation step if donations are enabled and guest is newly registered
+        if (donationsEnabled && !result.alreadyRegistered && !result.requireApproval) {
+          setShowDonationStep(true);
+          setStep(3);
+        } else {
+          setSubmitted(true);
+        }
       } else {
         setError('Failed to submit. Please try again.');
       }
@@ -360,6 +377,23 @@ export function RSVPPage() {
             </button>
           </form>
         </div>
+      </div>
+    );
+  }
+
+  // Step 3 - Donation (optional)
+  if (showDonationStep && step === 3 && party) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <DonationStep
+          partyId={party.id}
+          partyName={party.name}
+          guestId={guestId || undefined}
+          guestName={name}
+          guestEmail={email}
+          onComplete={() => setSubmitted(true)}
+          onSkip={() => setSubmitted(true)}
+        />
       </div>
     );
   }

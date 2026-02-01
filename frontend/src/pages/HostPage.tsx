@@ -11,6 +11,7 @@ import { BeverageSettings } from '../components/BeverageSettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
+import { DonationSummary } from '../components/DonationSummary';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -191,6 +192,7 @@ function HostPageContent() {
             {activeTab === 'guests' && (
               <>
                 <GuestList />
+                <DonationSummary />
               </>
             )}
 

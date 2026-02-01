@@ -851,6 +851,11 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    donation_enabled?: boolean;
+    donation_goal?: number | null;
+    donation_message?: string | null;
+    suggested_amounts?: number[];
+    donation_recipient?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -873,6 +878,11 @@ export async function updateParty(
         description: updates.description,
         customUrl: updates.custom_url,
         coHosts: updates.co_hosts,
+        donationEnabled: updates.donation_enabled,
+        donationGoal: updates.donation_goal,
+        donationMessage: updates.donation_message,
+        suggestedAmounts: updates.suggested_amounts,
+        donationRecipient: updates.donation_recipient,
       });
       return true;
     } catch (error) {

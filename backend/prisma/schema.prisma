@@ -61,11 +61,19 @@ model Party {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Donation settings
+  donationEnabled    Boolean   @default(false) @map("donation_enabled")
+  donationGoal       Decimal?  @db.Decimal(10, 2) @map("donation_goal")
+  donationMessage    String?   @map("donation_message")
+  suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
+  donationRecipient  String?   @map("donation_recipient")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests Guest[]
-  orders Order[]
+  guests    Guest[]
+  orders    Order[]
+  donations Donation[]
 
   @@map("parties")
 }
@@ -97,7 +105,32 @@ model Guest {
 
   pizzaMappings GuestPizzaMapping[]
 
+  donations Donation[]
+
   @@map("guests")
+}
+
+model Donation {
+  id              String   @id @default(cuid())
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("usd")
+  status          String   @default("pending") // pending, succeeded, failed, refunded
+  paymentIntentId String?  @map("payment_intent_id")
+  chargeId        String?  @map("charge_id")
+  donorName       String?  @map("donor_name")
+  donorEmail      String?  @map("donor_email")
+  isAnonymous     Boolean  @default(false) @map("is_anonymous")
+  message         String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  guestId String? @map("guest_id") @db.Uuid
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: SetNull)
+
+  @@map("donations")
 }
 
 model Order {

@@ -83,7 +83,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts
+      customUrl, timezone, hideGuests, requireApproval, coHosts,
+      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient
     } = req.body;
 
     // Generate default party name if not provided
@@ -137,6 +138,11 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         customUrl: customUrl || null,
         coHosts: finalCoHosts,
         userId: req.userId!,
+        donationEnabled: donationEnabled || false,
+        donationGoal: donationGoal || null,
+        donationMessage: donationMessage || null,
+        suggestedAmounts: suggestedAmounts || [500, 1000, 2500, 5000],
+        donationRecipient: donationRecipient || null,
       },
       include: {
         user: { select: { name: true } },
@@ -207,7 +213,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias
+      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
+      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient
     } = req.body;
 
     // Verify ownership or super admin
@@ -248,6 +255,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(coHosts !== undefined && { coHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
+        ...(donationEnabled !== undefined && { donationEnabled }),
+        ...(donationGoal !== undefined && { donationGoal: donationGoal || null }),
+        ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
+        ...(suggestedAmounts !== undefined && { suggestedAmounts }),
+        ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
       },
       include: {
         user: { select: { name: true } },
