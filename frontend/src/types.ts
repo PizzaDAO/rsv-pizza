@@ -10,6 +10,8 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
+export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+
 export interface Guest {
   id?: string;
   name: string;
@@ -28,6 +30,10 @@ export interface Guest {
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checkedInAt?: string | null;
   checkedInBy?: string | null;
+  approved?: boolean | null; // null = pending, true = approved, false = declined (legacy)
+  status?: GuestStatus;
+  waitlistPosition?: number | null;
+  promotedAt?: string | null;
 }
 
 export interface PizzaStyle {

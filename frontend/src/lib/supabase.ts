@@ -6,6 +6,7 @@ import {
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
+  promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
 
@@ -255,6 +256,8 @@ export interface DbParty {
   donation_eth_address?: string | null;
 }
 
+export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+
 export interface DbGuest {
   id: string;
   party_id: string;
@@ -275,6 +278,10 @@ export interface DbGuest {
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checked_in_at?: string | null;
   checked_in_by?: string | null;
+  approved?: boolean | null; // null = pending, true = approved, false = declined (legacy)
+  status?: DbGuestStatus;
+  waitlist_position?: number | null;
+  promoted_at?: string | null;
 }
 
 // Safe column list for parties table — excludes password
@@ -671,6 +678,8 @@ export async function addGuestToParty(
   pizzeriaRankings?: string[],
   suggestedPizzerias?: any[]
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean } | null> {
+  pizzeriaRankings?: string[]
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     return null;
@@ -704,7 +713,7 @@ export async function addGuestToParty(
 
     const data = await response.json();
 
-    // Return a minimal DbGuest object (backend only returns id and name)
+    // Return a minimal DbGuest object (backend returns id, name, status, waitlistPosition)
     const guest = {
       id: data.guest.id,
       party_id: partyId,
@@ -722,9 +731,18 @@ export async function addGuestToParty(
       suggested_pizzerias: suggestedPizzerias || [],
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
+      status: data.guest.status || 'CONFIRMED',
+      waitlist_position: data.guest.waitlistPosition || null,
     } as DbGuest;
 
-    return { guest, alreadyRegistered: data.alreadyRegistered || false, requireApproval: data.requireApproval || false, updated: data.updated || false };
+    return {
+      guest,
+      alreadyRegistered: data.alreadyRegistered || false,
+      requireApproval: data.requireApproval || false,
+      updated: data.updated || false,
+      waitlisted: data.waitlisted || false,
+      waitlistPosition: data.waitlistPosition || null,
+    };
   } catch (error) {
     console.error('Error adding guest:', error);
     return null;
@@ -901,6 +919,22 @@ export async function updateGuestApproval(guestId: string, approved: boolean, pa
     return false;
   }
   return true;
+}
+
+export async function promoteGuest(guestId: string, partyId: string): Promise<boolean> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      await promoteGuestApi(partyId, guestId);
+      return true;
+    } catch (error) {
+      console.error('Error promoting guest via API:', error);
+      return false;
+    }
+  }
+
+  console.error('Must be authenticated to promote guest');
+  return false;
 }
 
 export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {

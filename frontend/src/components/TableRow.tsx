@@ -1,6 +1,7 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
 import { Trash2, Check, X, CheckCircle2, Loader2 } from 'lucide-react';
+import { Trash2, Check, X, ArrowUpCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -20,7 +21,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-export type TableRowVariant = 'basic' | 'requests' | 'beverage' | 'pizza';
+export type TableRowVariant = 'basic' | 'requests' | 'beverage' | 'pizza' | 'waitlist';
 
 interface TableRowProps {
   guest?: Guest;
@@ -34,6 +35,7 @@ interface TableRowProps {
   onRemove?: (id: string) => void;
   onCheckIn?: (id: string) => void;
   isCheckingIn?: boolean;
+  onPromote?: (id: string) => void;
   // For requests variant - lookup functions
   toppingNameById?: (id: string) => string;
   beverageNameById?: (id: string) => string;
@@ -51,6 +53,7 @@ export const TableRow: React.FC<TableRowProps> = ({
   onRemove,
   onCheckIn,
   isCheckingIn = false,
+  onPromote,
   toppingNameById = (id) => id,
   beverageNameById = (id) => id,
 }) => {
@@ -165,6 +168,53 @@ export const TableRow: React.FC<TableRowProps> = ({
 
   // Guest variants require guest
   if (!guest) return null;
+
+  // Waitlist variant
+  if (variant === 'waitlist') {
+    return (
+      <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+        {/* Position badge */}
+        <div className="w-8 h-8 rounded-full bg-[#ffc107]/20 border border-[#ffc107]/30 flex items-center justify-center text-[#ffc107] text-sm font-bold flex-shrink-0">
+          #{guest.waitlistPosition || '?'}
+        </div>
+
+        {/* Avatar */}
+        <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-white text-sm font-medium flex-shrink-0`}>
+          {guest.name.charAt(0).toUpperCase()}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-white">{guest.name}</span>
+          {guest.email && (
+            <span className="text-white/50 text-sm truncate">{guest.email}</span>
+          )}
+        </div>
+
+        {/* Promote button */}
+        {onPromote && (
+          <button
+            onClick={() => guest.id && onPromote(guest.id)}
+            className="flex items-center gap-1.5 text-[#39d98a] hover:bg-[#39d98a]/10 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium"
+          >
+            <ArrowUpCircle size={16} />
+            <span>Promote</span>
+          </button>
+        )}
+
+        {/* Delete */}
+        {onRemove && (
+          <button
+            onClick={() => guest.id && onRemove(guest.id)}
+            className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+            aria-label="Remove guest"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
