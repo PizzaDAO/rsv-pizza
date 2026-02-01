@@ -1,4 +1,4 @@
-import { Pizzeria } from '../types';
+import { Pizzeria, Photo, PhotoStats } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -256,6 +256,146 @@ export async function getEventBySlug(slug: string): Promise<PublicEvent | null> 
     return response.event;
   } catch (error) {
     console.error('Error fetching event:', error);
+    return null;
+  }
+}
+
+// Photo API functions
+export interface PhotoUploadData {
+  url: string;
+  thumbnailUrl?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  uploaderName?: string;
+  uploaderEmail?: string;
+  guestId?: string;
+  caption?: string;
+  tags?: string[];
+}
+
+export interface PhotosListResponse {
+  photos: Photo[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PhotoFilters {
+  starred?: boolean;
+  tag?: string;
+  uploadedBy?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Get photos for a party (public endpoint)
+export async function getPartyPhotos(
+  partyId: string,
+  filters: PhotoFilters = {}
+): Promise<PhotosListResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.starred) params.append('starred', 'true');
+    if (filters.tag) params.append('tag', filters.tag);
+    if (filters.uploadedBy) params.append('uploadedBy', filters.uploadedBy);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/photos${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<PhotosListResponse>(url, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photos:', error);
+    return null;
+  }
+}
+
+// Upload a photo (public endpoint - guest can upload)
+export async function uploadPhoto(
+  partyId: string,
+  data: PhotoUploadData
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos`, {
+      method: 'POST',
+      body: data,
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error uploading photo:', error);
+    return null;
+  }
+}
+
+// Get single photo details
+export async function getPhoto(
+  partyId: string,
+  photoId: string
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photo:', error);
+    return null;
+  }
+}
+
+// Update photo (host only)
+export async function updatePhoto(
+  partyId: string,
+  photoId: string,
+  data: { caption?: string; tags?: string[]; starred?: boolean }
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating photo:', error);
+    return null;
+  }
+}
+
+// Delete photo (host or uploader)
+export async function deletePhoto(
+  partyId: string,
+  photoId: string,
+  uploaderEmail?: string
+): Promise<boolean> {
+  try {
+    const params = uploaderEmail ? `?uploaderEmail=${encodeURIComponent(uploaderEmail)}` : '';
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/photos/${photoId}${params}`, {
+      method: 'DELETE',
+      requireAuth: false,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    return false;
+  }
+}
+
+// Get photo statistics
+export async function getPhotoStats(partyId: string): Promise<PhotoStats | null> {
+  try {
+    return await apiRequest<PhotoStats>(`/api/parties/${partyId}/photos/stats`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photo stats:', error);
     return null;
   }
 }

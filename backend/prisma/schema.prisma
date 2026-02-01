@@ -61,11 +61,16 @@ model Party {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Photo settings
+  photosEnabled Boolean @default(true) @map("photos_enabled")
+  photosPublic  Boolean @default(true) @map("photos_public")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   guests Guest[]
   orders Order[]
+  photos Photo[]
 
   @@map("parties")
 }
@@ -96,6 +101,7 @@ model Guest {
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   pizzaMappings GuestPizzaMapping[]
+  photos        Photo[]
 
   @@map("guests")
 }
@@ -261,4 +267,43 @@ model ApiRequest {
 
   @@index([apiKeyId, createdAt])
   @@map("api_requests")
+}
+
+// ============================================
+// Photo Gallery Models
+// ============================================
+
+model Photo {
+  id           String    @id @default(uuid()) @db.Uuid
+  partyId      String    @map("party_id") @db.Uuid
+  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Upload info
+  url          String    // Supabase Storage public URL
+  thumbnailUrl String?   @map("thumbnail_url") // Optional smaller version
+  fileName     String    @map("file_name")
+  fileSize     Int       @map("file_size") // In bytes
+  mimeType     String    @map("mime_type")
+  width        Int?
+  height       Int?
+
+  // Uploader info (can be guest or anonymous)
+  uploadedBy     String? @map("uploaded_by") @db.Uuid // Guest ID if known
+  uploaderName   String? @map("uploader_name") // Display name
+  uploaderEmail  String? @map("uploader_email") // For tracking
+  guest          Guest?  @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  // Organization
+  caption   String?
+  tags      String[] @default([])
+  starred   Boolean  @default(false) // Host can star photos
+  starredAt DateTime? @map("starred_at") @db.Timestamptz
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, createdAt])
+  @@index([partyId, starred])
+  @@map("photos")
 }
