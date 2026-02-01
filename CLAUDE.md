@@ -65,7 +65,7 @@ This makes it easy for Snax to refer to specific tasks in conversation.
 
 ### Phase 3: Implementation
 
-**Each task gets its own git worktree** for isolated parallel work.
+**Each task gets its own git worktree** for isolated parallel work, with **draft PRs** for Vercel previews.
 
 #### Worktree Setup
 ```bash
@@ -73,8 +73,6 @@ This makes it easy for Snax to refer to specific tasks in conversation.
 git worktree add ../rsvpizza-{task-id} -b feature/{task-id}-{name}
 cd ../rsvpizza-{task-id}
 ```
-
-This creates a separate directory where the agent works without affecting other agents.
 
 #### Agent Instructions
 ```
@@ -84,20 +82,33 @@ Task tool:
 - prompt:
   1. Create worktree: git worktree add ../rsvpizza-{task-id} -b feature/{task-id}-{name}
   2. cd into the worktree directory
-  3. Read plan from plans/{task-id}.md (in main repo)
+  3. Read plan from plans/{task-id}.md (copy from main repo if needed)
   4. Implement the approved changes
-  5. Commit with descriptive message
-  6. Report what was done
+  5. Commit with descriptive message including task ID
+  6. Push branch: git push -u origin feature/{task-id}-{name}
+  7. Create draft PR: gh pr create --draft --title "Task ID: Description" --body "..."
+  8. Report:
+     - PR URL
+     - Vercel preview URL: https://rsvpizza-git-feature-{task-id}-{name}-pizza-dao.vercel.app
+     - Files changed
 ```
+
+#### Vercel Preview URLs
+PRs automatically get Vercel preview deployments:
+```
+https://rsvpizza-git-{branch-name}-pizza-dao.vercel.app
+```
+
+Example: `feature/diavola-85351-photo-widget` →
+`https://rsvpizza-git-feature-diavola-85351-photo-widget-pizza-dao.vercel.app`
 
 #### After Review
 ```bash
-# In main repo, merge the feature branch
-git merge feature/{task-id}-{name}
+# Merge the PR via GitHub (or locally)
+gh pr merge {pr-number} --merge
 
 # Clean up worktree
 git worktree remove ../rsvpizza-{task-id}
-git branch -d feature/{task-id}-{name}
 ```
 
 **Parallel implementation**: Multiple agents work in separate worktrees simultaneously - no conflicts.
