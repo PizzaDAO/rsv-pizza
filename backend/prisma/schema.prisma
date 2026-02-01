@@ -65,12 +65,17 @@ model Party {
   photosEnabled Boolean @default(true) @map("photos_enabled")
   photosPublic  Boolean @default(true) @map("photos_public")
 
+  // Sponsor settings
+  sponsorsEnabled      Boolean @default(false) @map("sponsors_enabled")
+  sponsorSectionTitle  String? @map("sponsor_section_title") // Custom title like "Thanks to our sponsors"
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests Guest[]
-  orders Order[]
-  photos Photo[]
+  guests   Guest[]
+  orders   Order[]
+  photos   Photo[]
+  sponsors Sponsor[]
 
   @@map("parties")
 }
@@ -306,4 +311,32 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@map("photos")
+}
+
+// ============================================
+// Sponsor Models
+// ============================================
+
+model Sponsor {
+  id          String  @id @default(uuid()) @db.Uuid
+  partyId     String  @map("party_id") @db.Uuid
+  party       Party   @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Sponsor info
+  name        String
+  tier        String  @default("partner") // gold, silver, bronze, partner
+  logoUrl     String? @map("logo_url")
+  websiteUrl  String? @map("website_url")
+  description String?
+
+  // Display settings
+  displayOrder Int     @default(0) @map("display_order")
+  visible      Boolean @default(true)
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, displayOrder])
+  @@map("sponsors")
 }

@@ -954,6 +954,9 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    // Sponsor settings
+    sponsors_enabled?: boolean;
+    sponsor_section_title?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -976,6 +979,8 @@ export async function updateParty(
         description: updates.description,
         customUrl: updates.custom_url,
         coHosts: updates.co_hosts,
+        sponsorsEnabled: updates.sponsors_enabled,
+        sponsorSectionTitle: updates.sponsor_section_title,
       });
       return true;
     } catch (error) {

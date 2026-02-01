@@ -207,7 +207,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias
+      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
+      sponsorsEnabled, sponsorSectionTitle
     } = req.body;
 
     // Verify ownership or super admin
@@ -248,6 +249,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(coHosts !== undefined && { coHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
+        ...(sponsorsEnabled !== undefined && { sponsorsEnabled }),
+        ...(sponsorSectionTitle !== undefined && { sponsorSectionTitle: sponsorSectionTitle || null }),
       },
       include: {
         user: { select: { name: true } },

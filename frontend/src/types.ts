@@ -250,3 +250,26 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Sponsor types
+export type SponsorTier = 'gold' | 'silver' | 'bronze' | 'partner';
+
+export interface Sponsor {
+  id: string;
+  partyId: string;
+  name: string;
+  tier: SponsorTier;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  description: string | null;
+  displayOrder: number;
+  visible: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SponsorsResponse {
+  sponsors: Sponsor[];
+  sponsorsEnabled: boolean;
+  sponsorSectionTitle: string | null;
+}

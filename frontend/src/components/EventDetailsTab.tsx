@@ -11,6 +11,7 @@ import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { SponsorSettings } from './SponsorSettings';
 
 export const EventDetailsTab: React.FC = () => {
   const { party, loadParty } = usePizza();
@@ -968,6 +969,20 @@ export const EventDetailsTab: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Sponsors Section */}
+        {party && (
+          <div className="border-t border-white/10 pt-4">
+            <SponsorSettings
+              partyId={party.id}
+              onUpdate={() => {
+                if (party?.inviteCode) {
+                  loadParty(party.inviteCode);
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Hosts Section */}
         <div>

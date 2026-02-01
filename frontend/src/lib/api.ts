@@ -1,4 +1,4 @@
-import { Pizzeria, Photo, PhotoStats } from '../types';
+import { Pizzeria, Photo, PhotoStats, Sponsor, SponsorsResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -85,6 +85,9 @@ export interface UpdatePartyData {
   description?: string | null;
   customUrl?: string | null;
   coHosts?: any[];
+  // Sponsor settings
+  sponsorsEnabled?: boolean;
+  sponsorSectionTitle?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -134,6 +137,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      sponsorsEnabled: data.sponsorsEnabled,
+      sponsorSectionTitle: data.sponsorSectionTitle,
     },
   });
 }
@@ -396,6 +401,124 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
     });
   } catch (error) {
     console.error('Error fetching photo stats:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Sponsor API functions
+// ============================================
+
+export interface SponsorCreateData {
+  name: string;
+  tier?: 'gold' | 'silver' | 'bronze' | 'partner';
+  logoUrl?: string;
+  websiteUrl?: string;
+  description?: string;
+  visible?: boolean;
+}
+
+export interface SponsorUpdateData {
+  name?: string;
+  tier?: 'gold' | 'silver' | 'bronze' | 'partner';
+  logoUrl?: string | null;
+  websiteUrl?: string | null;
+  description?: string | null;
+  displayOrder?: number;
+  visible?: boolean;
+}
+
+// Get sponsors for a party (public endpoint)
+export async function getPartySponsors(partyId: string): Promise<SponsorsResponse | null> {
+  try {
+    return await apiRequest<SponsorsResponse>(`/api/parties/${partyId}/sponsors`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsors:', error);
+    return null;
+  }
+}
+
+// Create a sponsor (host only)
+export async function createSponsor(
+  partyId: string,
+  data: SponsorCreateData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating sponsor:', error);
+    return null;
+  }
+}
+
+// Get single sponsor details
+export async function getSponsor(
+  partyId: string,
+  sponsorId: string
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsor:', error);
+    return null;
+  }
+}
+
+// Update sponsor (host only)
+export async function updateSponsor(
+  partyId: string,
+  sponsorId: string,
+  data: SponsorUpdateData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating sponsor:', error);
+    return null;
+  }
+}
+
+// Delete sponsor (host only)
+export async function deleteSponsor(partyId: string, sponsorId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting sponsor:', error);
+    return false;
+  }
+}
+
+// Reorder sponsors (host only)
+export async function reorderSponsors(
+  partyId: string,
+  sponsorIds: string[]
+): Promise<{ sponsors: Sponsor[] } | null> {
+  try {
+    return await apiRequest<{ sponsors: Sponsor[] }>(`/api/parties/${partyId}/sponsors/reorder`, {
+      method: 'POST',
+      body: { sponsorIds },
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error reordering sponsors:', error);
     return null;
   }
 }

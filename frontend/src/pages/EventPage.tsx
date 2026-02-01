@@ -13,6 +13,7 @@ import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
+import { SponsorDisplay } from '../components/SponsorDisplay';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -712,6 +713,9 @@ export function EventPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Sponsors Section */}
+                <SponsorDisplay partyId={event.id} />
 
                 {/* Mobile: Location Section */}
                 {event.address && googleMapsUrl && (
