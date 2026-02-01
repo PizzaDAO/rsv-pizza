@@ -200,18 +200,24 @@ textarea {
 
 
 
-/* Ensure body scrolls properly for sticky to work */
-html, body {
+/* iOS status bar tap-to-scroll: let the viewport be the main scroll container */
+html {
   height: 100%;
-  overflow-x: hidden;
-  /* iOS Safari scroll fix */
-  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
 }
 
 #root {
-  min-height: 100%;
-  position: relative;
-  z-index: 0;
+  min-height: 100vh;
+}
+
+/* Modal scroll lock - prevents body scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
 }
 
 /* Google Maps Autocomplete Dark Mode */

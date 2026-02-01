@@ -100,13 +100,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setPreferencesLoaded(true); // Mark as loaded so we don't override with profile preferences
       }
 
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = 'hidden';
+      // Prevent body scroll when modal is open (use class for iOS compatibility)
+      document.body.classList.add('modal-open');
     } else {
-      document.body.style.overflow = '';
+      document.body.classList.remove('modal-open');
     }
     return () => {
-      document.body.style.overflow = '';
+      document.body.classList.remove('modal-open');
     };
   }, [isOpen, existingGuest]);
 
