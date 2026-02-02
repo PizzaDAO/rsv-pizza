@@ -294,7 +294,7 @@ export function GPPLandingPage() {
               <div className="w-12 h-12 bg-[#5c7cfa]/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#5c7cfa]/30 transition-colors">
                 <HelpCircle className="w-6 h-6 text-[#5c7cfa]" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">PizzaDAO Links</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">PizzaDAO Resources</h3>
               <p className="text-white/60 text-sm">
                 Common questions about hosting and what to expect on the day.
               </p>
