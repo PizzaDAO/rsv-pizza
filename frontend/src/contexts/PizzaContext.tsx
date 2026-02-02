@@ -40,7 +40,7 @@ interface PizzaContextType {
   updatePizzaSettings: (settings: PizzaSettings) => void;
 }
 
-const PizzaContext = createContext<PizzaContextType | undefined>(undefined);
+export const PizzaContext = createContext<PizzaContextType | undefined>(undefined);
 
 // Re-export from constants for backward compatibility
 export const availableToppings = TOPPINGS;

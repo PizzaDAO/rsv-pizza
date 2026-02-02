@@ -314,3 +314,37 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Music/DJ Lineup types
+export type PerformerType = 'dj' | 'live_band' | 'solo' | 'playlist';
+export type PerformerStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Performer {
+  id: string;
+  partyId: string;
+  name: string;
+  type: PerformerType;
+  genre: string | null;
+  setTime: string | null;
+  setDuration: number | null;
+  sortOrder: number;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  instagram: string | null;
+  soundcloud: string | null;
+  status: PerformerStatus;
+  equipmentProvided: boolean;
+  equipmentNotes: string | null;
+  fee: number | null;
+  feePaid: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerformersResponse {
+  performers: Performer[];
+  musicEnabled: boolean;
+  musicNotes: string | null;
+}

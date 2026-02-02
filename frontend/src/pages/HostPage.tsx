@@ -16,6 +16,7 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
+import { MusicWidget } from '../components/music';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -311,7 +312,10 @@ function HostPageContent() {
             )}
 
             {activeTab === 'details' && (
-              <EventDetailsTab />
+              <>
+                <EventDetailsTab />
+                <MusicWidget isHost={true} />
+              </>
             )}
 
             {activeTab === 'photos' && party && (
