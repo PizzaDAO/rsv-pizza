@@ -15,7 +15,6 @@ import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { DonationSettings } from './DonationSettings';
 import { uuid } from '../lib/utils';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
-import { VenueWidget } from './venue';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -862,14 +861,6 @@ export const EventDetailsTab: React.FC = () => {
         {imageError && (
           <p className="text-xs text-red-400 mt-1">{imageError}</p>
         )}
-
-        {/* Venue Widget */}
-        <VenueWidget
-          party={party}
-          onUpdate={async (updates) => {
-            return await saveField('venue', updates);
-          }}
-        />
 
         {/* Options Section */}
         <div>

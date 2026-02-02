@@ -1,5 +1,6 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
 import { Pizzeria, Photo, PhotoStats, VenueStatus } from '../types';
+import { Pizzeria, Photo, PhotoStats, VenueStatus, Venue } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -675,4 +676,109 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+// ============================================
+// Venue API functions
+// ============================================
+
+export interface VenueCreateData {
+  name: string;
+  address?: string;
+  website?: string;
+  capacity?: number;
+  cost?: number;
+  organization?: string;
+  pointPerson?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  status?: VenueStatus;
+  notes?: string;
+}
+
+export interface VenueUpdateData extends Partial<VenueCreateData> {}
+
+// Get all venues for a party
+export async function getVenues(partyId: string): Promise<Venue[]> {
+  try {
+    const response = await apiRequest<{ venues: Venue[] }>(`/api/parties/${partyId}/venues`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return response.venues;
+  } catch (error) {
+    console.error('Error fetching venues:', error);
+    return [];
+  }
+}
+
+// Create a new venue
+export async function createVenue(partyId: string, data: VenueCreateData): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error creating venue:', error);
+    throw error;
+  }
+}
+
+// Update a venue
+export async function updateVenue(partyId: string, venueId: string, data: VenueUpdateData): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues/${venueId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error updating venue:', error);
+    throw error;
+  }
+}
+
+// Delete a venue
+export async function deleteVenue(partyId: string, venueId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/venues/${venueId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting venue:', error);
+    return false;
+  }
+}
+
+// Select a venue as the event location
+export async function selectVenue(partyId: string, venueId: string): Promise<{ venue: Venue; party: any } | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue; party: any }>(`/api/parties/${partyId}/venues/${venueId}/select`, {
+      method: 'PATCH',
+      requireAuth: true,
+    });
+    return response;
+  } catch (error) {
+    console.error('Error selecting venue:', error);
+    throw error;
+  }
+}
+
+// Deselect a venue
+export async function deselectVenue(partyId: string, venueId: string): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues/${venueId}/deselect`, {
+      method: 'PATCH',
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error deselecting venue:', error);
+    throw error;
+  }
 }

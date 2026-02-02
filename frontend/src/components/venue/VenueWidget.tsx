@@ -1,191 +1,393 @@
-import React, { useState } from 'react';
-import { MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Pencil } from 'lucide-react';
-import { Party, VenueStatus } from '../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MapPin, Users, DollarSign, Plus, Pencil, Trash2, Check, Globe, Loader2, Phone, Mail, Building2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Venue, VenueStatus } from '../../types';
+import { getVenues, createVenue, updateVenue, deleteVenue, selectVenue, deselectVenue, VenueCreateData } from '../../lib/api';
 import { VenueForm } from './VenueForm';
 
 interface VenueWidgetProps {
-  party: Party;
-  onUpdate: (updates: Record<string, any>) => Promise<boolean>;
+  partyId: string;
+  onVenueSelect?: () => void; // Callback when a venue is selected (to refresh party data)
 }
 
 // Status badge configuration
-const statusConfig: Record<VenueStatus, { label: string; color: string }> = {
-  researching: { label: 'Researching', color: 'bg-gray-500' },
-  contacted: { label: 'Contacted', color: 'bg-orange-500' },
-  negotiating: { label: 'Negotiating', color: 'bg-yellow-500' },
-  confirmed: { label: 'Confirmed', color: 'bg-green-500' },
-  deposit_paid: { label: 'Deposit Paid', color: 'bg-blue-500' },
-  paid_in_full: { label: 'Paid in Full', color: 'bg-purple-500' },
+const statusConfig: Record<VenueStatus, { label: string; color: string; bgColor: string }> = {
+  researching: { label: 'Researching', color: 'text-gray-300', bgColor: 'bg-gray-500/20' },
+  contacted: { label: 'Contacted', color: 'text-orange-300', bgColor: 'bg-orange-500/20' },
+  negotiating: { label: 'Negotiating', color: 'text-yellow-300', bgColor: 'bg-yellow-500/20' },
+  confirmed: { label: 'Confirmed', color: 'text-green-300', bgColor: 'bg-green-500/20' },
+  deposit_paid: { label: 'Deposit Paid', color: 'text-blue-300', bgColor: 'bg-blue-500/20' },
+  paid_in_full: { label: 'Paid in Full', color: 'text-purple-300', bgColor: 'bg-purple-500/20' },
+  declined: { label: 'Declined', color: 'text-red-300', bgColor: 'bg-red-500/20' },
 };
 
-export const VenueWidget: React.FC<VenueWidgetProps> = ({ party, onUpdate }) => {
+// Format currency
+const formatCost = (cost: number | null) => {
+  if (cost === null || cost === undefined) return null;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cost);
+};
+
+export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect }) => {
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [expandedVenue, setExpandedVenue] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const hasVenueData = party.venueName || party.address || party.venueStatus;
-  const hasContactInfo = party.venueContactName || party.venueContactEmail || party.venueContactPhone;
-
-  // Format currency
-  const formatCost = (cost: number | null) => {
-    if (cost === null || cost === undefined) return null;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(cost);
-  };
-
-  const handleSave = async (updates: Record<string, any>) => {
-    const success = await onUpdate(updates);
-    if (success) {
-      setShowForm(false);
+  // Load venues
+  const loadVenues = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getVenues(partyId);
+      setVenues(data);
+    } catch (error) {
+      console.error('Error loading venues:', error);
+    } finally {
+      setLoading(false);
     }
-    return success;
+  }, [partyId]);
+
+  useEffect(() => {
+    loadVenues();
+  }, [loadVenues]);
+
+  // Handle create venue
+  const handleCreate = async (data: VenueCreateData) => {
+    try {
+      const venue = await createVenue(partyId, data);
+      if (venue) {
+        setVenues(prev => [venue, ...prev]);
+        setShowForm(false);
+      }
+    } catch (error) {
+      throw error;
+    }
   };
+
+  // Handle update venue
+  const handleUpdate = async (data: VenueCreateData) => {
+    if (!editingVenue) return;
+    try {
+      const venue = await updateVenue(partyId, editingVenue.id, data);
+      if (venue) {
+        setVenues(prev => prev.map(v => v.id === venue.id ? venue : v));
+        setEditingVenue(null);
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  // Handle delete venue
+  const handleDelete = async (venueId: string) => {
+    if (!confirm('Are you sure you want to delete this venue option?')) return;
+
+    setActionLoading(venueId);
+    try {
+      const success = await deleteVenue(partyId, venueId);
+      if (success) {
+        setVenues(prev => prev.filter(v => v.id !== venueId));
+      }
+    } catch (error) {
+      console.error('Error deleting venue:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handle select venue
+  const handleSelect = async (venueId: string) => {
+    setActionLoading(venueId);
+    try {
+      const result = await selectVenue(partyId, venueId);
+      if (result) {
+        // Update local state
+        setVenues(prev => prev.map(v => ({
+          ...v,
+          isSelected: v.id === venueId,
+        })));
+        // Notify parent to refresh party data
+        onVenueSelect?.();
+      }
+    } catch (error) {
+      console.error('Error selecting venue:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handle deselect venue
+  const handleDeselect = async (venueId: string) => {
+    setActionLoading(venueId);
+    try {
+      await deselectVenue(partyId, venueId);
+      // Update local state
+      setVenues(prev => prev.map(v => ({
+        ...v,
+        isSelected: v.id === venueId ? false : v.isSelected,
+      })));
+    } catch (error) {
+      console.error('Error deselecting venue:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Toggle expanded venue
+  const toggleExpanded = (venueId: string) => {
+    setExpandedVenue(prev => prev === venueId ? null : venueId);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <MapPin size={18} className="text-[#ff393a]" />
-            <h3 className="font-semibold text-white">Venue</h3>
-          </div>
-          {party.venueStatus && (
-            <span className={`text-xs font-medium px-2 py-1 rounded-full text-white ${statusConfig[party.venueStatus].color}`}>
-              {statusConfig[party.venueStatus].label}
-            </span>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MapPin size={20} className="text-[#ff393a]" />
+          <h2 className="text-lg font-semibold text-white">Venue Options</h2>
+          {venues.length > 0 && (
+            <span className="text-sm text-white/40">({venues.length})</span>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-1.5 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+        >
+          <Plus size={16} />
+          Add Venue
+        </button>
+      </div>
 
-        {/* Content */}
-        <div className="p-4">
-          {hasVenueData ? (
-            <div className="space-y-3">
-              {/* Venue Name & Address */}
-              {(party.venueName || party.address) && (
-                <div>
-                  {party.venueName && (
-                    <p className="text-white font-medium">{party.venueName}</p>
-                  )}
-                  {party.address && (
-                    <p className="text-white/60 text-sm">{party.address}</p>
-                  )}
-                  {party.venueOrganization && (
-                    <p className="text-white/50 text-xs mt-1 flex items-center gap-1">
-                      <Building2 size={12} />
-                      {party.venueOrganization}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Capacity & Cost */}
-              {(party.venueCapacity || party.venueCost) && (
-                <div className="flex items-center gap-4 text-sm">
-                  {party.venueCapacity && (
-                    <span className="flex items-center gap-1.5 text-white/70">
-                      <Users size={14} className="text-white/40" />
-                      {party.venueCapacity} capacity
-                    </span>
-                  )}
-                  {party.venueCost && (
-                    <span className="flex items-center gap-1.5 text-white/70">
-                      <DollarSign size={14} className="text-white/40" />
-                      {formatCost(party.venueCost)}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Point Person */}
-              {party.venuePointPerson && (
-                <div className="flex items-center gap-1.5 text-sm text-white/70">
-                  <User size={14} className="text-white/40" />
-                  <span>Point Person: {party.venuePointPerson}</span>
-                </div>
-              )}
-
-              {/* Contact Info */}
-              {hasContactInfo && (
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-xs text-white/40 mb-1.5">Venue Contact</p>
-                  <div className="space-y-1">
-                    {party.venueContactName && (
-                      <p className="text-sm text-white/80">{party.venueContactName}</p>
-                    )}
-                    {party.venueContactEmail && (
-                      <a
-                        href={`mailto:${party.venueContactEmail}`}
-                        className="flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff5a5b] transition-colors"
-                      >
-                        <Mail size={12} />
-                        {party.venueContactEmail}
-                      </a>
-                    )}
-                    {party.venueContactPhone && (
-                      <a
-                        href={`tel:${party.venueContactPhone}`}
-                        className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors"
-                      >
-                        <Phone size={12} />
-                        {party.venueContactPhone}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Website */}
-              {party.venueWebsite && (
-                <a
-                  href={party.venueWebsite}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff5a5b] transition-colors"
-                >
-                  <Globe size={14} />
-                  View Website
-                </a>
-              )}
-
-              {/* Notes */}
-              {party.venueNotes && (
-                <div className="pt-2 border-t border-white/10">
-                  <div className="flex items-start gap-1.5 text-sm text-white/60">
-                    <FileText size={14} className="text-white/40 mt-0.5 flex-shrink-0" />
-                    <p className="whitespace-pre-wrap">{party.venueNotes}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-white/40 text-sm">No venue information yet</p>
-          )}
-        </div>
-
-        {/* Edit Button */}
-        <div className="px-4 pb-4">
+      {/* Venue List */}
+      {venues.length === 0 ? (
+        <div className="card p-8 text-center">
+          <MapPin size={32} className="mx-auto mb-3 text-white/20" />
+          <p className="text-white/60 mb-4">No venue options yet</p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-lg transition-colors"
           >
-            <Pencil size={14} />
-            {hasVenueData ? 'Edit Venue' : 'Add Venue Info'}
+            <Plus size={18} />
+            Add Your First Venue
           </button>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {venues.map((venue) => {
+            const isExpanded = expandedVenue === venue.id;
+            const isLoading = actionLoading === venue.id;
+            const statusInfo = statusConfig[venue.status] || statusConfig.researching;
+            const hasContactInfo = venue.contactName || venue.contactEmail || venue.contactPhone;
 
-      {/* Edit Modal */}
-      {showForm && (
+            return (
+              <div
+                key={venue.id}
+                className={`card overflow-hidden transition-all ${
+                  venue.isSelected
+                    ? 'ring-2 ring-[#ff393a] border-[#ff393a]/50'
+                    : 'border-white/10'
+                }`}
+              >
+                {/* Main Row */}
+                <div
+                  className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                  onClick={() => toggleExpanded(venue.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {venue.isSelected && (
+                          <span className="flex items-center gap-1 text-xs font-medium text-[#ff393a] bg-[#ff393a]/20 px-2 py-0.5 rounded-full">
+                            <Check size={12} />
+                            Selected
+                          </span>
+                        )}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                      <h3 className="font-medium text-white truncate">{venue.name}</h3>
+                      {venue.address && (
+                        <p className="text-sm text-white/60 truncate">{venue.address}</p>
+                      )}
+
+                      {/* Quick Stats */}
+                      <div className="flex items-center gap-4 mt-2 text-xs">
+                        {venue.capacity && (
+                          <span className="flex items-center gap-1 text-white/50">
+                            <Users size={12} />
+                            {venue.capacity}
+                          </span>
+                        )}
+                        {venue.cost && (
+                          <span className="flex items-center gap-1 text-white/50">
+                            <DollarSign size={12} />
+                            {formatCost(venue.cost)}
+                          </span>
+                        )}
+                        {venue.website && (
+                          <a
+                            href={venue.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-[#ff393a] hover:text-[#ff5a5b]"
+                          >
+                            <Globe size={12} />
+                            Website
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Icon */}
+                    <div className="flex-shrink-0 text-white/40">
+                      {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <div className="border-t border-white/10 p-4 bg-white/5 space-y-4">
+                    {/* Organization */}
+                    {venue.organization && (
+                      <div className="flex items-center gap-2 text-sm text-white/70">
+                        <Building2 size={14} className="text-white/40" />
+                        {venue.organization}
+                      </div>
+                    )}
+
+                    {/* Point Person */}
+                    {venue.pointPerson && (
+                      <div className="text-sm">
+                        <span className="text-white/40">Point Person: </span>
+                        <span className="text-white/80">{venue.pointPerson}</span>
+                      </div>
+                    )}
+
+                    {/* Contact Info */}
+                    {hasContactInfo && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-white/40">Venue Contact</p>
+                        {venue.contactName && (
+                          <p className="text-sm text-white/80">{venue.contactName}</p>
+                        )}
+                        {venue.contactEmail && (
+                          <a
+                            href={`mailto:${venue.contactEmail}`}
+                            className="flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff5a5b]"
+                          >
+                            <Mail size={12} />
+                            {venue.contactEmail}
+                          </a>
+                        )}
+                        {venue.contactPhone && (
+                          <a
+                            href={`tel:${venue.contactPhone}`}
+                            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
+                          >
+                            <Phone size={12} />
+                            {venue.contactPhone}
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    {venue.notes && (
+                      <div className="text-sm">
+                        <p className="text-xs text-white/40 mb-1">Notes</p>
+                        <p className="text-white/70 whitespace-pre-wrap">{venue.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                      {!venue.isSelected ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSelect(venue.id)}
+                          disabled={isLoading}
+                          className="flex items-center gap-1.5 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                        >
+                          {isLoading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Check size={14} />
+                          )}
+                          Select as Location
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeselect(venue.id)}
+                          disabled={isLoading}
+                          className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                        >
+                          {isLoading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            'Deselect'
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditingVenue(venue)}
+                        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                      >
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(venue.id)}
+                        disabled={isLoading}
+                        className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                      >
+                        {isLoading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add/Edit Form Modal */}
+      {(showForm || editingVenue) && (
         <VenueForm
-          party={party}
-          onSave={handleSave}
-          onClose={() => setShowForm(false)}
+          venue={editingVenue || undefined}
+          onSave={editingVenue ? handleUpdate : handleCreate}
+          onClose={() => {
+            setShowForm(false);
+            setEditingVenue(null);
+          }}
         />
       )}
-    </>
+    </div>
   );
 };

@@ -1,68 +1,71 @@
 import React, { useState } from 'react';
 import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2 } from 'lucide-react';
-import { Party, VenueStatus } from '../../types';
+import { Venue, VenueStatus } from '../../types';
+import { VenueCreateData } from '../../lib/api';
 
 interface VenueFormProps {
-  party: Party;
-  onSave: (updates: Record<string, any>) => Promise<boolean>;
+  venue?: Venue;
+  onSave: (data: VenueCreateData) => Promise<void>;
   onClose: () => void;
 }
 
-const venueStatusOptions: { value: VenueStatus | ''; label: string }[] = [
-  { value: '', label: 'No status' },
+const venueStatusOptions: { value: VenueStatus; label: string }[] = [
   { value: 'researching', label: 'Researching' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'negotiating', label: 'Negotiating' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'deposit_paid', label: 'Deposit Paid' },
   { value: 'paid_in_full', label: 'Paid in Full' },
+  { value: 'declined', label: 'Declined' },
 ];
 
-export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) => {
+export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [venueName, setVenueName] = useState(party.venueName || '');
-  const [address, setAddress] = useState(party.address || '');
-  const [venueStatus, setVenueStatus] = useState<VenueStatus | ''>(party.venueStatus || '');
-  const [venueCapacity, setVenueCapacity] = useState(party.venueCapacity?.toString() || '');
-  const [venueCost, setVenueCost] = useState(party.venueCost?.toString() || '');
-  const [venuePointPerson, setVenuePointPerson] = useState(party.venuePointPerson || '');
-  const [venueContactName, setVenueContactName] = useState(party.venueContactName || '');
-  const [venueContactEmail, setVenueContactEmail] = useState(party.venueContactEmail || '');
-  const [venueContactPhone, setVenueContactPhone] = useState(party.venueContactPhone || '');
-  const [venueOrganization, setVenueOrganization] = useState(party.venueOrganization || '');
-  const [venueWebsite, setVenueWebsite] = useState(party.venueWebsite || '');
-  const [venueNotes, setVenueNotes] = useState(party.venueNotes || '');
+  const [name, setName] = useState(venue?.name || '');
+  const [address, setAddress] = useState(venue?.address || '');
+  const [website, setWebsite] = useState(venue?.website || '');
+  const [capacity, setCapacity] = useState(venue?.capacity?.toString() || '');
+  const [cost, setCost] = useState(venue?.cost?.toString() || '');
+  const [organization, setOrganization] = useState(venue?.organization || '');
+  const [pointPerson, setPointPerson] = useState(venue?.pointPerson || '');
+  const [contactName, setContactName] = useState(venue?.contactName || '');
+  const [contactEmail, setContactEmail] = useState(venue?.contactEmail || '');
+  const [contactPhone, setContactPhone] = useState(venue?.contactPhone || '');
+  const [status, setStatus] = useState<VenueStatus>(venue?.status || 'researching');
+  const [notes, setNotes] = useState(venue?.notes || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!name.trim()) {
+      setError('Venue name is required');
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
-      const updates = {
-        venue_name: venueName.trim() || null,
-        address: address.trim() || null,
-        venueStatus: venueStatus || null,
-        venueCapacity: venueCapacity ? parseInt(venueCapacity, 10) : null,
-        venueCost: venueCost ? parseFloat(venueCost) : null,
-        venuePointPerson: venuePointPerson.trim() || null,
-        venueContactName: venueContactName.trim() || null,
-        venueContactEmail: venueContactEmail.trim() || null,
-        venueContactPhone: venueContactPhone.trim() || null,
-        venueOrganization: venueOrganization.trim() || null,
-        venueWebsite: venueWebsite.trim() || null,
-        venueNotes: venueNotes.trim() || null,
-      };
-
-      const success = await onSave(updates);
-      if (!success) {
-        throw new Error('Failed to save venue information');
-      }
+      await onSave({
+        name: name.trim(),
+        address: address.trim() || undefined,
+        website: website.trim() || undefined,
+        capacity: capacity ? parseInt(capacity, 10) : undefined,
+        cost: cost ? parseFloat(cost) : undefined,
+        organization: organization.trim() || undefined,
+        pointPerson: pointPerson.trim() || undefined,
+        contactName: contactName.trim() || undefined,
+        contactEmail: contactEmail.trim() || undefined,
+        contactPhone: contactPhone.trim() || undefined,
+        status,
+        notes: notes.trim() || undefined,
+      });
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(err instanceof Error ? err.message : 'Failed to save venue');
     } finally {
       setSaving(false);
     }
@@ -78,7 +81,9 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-white">Venue Information</h2>
+            <h2 className="text-lg font-semibold text-white">
+              {venue ? 'Edit Venue' : 'Add Venue Option'}
+            </h2>
           </div>
           <button
             type="button"
@@ -98,9 +103,9 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
               <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
               <input
                 type="text"
-                value={venueName}
-                onChange={(e) => setVenueName(e.target.value)}
-                placeholder="Venue Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Venue Name *"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
               />
             </div>
@@ -118,8 +123,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                 <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="url"
-                  value={venueWebsite}
-                  onChange={(e) => setVenueWebsite(e.target.value)}
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
                   placeholder="Website / Map Link"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
                 />
@@ -129,8 +134,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                 <input
                   type="number"
                   min="0"
-                  value={venueCapacity}
-                  onChange={(e) => setVenueCapacity(e.target.value)}
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
                   placeholder="Capacity"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
                 />
@@ -141,8 +146,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
               <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
               <input
                 type="text"
-                value={venueOrganization}
-                onChange={(e) => setVenueOrganization(e.target.value)}
+                value={organization}
+                onChange={(e) => setOrganization(e.target.value)}
                 placeholder="Organization / Company"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
               />
@@ -155,8 +160,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
 
             <div className="grid grid-cols-2 gap-3">
               <select
-                value={venueStatus}
-                onChange={(e) => setVenueStatus(e.target.value as VenueStatus | '')}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as VenueStatus)}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
@@ -173,8 +178,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                   type="number"
                   min="0"
                   step="0.01"
-                  value={venueCost}
-                  onChange={(e) => setVenueCost(e.target.value)}
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
                   placeholder="Cost"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
                 />
@@ -185,8 +190,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
               <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
               <input
                 type="text"
-                value={venuePointPerson}
-                onChange={(e) => setVenuePointPerson(e.target.value)}
+                value={pointPerson}
+                onChange={(e) => setPointPerson(e.target.value)}
                 placeholder="Point Person (your team)"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
               />
@@ -201,8 +206,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
               <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
               <input
                 type="text"
-                value={venueContactName}
-                onChange={(e) => setVenueContactName(e.target.value)}
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
                 placeholder="Contact Name"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
               />
@@ -213,8 +218,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="email"
-                  value={venueContactEmail}
-                  onChange={(e) => setVenueContactEmail(e.target.value)}
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
                   placeholder="Contact Email"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
                 />
@@ -223,8 +228,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                 <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="tel"
-                  value={venueContactPhone}
-                  onChange={(e) => setVenueContactPhone(e.target.value)}
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="Contact Phone"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
                 />
@@ -238,9 +243,9 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
             <div className="relative">
               <FileText size={16} className="absolute left-3 top-3 text-white/40" />
               <textarea
-                value={venueNotes}
-                onChange={(e) => setVenueNotes(e.target.value)}
-                placeholder="Additional notes about the venue..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional notes about this venue option..."
                 rows={3}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10 resize-none"
               />
@@ -265,7 +270,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !name.trim()}
               className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
               {saving ? (
@@ -273,8 +278,10 @@ export const VenueForm: React.FC<VenueFormProps> = ({ party, onSave, onClose }) 
                   <Loader2 size={14} className="animate-spin" />
                   Saving...
                 </>
+              ) : venue ? (
+                'Save Changes'
               ) : (
-                'Save Venue'
+                'Add Venue'
               )}
             </button>
           </div>

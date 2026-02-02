@@ -121,8 +121,30 @@ export interface PizzaSettings {
 }
 
 // Venue status tracking
-export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full';
+export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full' | 'declined';
 
+// Venue model (for venue picker)
+export interface Venue {
+  id: string;
+  partyId: string;
+  name: string;
+  address: string | null;
+  website: string | null;
+  capacity: number | null;
+  cost: number | null;
+  organization: string | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  status: VenueStatus;
+  isSelected: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Legacy VenueInfo interface (for backwards compatibility with Party fields)
 export interface VenueInfo {
   status: VenueStatus | null;
   capacity: number | null;
