@@ -65,12 +65,17 @@ model Party {
   photosEnabled Boolean @default(true) @map("photos_enabled")
   photosPublic  Boolean @default(true) @map("photos_public")
 
+  // Party Kit settings
+  kitEnabled  Boolean   @default(false) @map("kit_enabled")
+  kitDeadline DateTime? @map("kit_deadline") @db.Date
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests Guest[]
-  orders Order[]
-  photos Photo[]
+  guests   Guest[]
+  orders   Order[]
+  photos   Photo[]
+  partyKit PartyKit?
 
   @@map("parties")
 }
@@ -306,4 +311,47 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@map("photos")
+}
+
+// ============================================
+// Party Kit Models
+// ============================================
+
+model PartyKit {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @unique @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Kit Selection
+  requestedTier String  @map("requested_tier") // basic, large, deluxe
+  allocatedTier String? @map("allocated_tier") // What they actually get (may differ)
+
+  // Shipping Info
+  recipientName String  @map("recipient_name")
+  addressLine1  String  @map("address_line1")
+  addressLine2  String? @map("address_line2")
+  city          String
+  state         String?
+  postalCode    String  @map("postal_code")
+  country       String  @default("USA")
+  phone         String?
+
+  // Status: pending, approved, shipped, delivered, declined
+  status         String    @default("pending")
+  trackingNumber String?   @map("tracking_number")
+  trackingUrl    String?   @map("tracking_url")
+
+  // Notes
+  notes      String? // Host notes/special requests
+  adminNotes String? @map("admin_notes") // Internal notes
+
+  // Dates
+  requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz
+  shippedAt   DateTime? @map("shipped_at") @db.Timestamptz
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("party_kits")
 }

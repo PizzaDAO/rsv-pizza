@@ -1,4 +1,4 @@
-import { Pizzeria, Photo, PhotoStats } from '../types';
+import { Pizzeria, Photo, PhotoStats, PartyKit, KitTier } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -397,5 +397,86 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
   } catch (error) {
     console.error('Error fetching photo stats:', error);
     return null;
+  }
+}
+
+// Party Kit API functions
+export interface KitRequestData {
+  requestedTier: KitTier;
+  recipientName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface KitResponse {
+  kitEnabled: boolean;
+  kitDeadline: string | null;
+  kit: PartyKit | null;
+}
+
+// Get kit request for a party
+export async function getPartyKit(partyId: string): Promise<KitResponse | null> {
+  try {
+    return await apiRequest<KitResponse>(`/api/parties/${partyId}/kit`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching kit:', error);
+    return null;
+  }
+}
+
+// Submit a kit request
+export async function submitKitRequest(
+  partyId: string,
+  data: KitRequestData
+): Promise<{ kit: PartyKit } | null> {
+  try {
+    return await apiRequest<{ kit: PartyKit }>(`/api/parties/${partyId}/kit`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error submitting kit request:', error);
+    throw error; // Re-throw to show error in UI
+  }
+}
+
+// Update a kit request
+export async function updateKitRequest(
+  partyId: string,
+  data: Partial<KitRequestData>
+): Promise<{ kit: PartyKit } | null> {
+  try {
+    return await apiRequest<{ kit: PartyKit }>(`/api/parties/${partyId}/kit`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating kit request:', error);
+    throw error;
+  }
+}
+
+// Cancel a kit request
+export async function cancelKitRequest(partyId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/kit`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error canceling kit request:', error);
+    return false;
   }
 }

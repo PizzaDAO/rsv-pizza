@@ -11,6 +11,7 @@ import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { PartyKitWidget } from './kit';
 
 export const EventDetailsTab: React.FC = () => {
   const { party, loadParty } = usePizza();
@@ -1082,6 +1083,9 @@ export const EventDetailsTab: React.FC = () => {
             Add Host
           </button>
         </div>
+
+        {/* Party Kit Widget */}
+        <PartyKitWidget partyId={party.id} />
 
         {/* Error Message */}
         {message && message.type === 'error' && (
