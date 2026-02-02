@@ -993,6 +993,17 @@ export async function updateParty(
     duration?: number | null;
     address?: string | null;
     venue_name?: string | null;
+    // Venue tracking fields
+    venueStatus?: string | null;
+    venueCapacity?: number | null;
+    venueCost?: number | null;
+    venuePointPerson?: string | null;
+    venueContactName?: string | null;
+    venueContactEmail?: string | null;
+    venueContactPhone?: string | null;
+    venueOrganization?: string | null;
+    venueWebsite?: string | null;
+    venueNotes?: string | null;
     description?: string | null;
     password?: string | null;
     custom_url?: string | null;
@@ -1029,6 +1040,17 @@ export async function updateParty(
         timezone: updates.timezone,
         address: updates.address,
         venueName: updates.venue_name,
+        // Venue tracking fields
+        venueStatus: updates.venueStatus as any,
+        venueCapacity: updates.venueCapacity,
+        venueCost: updates.venueCost,
+        venuePointPerson: updates.venuePointPerson,
+        venueContactName: updates.venueContactName,
+        venueContactEmail: updates.venueContactEmail,
+        venueContactPhone: updates.venueContactPhone,
+        venueOrganization: updates.venueOrganization,
+        venueWebsite: updates.venueWebsite,
+        venueNotes: updates.venueNotes,
         maxGuests: updates.max_guests,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,

@@ -1,4 +1,5 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
+import { Pizzeria, Photo, PhotoStats, VenueStatus } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -95,6 +96,17 @@ export interface UpdatePartyData {
   timezone?: string | null;
   address?: string | null;
   venueName?: string | null;
+  // Venue tracking fields
+  venueStatus?: VenueStatus | null;
+  venueCapacity?: number | null;
+  venueCost?: number | null;
+  venuePointPerson?: string | null;
+  venueContactName?: string | null;
+  venueContactEmail?: string | null;
+  venueContactPhone?: string | null;
+  venueOrganization?: string | null;
+  venueWebsite?: string | null;
+  venueNotes?: string | null;
   maxGuests?: number | null;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -159,6 +171,17 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       timezone: data.timezone,
       address: data.address,
       venueName: data.venueName,
+      // Venue tracking fields
+      venueStatus: data.venueStatus,
+      venueCapacity: data.venueCapacity,
+      venueCost: data.venueCost,
+      venuePointPerson: data.venuePointPerson,
+      venueContactName: data.venueContactName,
+      venueContactEmail: data.venueContactEmail,
+      venueContactPhone: data.venueContactPhone,
+      venueOrganization: data.venueOrganization,
+      venueWebsite: data.venueWebsite,
+      venueNotes: data.venueNotes,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,

@@ -120,6 +120,22 @@ export interface PizzaSettings {
   style: PizzaStyle;
 }
 
+// Venue status tracking
+export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full';
+
+export interface VenueInfo {
+  status: VenueStatus | null;
+  capacity: number | null;
+  cost: number | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  organization: string | null;
+  website: string | null;
+  notes: string | null;
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -143,6 +159,17 @@ export interface Party {
   description: string | null;
   address: string | null;
   venueName: string | null;
+  // Venue tracking fields
+  venueStatus: VenueStatus | null;
+  venueCapacity: number | null;
+  venueCost: number | null;
+  venuePointPerson: string | null;
+  venueContactName: string | null;
+  venueContactEmail: string | null;
+  venueContactPhone: string | null;
+  venueOrganization: string | null;
+  venueWebsite: string | null;
+  venueNotes: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
