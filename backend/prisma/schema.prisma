@@ -65,6 +65,10 @@ model Party {
   photosEnabled Boolean @default(true) @map("photos_enabled")
   photosPublic  Boolean @default(true) @map("photos_public")
 
+  // Event type and tagging (for GPP and other special events)
+  eventType  String?  @map("event_type")  // 'standard', 'gpp', 'private', etc.
+  eventTags  String[] @default([]) @map("event_tags")  // Tags for filtering/grouping
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -14,6 +14,7 @@ import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { PhotoGallery } from '../components/photos';
+import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
 
 export function EventPage() {
@@ -529,6 +530,11 @@ export function EventPage() {
 
               {/* Event Title */}
               <div className="p-6 pb-1 md:border-b md:border-white/10">
+                {event.eventType === 'gpp' && (
+                  <div className="mb-3">
+                    <GPPBadge />
+                  </div>
+                )}
                 <h1 className="text-4xl md:text-5xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
