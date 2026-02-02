@@ -3,6 +3,7 @@ import { X, Loader2, AlertCircle, MapPin } from 'lucide-react';
 import { KitTier, KIT_TIERS, PartyKit } from '../../types';
 import { KitTierCard } from './KitTierCard';
 import { KitRequestData } from '../../lib/api';
+import { ShippingAddressAutocomplete, AddressComponents } from './ShippingAddressAutocomplete';
 
 interface KitRequestFormProps {
   isOpen: boolean;
@@ -56,6 +57,15 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
   const [notes, setNotes] = useState(existingKit?.notes || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle address autocomplete selection
+  const handleAddressSelected = (components: AddressComponents) => {
+    if (components.addressLine1) setAddressLine1(components.addressLine1);
+    if (components.city) setCity(components.city);
+    if (components.state) setState(components.state);
+    if (components.postalCode) setPostalCode(components.postalCode);
+    if (components.country) setCountry(components.country);
+  };
 
   const isDeadlinePassed = kitDeadline && new Date(kitDeadline) < new Date();
   const isEditing = !!existingKit;
@@ -174,13 +184,12 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
               />
 
-              <input
-                type="text"
+              <ShippingAddressAutocomplete
                 value={addressLine1}
-                onChange={(e) => setAddressLine1(e.target.value)}
+                onChange={setAddressLine1}
+                onAddressSelected={handleAddressSelected}
                 placeholder="Address Line 1 *"
                 disabled={isDeadlinePassed}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
               />
 
               <input
