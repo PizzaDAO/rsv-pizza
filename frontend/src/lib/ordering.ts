@@ -289,7 +289,7 @@ export async function initiateAIPhoneCall(
   partySize?: number,
   estimatedTotal?: number
 ): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('authToken');
 
   const response = await fetch(`${BACKEND_URL}/api/ai-phone/initiate`, {
     method: 'POST',
@@ -311,14 +311,24 @@ export async function initiateAIPhoneCall(
     }),
   });
 
-  return response.json();
+  const data = await response.json();
+
+  // Normalize error response - backend may return {message, code} or {error}
+  if (!response.ok || data.message || data.error) {
+    return {
+      success: false,
+      error: data.message || data.error || 'Failed to initiate AI call',
+    };
+  }
+
+  return data;
 }
 
 // Retry a failed AI phone call
 export async function retryAIPhoneCall(
   aiPhoneCallId: string
 ): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('authToken');
 
   const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/retry`, {
     method: 'POST',
@@ -333,7 +343,7 @@ export async function retryAIPhoneCall(
 
 // Get AI phone call status
 export async function getAIPhoneCallStatus(aiPhoneCallId: string) {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('authToken');
 
   const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/status`, {
     headers: {
@@ -350,7 +360,7 @@ export async function getAIPhoneCallStatus(aiPhoneCallId: string) {
 
 // Get AI phone call transcript
 export async function getAIPhoneCallTranscript(aiPhoneCallId: string) {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('authToken');
 
   const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/transcript`, {
     headers: {

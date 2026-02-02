@@ -34,7 +34,7 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
 
     const fetchTranscript = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('authToken');
         const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/transcript`, {
           headers: {
             Authorization: `Bearer ${token}`,

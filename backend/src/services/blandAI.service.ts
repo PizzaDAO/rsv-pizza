@@ -2,6 +2,162 @@ import { prisma } from '../config/database.js';
 
 const BLAND_API_URL = 'https://api.bland.ai/v1';
 
+// Email notification functions
+async function sendOrderConfirmedEmail(
+  email: string,
+  customerName: string,
+  pizzeriaName: string,
+  orderTotal: string | null,
+  estimatedTime: string | null,
+  fulfillmentType: string,
+  partyName: string
+) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.log('RESEND_API_KEY not set, skipping email notification');
+    return;
+  }
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Confirmed - RSV.Pizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Order Confirmed!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Your AI phone order was successful</p>
+        </div>
+
+        <div style="background: #f0fff4; padding: 20px; border-radius: 12px; border-left: 4px solid #38a169; margin-bottom: 20px;">
+          <h2 style="color: #38a169; margin: 0 0 10px 0;">✓ ${pizzeriaName} confirmed your order</h2>
+          <p style="margin: 0; color: #2d3748;">For: <strong>${partyName}</strong></p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 15px 0; color: #1a1a2e;">Order Details</h3>
+          ${orderTotal ? `<p style="margin: 5px 0;"><strong>Total:</strong> ${orderTotal}</p>` : ''}
+          ${estimatedTime ? `<p style="margin: 5px 0;"><strong>Ready:</strong> ${estimatedTime}</p>` : ''}
+          <p style="margin: 5px 0;"><strong>Type:</strong> ${fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'}</p>
+        </div>
+
+        <p style="color: #666; font-size: 14px; text-align: center;">
+          You can view the full call transcript and recording in your RSV.Pizza dashboard.
+        </p>
+      </body>
+    </html>
+  `;
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        to: [email],
+        subject: `✓ Order Confirmed - ${pizzeriaName}`,
+        html: emailHtml,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Failed to send order confirmed email:', error);
+    }
+  } catch (error) {
+    console.error('Error sending order confirmed email:', error);
+  }
+}
+
+async function sendOrderFailedEmail(
+  email: string,
+  customerName: string,
+  pizzeriaName: string,
+  pizzeriaPhone: string,
+  failureReason: string,
+  partyName: string
+) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.log('RESEND_API_KEY not set, skipping email notification');
+    return;
+  }
+
+  const reasonText = {
+    'no_answer': 'The pizzeria did not answer the phone.',
+    'voicemail': 'The call went to voicemail.',
+    'failed': 'The call could not be completed.',
+    'not_confirmed': 'The pizzeria was unable to confirm the order.',
+  }[failureReason] || 'The order could not be placed.';
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Not Confirmed - RSV.Pizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Order Update</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Action may be required</p>
+        </div>
+
+        <div style="background: #fff5f5; padding: 20px; border-radius: 12px; border-left: 4px solid #e53e3e; margin-bottom: 20px;">
+          <h2 style="color: #e53e3e; margin: 0 0 10px 0;">Order Not Confirmed</h2>
+          <p style="margin: 0; color: #2d3748;">${reasonText}</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 15px 0; color: #1a1a2e;">What to do next</h3>
+          <p style="margin: 5px 0;">You can try one of the following:</p>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Retry the AI call from your dashboard</li>
+            <li>Call <strong>${pizzeriaName}</strong> directly at <a href="tel:${pizzeriaPhone}" style="color: #3182ce;">${pizzeriaPhone}</a></li>
+          </ul>
+        </div>
+
+        <div style="background: #ebf8ff; padding: 15px; border-radius: 8px; text-align: center;">
+          <p style="margin: 0; color: #2b6cb0;">
+            <strong>Party:</strong> ${partyName}<br>
+            <strong>Pizzeria:</strong> ${pizzeriaName}
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        to: [email],
+        subject: `⚠️ Order Update - ${pizzeriaName}`,
+        html: emailHtml,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Failed to send order failed email:', error);
+    }
+  } catch (error) {
+    console.error('Error sending order failed email:', error);
+  }
+}
+
 export interface OrderItem {
   name: string;
   quantity: number;
@@ -255,9 +411,13 @@ export async function initiateCall(request: InitiateCallRequest): Promise<CallRe
 export async function processWebhook(payload: BlandWebhookPayload): Promise<void> {
   const { call_id, status, completed } = payload;
 
-  // Find the AIPhoneCall record
+  // Find the AIPhoneCall record with user and party info for notifications
   const aiPhoneCall = await prisma.aIPhoneCall.findUnique({
     where: { callId: call_id },
+    include: {
+      user: true,
+      party: true,
+    },
   });
 
   if (!aiPhoneCall) {
@@ -338,6 +498,41 @@ export async function processWebhook(payload: BlandWebhookPayload): Promise<void
       where: { id: aiPhoneCall.id },
       data: { orderId: order.id },
     });
+  }
+
+  // Send email notifications when call is completed
+  if (completed && aiPhoneCall.user?.email) {
+    const partyName = aiPhoneCall.party?.name || 'Your Party';
+
+    if (orderConfirmed) {
+      // Order was confirmed - send success email
+      await sendOrderConfirmedEmail(
+        aiPhoneCall.user.email,
+        aiPhoneCall.customerName,
+        aiPhoneCall.pizzeriaName,
+        orderTotal || null,
+        estimatedTime || null,
+        aiPhoneCall.fulfillmentType,
+        partyName
+      );
+    } else {
+      // Order not confirmed - send failure email
+      let failureReason = 'not_confirmed';
+      if (newStatus === 'no_answer') {
+        failureReason = payload.answered_by === 'voicemail' ? 'voicemail' : 'no_answer';
+      } else if (newStatus === 'failed') {
+        failureReason = 'failed';
+      }
+
+      await sendOrderFailedEmail(
+        aiPhoneCall.user.email,
+        aiPhoneCall.customerName,
+        aiPhoneCall.pizzeriaName,
+        aiPhoneCall.pizzeriaPhone,
+        failureReason,
+        partyName
+      );
+    }
   }
 }
 

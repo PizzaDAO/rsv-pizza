@@ -91,7 +91,19 @@
       "Bash(not found\" errors when RSVPing to events accessed via custom URL.\n\nNow all three RSVP endpoints check both inviteCode and customUrl.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git branch:*)",
       "Bash(vercel ls:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "mcp__supabase__get_project",
+      "mcp__vercel__list_teams",
+      "mcp__vercel__list_deployments",
+      "mcp__vercel__get_project",
+      "mcp__vercel__deploy_to_vercel",
+      "Bash(vercel deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx prisma migrate deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" ./node_modules/.bin/prisma migrate deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx --package=prisma@5.22.0 prisma migrate deploy:*)",
+      "mcp__supabase__get_project_url",
+      "mcp__supabase__get_publishable_keys",
+      "Bash(vercel logs:*)"
     ]
   }
 }

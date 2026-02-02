@@ -44,7 +44,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
     const fetchStatus = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('authToken');
         const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/status`, {
           headers: {
             Authorization: `Bearer ${token}`,

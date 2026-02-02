@@ -37,6 +37,11 @@ export const PizzaOrderSummary: React.FC = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const [autoSearched, setAutoSearched] = useState(false);
 
+  // Test mode state
+  const [showTestMode, setShowTestMode] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testPizzeriaName, setTestPizzeriaName] = useState('Test Pizzeria');
+
   // Auto-search if party address is provided
   useEffect(() => {
     if (party?.address && !autoSearched && recommendations.length > 0) {
@@ -115,6 +120,31 @@ export const PizzaOrderSummary: React.FC = () => {
   const handleInlineSelectPizzeria = (pizzeria: Pizzeria, option: OrderingOption) => {
     setSelectedPizzeria(pizzeria);
     setSelectedOption(option);
+  };
+
+  // Handle test mode - create a fake pizzeria with AI phone option
+  const handleTestAICall = () => {
+    if (!testPhone.trim()) return;
+
+    const testPizzeria: Pizzeria = {
+      id: 'test-pizzeria',
+      placeId: 'test-place-id',
+      name: testPizzeriaName || 'Test Pizzeria',
+      address: '123 Test Street',
+      phone: testPhone,
+      rating: 5.0,
+      reviewCount: 100,
+      isOpen: true,
+      distance: 0,
+      location: { lat: 0, lng: 0 },
+      orderingOptions: [
+        { provider: 'ai_phone' as any, available: true },
+        { provider: 'phone', available: true },
+      ],
+    };
+
+    setSelectedPizzeria(testPizzeria);
+    setSelectedOption({ provider: 'ai_phone' as any, available: true });
   };
 
   // Generate call script for phone ordering
@@ -605,6 +635,45 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   {pizzeriaError && (
                     <p className="text-xs text-[#ff393a]">{pizzeriaError}</p>
                   )}
+
+                  {/* Test Mode Section */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => setShowTestMode(!showTestMode)}
+                      className="flex items-center gap-2 text-xs text-white/50 hover:text-white/70"
+                    >
+                      <Phone size={12} />
+                      Test AI Call with Custom Number
+                      {showTestMode ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+
+                    {showTestMode && (
+                      <div className="mt-3 space-y-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <p className="text-xs text-purple-300">Enter any phone number to test the AI calling feature:</p>
+                        <input
+                          type="text"
+                          value={testPizzeriaName}
+                          onChange={(e) => setTestPizzeriaName(e.target.value)}
+                          placeholder="Pizzeria name (optional)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <input
+                          type="tel"
+                          value={testPhone}
+                          onChange={(e) => setTestPhone(e.target.value)}
+                          placeholder="Phone number (e.g., +1-555-123-4567)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <button
+                          onClick={handleTestAICall}
+                          disabled={!testPhone.trim()}
+                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        >
+                          Start Test AI Call
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 // Show top 3 pizzerias
@@ -687,6 +756,45 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       </div>
                     );
                   })}
+
+                  {/* Test Mode Section - also show after search */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => setShowTestMode(!showTestMode)}
+                      className="flex items-center gap-2 text-xs text-white/50 hover:text-white/70"
+                    >
+                      <Phone size={12} />
+                      Test AI Call with Custom Number
+                      {showTestMode ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+
+                    {showTestMode && (
+                      <div className="mt-3 space-y-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <p className="text-xs text-purple-300">Enter any phone number to test the AI calling feature:</p>
+                        <input
+                          type="text"
+                          value={testPizzeriaName}
+                          onChange={(e) => setTestPizzeriaName(e.target.value)}
+                          placeholder="Pizzeria name (optional)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <input
+                          type="tel"
+                          value={testPhone}
+                          onChange={(e) => setTestPhone(e.target.value)}
+                          placeholder="Phone number (e.g., +1-555-123-4567)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <button
+                          onClick={handleTestAICall}
+                          disabled={!testPhone.trim()}
+                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        >
+                          Start Test AI Call
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
