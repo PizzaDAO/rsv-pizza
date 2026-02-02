@@ -151,8 +151,20 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       });
     }
 
-    // Generate event name with city
-    const eventName = `Global Pizza Party - ${normalizedCity}`;
+    // Generate event name with city (no dash, just space)
+    const eventName = `Global Pizza Party ${normalizedCity}`;
+
+    // Generate custom URL from city name (lowercase, no spaces)
+    const customUrl = normalizedCity.toLowerCase().replace(/\s+/g, '');
+
+    // Calculate default date: May 22 of current or next year
+    const now = new Date();
+    let defaultYear = now.getFullYear();
+    const may22 = new Date(defaultYear, 4, 22); // Month is 0-indexed, so 4 = May
+    if (now > may22) {
+      defaultYear++; // If May 22 has passed, use next year
+    }
+    const defaultDate = new Date(defaultYear, 4, 22, 18, 0, 0); // May 22 at 6 PM
 
     // Create the party with GPP defaults
     const party = await prisma.party.create({
@@ -165,12 +177,22 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         hideGuests: GPP_DEFAULTS.hideGuests,
         photosEnabled: GPP_DEFAULTS.photosEnabled,
         photosPublic: GPP_DEFAULTS.photosPublic,
-        coHosts: [{
-          id: crypto.randomUUID(),
-          name: normalizedHostName,
-          email: normalizedEmail,
-          showOnEvent: true
-        }],
+        customUrl: customUrl,
+        date: defaultDate,
+        coHosts: [
+          {
+            id: crypto.randomUUID(),
+            name: normalizedHostName,
+            email: normalizedEmail,
+            showOnEvent: true
+          },
+          {
+            id: crypto.randomUUID(),
+            name: 'PizzaDAO',
+            email: 'hello@rarepizzas.com',
+            showOnEvent: true
+          }
+        ],
         userId: user.id,
       },
       include: {

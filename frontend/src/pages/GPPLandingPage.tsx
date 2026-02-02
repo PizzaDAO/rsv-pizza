@@ -215,7 +215,7 @@ export function GPPLandingPage() {
                     disabled={isSubmitting}
                   />
                   <p className="text-xs text-white/50 mt-2">
-                    We'll send you a login link to manage your event
+                    We'll send you a login code to manage your event
                   </p>
                 </div>
 
@@ -256,7 +256,7 @@ export function GPPLandingPage() {
 
           <div className="grid md:grid-cols-3 gap-6">
             <a
-              href="https://pizzadao.xyz/gpp"
+              href="https://docs.google.com/presentation/d/e/2PACX-1vSNFVmhuegxE6QhHFHBC1WCVGJ4eA-Zl-SpzcQG0kMuG1bQf3GA_01BaWtLoL-VUgTT0y3M330lGB5D/pub?start=false&loop=false&delayms=3000"
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 hover:bg-white/5 transition-colors group"
@@ -271,7 +271,7 @@ export function GPPLandingPage() {
             </a>
 
             <a
-              href="https://t.me/pizzadao"
+              href="https://t.me/+Qr-B8Y6DYH4yMjIx"
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 hover:bg-white/5 transition-colors group"
@@ -286,7 +286,7 @@ export function GPPLandingPage() {
             </a>
 
             <a
-              href="https://pizzadao.xyz/faq"
+              href="https://pizzadao.xyz/landing"
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 hover:bg-white/5 transition-colors group"
@@ -294,7 +294,7 @@ export function GPPLandingPage() {
               <div className="w-12 h-12 bg-[#5c7cfa]/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#5c7cfa]/30 transition-colors">
                 <HelpCircle className="w-6 h-6 text-[#5c7cfa]" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">FAQ</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">PizzaDAO Links</h3>
               <p className="text-white/60 text-sm">
                 Common questions about hosting and what to expect on the day.
               </p>
