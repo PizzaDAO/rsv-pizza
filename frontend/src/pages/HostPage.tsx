@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, FileBarChart } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -16,11 +16,12 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
+import { ReportWidget } from '../components/report';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'pizza' | 'guests' | 'photos';
+type TabType = 'details' | 'pizza' | 'guests' | 'photos' | 'report';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -63,7 +64,7 @@ function HostPageContent() {
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'report') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -177,6 +178,7 @@ function HostPageContent() {
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
   ];
 
   return (
@@ -341,6 +343,10 @@ function HostPageContent() {
                   photoModeration={photoModerationEnabled}
                 />
               </div>
+            )}
+
+            {activeTab === 'report' && party && (
+              <ReportWidget partyId={party.id} />
             )}
           </div>
         </div>
