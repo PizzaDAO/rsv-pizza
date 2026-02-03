@@ -348,3 +348,29 @@ export interface PerformersResponse {
   musicEnabled: boolean;
   musicNotes: string | null;
 }
+
+// Song type for music widget
+export type MusicPlatform = 'spotify' | 'apple_music' | 'youtube' | 'soundcloud' | 'other';
+
+export interface Song {
+  id: string;
+  partyId: string;
+  title: string;
+  artist: string;
+  platform: MusicPlatform;
+  url: string | null;
+  addedBy: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface Playlist {
+  id: string;
+  partyId: string;
+  name: string;
+  platform: MusicPlatform;
+  url: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+}

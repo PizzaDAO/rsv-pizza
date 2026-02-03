@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { Performer } from '../../types';
+import { Performer, Song, Playlist, MusicPlatform } from '../../types';
 import { PizzaContext } from '../../contexts/PizzaContext';
 import {
   getPerformers,
@@ -12,37 +12,59 @@ import {
 } from '../../lib/api';
 import { PerformerCard } from './PerformerCard';
 import { PerformerForm, PerformerFormData } from './PerformerForm';
+import { SongCard } from './SongCard';
+import { SongForm, SongFormData } from './SongForm';
+import { PlaylistCard } from './PlaylistCard';
+import { PlaylistForm, PlaylistFormData } from './PlaylistForm';
 import { LineupOverview } from './LineupOverview';
-import { Music, Plus, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Music, Plus, Loader2, Mic2, ListMusic, Disc3 } from 'lucide-react';
 
 interface MusicWidgetProps {
   isHost?: boolean;
   partyId?: string; // Optional - if not provided, will use PizzaContext
 }
 
+type MusicSection = 'performers' | 'songs' | 'playlists';
+
 export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyId: propsPartyId }) => {
-  // Try to use PizzaContext, but don't require it (useContext returns null if no Provider)
+  // Try to use PizzaContext, but don't require it
   const pizzaContext = useContext(PizzaContext);
   const contextPartyId = pizzaContext?.party?.id;
   const effectivePartyId = propsPartyId || contextPartyId;
+
+  // Performers state
   const [performers, setPerformers] = useState<Performer[]>([]);
   const [musicEnabled, setMusicEnabled] = useState(false);
   const [musicNotes, setMusicNotes] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  // Songs and Playlists state (stored locally since backend doesn't support them yet)
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+
+  // Active section
+  const [activeSection, setActiveSection] = useState<MusicSection>('performers');
+
+  // Performer form state
+  const [isPerformerFormOpen, setIsPerformerFormOpen] = useState(false);
   const [editingPerformer, setEditingPerformer] = useState<Performer | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingPerformer, setSavingPerformer] = useState(false);
 
-  // Expanded state
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Song form state
+  const [isSongFormOpen, setIsSongFormOpen] = useState(false);
+  const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [savingSong, setSavingSong] = useState(false);
 
-  // Drag state
+  // Playlist form state
+  const [isPlaylistFormOpen, setIsPlaylistFormOpen] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+  const [savingPlaylist, setSavingPlaylist] = useState(false);
+
+  // Drag state for performers
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Load performers
+  // Load performers from API
   const loadPerformers = useCallback(async () => {
     if (!effectivePartyId) return;
 
@@ -64,15 +86,56 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
     }
   }, [effectivePartyId]);
 
+  // Load songs and playlists from localStorage (temporary until backend support)
+  const loadLocalMusicData = useCallback(() => {
+    if (!effectivePartyId) return;
+
+    const storedSongs = localStorage.getItem(`music_songs_${effectivePartyId}`);
+    const storedPlaylists = localStorage.getItem(`music_playlists_${effectivePartyId}`);
+
+    if (storedSongs) {
+      try {
+        setSongs(JSON.parse(storedSongs));
+      } catch (e) {
+        console.error('Error parsing stored songs:', e);
+      }
+    }
+
+    if (storedPlaylists) {
+      try {
+        setPlaylists(JSON.parse(storedPlaylists));
+      } catch (e) {
+        console.error('Error parsing stored playlists:', e);
+      }
+    }
+  }, [effectivePartyId]);
+
+  // Save songs to localStorage
+  const saveSongsToLocal = useCallback((newSongs: Song[]) => {
+    if (!effectivePartyId) return;
+    localStorage.setItem(`music_songs_${effectivePartyId}`, JSON.stringify(newSongs));
+    setSongs(newSongs);
+  }, [effectivePartyId]);
+
+  // Save playlists to localStorage
+  const savePlaylistsToLocal = useCallback((newPlaylists: Playlist[]) => {
+    if (!effectivePartyId) return;
+    localStorage.setItem(`music_playlists_${effectivePartyId}`, JSON.stringify(newPlaylists));
+    setPlaylists(newPlaylists);
+  }, [effectivePartyId]);
+
   useEffect(() => {
     loadPerformers();
-  }, [loadPerformers]);
+    loadLocalMusicData();
+  }, [loadPerformers, loadLocalMusicData]);
 
-  // Handle add/edit performer
+  // ============================================
+  // Performer handlers
+  // ============================================
   const handleSavePerformer = async (formData: PerformerFormData) => {
     if (!effectivePartyId) return;
 
-    setSaving(true);
+    setSavingPerformer(true);
     setError(null);
 
     try {
@@ -96,34 +159,25 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
       };
 
       if (editingPerformer) {
-        // Update existing
         await updatePerformer(effectivePartyId, editingPerformer.id, data);
       } else {
-        // Add new
         await addPerformer(effectivePartyId, data as CreatePerformerData);
       }
 
-      // Reload performers
       await loadPerformers();
-
-      // Close form
-      setIsFormOpen(false);
+      setIsPerformerFormOpen(false);
       setEditingPerformer(null);
     } catch (err) {
       console.error('Error saving performer:', err);
       setError(err instanceof Error ? err.message : 'Failed to save performer');
     } finally {
-      setSaving(false);
+      setSavingPerformer(false);
     }
   };
 
-  // Handle delete performer
   const handleDeletePerformer = async (performerId: string) => {
     if (!effectivePartyId) return;
-
-    if (!confirm('Are you sure you want to remove this performer?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to remove this performer?')) return;
 
     try {
       await deletePerformer(effectivePartyId, performerId);
@@ -134,19 +188,17 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
     }
   };
 
-  // Handle edit performer
   const handleEditPerformer = (performer: Performer) => {
     setEditingPerformer(performer);
-    setIsFormOpen(true);
+    setIsPerformerFormOpen(true);
   };
 
-  // Handle add new performer
   const handleAddPerformer = () => {
     setEditingPerformer(null);
-    setIsFormOpen(true);
+    setIsPerformerFormOpen(true);
   };
 
-  // Handle drag reorder
+  // Drag handlers for performers
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
@@ -172,73 +224,208 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
 
     setDraggedIndex(null);
 
-    // Save new order
     try {
       const performerIds = performers.map((p) => p.id);
       await reorderPerformers(effectivePartyId, performerIds);
     } catch (err) {
       console.error('Error reordering performers:', err);
       setError('Failed to save order');
-      // Reload to get correct order
       await loadPerformers();
     }
   };
+
+  // ============================================
+  // Song handlers
+  // ============================================
+  const handleSaveSong = async (formData: SongFormData) => {
+    if (!effectivePartyId) return;
+
+    setSavingSong(true);
+
+    try {
+      if (editingSong) {
+        // Update existing song
+        const updatedSongs = songs.map(s =>
+          s.id === editingSong.id
+            ? { ...s, ...formData }
+            : s
+        );
+        saveSongsToLocal(updatedSongs);
+      } else {
+        // Add new song
+        const newSong: Song = {
+          id: `song_${Date.now()}`,
+          partyId: effectivePartyId,
+          title: formData.title,
+          artist: formData.artist,
+          platform: formData.platform,
+          url: formData.url || null,
+          addedBy: null,
+          sortOrder: songs.length,
+          createdAt: new Date().toISOString(),
+        };
+        saveSongsToLocal([...songs, newSong]);
+      }
+
+      setIsSongFormOpen(false);
+      setEditingSong(null);
+    } catch (err) {
+      console.error('Error saving song:', err);
+      setError('Failed to save song');
+    } finally {
+      setSavingSong(false);
+    }
+  };
+
+  const handleDeleteSong = (songId: string) => {
+    if (!confirm('Are you sure you want to remove this song?')) return;
+    saveSongsToLocal(songs.filter(s => s.id !== songId));
+  };
+
+  const handleEditSong = (song: Song) => {
+    setEditingSong(song);
+    setIsSongFormOpen(true);
+  };
+
+  const handleAddSong = () => {
+    setEditingSong(null);
+    setIsSongFormOpen(true);
+  };
+
+  // ============================================
+  // Playlist handlers
+  // ============================================
+  const handleSavePlaylist = async (formData: PlaylistFormData) => {
+    if (!effectivePartyId) return;
+
+    setSavingPlaylist(true);
+
+    try {
+      if (editingPlaylist) {
+        // Update existing playlist
+        const updatedPlaylists = playlists.map(p =>
+          p.id === editingPlaylist.id
+            ? { ...p, ...formData }
+            : p
+        );
+        savePlaylistsToLocal(updatedPlaylists);
+      } else {
+        // Add new playlist
+        const newPlaylist: Playlist = {
+          id: `playlist_${Date.now()}`,
+          partyId: effectivePartyId,
+          name: formData.name,
+          platform: formData.platform,
+          url: formData.url,
+          description: formData.description || null,
+          sortOrder: playlists.length,
+          createdAt: new Date().toISOString(),
+        };
+        savePlaylistsToLocal([...playlists, newPlaylist]);
+      }
+
+      setIsPlaylistFormOpen(false);
+      setEditingPlaylist(null);
+    } catch (err) {
+      console.error('Error saving playlist:', err);
+      setError('Failed to save playlist');
+    } finally {
+      setSavingPlaylist(false);
+    }
+  };
+
+  const handleDeletePlaylist = (playlistId: string) => {
+    if (!confirm('Are you sure you want to remove this playlist?')) return;
+    savePlaylistsToLocal(playlists.filter(p => p.id !== playlistId));
+  };
+
+  const handleEditPlaylist = (playlist: Playlist) => {
+    setEditingPlaylist(playlist);
+    setIsPlaylistFormOpen(true);
+  };
+
+  const handleAddPlaylist = () => {
+    setEditingPlaylist(null);
+    setIsPlaylistFormOpen(true);
+  };
+
+  // Section tabs for host view
+  const sections: { id: MusicSection; label: string; icon: React.ReactNode; count: number }[] = [
+    { id: 'performers', label: 'Performers', icon: <Mic2 size={16} />, count: performers.length },
+    { id: 'songs', label: 'Songs', icon: <Disc3 size={16} />, count: songs.length },
+    { id: 'playlists', label: 'Playlists', icon: <ListMusic size={16} />, count: playlists.length },
+  ];
 
   // Don't render if music is not enabled and user is not host
   if (!isHost && !musicEnabled) {
     return null;
   }
 
-  // Don't render if no performers and not host
-  if (!isHost && performers.length === 0) {
+  // Don't render if no content and not host
+  if (!isHost && performers.length === 0 && songs.length === 0 && playlists.length === 0) {
     return null;
   }
 
   return (
     <div className="card p-4 sm:p-6">
       {/* Header */}
-      <div
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center gap-3">
-          <Music size={20} className="text-[#ff393a]" />
-          <h2 className="text-lg font-semibold text-white">Music</h2>
-          {performers.length > 0 && (
-            <span className="text-sm text-white/50">({performers.length})</span>
-          )}
-        </div>
-        <button className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </button>
+      <div className="flex items-center gap-3 mb-4">
+        <Music size={20} className="text-[#ff393a]" />
+        <h2 className="text-lg font-semibold text-white">Music</h2>
       </div>
 
-      {/* Content */}
-      {isExpanded && (
-        <div className="mt-4 space-y-4">
-          {/* Error */}
-          {error && (
-            <div className="p-3 rounded-xl text-sm bg-red-500/10 border border-red-500/30 text-red-400">
-              {error}
+      {/* Error */}
+      {error && (
+        <div className="p-3 rounded-xl text-sm bg-red-500/10 border border-red-500/30 text-red-400 mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-white/50" />
+        </div>
+      ) : (
+        <>
+          {/* Section Tabs (Host Only) */}
+          {isHost && (
+            <div className="flex gap-2 mb-4 border-b border-white/10 pb-4">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    activeSection === section.id
+                      ? 'bg-[#ff393a] text-white'
+                      : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {section.icon}
+                  <span>{section.label}</span>
+                  {section.count > 0 && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                      activeSection === section.id ? 'bg-white/20' : 'bg-white/10'
+                    }`}>
+                      {section.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Loading */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={24} className="animate-spin text-white/50" />
-            </div>
-          ) : (
-            <>
-              {/* Lineup Overview (show if there are performers) */}
+          {/* Performers Section */}
+          {(activeSection === 'performers' || !isHost) && (
+            <div className="space-y-4">
+              {/* Lineup Overview (show if there are performers and not host) */}
               {performers.length > 0 && !isHost && (
                 <LineupOverview performers={performers} />
               )}
 
               {/* Host View - Editable List */}
-              {isHost && (
+              {isHost && activeSection === 'performers' && (
                 <>
-                  {/* Performer Cards */}
                   {performers.length > 0 ? (
                     <div className="space-y-2">
                       {performers.map((performer, index) => (
@@ -258,9 +445,9 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                     </div>
                   ) : (
                     <div className="text-center py-8 text-white/50">
-                      <Music size={32} className="mx-auto mb-2 opacity-50" />
+                      <Mic2 size={32} className="mx-auto mb-2 opacity-50" />
                       <p>No performers added yet</p>
-                      <p className="text-sm">Add DJs, bands, or playlists to your event</p>
+                      <p className="text-sm">Add DJs, bands, or solo artists</p>
                     </div>
                   )}
 
@@ -279,21 +466,160 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                   </button>
                 </>
               )}
-            </>
+            </div>
           )}
-        </div>
+
+          {/* Songs Section */}
+          {isHost && activeSection === 'songs' && (
+            <div className="space-y-4">
+              {songs.length > 0 ? (
+                <div className="space-y-2">
+                  {songs.map((song) => (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      onEdit={handleEditSong}
+                      onDelete={handleDeleteSong}
+                      isHost={true}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/50">
+                  <Disc3 size={32} className="mx-auto mb-2 opacity-50" />
+                  <p>No songs added yet</p>
+                  <p className="text-sm">Add individual songs with links to Spotify, YouTube, etc.</p>
+                </div>
+              )}
+
+              {/* Add Song Button */}
+              <button
+                onClick={handleAddSong}
+                className="w-full btn-secondary flex items-center justify-center gap-2"
+              >
+                <Plus size={18} />
+                Add Song
+              </button>
+            </div>
+          )}
+
+          {/* Playlists Section */}
+          {isHost && activeSection === 'playlists' && (
+            <div className="space-y-4">
+              {playlists.length > 0 ? (
+                <div className="space-y-2">
+                  {playlists.map((playlist) => (
+                    <PlaylistCard
+                      key={playlist.id}
+                      playlist={playlist}
+                      onEdit={handleEditPlaylist}
+                      onDelete={handleDeletePlaylist}
+                      isHost={true}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/50">
+                  <ListMusic size={32} className="mx-auto mb-2 opacity-50" />
+                  <p>No playlists added yet</p>
+                  <p className="text-sm">Add Spotify, Apple Music, or YouTube playlists</p>
+                </div>
+              )}
+
+              {/* Add Playlist Button */}
+              <button
+                onClick={handleAddPlaylist}
+                className="w-full btn-secondary flex items-center justify-center gap-2"
+              >
+                <Plus size={18} />
+                Add Playlist
+              </button>
+            </div>
+          )}
+
+          {/* Guest View - Show Songs and Playlists if they exist */}
+          {!isHost && (songs.length > 0 || playlists.length > 0) && (
+            <div className="space-y-4 mt-4">
+              {/* Songs */}
+              {songs.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                    <Disc3 size={14} />
+                    Songs
+                  </h3>
+                  <div className="space-y-2">
+                    {songs.map((song) => (
+                      <SongCard
+                        key={song.id}
+                        song={song}
+                        onEdit={() => {}}
+                        onDelete={() => {}}
+                        isHost={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Playlists */}
+              {playlists.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                    <ListMusic size={14} />
+                    Playlists
+                  </h3>
+                  <div className="space-y-2">
+                    {playlists.map((playlist) => (
+                      <PlaylistCard
+                        key={playlist.id}
+                        playlist={playlist}
+                        onEdit={() => {}}
+                        onDelete={() => {}}
+                        isHost={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Performer Form Modal */}
       <PerformerForm
         performer={editingPerformer}
-        isOpen={isFormOpen}
+        isOpen={isPerformerFormOpen}
         onClose={() => {
-          setIsFormOpen(false);
+          setIsPerformerFormOpen(false);
           setEditingPerformer(null);
         }}
         onSave={handleSavePerformer}
-        saving={saving}
+        saving={savingPerformer}
+      />
+
+      {/* Song Form Modal */}
+      <SongForm
+        song={editingSong}
+        isOpen={isSongFormOpen}
+        onClose={() => {
+          setIsSongFormOpen(false);
+          setEditingSong(null);
+        }}
+        onSave={handleSaveSong}
+        saving={savingSong}
+      />
+
+      {/* Playlist Form Modal */}
+      <PlaylistForm
+        playlist={editingPlaylist}
+        isOpen={isPlaylistFormOpen}
+        onClose={() => {
+          setIsPlaylistFormOpen(false);
+          setEditingPlaylist(null);
+        }}
+        onSave={handleSavePlaylist}
+        saving={savingPlaylist}
       />
     </div>
   );
