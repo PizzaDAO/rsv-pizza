@@ -103,7 +103,11 @@
       "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx --package=prisma@5.22.0 prisma migrate deploy:*)",
       "mcp__supabase__get_project_url",
       "mcp__supabase__get_publishable_keys",
-      "Bash(vercel logs:*)"
+      "Bash(vercel logs:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr view:*)",
+      "Bash(vercel:*)"
     ]
   }
 }
