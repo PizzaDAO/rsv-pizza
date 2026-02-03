@@ -314,3 +314,61 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Raffle Widget types
+export type RaffleStatus = 'draft' | 'open' | 'closed' | 'drawn';
+
+export interface Raffle {
+  id: string;
+  partyId: string;
+  name: string;
+  description: string | null;
+  status: RaffleStatus;
+  entriesPerGuest: number;
+  createdAt: string;
+  updatedAt: string;
+  prizes: RafflePrize[];
+  entries: RaffleEntry[];
+  winners: RaffleWinner[];
+  _count?: {
+    entries: number;
+  };
+}
+
+export interface RafflePrize {
+  id: string;
+  raffleId: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  createdAt: string;
+}
+
+export interface RaffleEntry {
+  id: string;
+  raffleId: string;
+  guestId: string;
+  createdAt: string;
+  guest?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface RaffleWinner {
+  id: string;
+  raffleId: string;
+  prizeId: string;
+  guestId: string;
+  claimedAt: string | null;
+  createdAt: string;
+  guest?: {
+    id: string;
+    name: string;
+  };
+  prize?: {
+    id: string;
+    name: string;
+  };
+}

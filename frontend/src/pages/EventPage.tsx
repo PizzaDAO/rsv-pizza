@@ -17,6 +17,7 @@ import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
 import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
+import { RaffleEntry } from '../components/raffle';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
@@ -922,6 +923,15 @@ export function EventPage() {
                     coHosts={event.coHosts}
                     size="lg"
                     showTitle={true}
+                  />
+                </div>
+
+                {/* Raffle Section */}
+                <div className="border-t border-white/10 pt-6 mt-6">
+                  <RaffleEntry
+                    partyId={event.id}
+                    guestId={existingGuestData?.id}
+                    guestName={existingGuestData?.name || user?.name}
                   />
                 </div>
 

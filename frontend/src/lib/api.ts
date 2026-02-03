@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Raffle, RafflePrize, RaffleEntry, RaffleWinner } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -652,4 +652,199 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
+// ============================================
+// Raffle API Functions
+// ============================================
+
+// Get all raffles for a party (public)
+export async function getRaffles(partyId: string): Promise<{ raffles: Raffle[] } | null> {
+  try {
+    return await apiRequest<{ raffles: Raffle[] }>(`/api/parties/${partyId}/raffles`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching raffles:', error);
+    return null;
+  }
+}
+
+// Get a single raffle (public)
+export async function getRaffle(partyId: string, raffleId: string): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching raffle:', error);
+    return null;
+  }
+}
+
+// Create a new raffle (host only)
+export async function createRaffle(
+  partyId: string,
+  data: { name: string; description?: string; entriesPerGuest?: number }
+): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating raffle:', error);
+    return null;
+  }
+}
+
+// Update a raffle (host only)
+export async function updateRaffle(
+  partyId: string,
+  raffleId: string,
+  data: { name?: string; description?: string; status?: string; entriesPerGuest?: number }
+): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating raffle:', error);
+    return null;
+  }
+}
+
+// Delete a raffle (host only)
+export async function deleteRaffle(partyId: string, raffleId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting raffle:', error);
+    return false;
+  }
+}
+
+// Add a prize to a raffle (host only)
+export async function addRafflePrize(
+  partyId: string,
+  raffleId: string,
+  data: { name: string; description?: string; imageUrl?: string; quantity?: number }
+): Promise<{ prize: RafflePrize } | null> {
+  try {
+    return await apiRequest<{ prize: RafflePrize }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error adding prize:', error);
+    return null;
+  }
+}
+
+// Update a prize (host only)
+export async function updateRafflePrize(
+  partyId: string,
+  raffleId: string,
+  prizeId: string,
+  data: { name?: string; description?: string; imageUrl?: string; quantity?: number }
+): Promise<{ prize: RafflePrize } | null> {
+  try {
+    return await apiRequest<{ prize: RafflePrize }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes/${prizeId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating prize:', error);
+    return null;
+  }
+}
+
+// Delete a prize (host only)
+export async function deleteRafflePrize(partyId: string, raffleId: string, prizeId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes/${prizeId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting prize:', error);
+    return false;
+  }
+}
+
+// Guest enters the raffle (public)
+export async function enterRaffle(
+  partyId: string,
+  raffleId: string,
+  guestId: string
+): Promise<{ entry: RaffleEntry } | null> {
+  try {
+    return await apiRequest<{ entry: RaffleEntry }>(`/api/parties/${partyId}/raffles/${raffleId}/enter`, {
+      method: 'POST',
+      body: { guestId },
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error entering raffle:', error);
+    throw error; // Re-throw to handle specific error messages
+  }
+}
+
+// Draw winners (host only)
+export async function drawRaffleWinners(partyId: string, raffleId: string): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}/draw`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error drawing winners:', error);
+    throw error;
+  }
+}
+
+// Mark prize as claimed (host only)
+export async function claimRafflePrize(
+  partyId: string,
+  raffleId: string,
+  winnerId: string
+): Promise<{ winner: RaffleWinner } | null> {
+  try {
+    return await apiRequest<{ winner: RaffleWinner }>(`/api/parties/${partyId}/raffles/${raffleId}/winners/${winnerId}/claim`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error claiming prize:', error);
+    return null;
+  }
+}
+
+// Unmark prize as claimed (host only)
+export async function unclaimRafflePrize(
+  partyId: string,
+  raffleId: string,
+  winnerId: string
+): Promise<{ winner: RaffleWinner } | null> {
+  try {
+    return await apiRequest<{ winner: RaffleWinner }>(`/api/parties/${partyId}/raffles/${raffleId}/winners/${winnerId}/claim`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error unclaiming prize:', error);
+    return null;
+  }
 }

@@ -103,6 +103,7 @@ app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
+app.use('/api/parties', raffleRoutes); // Raffle routes (some public, some require auth)
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
