@@ -127,7 +127,7 @@ model Order {
   avgGuestsPerPizza Float?
 
   partyId String
-  party   Party  @relation(fields: [partyId], references: [id])
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
