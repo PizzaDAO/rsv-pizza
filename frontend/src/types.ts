@@ -314,3 +314,77 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Report Widget types
+export interface SocialPost {
+  id: string;
+  partyId: string;
+  platform: 'twitter' | 'farcaster' | 'instagram';
+  url: string;
+  authorHandle: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface NotableAttendee {
+  id: string;
+  partyId: string;
+  name: string;
+  link: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ReportStats {
+  totalRsvps: number;
+  approvedGuests: number;
+  mailingListSignups: number;
+  walletAddresses: number;
+  roleBreakdown: Record<string, number>;
+}
+
+export interface EventReport {
+  // Event details
+  id: string;
+  name: string;
+  date: string | null;
+  timezone: string | null;
+  venueName: string | null;
+  address: string | null;
+  eventImageUrl: string | null;
+  description: string | null;
+  coHosts: CoHost[];
+  host: {
+    name: string | null;
+    profilePictureUrl: string | null;
+  } | null;
+
+  // Report-specific fields
+  reportRecap: string | null;
+  reportVideoUrl: string | null;
+  reportPhotosUrl: string | null;
+  flyerArtist: string | null;
+
+  // KPIs
+  xPostUrl: string | null;
+  xPostViews: number | null;
+  farcasterPostUrl: string | null;
+  farcasterViews: number | null;
+  lumaUrl: string | null;
+  lumaViews: number | null;
+  poapEventId: string | null;
+  poapMints: number | null;
+  poapMoments: number | null;
+
+  // Report settings
+  reportPublished?: boolean;
+  reportPublicSlug?: string | null;
+
+  // Related data
+  socialPosts: SocialPost[];
+  notableAttendees: NotableAttendee[];
+  featuredPhotos: Photo[];
+
+  // Calculated stats
+  stats: ReportStats;
+}
