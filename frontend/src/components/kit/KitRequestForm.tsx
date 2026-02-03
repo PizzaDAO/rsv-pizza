@@ -55,7 +55,6 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
   const [notes, setNotes] = useState(existingKit?.notes || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showTierInfo, setShowTierInfo] = useState(false);
 
   // Helper to get tier icon
   const getTierIcon = (tierId: string) => {
@@ -171,18 +170,8 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
               </div>
             </div>
 
-            {/* Collapsible tier info */}
-            <button
-              type="button"
-              onClick={() => setShowTierInfo(!showTierInfo)}
-              className="text-xs text-[#ff393a] hover:text-[#ff5a5b] flex items-center gap-1 mt-2"
-            >
-              {showTierInfo ? 'Hide' : 'View'} kit tier details
-              <span className={`transition-transform ${showTierInfo ? 'rotate-180' : ''}`}>&#9662;</span>
-            </button>
-
-            {showTierInfo && (
-              <div className="mt-3 space-y-3 pt-3 border-t border-white/10">
+            {/* Kit tier info */}
+            <div className="mt-3 space-y-3 pt-3 border-t border-white/10">
                 {KIT_TIERS.map((tier) => (
                   <div key={tier.id} className="bg-white/5 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
@@ -201,7 +190,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Shipping Address */}
