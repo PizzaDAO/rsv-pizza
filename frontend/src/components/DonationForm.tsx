@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, EyeOff } from 'lucide-react';
+import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, EyeOff, CreditCard, Copy, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { createDonation, updateDonationStatus } from '../lib/api';
 import { DonationPublicStats } from '../types';
@@ -9,6 +9,9 @@ import { Checkbox } from './Checkbox';
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+
+// Crypto donation address
+const CRYPTO_ADDRESS = 'dreadpizzaroberts.eth';
 
 interface DonationFormProps {
   partyId: string;
@@ -148,6 +151,80 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
   );
 };
 
+// Crypto donation component
+const CryptoDonation: React.FC<{
+  onSuccess?: () => void;
+}> = ({ onSuccess }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(CRYPTO_ADDRESS);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+        <p className="text-white/60 text-sm mb-3">
+          Send any amount of ETH, USDC, or other tokens to:
+        </p>
+
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <div className="flex items-center justify-between gap-2">
+            <code className="text-[#ff393a] font-mono text-sm break-all">
+              {CRYPTO_ADDRESS}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Copy address"
+            >
+              {copied ? (
+                <Check size={16} className="text-[#39d98a]" />
+              ) : (
+                <Copy size={16} className="text-white/60" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <p className="text-white/50 text-xs">
+            Accepts ETH, USDC, and other ERC-20 tokens on Ethereum mainnet.
+          </p>
+        </div>
+      </div>
+
+      <a
+        href={`https://etherscan.io/address/${CRYPTO_ADDRESS}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 text-white/60 hover:text-white text-sm transition-colors"
+      >
+        <ExternalLink size={14} />
+        View on Etherscan
+      </a>
+
+      <button
+        type="button"
+        onClick={onSuccess}
+        className="w-full btn-secondary"
+      >
+        Done
+      </button>
+    </div>
+  );
+};
+
+// Payment method type
+type PaymentMethod = 'stripe' | 'crypto' | null;
+
 // Main donation form component
 export const DonationForm: React.FC<DonationFormProps> = ({
   partyId,
@@ -158,6 +235,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
   guestName = '',
   guestEmail = '',
 }) => {
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [donorName, setDonorName] = useState(guestName);
@@ -236,10 +314,91 @@ export const DonationForm: React.FC<DonationFormProps> = ({
     },
   };
 
-  // Amount selection step
-  if (!clientSecret) {
+  // Show crypto donation view
+  if (paymentMethod === 'crypto') {
     return (
       <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setPaymentMethod(null)}
+          className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors"
+        >
+          &larr; Back to payment options
+        </button>
+        <CryptoDonation onSuccess={onSuccess} />
+      </div>
+    );
+  }
+
+  // Payment method selection (before amount selection)
+  if (paymentMethod === null) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-white/80 mb-3">
+            Choose Payment Method
+          </label>
+          <div className="space-y-2">
+            {/* Stripe option */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('stripe')}
+              className="w-full p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-4"
+            >
+              <div className="w-12 h-12 bg-[#635bff]/20 rounded-full flex items-center justify-center border border-[#635bff]/30">
+                <CreditCard size={24} className="text-[#635bff]" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-white font-medium">Card Payment</p>
+                <p className="text-white/50 text-sm">Credit/debit card via Stripe</p>
+              </div>
+            </button>
+
+            {/* Crypto option */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('crypto')}
+              className="w-full p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-4"
+            >
+              <div className="w-12 h-12 bg-[#627eea]/20 rounded-full flex items-center justify-center border border-[#627eea]/30">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#627eea]">
+                  <path d="M12 1.5L5.5 12.5L12 16.5L18.5 12.5L12 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5.5 12.5L12 22.5L18.5 12.5L12 16.5L5.5 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-white font-medium">Crypto</p>
+                <p className="text-white/50 text-sm">ETH, USDC, or other tokens</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full btn-secondary"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Amount selection step (for Stripe)
+  if (!clientSecret && paymentMethod === 'stripe') {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setPaymentMethod(null)}
+          className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors"
+        >
+          &larr; Back to payment options
+        </button>
+
         {/* Suggested Amounts */}
         <div>
           <label className="block text-sm font-medium text-white/80 mb-2">

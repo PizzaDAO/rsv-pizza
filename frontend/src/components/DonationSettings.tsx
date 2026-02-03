@@ -14,7 +14,6 @@ export const DonationSettings: React.FC = () => {
   const [donationRecipient, setDonationRecipient] = useState('');
   const [suggestedAmounts, setSuggestedAmounts] = useState<number[]>([500, 1000, 2500, 5000]);
   const [newAmount, setNewAmount] = useState('');
-  const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
 
   // Load party data
@@ -105,11 +104,15 @@ export const DonationSettings: React.FC = () => {
             <p className="text-white/50 text-sm">Allow guests to contribute to your event</p>
           </div>
         </div>
-        <Checkbox
-          checked={donationEnabled}
-          onChange={handleToggleDonations}
-          label=""
-        />
+{savingField === 'donationEnabled' ? (
+          <Loader2 size={20} className="animate-spin text-[#ff393a]" />
+        ) : (
+          <Checkbox
+            checked={donationEnabled}
+            onChange={handleToggleDonations}
+            label=""
+          />
+        )}
       </div>
 
       {/* Donation Settings (only show when enabled) */}
@@ -199,7 +202,7 @@ export const DonationSettings: React.FC = () => {
                   onChange={(e) => setNewAmount(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addSuggestedAmount()}
                   placeholder="Add amount"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pl-8 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pl-10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
               <button

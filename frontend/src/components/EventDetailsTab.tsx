@@ -971,13 +971,7 @@ export const EventDetailsTab: React.FC = () => {
         </div>
 
         {/* Donations Section */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <DollarSign size={16} className="text-white/80" />
-            <label className="text-sm font-medium text-white/80">Donations</label>
-          </div>
-          <DonationSettings />
-        </div>
+        <DonationSettings />
 
         {/* Hosts Section */}
         <div>
