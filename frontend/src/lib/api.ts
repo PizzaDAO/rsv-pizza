@@ -582,17 +582,19 @@ export async function batchReviewPhotos(
 
 export interface CreateSponsorData {
   name: string;
-  organization?: string;
   website?: string;
+  brandTwitter?: string;
   pointPerson?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
-  twitter?: string;
+  contactTwitter?: string;
+  telegram?: string;
   status?: SponsorStatus;
   amount?: number | null;
   amountReceived?: number | null;
   sponsorshipType?: SponsorshipType | null;
+  productService?: string;
   logoUrl?: string;
   notes?: string;
   lastContactedAt?: string | null;

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Edit2, Target, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Edit2, Target, Check, Loader2 } from 'lucide-react';
 import { SponsorStats, SponsorStatus } from '../../types';
 
 interface SponsorPipelineProps {
@@ -28,6 +28,8 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const goal = stats?.fundraisingGoal || 0;
   const received = stats?.totalReceived || 0;
@@ -35,21 +37,64 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
   const progressPercent = goal > 0 ? Math.min((received / goal) * 100, 100) : 0;
   const confirmedPercent = goal > 0 ? Math.min((confirmed / goal) * 100, 100) : 0;
 
-  const handleEditGoal = () => {
-    setGoalInput(goal > 0 ? goal.toString() : '');
-    setIsEditingGoal(true);
+  // Initialize goalInput when editing starts
+  useEffect(() => {
+    if (isEditingGoal) {
+      setGoalInput(goal > 0 ? goal.toString() : '');
+    }
+  }, [isEditingGoal, goal]);
+
+  // Auto-save with debounce
+  const handleGoalChange = (value: string) => {
+    setGoalInput(value);
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for auto-save
+    saveTimeoutRef.current = setTimeout(async () => {
+      const newGoal = value ? parseFloat(value) : null;
+      // Only save if the value has actually changed
+      if (newGoal !== goal) {
+        setIsSaving(true);
+        try {
+          await onUpdateGoal(newGoal);
+        } catch (error) {
+          console.error('Failed to update goal:', error);
+        }
+        setIsSaving(false);
+      }
+    }, 800); // 800ms debounce
   };
 
-  const handleSaveGoal = async () => {
-    setIsSaving(true);
-    try {
-      const newGoal = goalInput ? parseFloat(goalInput) : null;
-      await onUpdateGoal(newGoal);
-      setIsEditingGoal(false);
-    } catch (error) {
-      console.error('Failed to update goal:', error);
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleEditGoal = () => {
+    setIsEditingGoal(true);
+    // Focus input after render
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleBlur = () => {
+    // Save immediately on blur if there's a pending change
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
-    setIsSaving(false);
+    const newGoal = goalInput ? parseFloat(goalInput) : null;
+    if (newGoal !== goal) {
+      setIsSaving(true);
+      onUpdateGoal(newGoal).finally(() => setIsSaving(false));
+    }
+    setIsEditingGoal(false);
   };
 
   const formatCurrency = (amount: number) => {
@@ -74,26 +119,18 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
             <div className="flex items-center gap-2">
               <span className="text-white/60 text-sm">$</span>
               <input
+                ref={inputRef}
                 type="number"
                 value={goalInput}
-                onChange={e => setGoalInput(e.target.value)}
+                onChange={e => handleGoalChange(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={e => e.key === 'Enter' && handleBlur()}
                 placeholder="Goal amount"
                 className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                autoFocus
               />
-              <button
-                onClick={handleSaveGoal}
-                disabled={isSaving}
-                className="p-1 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded transition-colors"
-              >
-                <Check size={16} />
-              </button>
-              <button
-                onClick={() => setIsEditingGoal(false)}
-                className="text-white/40 hover:text-white/60 text-sm"
-              >
-                Cancel
-              </button>
+              {isSaving && (
+                <Loader2 size={16} className="animate-spin text-white/40" />
+              )}
             </div>
           ) : (
             <button

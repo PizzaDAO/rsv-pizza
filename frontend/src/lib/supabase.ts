@@ -99,6 +99,42 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
 }
 
 /**
+ * Upload a sponsor logo to Supabase Storage and return the public URL
+ * @param file The image file to upload
+ * @returns The public URL of the uploaded logo, or null if upload failed
+ */
+export async function uploadSponsorLogo(file: File): Promise<string | null> {
+  try {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `sponsor-logos/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    // Upload to Supabase Storage (using event-images bucket for now)
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading sponsor logo:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading sponsor logo:', error);
+    return null;
+  }
+}
+
+/**
  * Upload an event photo to Supabase Storage
  * @param file The image file to upload
  * @param partyId The party ID for organizing uploads

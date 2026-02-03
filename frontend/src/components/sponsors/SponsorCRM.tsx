@@ -157,23 +157,13 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Sponsor CRM</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => loadData(true)}
-            disabled={isRefreshing}
-            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"
-          >
-            <Plus size={18} />
-            Add Sponsor
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"
+        >
+          <Plus size={18} />
+          Add Sponsor
+        </button>
       </div>
 
       {/* Pipeline Overview */}

@@ -1,7 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { X, Building2, User, Mail, Phone, Twitter, DollarSign, FileText, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image } from 'lucide-react';
 import { Sponsor, SponsorStatus, SponsorshipType } from '../../types';
 import { CreateSponsorData } from '../../lib/api';
+import { IconInput } from '../IconInput';
+import { uploadSponsorLogo } from '../../lib/supabase';
+
+// X (Twitter) icon component
+const XIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+// Telegram icon component
+const TelegramIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+  </svg>
+);
 
 interface SponsorFormProps {
   sponsor?: Sponsor | null;
@@ -33,45 +49,85 @@ const TYPE_OPTIONS: { value: SponsorshipType; label: string }[] = [
 export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFormProps) {
   const [formData, setFormData] = useState<CreateSponsorData>({
     name: '',
-    organization: '',
     website: '',
+    brandTwitter: '',
     pointPerson: '',
     contactName: '',
     contactEmail: '',
     contactPhone: '',
-    twitter: '',
+    contactTwitter: '',
+    telegram: '',
     status: 'todo',
     amount: null,
     amountReceived: null,
     sponsorshipType: null,
+    productService: '',
     logoUrl: '',
     notes: '',
     lastContactedAt: null,
   });
   const [error, setError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize form with sponsor data if editing
   useEffect(() => {
     if (sponsor) {
       setFormData({
         name: sponsor.name,
-        organization: sponsor.organization || '',
         website: sponsor.website || '',
+        brandTwitter: sponsor.brandTwitter || '',
         pointPerson: sponsor.pointPerson || '',
         contactName: sponsor.contactName || '',
         contactEmail: sponsor.contactEmail || '',
         contactPhone: sponsor.contactPhone || '',
-        twitter: sponsor.twitter || '',
+        contactTwitter: sponsor.contactTwitter || '',
+        telegram: sponsor.telegram || '',
         status: sponsor.status,
         amount: sponsor.amount,
         amountReceived: sponsor.amountReceived,
         sponsorshipType: sponsor.sponsorshipType,
+        productService: sponsor.productService || '',
         logoUrl: sponsor.logoUrl || '',
         notes: sponsor.notes || '',
         lastContactedAt: sponsor.lastContactedAt ? sponsor.lastContactedAt.split('T')[0] : null,
       });
+      if (sponsor.logoUrl) {
+        setLogoPreview(sponsor.logoUrl);
+      }
     }
   }, [sponsor]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
+      return;
+    }
+
+    setLogoFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setLogoPreview(objectUrl);
+    setError(null);
+  };
+
+  const removeLogo = () => {
+    if (logoPreview && logoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setLogoFile(null);
+    setLogoPreview(null);
+    handleChange('logoUrl', '');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,9 +139,26 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
     }
 
     try {
+      let logoUrl = formData.logoUrl;
+
+      // Upload logo if a new file was selected
+      if (logoFile) {
+        setUploadingLogo(true);
+        const uploadedUrl = await uploadSponsorLogo(logoFile);
+        if (uploadedUrl) {
+          logoUrl = uploadedUrl;
+        } else {
+          setError('Failed to upload logo. Please try again.');
+          setUploadingLogo(false);
+          return;
+        }
+        setUploadingLogo(false);
+      }
+
       await onSubmit({
         ...formData,
         name: formData.name.trim(),
+        logoUrl,
         lastContactedAt: formData.lastContactedAt || null,
       });
     } catch (err) {
@@ -96,8 +169,6 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
   const handleChange = (field: keyof CreateSponsorData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
-
-  const isConfirmed = ['yes', 'invoiced', 'paid'].includes(formData.status || 'todo');
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -122,251 +193,268 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
           )}
 
           {/* Sponsor Info */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
               <Building2 size={16} />
               Sponsor Info
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Name *</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <IconInput
+                icon={Building2}
+                type="text"
+                value={formData.name}
+                onChange={e => handleChange('name', e.target.value)}
+                placeholder="Sponsor Name *"
+                required
+              />
+              <IconInput
+                icon={Globe}
+                type="url"
+                value={formData.website || ''}
+                onChange={e => handleChange('website', e.target.value)}
+                placeholder="Website"
+              />
+              <div className="relative">
+                <XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={e => handleChange('name', e.target.value)}
-                  placeholder="Company or sponsor name"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Organization</label>
-                <input
-                  type="text"
-                  value={formData.organization || ''}
-                  onChange={e => handleChange('organization', e.target.value)}
-                  placeholder="Parent organization"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm text-white/60 mb-1">Website</label>
-                <input
-                  type="url"
-                  value={formData.website || ''}
-                  onChange={e => handleChange('website', e.target.value)}
-                  placeholder="https://example.com"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  value={formData.brandTwitter || ''}
+                  onChange={e => handleChange('brandTwitter', e.target.value)}
+                  placeholder="Brand X Handle"
+                  className="w-full !pl-14"
                 />
               </div>
             </div>
           </div>
 
           {/* Contact Info */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
               <User size={16} />
               Contact Info
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Point Person (Your Team)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <IconInput
+                icon={User}
+                type="text"
+                value={formData.pointPerson || ''}
+                onChange={e => handleChange('pointPerson', e.target.value)}
+                placeholder="Point Person (Your Team)"
+              />
+              <IconInput
+                icon={User}
+                type="text"
+                value={formData.contactName || ''}
+                onChange={e => handleChange('contactName', e.target.value)}
+                placeholder="Contact Name"
+              />
+              <IconInput
+                icon={Mail}
+                type="email"
+                value={formData.contactEmail || ''}
+                onChange={e => handleChange('contactEmail', e.target.value)}
+                placeholder="Email"
+              />
+              <IconInput
+                icon={Phone}
+                type="tel"
+                value={formData.contactPhone || ''}
+                onChange={e => handleChange('contactPhone', e.target.value)}
+                placeholder="Phone"
+              />
+              <div className="relative">
+                <XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="text"
-                  value={formData.pointPerson || ''}
-                  onChange={e => handleChange('pointPerson', e.target.value)}
-                  placeholder="Who's managing this?"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  value={formData.contactTwitter || ''}
+                  onChange={e => handleChange('contactTwitter', e.target.value)}
+                  placeholder="Contact X Handle"
+                  className="w-full !pl-14"
                 />
               </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Contact Name</label>
+              <div className="relative">
+                <TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="text"
-                  value={formData.contactName || ''}
-                  onChange={e => handleChange('contactName', e.target.value)}
-                  placeholder="Their contact person"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1 flex items-center gap-1">
-                  <Mail size={14} />
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.contactEmail || ''}
-                  onChange={e => handleChange('contactEmail', e.target.value)}
-                  placeholder="contact@example.com"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1 flex items-center gap-1">
-                  <Phone size={14} />
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.contactPhone || ''}
-                  onChange={e => handleChange('contactPhone', e.target.value)}
-                  placeholder="+1 555 123 4567"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm text-white/60 mb-1 flex items-center gap-1">
-                  <Twitter size={14} />
-                  Twitter
-                </label>
-                <input
-                  type="text"
-                  value={formData.twitter || ''}
-                  onChange={e => handleChange('twitter', e.target.value)}
-                  placeholder="@handle"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  value={formData.telegram || ''}
+                  onChange={e => handleChange('telegram', e.target.value)}
+                  placeholder="Telegram"
+                  className="w-full !pl-14"
                 />
               </div>
             </div>
           </div>
 
           {/* Pipeline */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
               <Calendar size={16} />
               Pipeline
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Status</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative">
+                <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <select
                   value={formData.status}
                   onChange={e => handleChange('status', e.target.value as SponsorStatus)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  className="w-full !pl-14 bg-[#0d0d1a] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
                 >
                   {STATUS_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
+                    <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
                       {opt.label}
                     </option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Last Contacted</label>
+              <div className="relative">
+                <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
                   type="date"
                   value={formData.lastContactedAt || ''}
                   onChange={e => handleChange('lastContactedAt', e.target.value || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  placeholder="Last Contacted"
+                  className="w-full !pl-14"
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
             </div>
           </div>
 
           {/* Fundraising */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
               <DollarSign size={16} />
               Fundraising
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Amount (Pledged)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.amount ?? ''}
-                    onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="0.00"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                  />
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative">
+                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.amount ?? ''}
+                  onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
+                  placeholder="Amount Pledged"
+                  className="w-full !pl-14"
+                />
               </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Amount Received</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.amountReceived ?? ''}
-                    onChange={e => handleChange('amountReceived', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="0.00"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                  />
-                </div>
+              <div className="relative">
+                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.amountReceived ?? ''}
+                  onChange={e => handleChange('amountReceived', e.target.value ? parseFloat(e.target.value) : null)}
+                  placeholder="Amount Received"
+                  className="w-full !pl-14"
+                />
               </div>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Type</label>
+              <div className="relative">
+                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <select
                   value={formData.sponsorshipType || ''}
                   onChange={e => handleChange('sponsorshipType', e.target.value as SponsorshipType || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                  className="w-full !pl-14 bg-[#0d0d1a] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
                 >
-                  <option value="">Select type...</option>
+                  <option value="" className="bg-[#1a1a2e] text-white/50">Contribution Type</option>
                   {TYPE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
+                    <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
                       {opt.label}
                     </option>
                   ))}
                 </select>
               </div>
+              <IconInput
+                icon={FileText}
+                type="text"
+                value={formData.productService || ''}
+                onChange={e => handleChange('productService', e.target.value)}
+                placeholder="Product/Service (if non-monetary)"
+              />
             </div>
           </div>
 
-          {/* Assets (only show if confirmed) */}
-          {isConfirmed && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-white/80">Assets</h3>
-              <div>
-                <label className="block text-sm text-white/60 mb-1">Logo URL</label>
-                <input
-                  type="url"
-                  value={formData.logoUrl || ''}
-                  onChange={e => handleChange('logoUrl', e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+          {/* Logo Upload */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+              <Image size={16} />
+              Logo
+            </h3>
+            {logoPreview ? (
+              <div className="flex items-center gap-4">
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="w-16 h-16 object-contain rounded-lg border border-white/10 bg-white/5"
                 />
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Remove
+                </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <Upload size={16} />
+                  Upload Logo
+                </button>
+                <div className="flex-1">
+                  <IconInput
+                    icon={Globe}
+                    type="url"
+                    value={formData.logoUrl || ''}
+                    onChange={e => handleChange('logoUrl', e.target.value)}
+                    placeholder="Or paste logo URL"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Notes */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
               <FileText size={16} />
               Notes
             </h3>
-            <textarea
-              value={formData.notes || ''}
-              onChange={e => handleChange('notes', e.target.value)}
-              placeholder="Communication history, meeting notes, etc."
-              rows={4}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
-            />
+            <div className="relative">
+              <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
+              <textarea
+                value={formData.notes || ''}
+                onChange={e => handleChange('notes', e.target.value)}
+                placeholder="Communication history, meeting notes, etc."
+                rows={3}
+                className="w-full !pl-14 resize-none"
+              />
+            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
+          <div className="flex justify-end pt-4 border-t border-white/10">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || uploadingLogo}
               className="px-4 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Saving...' : sponsor ? 'Update Sponsor' : 'Add Sponsor'}
+              {isLoading || uploadingLogo ? 'Saving...' : sponsor ? 'Update Sponsor' : 'Add Sponsor'}
             </button>
           </div>
         </form>
