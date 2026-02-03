@@ -314,3 +314,32 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Staffing types
+export type StaffStatus = 'invited' | 'confirmed' | 'declined' | 'checked_in';
+
+export interface Staff {
+  id: string;
+  partyId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  status: StaffStatus;
+  confirmedAt: string | null;
+  checkedInAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StaffStats {
+  totalStaff: number;
+  byStatus: {
+    invited: number;
+    confirmed: number;
+    declined: number;
+    checked_in: number;
+  };
+  uniqueRoles: string[];
+}
