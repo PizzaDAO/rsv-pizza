@@ -402,7 +402,7 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
 
 // Party Kit API functions
 export interface KitRequestData {
-  requestedTier: KitTier;
+  requestedTier?: KitTier; // Optional - PizzaDAO will allocate the appropriate tier
   recipientName: string;
   addressLine1: string;
   addressLine2?: string;

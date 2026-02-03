@@ -43,7 +43,6 @@ const STATUS_CONFIG: Record<KitStatus, { color: string; bgColor: string; icon: R
 
 export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onEdit }) => {
   const statusConfig = STATUS_CONFIG[kit.status];
-  const requestedTier = KIT_TIERS.find(t => t.id === kit.requestedTier);
   const allocatedTier = kit.allocatedTier ? KIT_TIERS.find(t => t.id === kit.allocatedTier) : null;
 
   const formatAddress = () => {
@@ -76,16 +75,13 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
       <div className="p-4 space-y-4">
         {/* Kit Tier */}
         <div>
-          <p className="text-sm text-white/50 mb-1">Requested</p>
-          <p className="text-white font-medium">{requestedTier?.name || kit.requestedTier}</p>
-          {allocatedTier && allocatedTier.id !== kit.requestedTier && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-white/50">Allocated:</span>
-              <span className="text-sm text-green-400 font-medium">{allocatedTier.name}</span>
-            </div>
-          )}
-          {allocatedTier && allocatedTier.id === kit.requestedTier && (
-            <p className="text-sm text-green-400 mt-1">Confirmed</p>
+          <p className="text-sm text-white/50 mb-1">Kit Tier</p>
+          {allocatedTier ? (
+            <p className="text-white font-medium">{allocatedTier.name}</p>
+          ) : (
+            <p className="text-white/70 text-sm italic">
+              PizzaDAO will assign the appropriate tier for your event
+            </p>
           )}
         </div>
 

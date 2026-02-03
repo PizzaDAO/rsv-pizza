@@ -86,16 +86,17 @@ router.post('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Response
     }
 
     // Validate required fields
-    if (!requestedTier || !recipientName || !addressLine1 || !city || !postalCode) {
+    if (!recipientName || !addressLine1 || !city || !postalCode) {
       throw new AppError(
-        'Missing required fields: requestedTier, recipientName, addressLine1, city, postalCode',
+        'Missing required fields: recipientName, addressLine1, city, postalCode',
         400,
         'VALIDATION_ERROR'
       );
     }
 
-    // Validate tier
-    if (!VALID_TIERS.includes(requestedTier)) {
+    // Validate tier if provided (optional - PizzaDAO will allocate the actual tier)
+    const tier = requestedTier || 'basic'; // Default to basic if not specified
+    if (!VALID_TIERS.includes(tier)) {
       throw new AppError(
         `Invalid tier. Must be one of: ${VALID_TIERS.join(', ')}`,
         400,
@@ -135,7 +136,7 @@ router.post('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Response
     const kit = await prisma.partyKit.create({
       data: {
         partyId,
-        requestedTier,
+        requestedTier: tier,
         recipientName,
         addressLine1,
         addressLine2: addressLine2 || null,

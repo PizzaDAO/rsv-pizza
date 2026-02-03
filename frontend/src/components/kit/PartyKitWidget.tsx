@@ -39,7 +39,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
     loadKit();
   }, [partyId]);
 
-  const handleSubmitRequest = async (data: KitRequestData) => {
+  const handleSubmitRequest = async (data: Omit<KitRequestData, 'requestedTier'>) => {
     if (isEditing && kit) {
       const response = await updateKitRequest(partyId, data);
       if (response) {

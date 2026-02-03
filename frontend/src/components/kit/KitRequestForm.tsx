@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { X, Loader2, AlertCircle, MapPin } from 'lucide-react';
-import { KitTier, KIT_TIERS, PartyKit } from '../../types';
-import { KitTierCard } from './KitTierCard';
+import { X, Loader2, AlertCircle, MapPin, Info, Gift, Package, Star, Check } from 'lucide-react';
+import { KIT_TIERS, PartyKit } from '../../types';
 import { KitRequestData } from '../../lib/api';
 import { ShippingAddressAutocomplete, AddressComponents } from './ShippingAddressAutocomplete';
 
 interface KitRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: KitRequestData) => Promise<void>;
+  onSubmit: (data: Omit<KitRequestData, 'requestedTier'>) => Promise<void>;
   existingKit?: PartyKit | null;
   kitDeadline?: string | null;
 }
@@ -45,7 +44,6 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
   existingKit,
   kitDeadline,
 }) => {
-  const [selectedTier, setSelectedTier] = useState<KitTier>(existingKit?.requestedTier || 'basic');
   const [recipientName, setRecipientName] = useState(existingKit?.recipientName || '');
   const [addressLine1, setAddressLine1] = useState(existingKit?.addressLine1 || '');
   const [addressLine2, setAddressLine2] = useState(existingKit?.addressLine2 || '');
@@ -57,6 +55,21 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
   const [notes, setNotes] = useState(existingKit?.notes || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTierInfo, setShowTierInfo] = useState(false);
+
+  // Helper to get tier icon
+  const getTierIcon = (tierId: string) => {
+    switch (tierId) {
+      case 'basic':
+        return <Gift size={18} />;
+      case 'large':
+        return <Package size={18} />;
+      case 'deluxe':
+        return <Star size={18} />;
+      default:
+        return <Gift size={18} />;
+    }
+  };
 
   // Handle address autocomplete selection
   const handleAddressSelected = (components: AddressComponents) => {
@@ -83,7 +96,6 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
     setSubmitting(true);
     try {
       await onSubmit({
-        requestedTier: selectedTier,
         recipientName: recipientName.trim(),
         addressLine1: addressLine1.trim(),
         addressLine2: addressLine2.trim() || undefined,
@@ -147,22 +159,49 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             </div>
           )}
 
-          {/* Kit Selection */}
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-3">
-              Select Your Kit
-            </label>
-            <div className="space-y-3">
-              {KIT_TIERS.map((tier) => (
-                <KitTierCard
-                  key={tier.id}
-                  tier={tier}
-                  selected={selectedTier === tier.id}
-                  onSelect={setSelectedTier}
-                  disabled={isDeadlinePassed}
-                />
-              ))}
+          {/* Kit Information */}
+          <div className="p-4 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl">
+            <div className="flex items-start gap-3 mb-3">
+              <Info size={18} className="text-[#ff393a] flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-white font-medium">Party Kit Request</p>
+                <p className="text-xs text-white/60 mt-1">
+                  PizzaDAO will review your event and assign the appropriate kit tier based on your party size and requirements.
+                </p>
+              </div>
             </div>
+
+            {/* Collapsible tier info */}
+            <button
+              type="button"
+              onClick={() => setShowTierInfo(!showTierInfo)}
+              className="text-xs text-[#ff393a] hover:text-[#ff5a5b] flex items-center gap-1 mt-2"
+            >
+              {showTierInfo ? 'Hide' : 'View'} kit tier details
+              <span className={`transition-transform ${showTierInfo ? 'rotate-180' : ''}`}>&#9662;</span>
+            </button>
+
+            {showTierInfo && (
+              <div className="mt-3 space-y-3 pt-3 border-t border-white/10">
+                {KIT_TIERS.map((tier) => (
+                  <div key={tier.id} className="bg-white/5 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[#ff393a]">{getTierIcon(tier.id)}</span>
+                      <span className="text-sm font-medium text-white">{tier.name}</span>
+                    </div>
+                    <p className="text-xs text-white/50 mb-2">{tier.description}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {tier.contents.map((item, index) => (
+                        <span key={index} className="inline-flex items-center gap-1 text-xs bg-white/10 text-white/70 px-2 py-0.5 rounded">
+                          <Check size={10} className="text-[#ff393a]" />
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Shipping Address */}
