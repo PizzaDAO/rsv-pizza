@@ -14,7 +14,7 @@ export function GPPLandingPage() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string } | null>(null);
+  const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +32,7 @@ export function GPPLandingPage() {
         setSuccess({
           hostPageUrl: response.hostPageUrl,
           eventName: response.event.name,
+          email: email.trim(),
         });
       }
     } catch (err) {
@@ -68,10 +69,10 @@ export function GPPLandingPage() {
 
             <div className="space-y-4">
               <button
-                onClick={() => window.location.href = success.hostPageUrl}
+                onClick={() => navigate(`/login?email=${encodeURIComponent(success.email)}&redirect=${encodeURIComponent(success.hostPageUrl)}`)}
                 className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-lg"
               >
-                Go to Host Dashboard
+                Sign In to Host Dashboard
                 <ArrowRight size={20} />
               </button>
 
