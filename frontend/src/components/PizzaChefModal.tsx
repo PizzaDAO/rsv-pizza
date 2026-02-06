@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 interface PizzaChefModalProps {
@@ -7,9 +7,16 @@ interface PizzaChefModalProps {
 }
 
 export function PizzaChefModal({ isOpen, onClose }: PizzaChefModalProps) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
-  // Handle ESC key to close
+  // Reset loading state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIframeLoaded(false);
+    }
+  }, [isOpen]);
+
+  // ESC key closes modal
   useEffect(() => {
     if (!isOpen) return;
 
@@ -23,13 +30,6 @@ export function PizzaChefModal({ isOpen, onClose }: PizzaChefModalProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Reset loading state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setIsLoading(true);
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   return (
@@ -38,22 +38,21 @@ export function PizzaChefModal({ isOpen, onClose }: PizzaChefModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl overflow-hidden"
-        style={{ width: '90vw', height: '90vh' }}
+        className="relative w-[90vw] h-[90vh] rounded-2xl overflow-hidden bg-black/80 border border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 text-white/50 hover:text-white transition-colors bg-black/50 rounded-full p-2"
+          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-colors"
         >
-          <X size={24} />
+          <X size={20} />
         </button>
 
-        {/* Loading state */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a2e]">
-            <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
+        {/* Loading spinner */}
+        {!iframeLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-10 h-10 animate-spin text-[#ff393a]" />
           </div>
         )}
 
@@ -61,8 +60,9 @@ export function PizzaChefModal({ isOpen, onClose }: PizzaChefModalProps) {
         <iframe
           src="https://pizza-chef-six.vercel.app/"
           className="w-full h-full border-0"
-          onLoad={() => setIsLoading(false)}
+          onLoad={() => setIframeLoaded(true)}
           title="Pizza Chef"
+          allow="autoplay"
         />
       </div>
     </div>
