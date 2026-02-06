@@ -34,12 +34,19 @@ export const DonationSettings: React.FC = () => {
 
     try {
       const success = await updateParty(party.id, updates);
-      if (success && party.inviteCode) {
-        await loadParty(party.inviteCode);
+      if (!success) {
+        // Revert optimistic update on failure by reloading
+        if (party.inviteCode) {
+          await loadParty(party.inviteCode);
+        }
       }
       return success;
     } catch (error) {
       console.error(`Error saving ${fieldName}:`, error);
+      // Revert on error
+      if (party.inviteCode) {
+        await loadParty(party.inviteCode);
+      }
       return false;
     } finally {
       setSavingField(null);
