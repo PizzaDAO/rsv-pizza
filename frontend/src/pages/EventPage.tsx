@@ -95,25 +95,17 @@ export function EventPage() {
   // Easter egg: Press 'p' to open Pizza Chef modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input, textarea, or contenteditable element
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      // Open Pizza Chef modal when 'p' is pressed
+      if (showPizzaChef) return; // don't re-trigger if already open
+      const tag = (e.target as HTMLElement).tagName;
+      const isEditable = (e.target as HTMLElement).isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
       if (e.key === 'p' || e.key === 'P') {
         setShowPizzaChef(true);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [showPizzaChef]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,13 +298,13 @@ export function EventPage() {
 
   const metaTitle = event.name;
 
-  // Construct description: Host • Date @ Time • Location. Description
+  // Construct description: Host * Date @ Time * Location. Description
   const detailsParts: string[] = [];
   if (event.hostName) detailsParts.push(`Hosted by ${event.hostName}`);
   if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
   if (event.address) detailsParts.push(event.address);
 
-  const details = detailsParts.join(' • ');
+  const details = detailsParts.join(' \u2022 ');
   let metaDescription = details;
 
   if (event.description) {
@@ -491,7 +483,7 @@ export function EventPage() {
                     <Users className="w-4 h-4" />
                     <span>
                       {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      {event.maxGuests && ` \u2022 ${event.maxGuests} expected`}
                     </span>
                   </div>
                 </div>
@@ -698,7 +690,7 @@ export function EventPage() {
                     <Users className="w-4 h-4" />
                     <span>
                       {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      {event.maxGuests && ` \u2022 ${event.maxGuests} expected`}
                     </span>
                   </div>
                 </div>
