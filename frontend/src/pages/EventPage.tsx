@@ -484,15 +484,17 @@ export function EventPage() {
                 />
 
                 {/* Guest Count */}
-                <div className="pt-4 border-t border-white/10 mt-4">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` \u2022 ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="pt-4 border-t border-white/10 mt-4">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -691,15 +693,17 @@ export function EventPage() {
                 </div>
 
                 {/* Guest Count - Mobile */}
-                <div className="md:hidden pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` \u2022 ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="md:hidden pt-4 border-t border-white/10">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Description */}
                 {event.description && (
