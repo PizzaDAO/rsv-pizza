@@ -17,6 +17,7 @@ import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
+import { PizzaDAOModal } from '../components/PizzaDAOModal';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -40,6 +41,7 @@ export function EventPage() {
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
+  const [showPizzaDAO, setShowPizzaDAO] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -92,20 +94,24 @@ export function EventPage() {
     loadEvent();
   }, [slug, user?.email]);
 
-  // Easter egg: Press 'p' to open Pizza Chef modal
+  // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (showPizzaChef) return; // don't re-trigger if already open
       const tag = (e.target as HTMLElement).tagName;
       const isEditable = (e.target as HTMLElement).isContentEditable;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
-      if (e.key === 'p' || e.key === 'P') {
+
+      if ((e.key === 'p' || e.key === 'P') && !showPizzaChef) {
         setShowPizzaChef(true);
+      }
+
+      if (e.key === 'Enter' && !showPizzaDAO && !showRSVPModal) {
+        setShowPizzaDAO(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPizzaChef]);
+  }, [showPizzaChef, showPizzaDAO, showRSVPModal]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -829,6 +835,12 @@ export function EventPage() {
       <PizzaChefModal
         isOpen={showPizzaChef}
         onClose={() => setShowPizzaChef(false)}
+      />
+
+      {/* PizzaDAO Easter Egg Modal */}
+      <PizzaDAOModal
+        isOpen={showPizzaDAO}
+        onClose={() => setShowPizzaDAO(false)}
       />
     </div>
   );
