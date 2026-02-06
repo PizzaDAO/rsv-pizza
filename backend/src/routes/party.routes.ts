@@ -12,32 +12,40 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
     return true;
   }
 
-  // Otherwise, must be the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
+  // Fetch the party
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
   });
 
-  return !!party;
+  if (!party) {
+    return false;
+  }
+
+  // Check if user is the owner
+  if (party.userId === userId) {
+    return true;
+  }
+
+  // Check if user is a co-host with edit permissions
+  if (userEmail) {
+    const coHosts = party.coHosts as Array<{ email?: string; canEdit?: boolean }> | null;
+    if (coHosts) {
+      const isEditor = coHosts.some(
+        (h) => h.email?.toLowerCase() === userEmail.toLowerCase() && h.canEdit === true
+      );
+      if (isEditor) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
-  // Super admin can access any party
-  if (isSuperAdmin(userEmail)) {
-    return prisma.party.findUnique({
-      where: { id: partyId },
-      include: {
-        user: { select: { name: true } },
-        guests: {
-          orderBy: { submittedAt: 'desc' },
-        },
-      },
-    });
-  }
-
-  // Otherwise, must be the party owner
-  return prisma.party.findFirst({
-    where: { id: partyId, userId },
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
     include: {
       user: { select: { name: true } },
       guests: {
@@ -45,6 +53,35 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
       },
     },
   });
+
+  if (!party) {
+    return null;
+  }
+
+  // Super admin can access any party
+  if (isSuperAdmin(userEmail)) {
+    return party;
+  }
+
+  // Check if user is the owner
+  if (party.userId === userId) {
+    return party;
+  }
+
+  // Check if user is a co-host with edit permissions
+  if (userEmail) {
+    const coHosts = party.coHosts as Array<{ email?: string; canEdit?: boolean }> | null;
+    if (coHosts) {
+      const isEditor = coHosts.some(
+        (h) => h.email?.toLowerCase() === userEmail.toLowerCase() && h.canEdit === true
+      );
+      if (isEditor) {
+        return party;
+      }
+    }
+  }
+
+  return null;
 }
 
 const router = Router();

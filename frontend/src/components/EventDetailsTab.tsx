@@ -334,6 +334,15 @@ export const EventDetailsTab: React.FC = () => {
     await saveCoHostsArray(newCoHosts);
   };
 
+  const toggleCoHostCanEdit = async (id: string) => {
+    const newCoHosts = coHosts.map(h =>
+      h.id === id ? { ...h, canEdit: !h.canEdit } : h
+    );
+    setCoHosts(newCoHosts);
+    // Auto-save
+    await saveCoHostsArray(newCoHosts);
+  };
+
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
@@ -1050,6 +1059,13 @@ export const EventDetailsTab: React.FC = () => {
                     checked={coHost.showOnEvent !== false}
                     onChange={() => toggleCoHostShowOnEvent(coHost.id)}
                     label="Show"
+                    size={16}
+                    labelClassName="text-xs font-medium text-white/60"
+                  />
+                  <Checkbox
+                    checked={coHost.canEdit === true}
+                    onChange={() => toggleCoHostCanEdit(coHost.id)}
+                    label="Editor"
                     size={16}
                     labelClassName="text-xs font-medium text-white/60"
                   />
