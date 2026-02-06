@@ -39,6 +39,14 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
+
+    // If token is expired or invalid, clear auth and trigger re-login
+    if (response.status === 401 && requireAuth) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent('auth-expired'));
+    }
+
     throw new Error(error.message || `API error: ${response.status}`);
   }
 

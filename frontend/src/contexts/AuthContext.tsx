@@ -50,6 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  // Listen for auth-expired events (triggered when API returns 401)
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('auth-expired', handleAuthExpired);
+  }, []);
+
   const signIn = async (email: string) => {
     const response = await fetch(`${API_URL}/api/auth/magic-link`, {
       method: 'POST',
