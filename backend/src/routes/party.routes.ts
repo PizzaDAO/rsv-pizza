@@ -244,7 +244,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias
+      customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
+      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient
     } = req.body;
 
     // Verify ownership or super admin
@@ -285,6 +286,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(coHosts !== undefined && { coHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
+        ...(donationEnabled !== undefined && { donationEnabled }),
+        ...(donationGoal !== undefined && { donationGoal: donationGoal || null }),
+        ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
+        ...(suggestedAmounts !== undefined && { suggestedAmounts }),
+        ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
       },
       include: {
         user: { select: { name: true } },
