@@ -126,59 +126,40 @@ export const DonationSettings: React.FC = () => {
       {donationEnabled && (
         <div className="space-y-3 border-l-2 border-[#ff393a]/30 pl-4 ml-2">
           {/* Recipient Name */}
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              Recipient Name (optional)
-            </label>
-            <IconInput
-              icon={User}
-              type="text"
-              value={donationRecipient}
-              onChange={(e) => setDonationRecipient(e.target.value)}
-              onBlur={handleRecipientBlur}
-              placeholder="Who are donations going to?"
-            />
-            <p className="text-xs text-white/40 mt-1">Leave blank to use your name</p>
-          </div>
+          <IconInput
+            icon={User}
+            type="text"
+            value={donationRecipient}
+            onChange={(e) => setDonationRecipient(e.target.value)}
+            onBlur={handleRecipientBlur}
+            placeholder="Recipient name (leave blank to use yours)"
+          />
 
           {/* Donation Goal */}
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              Goal Amount (optional)
-            </label>
-            <IconInput
-              icon={Target}
-              type="number"
-              min={0}
-              step={1}
-              value={donationGoal}
-              onChange={(e) => setDonationGoal(e.target.value)}
-              onBlur={handleGoalBlur}
-              placeholder="e.g., 500"
-            />
-            <p className="text-xs text-white/40 mt-1">Set a fundraising goal in dollars</p>
-          </div>
+          <IconInput
+            icon={Target}
+            type="number"
+            min={0}
+            step={1}
+            value={donationGoal}
+            onChange={(e) => setDonationGoal(e.target.value)}
+            onBlur={handleGoalBlur}
+            placeholder="Goal amount in dollars (optional)"
+          />
 
           {/* Custom Message */}
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              Message to Donors (optional)
-            </label>
-            <IconInput
-              icon={MessageSquare}
-              multiline
-              value={donationMessage}
-              onChange={(e) => setDonationMessage(e.target.value)}
-              onBlur={handleMessageBlur}
-              placeholder="Thank you for supporting our event!"
-            />
-          </div>
+          <IconInput
+            icon={MessageSquare}
+            multiline
+            value={donationMessage}
+            onChange={(e) => setDonationMessage(e.target.value)}
+            onBlur={handleMessageBlur}
+            placeholder="Message to donors (optional)"
+          />
 
           {/* Suggested Amounts */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              Suggested Amounts
-            </label>
+            <p className="text-sm font-medium text-white/80 mb-2">Suggested Amounts</p>
             <div className="flex flex-wrap gap-2 mb-2">
               {suggestedAmounts.map((amount) => (
                 <div
