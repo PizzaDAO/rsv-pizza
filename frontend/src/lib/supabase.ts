@@ -258,6 +258,8 @@ export interface DbGuest {
   submitted_at: string;
   submitted_via: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
 }
 
 // Party operations

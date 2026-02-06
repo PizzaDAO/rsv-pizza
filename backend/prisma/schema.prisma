@@ -101,6 +101,10 @@ model Guest {
   nftTransactionHash String?   @map("nft_transaction_hash")
   nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
 
+  // Check-in fields
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+  checkedInBy String?   @map("checked_in_by") @db.Uuid
+
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
