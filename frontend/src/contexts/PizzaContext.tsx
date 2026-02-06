@@ -95,6 +95,11 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || [],
     createdAt: dbParty.created_at,
+    donationEnabled: dbParty.donation_enabled || false,
+    donationGoal: dbParty.donation_goal || null,
+    donationMessage: dbParty.donation_message || null,
+    suggestedAmounts: dbParty.suggested_amounts || null,
+    donationRecipient: dbParty.donation_recipient || null,
     guests,
   };
 }

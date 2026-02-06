@@ -136,6 +136,11 @@ export interface DbParty {
   rsvp_closed_at: string | null;
   co_hosts: any[];
   created_at: string;
+  donation_enabled?: boolean;
+  donation_goal?: number | null;
+  donation_message?: string | null;
+  suggested_amounts?: number[];
+  donation_recipient?: string | null;
 }
 
 export interface DbGuest {
@@ -399,7 +404,9 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const safeColumns = `
     id, name, invite_code, custom_url, date, duration, timezone,
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
-    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id
+    require_approval, venue_name,
+    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
+    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient
   `;
 
   let party: DbParty | null = null;

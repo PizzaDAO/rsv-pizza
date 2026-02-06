@@ -7,8 +7,10 @@ import { createDonation, updateDonationStatus } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { Checkbox } from './Checkbox';
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// Initialize Stripe (lazy-load only when key exists to avoid empty key error)
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 // Crypto donation address
 const CRYPTO_ADDRESS = 'dreadpizzaroberts.eth';
