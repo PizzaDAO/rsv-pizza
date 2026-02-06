@@ -164,16 +164,14 @@ export const DonationSettings: React.FC = () => {
             <label className="block text-sm font-medium text-white/80 mb-2">
               Message to Donors (optional)
             </label>
-            <div className="relative">
-              <MessageSquare size={18} className="absolute left-3 top-3 text-white/40" />
-              <textarea
-                value={donationMessage}
-                onChange={(e) => setDonationMessage(e.target.value)}
-                onBlur={handleMessageBlur}
-                placeholder="Thank you for supporting our event!"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 pl-10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[80px] resize-y"
-              />
-            </div>
+            <IconInput
+              icon={MessageSquare}
+              multiline
+              value={donationMessage}
+              onChange={(e) => setDonationMessage(e.target.value)}
+              onBlur={handleMessageBlur}
+              placeholder="Thank you for supporting our event!"
+            />
           </div>
 
           {/* Suggested Amounts */}
@@ -199,9 +197,10 @@ export const DonationSettings: React.FC = () => {
               ))}
             </div>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-                <input
+              <div className="flex-1">
+                <IconInput
+                  icon={DollarSign}
+                  iconSize={16}
                   type="number"
                   min={1}
                   step={1}
@@ -209,7 +208,6 @@ export const DonationSettings: React.FC = () => {
                   onChange={(e) => setNewAmount(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addSuggestedAmount()}
                   placeholder="Add amount"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pl-10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
               <button
