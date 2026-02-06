@@ -16,6 +16,7 @@ import { RSVPModal } from '../components/RSVPModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
+import { PizzaChefModal } from '../components/PizzaChefModal';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,6 +39,7 @@ export function EventPage() {
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showPizzaChef, setShowPizzaChef] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -89,6 +91,29 @@ export function EventPage() {
     }
     loadEvent();
   }, [slug, user?.email]);
+
+  // Easter egg: Press 'p' to open Pizza Chef modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea, or contenteditable element
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Open Pizza Chef modal when 'p' is pressed
+      if (e.key === 'p' || e.key === 'P') {
+        setShowPizzaChef(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -807,6 +832,12 @@ export function EventPage() {
       </div>
 
       <CornerLinks />
+
+      {/* Pizza Chef Easter Egg Modal */}
+      <PizzaChefModal
+        isOpen={showPizzaChef}
+        onClose={() => setShowPizzaChef(false)}
+      />
     </div>
   );
 }
