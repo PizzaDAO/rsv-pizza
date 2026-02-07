@@ -11,7 +11,7 @@ const PLATFORMS = {
 
 interface SocialPostsListProps {
   posts: SocialPost[];
-  onAdd: (post: { platform: string; url: string; authorHandle?: string }) => Promise<void>;
+  onAdd: (post: { platform: string; url: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   editable?: boolean;
 }
@@ -20,7 +20,6 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
   const [isAdding, setIsAdding] = useState(false);
   const [newPlatform, setNewPlatform] = useState<string>('twitter');
   const [newUrl, setNewUrl] = useState('');
-  const [newAuthor, setNewAuthor] = useState('');
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -32,10 +31,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
       await onAdd({
         platform: newPlatform,
         url: newUrl.trim(),
-        authorHandle: newAuthor.trim() || undefined,
       });
       setNewUrl('');
-      setNewAuthor('');
       setIsAdding(false);
     } catch (error) {
       console.error('Failed to add social post:', error);
@@ -145,13 +142,6 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
             placeholder="Post URL"
             className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
-          <input
-            type="text"
-            value={newAuthor}
-            onChange={(e) => setNewAuthor(e.target.value)}
-            placeholder="Author handle (optional)"
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-          />
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
@@ -165,7 +155,6 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               onClick={() => {
                 setIsAdding(false);
                 setNewUrl('');
-                setNewAuthor('');
               }}
               className="btn-secondary text-sm py-2"
             >

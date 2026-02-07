@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { EventReport } from '../../types';
+import { EventReport, Guest } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
@@ -22,6 +22,56 @@ interface ReportWidgetProps {
   partyId: string;
 }
 
+// Build a fallback report from party + guests context data (used when API is unavailable)
+function buildFallbackReport(party: any, guests: Guest[]): EventReport {
+  const approvedGuests = guests.filter(g => g.approved !== false).length;
+  const mailingListSignups = guests.filter(g => g.mailingListOptIn).length;
+  const walletAddresses = guests.filter(g => g.ethereumAddress).length;
+  const roleBreakdown: Record<string, number> = {};
+  guests.forEach(g => {
+    const role = (g.roles && g.roles.length > 0) ? g.roles[0] : 'Other';
+    roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+  });
+
+  return {
+    id: party.id,
+    name: party.name,
+    date: party.date,
+    timezone: party.timezone,
+    venueName: party.venueName,
+    address: party.address,
+    eventImageUrl: party.eventImageUrl,
+    description: party.description,
+    coHosts: party.coHosts || [],
+    host: party.hostName ? { name: party.hostName, profilePictureUrl: null } : null,
+    reportRecap: null,
+    reportVideoUrl: null,
+    reportPhotosUrl: null,
+    flyerArtist: null,
+    xPostUrl: null,
+    xPostViews: null,
+    farcasterPostUrl: null,
+    farcasterViews: null,
+    lumaUrl: null,
+    lumaViews: null,
+    poapEventId: null,
+    poapMints: null,
+    poapMoments: null,
+    reportPublished: false,
+    reportPublicSlug: null,
+    socialPosts: [],
+    notableAttendees: [],
+    featuredPhotos: [],
+    stats: {
+      totalRsvps: guests.length,
+      approvedGuests,
+      mailingListSignups,
+      walletAddresses,
+      roleBreakdown,
+    },
+  };
+}
+
 export function ReportWidget({ partyId }: ReportWidgetProps) {
   const { party, guests } = usePizza();
   const [report, setReport] = useState<EventReport | null>(null);
@@ -36,71 +86,41 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   // Track pending changes for debounced save
   const pendingChanges = useRef<Record<string, any>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevent context-triggered re-fetches from overwriting local edits
+  const initialLoadDone = useRef(false);
+  // Keep latest party/guests in refs so loadReport does not depend on context objects
+  const partyRef = useRef(party);
+  const guestsRef = useRef(guests);
+  partyRef.current = party;
+  guestsRef.current = guests;
 
-  // Load report data from API
+  // Load report data from API - only depends on partyId (stable)
   const loadReport = useCallback(async () => {
     try {
       const result = await getReport(partyId);
       if (result?.report) {
         setReport(result.report);
-      } else if (party) {
-        // Fallback: Build report from party data if API fails
-        const approvedGuests = guests.filter(g => g.approved !== false).length;
-        const mailingListSignups = guests.filter(g => g.mailingListOptIn).length;
-        const walletAddresses = guests.filter(g => g.ethereumAddress).length;
-        const roleBreakdown: Record<string, number> = {};
-        guests.forEach(g => {
-          const role = (g.roles && g.roles.length > 0) ? g.roles[0] : 'Other';
-          roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
-        });
-
-        setReport({
-          id: party.id,
-          name: party.name,
-          date: party.date,
-          timezone: party.timezone,
-          venueName: party.venueName,
-          address: party.address,
-          eventImageUrl: party.eventImageUrl,
-          description: party.description,
-          coHosts: party.coHosts || [],
-          host: party.hostName ? { name: party.hostName, profilePictureUrl: null } : null,
-          reportRecap: null,
-          reportVideoUrl: null,
-          reportPhotosUrl: null,
-          flyerArtist: null,
-          xPostUrl: null,
-          xPostViews: null,
-          farcasterPostUrl: null,
-          farcasterViews: null,
-          lumaUrl: null,
-          lumaViews: null,
-          poapEventId: null,
-          poapMints: null,
-          poapMoments: null,
-          reportPublished: false,
-          reportPublicSlug: null,
-          socialPosts: [],
-          notableAttendees: [],
-          featuredPhotos: [],
-          stats: {
-            totalRsvps: guests.length,
-            approvedGuests,
-            mailingListSignups,
-            walletAddresses,
-            roleBreakdown,
-          },
-        });
+      } else if (partyRef.current) {
+        // Fallback: Build report from party data if API returns nothing
+        setReport(buildFallbackReport(partyRef.current, guestsRef.current));
       }
       setError(null);
     } catch (err) {
-      setError('Failed to load report data');
+      // On initial load error, use fallback from context data
+      if (!initialLoadDone.current && partyRef.current) {
+        setReport(buildFallbackReport(partyRef.current, guestsRef.current));
+        setError(null);
+      } else {
+        setError('Failed to load report data');
+      }
       console.error('Error loading report:', err);
     } finally {
       setLoading(false);
+      initialLoadDone.current = true;
     }
-  }, [partyId, party, guests]);
+  }, [partyId]);
 
+  // Only load once on mount (or if partyId changes)
   useEffect(() => {
     loadReport();
   }, [loadReport]);
@@ -120,7 +140,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         setTimeout(() => setSaveSuccess(false), 2000);
       } else {
         setError('Failed to save changes');
-        // Reload to get correct state
+        // Revert optimistic update by reloading
         loadReport();
       }
     } catch (err) {
@@ -134,8 +154,6 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
   // Handle field changes with debounced auto-save
   const handleChange = useCallback((field: string, value: string | number | null) => {
-    if (!report) return;
-
     // Update local state immediately (optimistic)
     setReport(prev => prev ? { ...prev, [field]: value } : null);
 
@@ -147,7 +165,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       clearTimeout(saveTimer.current);
     }
     saveTimer.current = setTimeout(debouncedSave, 1500);
-  }, [report, debouncedSave]);
+  }, [debouncedSave]);
 
   // Manual save (flush pending changes)
   const handleSaveNow = useCallback(async () => {
@@ -167,8 +185,8 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     };
   }, []);
 
-  // Handle adding social posts
-  const handleAddSocialPost = async (post: { platform: string; url: string; authorHandle?: string }) => {
+  // Handle adding social posts (authorHandle extracted by backend from URL)
+  const handleAddSocialPost = async (post: { platform: string; url: string }) => {
     const result = await addSocialPost(partyId, post);
     if (result?.socialPost) {
       setReport(prev => prev ? {
@@ -219,9 +237,12 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     }
   };
 
-  // Handle publish/unpublish
+  // Handle publish - flush pending changes first
   const handlePublish = async () => {
     if (!report) return;
+
+    // Flush any pending changes before publishing
+    await handleSaveNow();
 
     setPublishingState('publishing');
     try {
@@ -232,9 +253,12 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           reportPublished: true,
           reportPublicSlug: result.reportPublicSlug,
         } : null);
+      } else {
+        setError('Failed to publish report');
       }
     } catch (err) {
       console.error('Error publishing report:', err);
+      setError('Failed to publish report');
     } finally {
       setPublishingState('idle');
     }
@@ -448,6 +472,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       <div className="card p-6">
         <NotableAttendeesList
           attendees={report.notableAttendees}
+          guests={guests}
           onAdd={handleAddNotableAttendee}
           onDelete={handleDeleteNotableAttendee}
           editable={true}
