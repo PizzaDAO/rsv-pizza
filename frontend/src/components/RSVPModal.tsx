@@ -531,10 +531,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       validateWalletAddress(e.target.value);
                     }}
                     placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
-                    className={walletValidation === 'valid' ? 'pr-10 border-[#39d98a]/50' : walletValidation === 'invalid' ? 'border-[#ff393a]/50' : ''}
+                    className={walletValidation === 'valid' ? 'border-[#39d98a]/50' : walletValidation === 'invalid' ? 'border-[#ff393a]/50' : ''}
                   />
                   {walletValidation === 'valid' && (
-                    <Check size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#39d98a]" />
+                    <Check size={14} className="absolute left-[2.35rem] top-1/2 -translate-y-1/2 text-[#39d98a]" />
                   )}
                 </div>
                 {hasWallet && (
