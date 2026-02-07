@@ -75,6 +75,7 @@ model Party {
   donationMessage    String?   @map("donation_message")
   suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
   donationRecipient  String?   @map("donation_recipient")
+  donationEthAddress String?   @map("donation_eth_address")
 
   // Share-to-unlock settings
   shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
