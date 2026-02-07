@@ -90,6 +90,7 @@ model Party {
   donations Donation[]
   raffles   Raffle[]
   displays  Display[]
+  staff     Staff[]
 
   @@map("parties")
 }
@@ -470,4 +471,35 @@ model Display {
   @@unique([partyId, slug])
   @@index([partyId])
   @@map("displays")
+}
+
+// ============================================
+// Staffing Widget Models
+// ============================================
+
+model Staff {
+  id          String    @id @default(uuid()) @db.Uuid
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Staff info
+  name        String
+  email       String?
+  phone       String?
+  role        String    // Role/position (e.g., "Coordinator", "Door", "Bar", "DJ", etc.)
+
+  // Status
+  status      String    @default("invited") // invited, confirmed, declined, checked_in
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+
+  // Notes
+  notes       String?
+
+  // Metadata
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, status])
+  @@map("staff")
 }

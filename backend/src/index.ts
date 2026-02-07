@@ -14,6 +14,7 @@ import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
+import staffRoutes from './routes/staff.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -78,6 +79,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
+app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', partyRoutes); // Party routes have global auth
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
