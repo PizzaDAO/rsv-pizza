@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { createDonation, updateDonationStatus } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { Checkbox } from './Checkbox';
+import { IconInput } from './IconInput';
 
 // Initialize Stripe (lazy-load only when key exists to avoid empty key error)
 const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -338,11 +339,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
   if (paymentMethod === null) {
     return (
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-3">
-            Choose Payment Method
-          </label>
-          <div className="space-y-2">
+        <div className="space-y-2">
             {/* Stripe option */}
             <button
               type="button"
@@ -375,7 +372,6 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 <p className="text-white/50 text-sm">ETH, USDC, or other tokens</p>
               </div>
             </button>
-          </div>
         </div>
 
         {onCancel && (
@@ -405,9 +401,6 @@ export const DonationForm: React.FC<DonationFormProps> = ({
 
         {/* Suggested Amounts */}
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            Select Amount
-          </label>
           <div className="grid grid-cols-2 gap-2">
             {suggestedAmounts.map((amount) => (
               <button
@@ -427,69 +420,47 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         </div>
 
         {/* Custom Amount */}
-        <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            Or Enter Custom Amount
-          </label>
-          <div className="relative">
-            <DollarSign size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="number"
-              min={0.5}
-              step={0.01}
-              value={customAmount}
-              onChange={(e) => handleCustomAmountChange(e.target.value)}
-              placeholder="0.00"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 pl-10 text-white text-lg focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
-        </div>
+        <IconInput
+          icon={DollarSign}
+          type="number"
+          min={0.5}
+          step={0.01}
+          value={customAmount}
+          onChange={(e) => handleCustomAmountChange(e.target.value)}
+          placeholder="Custom amount"
+        />
 
         {/* Donor Info */}
         <div className="space-y-3 border-t border-white/10 pt-4">
-          <div className="relative">
-            <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="text"
-              value={donorName}
-              onChange={(e) => setDonorName(e.target.value)}
-              placeholder="Your Name (optional)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pl-10 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput
+            icon={User}
+            type="text"
+            value={donorName}
+            onChange={(e) => setDonorName(e.target.value)}
+            placeholder="Your name"
+          />
 
-          <div className="relative">
-            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="email"
-              value={donorEmail}
-              onChange={(e) => setDonorEmail(e.target.value)}
-              placeholder="Email (for receipt)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pl-10 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput
+            icon={Mail}
+            type="email"
+            value={donorEmail}
+            onChange={(e) => setDonorEmail(e.target.value)}
+            placeholder="Email (for receipt)"
+          />
 
-          <div className="relative">
-            <MessageSquare size={18} className="absolute left-3 top-3 text-white/40" />
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Add a message (optional)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pl-10 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[60px] resize-none"
-            />
-          </div>
+          <IconInput
+            icon={MessageSquare}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Add a message"
+            multiline
+          />
 
-          <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
-            <Checkbox
-              checked={isAnonymous}
-              onChange={() => setIsAnonymous(!isAnonymous)}
-              label=""
-            />
-            <div className="flex items-center gap-2 text-white/80">
-              <EyeOff size={16} />
-              Make my donation anonymous
-            </div>
-          </div>
+          <Checkbox
+            checked={isAnonymous}
+            onChange={() => setIsAnonymous(!isAnonymous)}
+            label="Make my donation anonymous"
+          />
         </div>
 
         {error && (
