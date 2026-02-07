@@ -18,6 +18,7 @@ import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
+import { stripMarkdown } from '../lib/utils';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -314,9 +315,10 @@ export function EventPage() {
   let metaDescription = details;
 
   if (event.description) {
+    const cleanDescription = stripMarkdown(event.description);
     const remainingChars = 300 - details.length;
     if (remainingChars > 10) {
-      metaDescription += `. ${event.description.substring(0, remainingChars)}${event.description.length > remainingChars ? '...' : ''}`;
+      metaDescription += `. ${cleanDescription.substring(0, remainingChars)}${cleanDescription.length > remainingChars ? '...' : ''}`;
     }
   } else if (!metaDescription) {
     metaDescription = `Join us for ${event.name}! RSVP now.`;

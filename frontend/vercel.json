@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/((?!og-static/|assets/).*)",
+      "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }
   ],
