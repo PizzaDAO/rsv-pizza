@@ -146,6 +146,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      shareToUnlock: data.shareToUnlock,
+      shareTweetText: data.shareTweetText,
     },
   });
 }
