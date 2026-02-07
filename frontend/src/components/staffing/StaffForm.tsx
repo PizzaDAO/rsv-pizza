@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Loader2, User, Mail, Phone, FileText } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Loader2, User, Mail, Phone, FileText, Briefcase, DollarSign, Clock } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { Staff, StaffStatus } from '../../types';
 
 interface StaffFormProps {
@@ -50,6 +51,11 @@ export const StaffForm: React.FC<StaffFormProps> = ({
   const [status, setStatus] = useState<StaffStatus>('invited');
   const [notes, setNotes] = useState('');
   const [showRoleSuggestions, setShowRoleSuggestions] = useState(false);
+  const [payType, setPayType] = useState<'hourly' | 'flat'>('hourly');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [flatFee, setFlatFee] = useState('');
 
   const isEditing = !!staff;
 
@@ -65,9 +71,35 @@ export const StaffForm: React.FC<StaffFormProps> = ({
     }
   }, [staff]);
 
+  // Calculate total cost for hourly
+  const totalCost = useMemo(() => {
+    if (payType !== 'hourly' || !hourlyRate || !startTime || !endTime) return null;
+    const rate = parseFloat(hourlyRate);
+    if (isNaN(rate)) return null;
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    const diffMin = endMin > startMin ? endMin - startMin : (24 * 60 - startMin) + endMin;
+    const hours = diffMin / 60;
+    return (rate * hours).toFixed(2);
+  }, [payType, hourlyRate, startTime, endTime]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !role.trim()) return;
+
+    // Build pay info into notes
+    let payNote = '';
+    if (payType === 'hourly' && hourlyRate) {
+      payNote = `Pay: $${hourlyRate}/hr`;
+      if (startTime && endTime) payNote += ` (${startTime}–${endTime})`;
+      if (totalCost) payNote += ` = $${totalCost}`;
+    } else if (payType === 'flat' && flatFee) {
+      payNote = `Pay: $${flatFee} flat fee`;
+    }
+
+    const fullNotes = [payNote, notes.trim()].filter(Boolean).join('\n');
 
     await onSave({
       name: name.trim(),
@@ -75,7 +107,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
       phone: phone.trim() || undefined,
       role: role.trim(),
       status,
-      notes: notes.trim() || undefined,
+      notes: fullNotes || undefined,
     });
   };
 
@@ -84,9 +116,9 @@ export const StaffForm: React.FC<StaffFormProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={onClose}>
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-white">
             {isEditing ? 'Edit Staff Member' : 'Add Staff Member'}
           </h2>
@@ -95,24 +127,20 @@ export const StaffForm: React.FC<StaffFormProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Name */}
-          <div className="relative">
-            <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
+        <form onSubmit={handleSubmit} className="space-y-2">
+          {/* Name & Role row */}
+          <div className="grid grid-cols-2 gap-2">
+            <IconInput
+              icon={User}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Name *"
               required
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
             />
-          </div>
-
-          {/* Role with suggestions */}
-          <div className="relative">
             <div className="relative">
-              <input
+              <IconInput
+                icon={Briefcase}
                 type="text"
                 value={role}
                 onChange={(e) => {
@@ -123,90 +151,156 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                 onBlur={() => setTimeout(() => setShowRoleSuggestions(false), 200)}
                 placeholder="Role *"
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
+              {showRoleSuggestions && filteredRoleSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-[#1a1a2e] border border-white/20 rounded-lg shadow-lg overflow-hidden">
+                  {filteredRoleSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        setRole(suggestion);
+                        setShowRoleSuggestions(false);
+                      }}
+                      className="w-full px-3 py-2 text-left text-white/80 hover:bg-white/10 text-sm"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {showRoleSuggestions && filteredRoleSuggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-[#1a1a2e] border border-white/20 rounded-lg shadow-lg overflow-hidden">
-                {filteredRoleSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => {
-                      setRole(suggestion);
-                      setShowRoleSuggestions(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-white/80 hover:bg-white/10 text-sm"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
+          </div>
+
+          {/* Email & Phone row */}
+          <div className="grid grid-cols-2 gap-2">
+            <IconInput
+              icon={Mail}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+            />
+            <IconInput
+              icon={Phone}
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone"
+            />
           </div>
 
           {/* Status */}
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StaffStatus)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#ff393a]/50"
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} className="bg-[#1a1a2e]">
+              <option key={option.value} value={option.value} className="bg-[#1a1a2e] text-white">
                 {option.label}
               </option>
             ))}
           </select>
 
-          {/* Email */}
-          <div className="relative">
-            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email (optional)"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
-            />
-          </div>
+          {/* Pay Type Toggle */}
+          <div>
+            <div className="flex rounded-xl overflow-hidden border border-white/10">
+              <button
+                type="button"
+                onClick={() => setPayType('hourly')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  payType === 'hourly'
+                    ? 'bg-[#ff393a] text-white'
+                    : 'bg-white/5 text-white/50 hover:text-white/80'
+                }`}
+              >
+                Hourly
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayType('flat')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  payType === 'flat'
+                    ? 'bg-[#ff393a] text-white'
+                    : 'bg-white/5 text-white/50 hover:text-white/80'
+                }`}
+              >
+                Flat Fee
+              </button>
+            </div>
 
-          {/* Phone */}
-          <div className="relative">
-            <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone (optional)"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10"
-            />
+            {payType === 'hourly' ? (
+              <div className="mt-2 space-y-2">
+                <IconInput
+                  icon={DollarSign}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  placeholder="Hourly rate"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <IconInput
+                    icon={Clock}
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    placeholder="Start time"
+                  />
+                  <IconInput
+                    icon={Clock}
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    placeholder="End time"
+                  />
+                </div>
+                {totalCost && (
+                  <p className="text-xs text-[#39d98a] font-medium px-1">
+                    Total: ${totalCost}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2">
+                <IconInput
+                  icon={DollarSign}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={flatFee}
+                  onChange={(e) => setFlatFee(e.target.value)}
+                  placeholder="Flat fee amount"
+                />
+              </div>
+            )}
           </div>
 
           {/* Notes */}
-          <div className="relative">
-            <FileText size={18} className="absolute left-3 top-3 text-white/40" />
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes (optional)"
-              rows={2}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] pl-10 resize-none"
-            />
-          </div>
+          <IconInput
+            icon={FileText}
+            multiline
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes"
+          />
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-xl transition-colors text-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || !name.trim() || !role.trim()}
-              className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+              className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
             >
               {saving ? (
                 <>
