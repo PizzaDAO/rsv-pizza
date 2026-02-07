@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Performer, PerformerType, PerformerStatus } from '../../types';
-import { X, Loader2 } from 'lucide-react';
+import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
+import { X, Loader2, User, Music, Clock, Hash, Instagram, Cloud, Mail, Phone, UserCircle, Wrench, DollarSign, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PerformerFormProps {
   performer?: Performer | null;
@@ -49,10 +51,10 @@ const defaultFormData: PerformerFormData = {
 };
 
 const performerTypes: { value: PerformerType; label: string; icon: string }[] = [
-  { value: 'dj', label: 'DJ', icon: '\uD83C\uDFA7' },
-  { value: 'live_band', label: 'Live Band', icon: '\uD83C\uDFB8' },
-  { value: 'solo', label: 'Solo Artist', icon: '\uD83C\uDFA4' },
-  { value: 'playlist', label: 'Playlist', icon: '\uD83C\uDFB5' },
+  { value: 'dj', label: 'DJ', icon: '🌧' },
+  { value: 'live_band', label: 'Live Band', icon: '🌸' },
+  { value: 'solo', label: 'Solo Artist', icon: '🌤' },
+  { value: 'playlist', label: 'Playlist', icon: '🎵' },
 ];
 
 const statusOptions: { value: PerformerStatus; label: string; color: string }[] = [
@@ -71,7 +73,6 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
   const [formData, setFormData] = useState<PerformerFormData>(defaultFormData);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Reset form when modal opens/closes or performer changes
   useEffect(() => {
     if (isOpen && performer) {
       setFormData({
@@ -92,14 +93,9 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
         feePaid: performer.feePaid,
         notes: performer.notes || '',
       });
-      // Show advanced if any advanced fields are filled
       setShowAdvanced(
-        !!performer.contactName ||
-        !!performer.contactEmail ||
-        !!performer.contactPhone ||
-        !!performer.equipmentNotes ||
-        !!performer.fee ||
-        !!performer.notes
+        !!performer.contactName || !!performer.contactEmail || !!performer.contactPhone ||
+        !!performer.equipmentNotes || !!performer.fee || !!performer.notes
       );
     } else if (isOpen) {
       setFormData(defaultFormData);
@@ -122,7 +118,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/70 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -130,275 +126,88 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-white">
             {isEditing ? 'Edit Performer' : 'Add Performer'}
           </h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name (required) */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Name <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="DJ Name or Artist"
-              required
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <IconInput icon={User} type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="DJ Name or Artist" required />
+
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={formData.type}
+              onChange={(e) => handleChange('type', e.target.value as PerformerType)}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
-
-          {/* Type & Status Row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">Type</label>
-              <select
-                value={formData.type}
-                onChange={(e) => handleChange('type', e.target.value as PerformerType)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              >
-                {performerTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.icon} {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value as PerformerStatus)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              >
-                {statusOptions.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Genre */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Genre / Style</label>
-            <input
-              type="text"
-              value={formData.genre}
-              onChange={(e) => handleChange('genre', e.target.value)}
-              placeholder="e.g., House, Techno, Hip Hop"
+            >
+              {performerTypes.map((type) => (
+                <option key={type.value} value={type.value}>{type.icon} {type.label}</option>
+              ))}
+            </select>
+            <select
+              value={formData.status}
+              onChange={(e) => handleChange('status', e.target.value as PerformerStatus)}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
+            >
+              {statusOptions.map((status) => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Schedule Row */}
+          <IconInput icon={Music} type="text" value={formData.genre} onChange={(e) => handleChange('genre', e.target.value)} placeholder="e.g., House, Techno, Hip Hop" />
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">Set Time</label>
-              <input
-                type="time"
-                value={formData.setTime}
-                onChange={(e) => handleChange('setTime', e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                style={{ colorScheme: 'dark' }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">Duration (min)</label>
-              <input
-                type="number"
-                value={formData.setDuration}
-                onChange={(e) => handleChange('setDuration', e.target.value)}
-                placeholder="e.g., 120"
-                min="0"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-            </div>
+            <IconInput icon={Clock} type="time" value={formData.setTime} onChange={(e) => handleChange('setTime', e.target.value)} style={{ colorScheme: 'dark' }} />
+            <IconInput icon={Hash} type="number" value={formData.setDuration} onChange={(e) => handleChange('setDuration', e.target.value)} placeholder="Duration (min)" min="0" />
           </div>
 
-          {/* Social Links Row */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">Instagram</label>
-              <input
-                type="text"
-                value={formData.instagram}
-                onChange={(e) => handleChange('instagram', e.target.value)}
-                placeholder="@username"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">SoundCloud</label>
-              <input
-                type="text"
-                value={formData.soundcloud}
-                onChange={(e) => handleChange('soundcloud', e.target.value)}
-                placeholder="username or URL"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-            </div>
+            <IconInput icon={Instagram} type="text" value={formData.instagram} onChange={(e) => handleChange('instagram', e.target.value)} placeholder="@username" />
+            <IconInput icon={Cloud} type="text" value={formData.soundcloud} onChange={(e) => handleChange('soundcloud', e.target.value)} placeholder="username or URL" />
           </div>
 
-          {/* Advanced Section Toggle */}
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm"
+            className="w-full flex items-center justify-between p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm"
           >
             <span className="text-white/70">Contact & Payment Details</span>
-            {showAdvanced ? (
-              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            )}
+            {showAdvanced ? <ChevronUp size={18} className="text-white/60" /> : <ChevronDown size={18} className="text-white/60" />}
           </button>
 
-          {/* Advanced Fields */}
           {showAdvanced && (
             <div className="space-y-3 border-l-2 border-white/10 pl-4">
-              {/* Contact Info */}
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Contact Name</label>
-                <input
-                  type="text"
-                  value={formData.contactName}
-                  onChange={(e) => handleChange('contactName', e.target.value)}
-                  placeholder="Real name or booking contact"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
-
+              <IconInput icon={UserCircle} type="text" value={formData.contactName} onChange={(e) => handleChange('contactName', e.target.value)} placeholder="Real name or booking contact" />
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={formData.contactEmail}
-                    onChange={(e) => handleChange('contactEmail', e.target.value)}
-                    placeholder="contact@email.com"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.contactPhone}
-                    onChange={(e) => handleChange('contactPhone', e.target.value)}
-                    placeholder="+1 555-123-4567"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                  />
-                </div>
+                <IconInput icon={Mail} type="email" value={formData.contactEmail} onChange={(e) => handleChange('contactEmail', e.target.value)} placeholder="contact@email.com" />
+                <IconInput icon={Phone} type="tel" value={formData.contactPhone} onChange={(e) => handleChange('contactPhone', e.target.value)} placeholder="+1 555-123-4567" />
               </div>
-
-              {/* Equipment */}
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="equipmentProvided"
-                  checked={formData.equipmentProvided}
-                  onChange={(e) => handleChange('equipmentProvided', e.target.checked)}
-                  className="w-4 h-4 rounded border-white/30 bg-white/10 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
-                />
-                <label htmlFor="equipmentProvided" className="text-sm text-white/70">
-                  Bringing their own equipment
-                </label>
+              <Checkbox checked={formData.equipmentProvided} onChange={() => handleChange('equipmentProvided', !formData.equipmentProvided)} label="Bringing their own equipment" />
+              <IconInput icon={Wrench} type="text" value={formData.equipmentNotes} onChange={(e) => handleChange('equipmentNotes', e.target.value)} placeholder="What equipment do they need?" />
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <IconInput icon={DollarSign} type="number" value={formData.fee} onChange={(e) => handleChange('fee', e.target.value)} placeholder="Fee ($)" min="0" step="0.01" />
+                <Checkbox checked={formData.feePaid} onChange={() => handleChange('feePaid', !formData.feePaid)} label="Paid" />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Equipment Notes</label>
-                <input
-                  type="text"
-                  value={formData.equipmentNotes}
-                  onChange={(e) => handleChange('equipmentNotes', e.target.value)}
-                  placeholder="What equipment do they need?"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
-
-              {/* Fee */}
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Fee ($)</label>
-                  <input
-                    type="number"
-                    value={formData.fee}
-                    onChange={(e) => handleChange('fee', e.target.value)}
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                  />
-                </div>
-                <div className="flex items-center gap-3 pb-2">
-                  <input
-                    type="checkbox"
-                    id="feePaid"
-                    checked={formData.feePaid}
-                    onChange={(e) => handleChange('feePaid', e.target.checked)}
-                    className="w-4 h-4 rounded border-white/30 bg-white/10 text-[#ff393a] focus:ring-[#ff393a] focus:ring-offset-0"
-                  />
-                  <label htmlFor="feePaid" className="text-sm text-white/70">
-                    Paid
-                  </label>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => handleChange('notes', e.target.value)}
-                  placeholder="Any additional notes..."
-                  rows={2}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
-                />
-              </div>
+              <IconInput icon={FileText} multiline rows={2} value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} placeholder="Any additional notes..." />
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-            >
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={saving || !formData.name.trim()}
-              className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={saving || !formData.name.trim()} className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
               {saving ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   Saving...
                 </>
-              ) : isEditing ? (
-                'Save Changes'
-              ) : (
-                'Add Performer'
-              )}
+              ) : isEditing ? 'Save Changes' : 'Add Performer'}
             </button>
           </div>
         </form>

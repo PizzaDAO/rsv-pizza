@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { Performer, Song, Playlist, MusicPlatform } from '../../types';
 import { PizzaContext } from '../../contexts/PizzaContext';
 import {
@@ -17,7 +17,7 @@ import { SongForm, SongFormData } from './SongForm';
 import { PlaylistCard } from './PlaylistCard';
 import { PlaylistForm, PlaylistFormData } from './PlaylistForm';
 import { LineupOverview } from './LineupOverview';
-import { Music, Plus, Loader2, Mic2, ListMusic, Disc3 } from 'lucide-react';
+import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload } from 'lucide-react';
 
 interface MusicWidgetProps {
   isHost?: boolean;
@@ -60,6 +60,10 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   const [isPlaylistFormOpen, setIsPlaylistFormOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [savingPlaylist, setSavingPlaylist] = useState(false);
+
+  // File upload state for songs
+  const [isSongDragOver, setIsSongDragOver] = useState(false);
+  const songFileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag state for performers
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -492,6 +496,13 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                 </div>
               )}
 
+
+              {isSongDragOver && (
+                <div className="border-2 border-dashed border-[#ff393a] bg-[#ff393a]/10 rounded-xl p-4 text-center">
+                  <Upload size={20} className="mx-auto mb-1 text-[#ff393a]" />
+                  <p className="text-sm text-white/60">Drop audio file here</p>
+                </div>
+              )}
               {/* Add Song Button */}
               <button
                 onClick={handleAddSong}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Song, MusicPlatform } from '../../types';
-import { X, Loader2, Music, Link as LinkIcon } from 'lucide-react';
+import { IconInput } from '../IconInput';
+import { X, Loader2, Music, Link as LinkIcon, Upload, User } from 'lucide-react';
 
 interface SongFormProps {
   song?: Song | null;
@@ -15,6 +16,7 @@ export interface SongFormData {
   artist: string;
   platform: MusicPlatform;
   url: string;
+  file?: File | null;
 }
 
 const defaultFormData: SongFormData = {
@@ -22,6 +24,7 @@ const defaultFormData: SongFormData = {
   artist: '',
   platform: 'spotify',
   url: '',
+  file: null,
 };
 
 const platformOptions: { value: MusicPlatform; label: string; icon: string }[] = [
@@ -50,6 +53,8 @@ export const SongForm: React.FC<SongFormProps> = ({
   saving = false,
 }) => {
   const [formData, setFormData] = useState<SongFormData>(defaultFormData);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset form when modal opens/closes or song changes
   useEffect(() => {
@@ -82,13 +87,42 @@ export const SongForm: React.FC<SongFormProps> = ({
     }
   };
 
+
+
+  const audioAccept = '.mp3,.wav,.m4a,.ogg,.flac,audio/*';
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^\.]+$/, '') }));
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('audio/')) {
+      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^\.]+$/, '') }));
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
   if (!isOpen) return null;
 
   const isEditing = !!song;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/70 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -111,60 +145,20 @@ export const SongForm: React.FC<SongFormProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Song Title */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Song Title <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
-              placeholder="Song name"
-              required
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput icon={Music} type="text" value={formData.title} onChange={(e) => handleChange('title', e.target.value)} placeholder="Song name" required />
 
           {/* Artist */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Artist <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.artist}
-              onChange={(e) => handleChange('artist', e.target.value)}
-              placeholder="Artist name"
-              required
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput icon={User} type="text" value={formData.artist} onChange={(e) => handleChange('artist', e.target.value)} placeholder="Artist name" required />
 
           {/* URL */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Link (optional)
-            </label>
-            <div className="relative">
-              <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-              <input
-                type="url"
-                value={formData.url}
-                onChange={(e) => handleChange('url', e.target.value)}
-                placeholder="https://open.spotify.com/track/..."
-                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-            </div>
-            <p className="text-xs text-white/40 mt-1">
-              Paste a Spotify, Apple Music, YouTube, or SoundCloud link
-            </p>
-          </div>
+          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange("url", e.target.value)} placeholder="https://open.spotify.com/track/..." />
+            <p className="text-xs text-white/40 mt-1">Paste a Spotify, Apple Music, YouTube, or SoundCloud link</p>
 
           {/* Platform */}
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Platform</label>
+            
             <div className="flex flex-wrap gap-2">
               {platformOptions.map((platform) => (
                 <button
@@ -182,6 +176,42 @@ export const SongForm: React.FC<SongFormProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+
+          {/* File Upload */}
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
+              isDragOver
+                ? 'border-[#ff393a] bg-[#ff393a]/10'
+                : formData.file
+                  ? 'border-green-500/30 bg-green-500/5'
+                  : 'border-white/10 hover:border-white/20'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={audioAccept}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            {formData.file ? (
+              <div className="flex items-center justify-center gap-2 text-green-400">
+                <Upload size={16} />
+                <span className="text-sm truncate max-w-[300px]">{formData.file.name}</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-white/40">
+                <Upload size={20} />
+                <span className="text-sm">Upload audio file or drag &amp; drop</span>
+                <span className="text-xs">.mp3, .wav, .m4a, .ogg, .flac</span>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Playlist, MusicPlatform } from '../../types';
-import { X, Loader2, ListMusic, Link as LinkIcon } from 'lucide-react';
+import { IconInput } from '../IconInput';
+import { X, Loader2, ListMusic, Link as LinkIcon, FileText } from 'lucide-react';
 
 interface PlaylistFormProps {
   playlist?: Playlist | null;
@@ -89,7 +90,7 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/70 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -112,25 +113,13 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Playlist Name */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Playlist Name <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="e.g., Pizza Party Vibes"
-              required
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          
 
           {/* Platform */}
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Platform</label>
+            
             <div className="flex flex-wrap gap-2">
               {platformOptions.map((platform) => (
                 <button
@@ -151,36 +140,10 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
           </div>
 
           {/* URL */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Playlist URL <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-              <input
-                type="url"
-                value={formData.url}
-                onChange={(e) => handleChange('url', e.target.value)}
-                placeholder={currentPlatform?.placeholder || 'Paste playlist URL'}
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-            </div>
-          </div>
+          
 
           {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">
-              Description (optional)
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="What's this playlist about?"
-              rows={2}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
-            />
-          </div>
+          
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
