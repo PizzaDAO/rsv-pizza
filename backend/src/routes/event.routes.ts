@@ -34,6 +34,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         selectedPizzerias: true,
         eventType: true,
         eventTags: true,
+        donationEnabled: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -80,6 +81,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           selectedPizzerias: true,
           eventType: true,
           eventTags: true,
+          donationEnabled: true,
           password: true,
           userId: true,
           user: {
@@ -140,6 +142,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
         eventTags: party.eventTags,
+        donationEnabled: party.donationEnabled,
         hasPassword: !!party.password,
         hostName: party.user?.name || null,
         hostProfile,
