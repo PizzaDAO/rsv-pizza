@@ -15,6 +15,7 @@ interface DisplayFormProps {
   onSave: (data: DisplayFormData) => void;
   onClose: () => void;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 export interface DisplayFormData {
@@ -36,7 +37,7 @@ const contentTypes: { value: DisplayContentType; label: string; icon: React.Reac
   { value: 'custom', label: 'Custom', icon: <Code size={20} />, description: 'Custom HTML content' },
 ];
 
-export function DisplayForm({ display, onSave, onClose, isLoading }: DisplayFormProps) {
+export function DisplayForm({ display, onSave, onClose, isLoading, error }: DisplayFormProps) {
   const [name, setName] = useState(display?.name || '');
   const [contentType, setContentType] = useState<DisplayContentType>(display?.contentType || 'qr_code');
   const [rotationInterval, setRotationInterval] = useState(display?.rotationInterval || 10);
@@ -486,6 +487,13 @@ export function DisplayForm({ display, onSave, onClose, isLoading }: DisplayForm
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
             />
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-4 border-t border-white/10">

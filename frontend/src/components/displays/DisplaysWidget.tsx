@@ -12,20 +12,21 @@ interface DisplaysWidgetProps {
 export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const [displays, setDisplays] = useState<Display[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingDisplay, setEditingDisplay] = useState<Display | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadDisplays = useCallback(async () => {
     try {
-      setError(null);
+      setLoadError(null);
       const result = await getPartyDisplays(partyId);
       if (result) {
         setDisplays(result.displays);
       }
     } catch (err) {
-      setError('Failed to load displays');
+      setLoadError('Failed to load displays');
       console.error(err);
     } finally {
       setLoading(false);
@@ -48,22 +49,30 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
 
   const handleSave = async (data: DisplayFormData) => {
     setSaving(true);
+    setSaveError(null);
     try {
       if (editingDisplay) {
         const result = await updateDisplay(partyId, editingDisplay.id, data);
         if (result) {
           setDisplays(displays.map(d => d.id === editingDisplay.id ? result.display : d));
+          setShowForm(false);
+          setEditingDisplay(null);
+        } else {
+          setSaveError('Failed to update display. Please try again.');
         }
       } else {
         const result = await createDisplay(partyId, data);
         if (result) {
           setDisplays([...displays, result.display]);
+          setShowForm(false);
+          setEditingDisplay(null);
+        } else {
+          setSaveError('Failed to create display. Please try again.');
         }
       }
-      setShowForm(false);
-      setEditingDisplay(null);
     } catch (err) {
       console.error('Error saving display:', err);
+      setSaveError('Failed to save display. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -101,12 +110,12 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="card p-8">
         <div className="flex flex-col items-center text-center">
           <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-          <p className="text-red-400">{error}</p>
+          <p className="text-red-400">{loadError}</p>
           <button
             onClick={loadDisplays}
             className="mt-4 text-sm text-[#ff393a] hover:underline"
@@ -179,8 +188,10 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
           onClose={() => {
             setShowForm(false);
             setEditingDisplay(null);
+            setSaveError(null);
           }}
           isLoading={saving}
+          error={saveError}
         />
       )}
     </div>
