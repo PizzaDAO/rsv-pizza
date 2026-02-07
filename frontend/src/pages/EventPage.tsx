@@ -244,7 +244,7 @@ export function EventPage() {
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Event Password"
+                placeholder="What's the password?"
                 className="w-full"
                 required
                 autoFocus
@@ -259,7 +259,7 @@ export function EventPage() {
             </button>
           </form>
 
-          {/* Share on X to unlock */}
+          {/* Share to unlock */}
           {event.shareToUnlock && (
             <div className="mt-6">
               <div className="flex items-center gap-3 mb-4">
@@ -271,7 +271,10 @@ export function EventPage() {
               {!showTweetInput ? (
                 <button
                   onClick={() => {
-                    const tweetText = event.shareTweetText || `I'm going to ${event.name}! RSVP at https://rsv.pizza/${slug}`;
+                    const eventUrl = `https://rsv.pizza/${slug}`;
+                    const tweetText = event.shareTweetText
+                      ? event.shareTweetText + '\n\n' + eventUrl
+                      : `I'm going to ${event.name}! RSVP at ${eventUrl}`;
                     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
                     window.open(intentUrl, '_blank');
                     setShowTweetInput(true);
@@ -281,7 +284,7 @@ export function EventPage() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
-                  Share on X to unlock
+                  Share to unlock
                 </button>
               ) : (
                 <div className="space-y-3">
@@ -325,12 +328,6 @@ export function EventPage() {
       </div>
     );
   }
-
-  // Debug logging
-  console.log('DEBUG - user:', user);
-  console.log('DEBUG - user.id:', user?.id);
-  console.log('DEBUG - event.userId:', event.userId);
-  console.log('DEBUG - match:', user?.id === event.userId);
 
   // Generate meta tags for social sharing
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rsv.pizza';
