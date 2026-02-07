@@ -132,7 +132,7 @@ export const DonationSettings: React.FC = () => {
             value={donationRecipient}
             onChange={(e) => setDonationRecipient(e.target.value)}
             onBlur={handleRecipientBlur}
-            placeholder="Recipient name (leave blank to use yours)"
+            placeholder="Recipient name"
           />
 
           {/* Donation Goal */}
@@ -144,7 +144,7 @@ export const DonationSettings: React.FC = () => {
             value={donationGoal}
             onChange={(e) => setDonationGoal(e.target.value)}
             onBlur={handleGoalBlur}
-            placeholder="Goal amount in dollars (optional)"
+            placeholder="Goal amount in dollars"
           />
 
           {/* Custom Message */}
@@ -154,7 +154,7 @@ export const DonationSettings: React.FC = () => {
             value={donationMessage}
             onChange={(e) => setDonationMessage(e.target.value)}
             onBlur={handleMessageBlur}
-            placeholder="Message to donors (optional)"
+            placeholder="Message to donors"
           />
 
           {/* Suggested Amounts */}
