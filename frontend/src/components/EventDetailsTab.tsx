@@ -1,6 +1,4 @@
-import React, { useState, use
-  const [shareToUnlock, setShareToUnlock] = useState(false);
-  const [shareTweetText, setShareTweetText] = useState('');Effect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
 import { IconInput } from './IconInput';
@@ -39,6 +37,8 @@ export const EventDetailsTab: React.FC = () => {
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
   const [hideGuests, setHideGuests] = useState(false);
+  const [shareToUnlock, setShareToUnlock] = useState(false);
+  const [shareTweetText, setShareTweetText] = useState('');
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
