@@ -575,7 +575,37 @@ export async function batchReviewPhotos(
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
+// GPP API functions
 // ============================================
+
+export interface CreateGPPEventData {
+  city: string;
+  hostName: string;
+  email: string;
+}
+
+export interface GPPEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    eventType: string;
+    eventTags: string[];
+  };
+  hostPageUrl: string;
+  eventPageUrl: string;
+  message: string;
+}
+
+export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEventResponse> {
+  return apiRequest<GPPEventResponse>('/api/gpp/events', {
+    method: 'POST',
+    body: data,
+    requireAuth: false,
+  });
+}
+
 // Budget API functions
 // ============================================
 
