@@ -189,9 +189,14 @@ router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: Nex
       throw new AppError('Share to unlock is not enabled for this event', 400, 'SHARE_NOT_ENABLED');
     }
 
+    // Normalize x.com URLs to twitter.com for oEmbed compatibility
+    const normalizedUrl = tweetUrl.replace('https://x.com/', 'https://twitter.com/').replace('http://x.com/', 'https://twitter.com/');
+
     // Verify tweet via oEmbed API
-    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}`;
-    const response = await fetch(oembedUrl);
+    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(normalizedUrl)}`;
+    const response = await fetch(oembedUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RSVPizza/1.0)' },
+    });
 
     if (response.ok) {
       res.json({ verified: true });
