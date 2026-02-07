@@ -540,16 +540,18 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                 {hasWallet && (
                   <button
                     type="button"
-                    onClick={connectWallet}
+                    onClick={ethereumAddress.trim() ? () => { setEthereumAddress(''); setWalletValidation('idle'); } : connectWallet}
                     disabled={walletConnecting}
                     className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
                   >
                     {walletConnecting ? (
                       <Loader2 size={14} className="animate-spin" />
+                    ) : ethereumAddress.trim() ? (
+                      <X size={14} />
                     ) : (
                       <Wallet size={14} />
                     )}
-                    <span className="hidden sm:inline">{walletConnecting ? 'Connecting...' : 'Connect'}</span>
+                    <span className="hidden sm:inline">{walletConnecting ? 'Connecting...' : ethereumAddress.trim() ? 'Clear' : 'Connect'}</span>
                   </button>
                 )}
               </div>
