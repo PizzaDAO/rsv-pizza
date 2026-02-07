@@ -291,6 +291,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
         ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
+        ...(shareToUnlock !== undefined && { shareToUnlock }),
+        ...(shareTweetText !== undefined && { shareTweetText: shareTweetText || null }),
       },
       include: {
         user: { select: { name: true } },

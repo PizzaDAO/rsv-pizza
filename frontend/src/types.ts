@@ -144,7 +144,9 @@ export interface Party {
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null; // 'standard', 'gpp', 'private', etc.
-  eventTags?: string[]; // Tags for filtering/grouping (e.g., 'Global Pizza Party')
+  eventTags?: string[]; // Tags for filtering/grouping
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
   createdAt: string;
   guests: Guest[];
 }

@@ -238,6 +238,8 @@ export interface DbParty {
   venue_name: string | null;
   rsvp_closed_at: string | null;
   co_hosts: any[];
+  share_to_unlock?: boolean;
+  share_tweet_text?: string | null;
   created_at: string;
 }
 
@@ -502,7 +504,8 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const safeColumns = `
     id, name, invite_code, custom_url, date, duration, timezone,
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
-    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id
+    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
+    share_to_unlock, share_tweet_text
   `;
 
   let party: DbParty | null = null;
@@ -954,6 +957,8 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    share_to_unlock?: boolean;
+    share_tweet_text?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -976,6 +981,8 @@ export async function updateParty(
         description: updates.description,
         customUrl: updates.custom_url,
         coHosts: updates.co_hosts,
+        shareToUnlock: updates.share_to_unlock,
+        shareTweetText: updates.share_tweet_text,
       });
       return true;
     } catch (error) {

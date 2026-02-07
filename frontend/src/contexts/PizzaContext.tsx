@@ -94,6 +94,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || [],
+    shareToUnlock: dbParty.share_to_unlock || false,
+    shareTweetText: dbParty.share_tweet_text || null,
     createdAt: dbParty.created_at,
     guests,
   };
