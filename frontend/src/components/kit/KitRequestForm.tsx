@@ -191,7 +191,6 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 ))}
               </div>
             </div>
-          </div>
 
           {/* Shipping Address */}
           <div>
