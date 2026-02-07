@@ -35,6 +35,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         eventType: true,
         eventTags: true,
         donationEnabled: true,
+        shareToUnlock: true,
+        shareTweetText: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -82,6 +84,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           eventType: true,
           eventTags: true,
           donationEnabled: true,
+          shareToUnlock: true,
+          shareTweetText: true,
           password: true,
           userId: true,
           user: {
@@ -143,6 +147,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         eventType: party.eventType,
         eventTags: party.eventTags,
         donationEnabled: party.donationEnabled,
+        shareToUnlock: party.shareToUnlock,
+        shareTweetText: party.shareTweetText,
         hasPassword: !!party.password,
         hostName: party.user?.name || null,
         hostProfile,
@@ -150,6 +156,48 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         userId: party.userId,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/events/:slug/verify-tweet - Verify a tweet exists via oEmbed
+router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    const { tweetUrl } = req.body;
+
+    if (!tweetUrl || typeof tweetUrl !== 'string') {
+      throw new AppError('Tweet URL is required', 400, 'MISSING_TWEET_URL');
+    }
+
+    // Validate URL format (must be twitter.com or x.com status URL)
+    const tweetUrlPattern = /^https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/\d+/;
+    if (!tweetUrlPattern.test(tweetUrl)) {
+      throw new AppError('Invalid tweet URL format', 400, 'INVALID_TWEET_URL');
+    }
+
+    // Verify the event exists and has share-to-unlock enabled
+    let party = await prisma.party.findUnique({ where: { inviteCode: slug }, select: { id: true, shareToUnlock: true } });
+    if (!party) {
+      party = await prisma.party.findUnique({ where: { customUrl: slug }, select: { id: true, shareToUnlock: true } });
+    }
+    if (!party) {
+      throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
+    }
+    if (!party.shareToUnlock) {
+      throw new AppError('Share to unlock is not enabled for this event', 400, 'SHARE_NOT_ENABLED');
+    }
+
+    // Verify tweet via oEmbed API
+    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}`;
+    const response = await fetch(oembedUrl);
+
+    if (response.ok) {
+      res.json({ verified: true });
+    } else {
+      res.json({ verified: false, error: 'Could not verify tweet. Please check the URL.' });
+    }
   } catch (error) {
     next(error);
   }
