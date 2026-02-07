@@ -1,0 +1,1 @@
+export { GPPBadge } from './GPPBadge';

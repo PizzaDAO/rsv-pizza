@@ -97,6 +97,7 @@ export interface CoHost {
   instagram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
+  canEdit?: boolean;
 }
 
 // Host profile from the user account
@@ -142,6 +143,8 @@ export interface Party {
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
+  eventType?: string | null; // 'standard', 'gpp', 'private', etc.
+  eventTags?: string[]; // Tags for filtering/grouping (e.g., 'Global Pizza Party')
   createdAt: string;
   guests: Guest[];
 }

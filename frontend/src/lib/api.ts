@@ -7,6 +7,9 @@ function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
 }
 
+// Custom event name for auth expiration
+export const AUTH_EXPIRED_EVENT = "auth-expired";
+
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: any;
@@ -241,6 +244,8 @@ export interface PublicEvent {
   guestCount: number;
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
+  eventType?: string | null;
+  eventTags?: string[];
 }
 
 // Public Event API (no auth required)

@@ -10,12 +10,34 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
     return true;
   }
 
-  // Otherwise, must be the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
+  // Fetch the party
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
   });
 
-  return !!party;
+  if (!party) {
+    return false;
+  }
+
+  // Check if user is the owner
+  if (party.userId === userId) {
+    return true;
+  }
+
+  // Check if user is a co-host with edit permissions
+  if (userEmail) {
+    const coHosts = party.coHosts as Array<{ email?: string; canEdit?: boolean }> | null;
+    if (coHosts) {
+      const isEditor = coHosts.some(
+        (h) => h.email?.toLowerCase() === userEmail.toLowerCase() && h.canEdit === true
+      );
+      if (isEditor) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 const router = Router();
@@ -80,6 +102,51 @@ router.get('/:partyId/photos', async (req: AuthRequest, res: Response, next: Nex
       total,
       limit: parseInt(limit as string, 10),
       offset: parseInt(offset as string, 10),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:partyId/photos/stats - Get photo statistics for a party
+// NOTE: This route MUST be defined before /:partyId/photos/:photoId to avoid "stats" being matched as photoId
+router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Get party to check existence
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, photosEnabled: true },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const totalPhotos = await prisma.photo.count({ where: { partyId } });
+    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
+
+    // Get unique tags
+    const photos = await prisma.photo.findMany({
+      where: { partyId },
+      select: { tags: true },
+    });
+    const allTags = photos.flatMap(p => p.tags);
+    const uniqueTags = [...new Set(allTags)];
+
+    // Get unique uploaders count
+    const uniqueUploaders = await prisma.photo.groupBy({
+      by: ['uploaderEmail'],
+      where: { partyId, uploaderEmail: { not: null } },
+    });
+
+    res.json({
+      totalPhotos,
+      starredPhotos,
+      uniqueTags,
+      uniqueUploadersCount: uniqueUploaders.length,
+      photosEnabled: party.photosEnabled,
     });
   } catch (error) {
     next(error);
@@ -291,50 +358,6 @@ router.delete('/:partyId/photos/:photoId', async (req: AuthRequest, res: Respons
     });
 
     res.json({ success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/parties/:partyId/photos/stats - Get photo statistics for a party
-router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { partyId } = req.params;
-
-    // Get party to check existence
-    const party = await prisma.party.findUnique({
-      where: { id: partyId },
-      select: { id: true, photosEnabled: true },
-    });
-
-    if (!party) {
-      throw new AppError('Party not found', 404, 'NOT_FOUND');
-    }
-
-    const totalPhotos = await prisma.photo.count({ where: { partyId } });
-    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
-
-    // Get unique tags
-    const photos = await prisma.photo.findMany({
-      where: { partyId },
-      select: { tags: true },
-    });
-    const allTags = photos.flatMap(p => p.tags);
-    const uniqueTags = [...new Set(allTags)];
-
-    // Get unique uploaders count
-    const uniqueUploaders = await prisma.photo.groupBy({
-      by: ['uploaderEmail'],
-      where: { partyId, uploaderEmail: { not: null } },
-    });
-
-    res.json({
-      totalPhotos,
-      starredPhotos,
-      uniqueTags,
-      uniqueUploadersCount: uniqueUploaders.length,
-      photosEnabled: party.photosEnabled,
-    });
   } catch (error) {
     next(error);
   }

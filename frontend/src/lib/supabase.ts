@@ -954,6 +954,7 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    selected_pizzerias?: any[];  // Pizzeria objects
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -971,6 +972,7 @@ export async function updateParty(
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
+        selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,
         description: updates.description,
