@@ -13,6 +13,9 @@ interface ApiOptions {
   requireAuth?: boolean;
 }
 
+// Custom event name for auth expiration
+export const AUTH_EXPIRED_EVENT = 'auth-expired';
+
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiOptions = {}
@@ -38,7 +41,18 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401 && requireAuth) {
+      // Clear the invalid token
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+
+      // Dispatch custom event for AuthContext to handle
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+    }
+
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
+
     throw new Error(error.message || `API error: ${response.status}`);
   }
 
@@ -241,6 +255,8 @@ export interface PublicEvent {
   guestCount: number;
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
+  eventType?: string | null;
+  eventTags?: string[];
 }
 
 // Public Event API (no auth required)
@@ -400,6 +416,7 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
   }
 }
 
+
 // Party Kit API functions
 export interface KitRequestData {
   requestedTier?: KitTier; // Optional - PizzaDAO will allocate the appropriate tier
@@ -419,7 +436,6 @@ export interface KitResponse {
   kitDeadline: string | null;
   kit: PartyKit | null;
 }
-
 // Get kit request for a party
 export async function getPartyKit(partyId: string): Promise<KitResponse | null> {
   try {
@@ -479,4 +495,33 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
     console.error('Error canceling kit request:', error);
     return false;
   }
+}
+
+// GPP API functions
+export interface CreateGPPEventData {
+  city: string;
+  hostName: string;
+  email: string;
+}
+
+export interface GPPEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    eventType: string;
+    eventTags: string[];
+  };
+  hostPageUrl: string;
+  eventPageUrl: string;
+  message: string;
+}
+
+export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEventResponse> {
+  return apiRequest<GPPEventResponse>('/api/gpp/events', {
+    method: 'POST',
+    body: data,
+    requireAuth: false,
+  });
 }
