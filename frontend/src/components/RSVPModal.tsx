@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin } from 'lucide-react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -100,9 +100,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [mintResult, setMintResult] = useState<MintResult>({});
   const { mint: mintNFT } = useMintNFT();
 
+  // Track whether the modal was previously open so we only reset state
+  // when transitioning from closed -> open, not when props change while open
+  const wasOpenRef = useRef(false);
+
   // Reset state when modal opens and lock body scroll
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      // Modal just opened: reset all state
       setSubmitted(false);
       setAlreadyRegistered(false);
       setPendingApproval(false);
@@ -130,9 +135,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
       // Prevent body scroll when modal is open (use class for iOS compatibility)
       document.body.classList.add('modal-open');
-    } else {
+    } else if (!isOpen) {
       document.body.classList.remove('modal-open');
     }
+    wasOpenRef.current = isOpen;
     return () => {
       document.body.classList.remove('modal-open');
     };
