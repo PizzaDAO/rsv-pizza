@@ -326,7 +326,8 @@ export interface SlideContent {
 }
 
 export interface SlideshowConfig {
-  slides: SlideContent[];
+  googleSlidesUrl?: string;
+  slides?: SlideContent[]; // Legacy - kept for backward compat
   transition?: 'fade' | 'slide' | 'none';
   shuffle?: boolean;
 }
@@ -375,6 +376,9 @@ export interface Display {
   password?: string | null;
   lastViewedAt?: string | null;
   viewCount: number;
+  physicalWidth?: string;
+  physicalHeight?: string;
+  resolution?: string;
   createdAt: string;
   updatedAt: string;
 }

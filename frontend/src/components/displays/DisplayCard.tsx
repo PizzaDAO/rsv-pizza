@@ -56,8 +56,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
     const config = display.contentConfig as any;
     switch (display.contentType) {
       case 'slideshow':
-        const slideCount = config?.slides?.length || 0;
-        return `${slideCount} slide${slideCount !== 1 ? 's' : ''}`;
+        return config?.googleSlidesUrl ? 'Google Slides' : 'No slides configured';
       case 'photos':
         const filter = config?.filter === 'starred' ? 'Starred only' : 'All photos';
         return filter;

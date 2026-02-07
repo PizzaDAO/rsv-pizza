@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Monitor, Image, QrCode, Info, Camera, Code, Plus, Trash2, GripVertical } from 'lucide-react';
+import { X, Monitor, Image, QrCode, Info, Camera, Code, Ruler, ScreenShare } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import {
   Display,
   DisplayContentType,
@@ -7,7 +8,6 @@ import {
   QRCodeConfig,
   PhotosConfig,
   EventInfoConfig,
-  SlideContent,
 } from '../../types';
 
 interface DisplayFormProps {
@@ -27,6 +27,9 @@ export interface DisplayFormData {
   showClock: boolean;
   showEventName: boolean;
   password?: string;
+  physicalWidth?: string;
+  physicalHeight?: string;
+  resolution?: string;
 }
 
 const contentTypes: { value: DisplayContentType; label: string; icon: React.ReactNode; description: string }[] = [
@@ -46,8 +49,13 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [showEventName, setShowEventName] = useState(display?.showEventName ?? true);
   const [password, setPassword] = useState('');
 
+  // Display dimensions
+  const [physicalWidth, setPhysicalWidth] = useState(display?.physicalWidth || '');
+  const [physicalHeight, setPhysicalHeight] = useState(display?.physicalHeight || '');
+  const [resolution, setResolution] = useState(display?.resolution || '');
+
   // Content type specific config
-  const [slideshowSlides, setSlideshowSlides] = useState<SlideContent[]>([]);
+  const [googleSlidesUrl, setGoogleSlidesUrl] = useState('');
   const [qrSize, setQrSize] = useState<'small' | 'medium' | 'large'>('large');
   const [qrMessage, setQrMessage] = useState('Scan to RSVP!');
   const [qrShowEventInfo, setQrShowEventInfo] = useState(true);
@@ -65,7 +73,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
       const config = display.contentConfig as any;
       switch (display.contentType) {
         case 'slideshow':
-          setSlideshowSlides(config.slides || []);
+          setGoogleSlidesUrl(config.googleSlidesUrl || '');
           break;
         case 'qr_code':
           setQrSize(config.size || 'large');
@@ -94,9 +102,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
     switch (contentType) {
       case 'slideshow':
         contentConfig = {
-          slides: slideshowSlides,
-          transition: 'fade',
-          shuffle: false,
+          googleSlidesUrl: googleSlidesUrl.trim(),
         } as SlideshowConfig;
         break;
       case 'qr_code':
@@ -135,21 +141,10 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
       showClock,
       showEventName,
       password: password || undefined,
+      physicalWidth: physicalWidth || undefined,
+      physicalHeight: physicalHeight || undefined,
+      resolution: resolution || undefined,
     });
-  };
-
-  const addSlide = () => {
-    setSlideshowSlides([...slideshowSlides, { type: 'text', content: '' }]);
-  };
-
-  const removeSlide = (index: number) => {
-    setSlideshowSlides(slideshowSlides.filter((_, i) => i !== index));
-  };
-
-  const updateSlide = (index: number, updates: Partial<SlideContent>) => {
-    setSlideshowSlides(slides =>
-      slides.map((slide, i) => (i === index ? { ...slide, ...updates } : slide))
-    );
   };
 
   return (
@@ -166,15 +161,37 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">Display Name</label>
-            <input
+          <IconInput
+            icon={Monitor}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Display name (e.g., Main Screen)"
+            required
+          />
+
+          {/* Dimensions */}
+          <div className="grid grid-cols-3 gap-2">
+            <IconInput
+              icon={Ruler}
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Main Screen, Photo Wall, etc."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-              required
+              value={physicalWidth}
+              onChange={(e) => setPhysicalWidth(e.target.value)}
+              placeholder="Width (in)"
+            />
+            <IconInput
+              icon={Ruler}
+              type="text"
+              value={physicalHeight}
+              onChange={(e) => setPhysicalHeight(e.target.value)}
+              placeholder="Height (in)"
+            />
+            <IconInput
+              icon={Monitor}
+              type="text"
+              value={resolution}
+              onChange={(e) => setResolution(e.target.value)}
+              placeholder="Resolution"
             />
           </div>
 
@@ -208,83 +225,15 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
             <h3 className="font-medium text-white">Content Settings</h3>
 
             {contentType === 'slideshow' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-white/70">Slides</span>
-                  <button
-                    type="button"
-                    onClick={addSlide}
-                    className="flex items-center gap-1 text-sm text-[#ff393a] hover:text-[#ff393a]/80"
-                  >
-                    <Plus size={14} />
-                    Add Slide
-                  </button>
-                </div>
-                {slideshowSlides.length === 0 ? (
-                  <p className="text-sm text-white/40 text-center py-4">
-                    No slides yet. Add slides to create your slideshow.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {slideshowSlides.map((slide, index) => (
-                      <div key={index} className="flex items-start gap-2 bg-white/5 rounded-lg p-3">
-                        <GripVertical size={16} className="text-white/30 mt-2 cursor-move" />
-                        <div className="flex-1 space-y-2">
-                          <select
-                            value={slide.type}
-                            onChange={(e) => updateSlide(index, { type: e.target.value as SlideContent['type'] })}
-                            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white"
-                          >
-                            <option value="text">Text</option>
-                            <option value="image">Image URL</option>
-                            <option value="qr">QR Code</option>
-                          </select>
-                          {slide.type === 'text' && (
-                            <input
-                              type="text"
-                              value={slide.content || ''}
-                              onChange={(e) => updateSlide(index, { content: e.target.value })}
-                              placeholder="Enter text..."
-                              className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white"
-                            />
-                          )}
-                          {slide.type === 'image' && (
-                            <input
-                              type="url"
-                              value={slide.url || ''}
-                              onChange={(e) => updateSlide(index, { url: e.target.value })}
-                              placeholder="Image URL..."
-                              className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white"
-                            />
-                          )}
-                          {slide.type === 'qr' && (
-                            <input
-                              type="url"
-                              value={slide.url || ''}
-                              onChange={(e) => updateSlide(index, { url: e.target.value })}
-                              placeholder="URL to encode..."
-                              className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white"
-                            />
-                          )}
-                          <input
-                            type="text"
-                            value={slide.caption || ''}
-                            onChange={(e) => updateSlide(index, { caption: e.target.value })}
-                            placeholder="Caption (optional)"
-                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeSlide(index)}
-                          className="text-red-400 hover:text-red-300 mt-2"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="space-y-2">
+                <IconInput
+                  icon={ScreenShare}
+                  type="url"
+                  value={googleSlidesUrl}
+                  onChange={(e) => setGoogleSlidesUrl(e.target.value)}
+                  placeholder="Google Slides URL"
+                />
+                <p className="text-xs text-white/40 pl-1">Paste the share link from Google Slides</p>
               </div>
             )}
 
