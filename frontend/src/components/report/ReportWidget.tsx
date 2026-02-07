@@ -1,10 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, FileText, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { EventReport, ReportStats, SocialPost, NotableAttendee, Photo } from '../../types';
+import { EventReport } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
+import { NotableAttendeesList } from './NotableAttendeesList';
+import { ReportPreview } from './ReportPreview';
+import {
+  getReport,
+  updateReport,
+  publishReport,
+  unpublishReport,
+  addSocialPost,
+  deleteSocialPost,
+  addNotableAttendee,
+  deleteNotableAttendee,
+} from '../../lib/api';
 
 interface ReportWidgetProps {
   partyId: string;
@@ -16,126 +28,244 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [publishingState, setPublishingState] = useState<'idle' | 'publishing' | 'unpublishing'>('idle');
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Build report from party and guests data
-  useEffect(() => {
-    if (!party) {
+  // Track pending changes for debounced save
+  const pendingChanges = useRef<Record<string, any>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load report data from API
+  const loadReport = useCallback(async () => {
+    try {
+      const result = await getReport(partyId);
+      if (result?.report) {
+        setReport(result.report);
+      } else if (party) {
+        // Fallback: Build report from party data if API fails
+        const approvedGuests = guests.filter(g => g.approved !== false).length;
+        const mailingListSignups = guests.filter(g => g.mailingListOptIn).length;
+        const walletAddresses = guests.filter(g => g.ethereumAddress).length;
+        const roleBreakdown: Record<string, number> = {};
+        guests.forEach(g => {
+          const role = (g.roles && g.roles.length > 0) ? g.roles[0] : 'Other';
+          roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+        });
+
+        setReport({
+          id: party.id,
+          name: party.name,
+          date: party.date,
+          timezone: party.timezone,
+          venueName: party.venueName,
+          address: party.address,
+          eventImageUrl: party.eventImageUrl,
+          description: party.description,
+          coHosts: party.coHosts || [],
+          host: party.hostName ? { name: party.hostName, profilePictureUrl: null } : null,
+          reportRecap: null,
+          reportVideoUrl: null,
+          reportPhotosUrl: null,
+          flyerArtist: null,
+          xPostUrl: null,
+          xPostViews: null,
+          farcasterPostUrl: null,
+          farcasterViews: null,
+          lumaUrl: null,
+          lumaViews: null,
+          poapEventId: null,
+          poapMints: null,
+          poapMoments: null,
+          reportPublished: false,
+          reportPublicSlug: null,
+          socialPosts: [],
+          notableAttendees: [],
+          featuredPhotos: [],
+          stats: {
+            totalRsvps: guests.length,
+            approvedGuests,
+            mailingListSignups,
+            walletAddresses,
+            roleBreakdown,
+          },
+        });
+      }
+      setError(null);
+    } catch (err) {
+      setError('Failed to load report data');
+      console.error('Error loading report:', err);
+    } finally {
       setLoading(false);
-      return;
     }
+  }, [partyId, party, guests]);
 
-    // Calculate stats from guests
-    const approvedGuests = guests.filter(g => g.status === 'approved').length;
-    const mailingListSignups = guests.filter(g => g.joinMailingList).length;
-    const walletAddresses = guests.filter(g => g.walletAddress).length;
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
 
-    // Calculate role breakdown
-    const roleBreakdown: Record<string, number> = {};
-    guests.forEach(g => {
-      const role = g.role || 'Other';
-      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
-    });
+  // Debounced save: accumulates changes and saves after 1.5s of inactivity
+  const debouncedSave = useCallback(async () => {
+    if (Object.keys(pendingChanges.current).length === 0) return;
 
-    const stats: ReportStats = {
-      totalRsvps: guests.length,
-      approvedGuests,
-      mailingListSignups,
-      walletAddresses,
-      roleBreakdown,
-    };
+    const changes = { ...pendingChanges.current };
+    pendingChanges.current = {};
 
-    // Build report object from party data
-    const eventReport: EventReport = {
-      id: party.id,
-      name: party.name,
-      date: party.date,
-      timezone: party.timezone,
-      venueName: party.venueName,
-      address: party.address,
-      eventImageUrl: party.eventImageUrl,
-      description: party.description,
-      coHosts: party.coHosts || [],
-      host: party.hostName ? { name: party.hostName, profilePictureUrl: null } : null,
+    setSaving(true);
+    try {
+      const success = await updateReport(partyId, changes);
+      if (success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      } else {
+        setError('Failed to save changes');
+        // Reload to get correct state
+        loadReport();
+      }
+    } catch (err) {
+      setError('Failed to save changes');
+      console.error('Error saving report:', err);
+      loadReport();
+    } finally {
+      setSaving(false);
+    }
+  }, [partyId, loadReport]);
 
-      // Report-specific fields (these would come from party.report_* fields if they exist)
-      reportRecap: (party as any).reportRecap || null,
-      reportVideoUrl: (party as any).reportVideoUrl || null,
-      reportPhotosUrl: (party as any).reportPhotosUrl || null,
-      flyerArtist: (party as any).flyerArtist || null,
-
-      // KPIs
-      xPostUrl: (party as any).xPostUrl || null,
-      xPostViews: (party as any).xPostViews || null,
-      farcasterPostUrl: (party as any).farcasterPostUrl || null,
-      farcasterViews: (party as any).farcasterViews || null,
-      lumaUrl: (party as any).lumaUrl || null,
-      lumaViews: (party as any).lumaViews || null,
-      poapEventId: (party as any).poapEventId || null,
-      poapMints: (party as any).poapMints || null,
-      poapMoments: (party as any).poapMoments || null,
-
-      // Report settings
-      reportPublished: (party as any).reportPublished || false,
-      reportPublicSlug: (party as any).reportPublicSlug || null,
-
-      // Related data (empty for now - would come from database)
-      socialPosts: [],
-      notableAttendees: [],
-      featuredPhotos: [],
-
-      // Calculated stats
-      stats,
-    };
-
-    setReport(eventReport);
-    setLoading(false);
-  }, [party, guests]);
-
-  // Handle field changes
-  const handleChange = async (field: string, value: string | number | null) => {
+  // Handle field changes with debounced auto-save
+  const handleChange = useCallback((field: string, value: string | number | null) => {
     if (!report) return;
 
-    // Update local state immediately
+    // Update local state immediately (optimistic)
     setReport(prev => prev ? { ...prev, [field]: value } : null);
 
-    // TODO: Save to database
-    // This would call an API to update the party's report fields
-    // await updatePartyReport(partyId, { [field]: value });
-  };
+    // Accumulate changes
+    pendingChanges.current[field] = value;
+
+    // Reset debounce timer
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+    }
+    saveTimer.current = setTimeout(debouncedSave, 1500);
+  }, [report, debouncedSave]);
+
+  // Manual save (flush pending changes)
+  const handleSaveNow = useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    await debouncedSave();
+  }, [debouncedSave]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+      }
+    };
+  }, []);
 
   // Handle adding social posts
   const handleAddSocialPost = async (post: { platform: string; url: string; authorHandle?: string }) => {
-    if (!report) return;
-
-    // Create new post (would normally come from API)
-    const newPost: SocialPost = {
-      id: crypto.randomUUID(),
-      partyId,
-      platform: post.platform as 'twitter' | 'farcaster' | 'instagram',
-      url: post.url,
-      authorHandle: post.authorHandle || null,
-      sortOrder: report.socialPosts.length,
-      createdAt: new Date().toISOString(),
-    };
-
-    setReport(prev => prev ? {
-      ...prev,
-      socialPosts: [...prev.socialPosts, newPost],
-    } : null);
-
-    // TODO: Save to database
+    const result = await addSocialPost(partyId, post);
+    if (result?.socialPost) {
+      setReport(prev => prev ? {
+        ...prev,
+        socialPosts: [...prev.socialPosts, result.socialPost],
+      } : null);
+    } else {
+      throw new Error('Failed to add social post');
+    }
   };
 
   // Handle deleting social posts
   const handleDeleteSocialPost = async (id: string) => {
+    const success = await deleteSocialPost(partyId, id);
+    if (success) {
+      setReport(prev => prev ? {
+        ...prev,
+        socialPosts: prev.socialPosts.filter(p => p.id !== id),
+      } : null);
+    } else {
+      throw new Error('Failed to delete social post');
+    }
+  };
+
+  // Handle adding notable attendees
+  const handleAddNotableAttendee = async (data: { name: string; link?: string }) => {
+    const result = await addNotableAttendee(partyId, data);
+    if (result?.notableAttendee) {
+      setReport(prev => prev ? {
+        ...prev,
+        notableAttendees: [...prev.notableAttendees, result.notableAttendee],
+      } : null);
+    } else {
+      throw new Error('Failed to add notable attendee');
+    }
+  };
+
+  // Handle deleting notable attendees
+  const handleDeleteNotableAttendee = async (id: string) => {
+    const success = await deleteNotableAttendee(partyId, id);
+    if (success) {
+      setReport(prev => prev ? {
+        ...prev,
+        notableAttendees: prev.notableAttendees.filter(a => a.id !== id),
+      } : null);
+    } else {
+      throw new Error('Failed to delete notable attendee');
+    }
+  };
+
+  // Handle publish/unpublish
+  const handlePublish = async () => {
     if (!report) return;
 
-    setReport(prev => prev ? {
-      ...prev,
-      socialPosts: prev.socialPosts.filter(p => p.id !== id),
-    } : null);
+    setPublishingState('publishing');
+    try {
+      const result = await publishReport(partyId);
+      if (result) {
+        setReport(prev => prev ? {
+          ...prev,
+          reportPublished: true,
+          reportPublicSlug: result.reportPublicSlug,
+        } : null);
+      }
+    } catch (err) {
+      console.error('Error publishing report:', err);
+    } finally {
+      setPublishingState('idle');
+    }
+  };
 
-    // TODO: Delete from database
+  const handleUnpublish = async () => {
+    if (!report) return;
+
+    setPublishingState('unpublishing');
+    try {
+      const success = await unpublishReport(partyId);
+      if (success) {
+        setReport(prev => prev ? {
+          ...prev,
+          reportPublished: false,
+        } : null);
+      }
+    } catch (err) {
+      console.error('Error unpublishing report:', err);
+    } finally {
+      setPublishingState('idle');
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (report?.reportPublicSlug) {
+      const url = `${window.location.origin}/report/${report.reportPublicSlug}`;
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
   if (loading) {
@@ -146,7 +276,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     );
   }
 
-  if (error) {
+  if (error && !report) {
     return (
       <div className="card p-8">
         <div className="flex items-center gap-3 text-red-400">
@@ -169,6 +299,24 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     );
   }
 
+  // Show preview mode
+  if (showPreview) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Report Preview</h2>
+          <button
+            onClick={() => setShowPreview(false)}
+            className="btn-secondary text-sm py-2 px-4"
+          >
+            Back to Editor
+          </button>
+        </div>
+        <ReportPreview report={report} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -180,12 +328,42 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               Track engagement metrics and collect attendee social posts
             </p>
           </div>
-          {saving && (
-            <div className="flex items-center gap-2 text-white/60 text-sm">
-              <Loader2 size={14} className="animate-spin" />
-              Saving...
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {saving && (
+              <div className="flex items-center gap-2 text-white/60 text-sm">
+                <Loader2 size={14} className="animate-spin" />
+                Saving...
+              </div>
+            )}
+            {saveSuccess && !saving && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <Check size={14} />
+                Saved
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center gap-2 text-red-400 text-sm">
+                <AlertCircle size={14} />
+                {error}
+              </div>
+            )}
+            <button
+              onClick={handleSaveNow}
+              disabled={saving || Object.keys(pendingChanges.current).length === 0}
+              className="btn-secondary text-sm py-2 px-3 flex items-center gap-1.5"
+              title="Save changes now"
+            >
+              <Save size={14} />
+              Save
+            </button>
+            <button
+              onClick={() => setShowPreview(true)}
+              className="btn-primary text-sm py-2 px-3 flex items-center gap-1.5"
+            >
+              <FileIcon size={14} />
+              Preview Report
+            </button>
+          </div>
         </div>
 
         {/* Event Summary */}
@@ -207,11 +385,71 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         </div>
       </div>
 
+      {/* Event Details Section */}
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Event Details</h3>
+        <div className="space-y-4">
+          {/* Recap */}
+          <div>
+            <textarea
+              value={report.reportRecap || ''}
+              onChange={(e) => handleChange('reportRecap', e.target.value || null)}
+              placeholder="Write a recap of your event..."
+              rows={4}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
+            />
+            <p className="text-xs text-white/30 mt-1">A summary of the event for the report</p>
+          </div>
+
+          {/* Flyer Artist & URLs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <input
+                type="text"
+                value={report.flyerArtist || ''}
+                onChange={(e) => handleChange('flyerArtist', e.target.value || null)}
+                placeholder="Flyer artist credit"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+              />
+            </div>
+            <div>
+              <input
+                type="url"
+                value={report.reportVideoUrl || ''}
+                onChange={(e) => handleChange('reportVideoUrl', e.target.value || null)}
+                placeholder="Party video URL"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <input
+              type="url"
+              value={report.reportPhotosUrl || ''}
+              onChange={(e) => handleChange('reportPhotosUrl', e.target.value || null)}
+              placeholder="Raw photos / video drive link"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* KPIs */}
       <div className="card p-6">
         <ReportKPIs
           report={report}
           onChange={handleChange}
+          editable={true}
+        />
+      </div>
+
+      {/* Notable Attendees */}
+      <div className="card p-6">
+        <NotableAttendeesList
+          attendees={report.notableAttendees}
+          onAdd={handleAddNotableAttendee}
+          onDelete={handleDeleteNotableAttendee}
           editable={true}
         />
       </div>
@@ -223,6 +461,24 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         </div>
       )}
 
+      {/* Featured Photos */}
+      {report.featuredPhotos.length > 0 && (
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Featured Photos</h3>
+          <p className="text-white/40 text-xs mb-3">Starred photos from the Photos tab appear here</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            {report.featuredPhotos.map((photo) => (
+              <img
+                key={photo.id}
+                src={photo.thumbnailUrl || photo.url}
+                alt={photo.caption || 'Event photo'}
+                className="w-full aspect-square object-cover rounded-lg"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Social Posts */}
       <div className="card p-6">
         <SocialPostsList
@@ -231,6 +487,74 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           onDelete={handleDeleteSocialPost}
           editable={true}
         />
+      </div>
+
+      {/* Publish Section */}
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Publish Report</h3>
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          {report.reportPublished ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-green-400">
+                <Eye size={16} />
+                <span className="text-sm font-medium">Report is published</span>
+              </div>
+              {report.reportPublicSlug && (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-white/80 text-sm truncate">
+                    {window.location.origin}/report/{report.reportPublicSlug}
+                  </div>
+                  <button
+                    onClick={handleCopyLink}
+                    className="btn-secondary text-sm py-2 px-3 flex items-center gap-1.5"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check size={14} />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={handleUnpublish}
+                disabled={publishingState === 'unpublishing'}
+                className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors"
+              >
+                {publishingState === 'unpublishing' ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <EyeOff size={14} />
+                )}
+                Unpublish Report
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-white/60 text-sm">
+                Publish your report to share it with a public link. Anyone with the link can view the compiled report.
+              </p>
+              <button
+                onClick={handlePublish}
+                disabled={publishingState === 'publishing'}
+                className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5"
+              >
+                {publishingState === 'publishing' ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Link2 size={14} />
+                )}
+                Publish Report
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
