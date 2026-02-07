@@ -110,12 +110,13 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
               autoFocus
             />
 
-            <textarea
+            <IconInput
+              icon={MapPin}
+              iconSize={16}
+              type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Address"
-              rows={2}
-              className="w-full resize-none"
             />
 
             <div className="grid grid-cols-2 gap-3">
