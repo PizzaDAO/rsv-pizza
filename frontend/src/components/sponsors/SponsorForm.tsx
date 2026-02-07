@@ -214,16 +214,13 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 onChange={e => handleChange('website', e.target.value)}
                 placeholder="Website"
               />
-              <div className="relative">
-                <XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="text"
-                  value={formData.brandTwitter || ''}
-                  onChange={e => handleChange('brandTwitter', e.target.value)}
-                  placeholder="Brand X Handle"
-                  className="w-full !pl-14"
-                />
-              </div>
+              <IconInput
+                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                type="text"
+                value={formData.brandTwitter || ''}
+                onChange={e => handleChange('brandTwitter', e.target.value)}
+                placeholder="Brand X Handle"
+              />
             </div>
           </div>
 
@@ -262,26 +259,20 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 onChange={e => handleChange('contactPhone', e.target.value)}
                 placeholder="Phone"
               />
-              <div className="relative">
-                <XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="text"
-                  value={formData.contactTwitter || ''}
-                  onChange={e => handleChange('contactTwitter', e.target.value)}
-                  placeholder="Contact X Handle"
-                  className="w-full !pl-14"
-                />
-              </div>
-              <div className="relative">
-                <TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="text"
-                  value={formData.telegram || ''}
-                  onChange={e => handleChange('telegram', e.target.value)}
-                  placeholder="Telegram"
-                  className="w-full !pl-14"
-                />
-              </div>
+              <IconInput
+                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                type="text"
+                value={formData.contactTwitter || ''}
+                onChange={e => handleChange('contactTwitter', e.target.value)}
+                placeholder="Contact X Handle"
+              />
+              <IconInput
+                customIcon={<TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                type="text"
+                value={formData.telegram || ''}
+                onChange={e => handleChange('telegram', e.target.value)}
+                placeholder="Telegram"
+              />
             </div>
           </div>
 
@@ -307,17 +298,14 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                   ))}
                 </select>
               </div>
-              <div className="relative">
-                <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.lastContactedAt || ''}
-                  onChange={e => handleChange('lastContactedAt', e.target.value || null)}
-                  placeholder="Last Contacted"
-                  className="w-full !pl-14"
-                  style={{ colorScheme: 'dark' }}
-                />
-              </div>
+              <IconInput
+                icon={Calendar}
+                type="date"
+                value={formData.lastContactedAt || ''}
+                onChange={e => handleChange('lastContactedAt', e.target.value || null)}
+                placeholder="Last Contacted"
+                style={{ colorScheme: 'dark' }}
+              />
             </div>
           </div>
 
@@ -328,30 +316,24 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
               Fundraising
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="relative">
-                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.amount ?? ''}
-                  onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="Amount Pledged"
-                  className="w-full !pl-14"
-                />
-              </div>
-              <div className="relative">
-                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.amountReceived ?? ''}
-                  onChange={e => handleChange('amountReceived', e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="Amount Received"
-                  className="w-full !pl-14"
-                />
-              </div>
+              <IconInput
+                icon={DollarSign}
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.amount ?? ''}
+                onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
+                placeholder="Amount Pledged"
+              />
+              <IconInput
+                icon={DollarSign}
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.amountReceived ?? ''}
+                onChange={e => handleChange('amountReceived', e.target.value ? parseFloat(e.target.value) : null)}
+                placeholder="Amount Received"
+              />
               <div className="relative">
                 <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <select
@@ -435,16 +417,14 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
               <FileText size={16} />
               Notes
             </h3>
-            <div className="relative">
-              <FileText size={20} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
-              <textarea
-                value={formData.notes || ''}
-                onChange={e => handleChange('notes', e.target.value)}
-                placeholder="Communication history, meeting notes, etc."
-                rows={3}
-                className="w-full !pl-14 resize-none"
-              />
-            </div>
+            <IconInput
+              icon={FileText}
+              multiline
+              rows={3}
+              value={formData.notes || ''}
+              onChange={e => handleChange('notes', (e.target as HTMLTextAreaElement).value)}
+              placeholder="Communication history, meeting notes, etc."
+            />
           </div>
 
           {/* Actions */}

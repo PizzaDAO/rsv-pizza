@@ -116,8 +116,11 @@ input[type="number"],
 input[type="password"],
 input[type="url"],
 input[type="tel"],
+<<<<<<< HEAD
 input[type="time"],
 input[type="search"],
+=======
+>>>>>>> 0a367c9 (basil-20144: Fix phone field styling and save functionality)
 textarea {
   text-align: left !important;
 }
