@@ -251,6 +251,7 @@ export interface PublicEvent {
   guestCount: number;
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
+  donationEnabled?: boolean;
 }
 
 // Public Event API (no auth required)

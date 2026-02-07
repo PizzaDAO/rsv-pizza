@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
@@ -13,6 +13,7 @@ import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
+import { DonationStep } from '../components/DonationStep';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -21,6 +22,7 @@ export function EventPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDonationModal, setShowDonationModal] = useState(false);
   const [event, setEvent] = useState<PublicEvent | null>(null);
 
   // Password protection state
@@ -440,6 +442,19 @@ export function EventPage() {
                 </div>
               )}
 
+              {/* Donate Button - Desktop */}
+              {event.donationEnabled && (
+                <div className="p-4 border-t border-white/10">
+                  <button
+                    onClick={() => setShowDonationModal(true)}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                  >
+                    <Heart size={16} />
+                    Support This Event
+                  </button>
+                </div>
+              )}
+
               {/* Host and Guest Info */}
               <div className="p-6 border-t border-white/10">
                 <HostsList
@@ -745,6 +760,19 @@ export function EventPage() {
                   </div>
                 )}
 
+                {/* Donate Button - Mobile */}
+                {event.donationEnabled && (
+                  <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                    <button
+                      onClick={() => setShowDonationModal(true)}
+                      className="btn-secondary w-full flex items-center justify-center gap-2"
+                    >
+                      <Heart size={16} />
+                      Support This Event
+                    </button>
+                  </div>
+                )}
+
                 {/* Mobile: Full Host Section */}
                 <div id="host-section" className="md:hidden border-t border-white/10 pt-6 mt-6">
                   <HostsList
@@ -762,6 +790,23 @@ export function EventPage() {
 
         <Footer className="mt-8 pb-2" />
       </div>
+
+      {/* Donation Modal */}
+      {showDonationModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowDonationModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <DonationStep
+              partyId={event.id}
+              partyName={event.name}
+              onComplete={() => setShowDonationModal(false)}
+              onSkip={() => setShowDonationModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <CornerLinks />
     </div>

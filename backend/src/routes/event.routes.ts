@@ -32,6 +32,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         rsvpClosedAt: true,
         coHosts: true,
         selectedPizzerias: true,
+        donationEnabled: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -76,6 +77,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           rsvpClosedAt: true,
           coHosts: true,
           selectedPizzerias: true,
+          donationEnabled: true,
           password: true,
           userId: true,
           user: {
@@ -134,6 +136,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         rsvpClosedAt: party.rsvpClosedAt,
         coHosts: party.coHosts,
         selectedPizzerias: party.selectedPizzerias,
+        donationEnabled: party.donationEnabled,
         hasPassword: !!party.password,
         hostName: party.user?.name || null,
         hostProfile,
