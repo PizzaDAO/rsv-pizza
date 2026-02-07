@@ -97,6 +97,7 @@ export interface CoHost {
   instagram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
+  canEdit?: boolean;
 }
 
 // Host profile from the user account

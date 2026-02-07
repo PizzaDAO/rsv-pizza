@@ -32,7 +32,15 @@ function HostPageContent() {
     // Super admin can edit any party
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
     // Party owner can edit
-    return party.userId === user.id;
+    if (party.userId === user.id) return true;
+    // Co-host with editor permission can edit
+    if (party.coHosts && Array.isArray(party.coHosts)) {
+      const isEditor = party.coHosts.some(
+        (h: any) => h.email?.toLowerCase() === user.email.toLowerCase() && h.canEdit === true
+      );
+      if (isEditor) return true;
+    }
+    return false;
   }, [party, user]);
 
   // Redirect unauthorized users to RSVP page after auth and party have loaded

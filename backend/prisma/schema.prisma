@@ -69,12 +69,28 @@ model Party {
   eventType  String?  @map("event_type")  // 'standard', 'gpp', 'private', etc.
   eventTags  String[] @default([]) @map("event_tags")  // Tags for filtering/grouping
 
+  // Donation settings
+  donationEnabled    Boolean   @default(false) @map("donation_enabled")
+  donationGoal       Decimal?  @db.Decimal(10, 2) @map("donation_goal")
+  donationMessage    String?   @map("donation_message")
+  suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
+  donationRecipient  String?   @map("donation_recipient")
+  donationEthAddress String?   @map("donation_eth_address")
+
+  // Share-to-unlock settings
+  shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
+  shareTweetText   String?  @map("share_tweet_text")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests Guest[]
-  orders Order[]
-  photos Photo[]
+  guests    Guest[]
+  orders    Order[]
+  photos    Photo[]
+  donations Donation[]
+  raffles   Raffle[]
+  displays  Display[]
+  staff     Staff[]
 
   @@map("parties")
 }
@@ -101,13 +117,43 @@ model Guest {
   nftTransactionHash String?   @map("nft_transaction_hash")
   nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
 
+  // Check-in fields
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+  checkedInBy String?   @map("checked_in_by") @db.Uuid
+
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   pizzaMappings GuestPizzaMapping[]
   photos        Photo[]
+  donations     Donation[]
+  raffleEntries RaffleEntry[]
+  raffleWins    RaffleWinner[]
 
   @@map("guests")
+}
+
+model Donation {
+  id              String   @id @default(cuid())
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("usd")
+  status          String   @default("pending") // pending, succeeded, failed, refunded
+  paymentIntentId String?  @map("payment_intent_id")
+  chargeId        String?  @map("charge_id")
+  donorName       String?  @map("donor_name")
+  donorEmail      String?  @map("donor_email")
+  isAnonymous     Boolean  @default(false) @map("is_anonymous")
+  message         String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  guestId String? @map("guest_id") @db.Uuid
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: SetNull)
+
+  @@map("donations")
 }
 
 model Order {
@@ -310,4 +356,150 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@map("photos")
+}
+
+// ============================================
+// Raffle Widget Models
+// ============================================
+
+model Raffle {
+  id              String    @id @default(uuid()) @db.Uuid
+  partyId         String    @map("party_id") @db.Uuid
+  party           Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name            String    @db.VarChar(255)
+  description     String?
+  status          String    @default("draft") @db.VarChar(50) // draft, open, closed, drawn
+  entriesPerGuest Int       @default(1) @map("entries_per_guest")
+
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  prizes          RafflePrize[]
+  entries         RaffleEntry[]
+  winners         RaffleWinner[]
+
+  @@index([partyId])
+  @@map("raffles")
+}
+
+model RafflePrize {
+  id          String    @id @default(uuid()) @db.Uuid
+  raffleId    String    @map("raffle_id") @db.Uuid
+  raffle      Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  name        String    @db.VarChar(255)
+  description String?
+  imageUrl    String?   @map("image_url")
+  quantity    Int       @default(1)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  winners     RaffleWinner[]
+
+  @@index([raffleId])
+  @@map("raffle_prizes")
+}
+
+model RaffleEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  raffleId  String   @map("raffle_id") @db.Uuid
+  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  guestId   String   @map("guest_id") @db.Uuid
+  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([raffleId, guestId])
+  @@index([raffleId])
+  @@index([guestId])
+  @@map("raffle_entries")
+}
+
+model RaffleWinner {
+  id        String    @id @default(uuid()) @db.Uuid
+  raffleId  String    @map("raffle_id") @db.Uuid
+  raffle    Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  prizeId   String    @map("prize_id") @db.Uuid
+  prize     RafflePrize @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  guestId   String    @map("guest_id") @db.Uuid
+  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  claimedAt DateTime? @map("claimed_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([raffleId])
+  @@index([guestId])
+  @@map("raffle_winners")
+}
+
+// ============================================
+// Display Widget Models
+// ============================================
+
+model Display {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name String
+  slug String
+
+  // Content Configuration
+  contentType   String @default("slideshow") @map("content_type") // slideshow, qr_code, event_info, photos, custom
+  contentConfig Json   @default("{}") @map("content_config") // Type-specific settings
+
+  // Display Settings
+  rotationInterval Int     @default(10) @map("rotation_interval") // Seconds between slides
+  backgroundColor  String  @default("#000000") @map("background_color")
+  showClock        Boolean @default(false) @map("show_clock")
+  showEventName    Boolean @default(true) @map("show_event_name")
+
+  // Access Control
+  isActive Boolean @default(true) @map("is_active")
+  password String?
+
+  // Analytics
+  lastViewedAt DateTime? @map("last_viewed_at") @db.Timestamptz
+  viewCount    Int       @default(0) @map("view_count")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([partyId, slug])
+  @@index([partyId])
+  @@map("displays")
+}
+
+// ============================================
+// Staffing Widget Models
+// ============================================
+
+model Staff {
+  id          String    @id @default(uuid()) @db.Uuid
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Staff info
+  name        String
+  email       String?
+  phone       String?
+  role        String    // Role/position (e.g., "Coordinator", "Door", "Bar", "DJ", etc.)
+
+  // Status
+  status      String    @default("invited") // invited, confirmed, declined, checked_in
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+
+  // Notes
+  notes       String?
+
+  // Metadata
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, status])
+  @@map("staff")
 }

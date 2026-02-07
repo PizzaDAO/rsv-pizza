@@ -16,6 +16,9 @@ import { RSVPModal } from '../components/RSVPModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
+import { PizzaChefModal } from '../components/PizzaChefModal';
+import { PizzaDAOModal } from '../components/PizzaDAOModal';
+import { stripMarkdown } from '../lib/utils';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,6 +41,8 @@ export function EventPage() {
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showPizzaChef, setShowPizzaChef] = useState(false);
+  const [showPizzaDAO, setShowPizzaDAO] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -89,6 +94,25 @@ export function EventPage() {
     }
     loadEvent();
   }, [slug, user?.email]);
+
+  // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      const isEditable = (e.target as HTMLElement).isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
+
+      if ((e.key === 'p' || e.key === 'P') && !showPizzaChef) {
+        setShowPizzaChef(true);
+      }
+
+      if (e.key === 'Enter' && !showPizzaDAO && !showRSVPModal) {
+        setShowPizzaDAO(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPizzaChef, showPizzaDAO, showRSVPModal]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,19 +305,20 @@ export function EventPage() {
 
   const metaTitle = event.name;
 
-  // Construct description: Host • Date @ Time • Location. Description
+  // Construct description: Host * Date @ Time * Location. Description
   const detailsParts: string[] = [];
   if (event.hostName) detailsParts.push(`Hosted by ${event.hostName}`);
   if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
   if (event.address) detailsParts.push(event.address);
 
-  const details = detailsParts.join(' • ');
+  const details = detailsParts.join(' \u2022 ');
   let metaDescription = details;
 
   if (event.description) {
+    const cleanDescription = stripMarkdown(event.description);
     const remainingChars = 300 - details.length;
     if (remainingChars > 10) {
-      metaDescription += `. ${event.description.substring(0, remainingChars)}${event.description.length > remainingChars ? '...' : ''}`;
+      metaDescription += `. ${cleanDescription.substring(0, remainingChars)}${cleanDescription.length > remainingChars ? '...' : ''}`;
     }
   } else if (!metaDescription) {
     metaDescription = `Join us for ${event.name}! RSVP now.`;
@@ -461,15 +486,17 @@ export function EventPage() {
                 />
 
                 {/* Guest Count */}
-                <div className="pt-4 border-t border-white/10 mt-4">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="pt-4 border-t border-white/10 mt-4">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -668,15 +695,17 @@ export function EventPage() {
                 </div>
 
                 {/* Guest Count - Mobile */}
-                <div className="md:hidden pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="md:hidden pt-4 border-t border-white/10">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Description */}
                 {event.description && (
@@ -807,6 +836,18 @@ export function EventPage() {
       </div>
 
       <CornerLinks />
+
+      {/* Pizza Chef Easter Egg Modal */}
+      <PizzaChefModal
+        isOpen={showPizzaChef}
+        onClose={() => setShowPizzaChef(false)}
+      />
+
+      {/* PizzaDAO Easter Egg Modal */}
+      <PizzaDAOModal
+        isOpen={showPizzaDAO}
+        onClose={() => setShowPizzaDAO(false)}
+      />
     </div>
   );
 }

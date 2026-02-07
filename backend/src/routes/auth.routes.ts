@@ -229,7 +229,7 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email },
       jwtSecret,
-      { expiresIn: '30d' }
+      { expiresIn: '365d' }
     );
 
     res.json({
@@ -317,7 +317,7 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email },
       jwtSecret,
-      { expiresIn: '30d' }
+      { expiresIn: '365d' }
     );
 
     res.json({

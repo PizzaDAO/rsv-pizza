@@ -7,7 +7,11 @@ interface IconInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const IconInput = forwardRef<HTMLInputElement, IconInputProps>(
-  ({ icon: Icon, iconSize = 20, className = '', ...props }, ref) => {
+  ({ icon: Icon, iconSize = 20, className = '', placeholder, required, ...props }, ref) => {
+    const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
+      ? `${placeholder} *`
+      : placeholder;
+
     return (
       <div className="relative">
         <Icon
@@ -17,6 +21,8 @@ export const IconInput = forwardRef<HTMLInputElement, IconInputProps>(
         <input
           ref={ref}
           className={`w-full !pl-14 ${className}`}
+          placeholder={displayPlaceholder}
+          required={required}
           {...props}
         />
       </div>
