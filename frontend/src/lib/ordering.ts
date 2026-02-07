@@ -152,6 +152,16 @@ export async function createAIPhoneOrder(
     }),
   });
 
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      return { success: false, error: data.error || data.message || `Request failed with status ${response.status}` };
+    } catch {
+      return { success: false, error: `Request failed with status ${response.status}` };
+    }
+  }
+
   return response.json();
 }
 
@@ -311,6 +321,15 @@ export async function initiateAIPhoneCall(
     }),
   });
 
+  // Handle non-JSON responses (e.g., HTML 404 from backend not yet deployed)
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return {
+      success: false,
+      error: `Backend API returned non-JSON response (status ${response.status}). The ai-phone endpoint may not be deployed yet.`,
+    };
+  }
+
   const data = await response.json();
 
   // Normalize error response - backend may return {message, code} or {error}
@@ -338,6 +357,22 @@ export async function retryAIPhoneCall(
     },
   });
 
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return {
+      success: false,
+      error: `Backend API returned non-JSON response (status ${response.status}).`,
+    };
+  }
+
+  if (!response.ok) {
+    const data = await response.json();
+    return {
+      success: false,
+      error: data.message || data.error || 'Failed to retry call',
+    };
+  }
+
   return response.json();
 }
 
@@ -350,6 +385,11 @@ export async function getAIPhoneCallStatus(aiPhoneCallId: string) {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Backend API returned non-JSON response (status ${response.status})`);
+  }
 
   if (!response.ok) {
     throw new Error('Failed to fetch call status');
@@ -367,6 +407,11 @@ export async function getAIPhoneCallTranscript(aiPhoneCallId: string) {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Backend API returned non-JSON response (status ${response.status})`);
+  }
 
   if (!response.ok) {
     throw new Error('Failed to fetch transcript');

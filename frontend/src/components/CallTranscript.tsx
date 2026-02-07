@@ -41,6 +41,11 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
           },
         });
 
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Backend API returned non-JSON response (status ${response.status})`);
+        }
+
         if (!response.ok) {
           throw new Error('Failed to fetch transcript');
         }

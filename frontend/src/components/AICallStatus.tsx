@@ -51,6 +51,11 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
           },
         });
 
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Backend API returned non-JSON response (status ${response.status}). The ai-phone endpoint may not be deployed yet.`);
+        }
+
         if (!response.ok) {
           throw new Error('Failed to fetch call status');
         }

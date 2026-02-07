@@ -174,7 +174,9 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
     const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
 
     try {
-      // Use backend API if partyId is available (enables call tracking)
+      // Try backend API first if partyId is available (enables call tracking)
+      let useEdgeFunctionFallback = !partyId;
+
       if (partyId) {
         const result = await initiateAIPhoneCall(
           partyId,
@@ -192,11 +194,17 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         if (result.success && result.aiPhoneCallId) {
           setAiPhoneCallId(result.aiPhoneCallId);
           setStep('calling');
+        } else if (result.error && result.error.includes('non-JSON response')) {
+          // Backend route not deployed yet, fall back to edge function
+          console.warn('Backend ai-phone route not available, falling back to edge function');
+          useEdgeFunctionFallback = true;
         } else {
           setError(result.error || 'Failed to initiate AI call');
         }
-      } else {
-        // Fallback to Supabase edge function (legacy flow without call tracking)
+      }
+
+      if (useEdgeFunctionFallback) {
+        // Fallback to Supabase edge function (works without backend deployment)
         let virtualCardDetails = undefined;
 
         // If paying with card, create virtual card
