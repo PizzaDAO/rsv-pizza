@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserPlus, Loader2, Filter, Check, Clock, X, LogIn } from 'lucide-react';
+import { UserPlus, Loader2, Check, Clock, X, LogIn } from 'lucide-react';
 import { Staff, StaffStatus, StaffStats } from '../../types';
 import { getPartyStaff, getStaffStats, createStaff, updateStaff, deleteStaff } from '../../lib/api';
 import { StaffCard } from './StaffCard';
@@ -62,7 +62,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
   useEffect(() => {
     loadStaff();
     loadStats();
-  }, [partyId, filter]);
+  }, [loadStaff, loadStats]);
 
   const handleAddClick = () => {
     setEditingStaff(null);
