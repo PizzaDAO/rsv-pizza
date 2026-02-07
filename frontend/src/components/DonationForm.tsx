@@ -12,8 +12,8 @@ const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
   : null;
 
-// Crypto donation address
-const CRYPTO_ADDRESS = 'dreadpizzaroberts.eth';
+// Default crypto donation address (fallback if host hasn't set one)
+const DEFAULT_CRYPTO_ADDRESS = 'dreadpizzaroberts.eth';
 
 interface DonationFormProps {
   partyId: string;
@@ -156,12 +156,13 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
 // Crypto donation component
 const CryptoDonation: React.FC<{
   onSuccess?: () => void;
-}> = ({ onSuccess }) => {
+  cryptoAddress: string;
+}> = ({ onSuccess, cryptoAddress }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(CRYPTO_ADDRESS);
+      await navigator.clipboard.writeText(cryptoAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -179,7 +180,7 @@ const CryptoDonation: React.FC<{
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <div className="flex items-center justify-between gap-2">
             <code className="text-[#ff393a] font-mono text-sm break-all">
-              {CRYPTO_ADDRESS}
+              {cryptoAddress}
             </code>
             <button
               type="button"
@@ -204,7 +205,7 @@ const CryptoDonation: React.FC<{
       </div>
 
       <a
-        href={`https://etherscan.io/address/${CRYPTO_ADDRESS}`}
+        href={`https://etherscan.io/address/${cryptoAddress}`}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 text-white/60 hover:text-white text-sm transition-colors"
@@ -249,6 +250,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const suggestedAmounts = stats.suggestedAmounts || [500, 1000, 2500, 5000];
+  const cryptoAddress = stats.donationEthAddress || DEFAULT_CRYPTO_ADDRESS;
 
   const finalAmount = selectedAmount || (customAmount ? Math.round(parseFloat(customAmount) * 100) : 0);
 
@@ -327,7 +329,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         >
           &larr; Back to payment options
         </button>
-        <CryptoDonation onSuccess={onSuccess} />
+        <CryptoDonation onSuccess={onSuccess} cryptoAddress={cryptoAddress} />
       </div>
     );
   }

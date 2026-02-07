@@ -90,6 +90,7 @@ export interface UpdatePartyData {
   donationMessage?: string | null;
   suggestedAmounts?: number[];
   donationRecipient?: string | null;
+  donationEthAddress?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -144,6 +145,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       donationMessage: data.donationMessage,
       suggestedAmounts: data.suggestedAmounts,
       donationRecipient: data.donationRecipient,
+      donationEthAddress: data.donationEthAddress,
     },
   });
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Target, MessageSquare, User, Plus, X, Loader2 } from 'lucide-react';
+import { DollarSign, Target, MessageSquare, User, Plus, X, Loader2, Wallet } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { Checkbox } from './Checkbox';
@@ -12,6 +12,8 @@ export const DonationSettings: React.FC = () => {
   const [donationGoal, setDonationGoal] = useState('');
   const [donationMessage, setDonationMessage] = useState('');
   const [donationRecipient, setDonationRecipient] = useState('');
+  const [donationEthAddress, setDonationEthAddress] = useState('');
+  const [walletValidation, setWalletValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [suggestedAmounts, setSuggestedAmounts] = useState<number[]>([500, 1000, 2500, 5000]);
   const [newAmount, setNewAmount] = useState('');
   const [savingField, setSavingField] = useState<string | null>(null);
@@ -23,6 +25,10 @@ export const DonationSettings: React.FC = () => {
       setDonationGoal(party.donationGoal ? String(party.donationGoal) : '');
       setDonationMessage(party.donationMessage || '');
       setDonationRecipient(party.donationRecipient || '');
+      setDonationEthAddress(party.donationEthAddress || '');
+      if (party.donationEthAddress) {
+        validateWalletAddress(party.donationEthAddress);
+      }
       setSuggestedAmounts(party.suggestedAmounts || [500, 1000, 2500, 5000]);
     }
   }, [party]);
@@ -70,6 +76,24 @@ export const DonationSettings: React.FC = () => {
 
   const handleRecipientBlur = async () => {
     await saveField('donationRecipient', { donation_recipient: donationRecipient || null });
+  };
+
+  const validateWalletAddress = (address: string) => {
+    if (!address.trim()) {
+      setWalletValidation('idle');
+      return;
+    }
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
+    if (ethAddressRegex.test(address.trim()) || ensRegex.test(address.trim())) {
+      setWalletValidation('valid');
+    } else {
+      setWalletValidation('invalid');
+    }
+  };
+
+  const handleEthAddressBlur = async () => {
+    await saveField('donationEthAddress', { donation_eth_address: donationEthAddress || null });
   };
 
   const addSuggestedAmount = async () => {
@@ -134,6 +158,24 @@ export const DonationSettings: React.FC = () => {
             onBlur={handleRecipientBlur}
             placeholder="Recipient name"
           />
+
+          {/* ETH Address */}
+          <div className="relative">
+            <IconInput
+              icon={Wallet}
+              type="text"
+              value={donationEthAddress}
+              onChange={(e) => {
+                setDonationEthAddress(e.target.value);
+                validateWalletAddress(e.target.value);
+              }}
+              onBlur={handleEthAddressBlur}
+              placeholder="ETH/ENS address for crypto donations (e.g. vitalik.eth)"
+            />
+            {walletValidation === 'invalid' && donationEthAddress.trim() && (
+              <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
+            )}
+          </div>
 
           {/* Donation Goal */}
           <IconInput

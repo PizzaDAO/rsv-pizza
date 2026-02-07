@@ -73,6 +73,7 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
         donationGoal: true,
         donationMessage: true,
         donationRecipient: true,
+        donationEthAddress: true,
         suggestedAmounts: true,
       },
     });
@@ -122,6 +123,7 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       message: party.donationMessage,
       recipient: party.donationRecipient,
       suggestedAmounts: party.suggestedAmounts,
+      donationEthAddress: party.donationEthAddress,
       recentDonors,
     });
   } catch (error) {

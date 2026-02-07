@@ -141,6 +141,7 @@ export interface DbParty {
   donation_message?: string | null;
   suggested_amounts?: number[];
   donation_recipient?: string | null;
+  donation_eth_address?: string | null;
 }
 
 export interface DbGuest {
@@ -406,7 +407,8 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
     require_approval, venue_name,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
-    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient
+    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
+    donation_eth_address
   `;
 
   let party: DbParty | null = null;
@@ -863,6 +865,7 @@ export async function updateParty(
     donation_message?: string | null;
     suggested_amounts?: number[];
     donation_recipient?: string | null;
+    donation_eth_address?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -890,6 +893,7 @@ export async function updateParty(
         donationMessage: updates.donation_message,
         suggestedAmounts: updates.suggested_amounts,
         donationRecipient: updates.donation_recipient,
+        donationEthAddress: updates.donation_eth_address,
       });
       return true;
     } catch (error) {
