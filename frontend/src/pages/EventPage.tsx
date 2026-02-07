@@ -52,8 +52,9 @@ export function EventPage() {
           setEvent(foundEvent);
 
           // Check if logged-in user has already RSVP'd and fetch their data
+          let hasRSVPd = false;
           if (user?.email) {
-            const hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
+            hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
             setUserHasRSVPd(hasRSVPd);
 
             if (hasRSVPd) {
@@ -63,8 +64,14 @@ export function EventPage() {
             }
           }
 
-          // Check if event has password protection
-          if (foundEvent.hasPassword) {
+          // Check if current user is a host (primary or co-host)
+          const isHost = user?.id === foundEvent.userId ||
+            (user?.email && foundEvent.coHosts?.some((h: any) => h.email?.toLowerCase() === user.email?.toLowerCase()));
+
+          // Skip password for hosts and already-RSVP'd guests
+          if (isHost || hasRSVPd) {
+            setIsAuthenticated(true);
+          } else if (foundEvent.hasPassword) {
             // Check if already authenticated in this session
             // Use inviteCode as key to be consistent with RSVPPage
             const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
@@ -222,6 +229,7 @@ export function EventPage() {
                 className="w-full"
                 required
                 autoFocus
+                autoComplete="off"
               />
             </div>
 
