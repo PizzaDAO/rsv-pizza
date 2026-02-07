@@ -43,7 +43,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
     if (result) {
       setRaffles(result.raffles);
     } else {
-      setError('Failed to load raffles');
+      setRaffles([]);
     }
     setLoading(false);
   }, [partyId]);
