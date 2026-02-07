@@ -1,12 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX, CheckCircle2, Loader2 } from 'lucide-react';
+import { UserRoundX, Search, CheckCircle2 } from 'lucide-react';
+import { IconInput } from './IconInput';
 import { checkInGuest } from '../lib/api';
 
 export const GuestList: React.FC = () => {
   const { guests, removeGuest, approveGuest, declineGuest, party, loadParty } = usePizza();
+  const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+
+  const filteredGuests = useMemo(() => {
+    if (!searchQuery.trim()) return guests;
+    const query = searchQuery.toLowerCase().trim();
+    return guests.filter(guest =>
+      guest.name.toLowerCase().includes(query) ||
+      (guest.email && guest.email.toLowerCase().includes(query))
+    );
+  }, [guests, searchQuery]);
 
   if (guests.length === 0) {
     return (
@@ -58,21 +69,44 @@ export const GuestList: React.FC = () => {
         </div>
       </div>
 
-      <div className="divide-y divide-white/10">
-        {guests.map(guest => (
-          <TableRow
-            key={guest.id}
-            guest={guest}
-            variant="basic"
-            requireApproval={requireApproval}
-            onApprove={approveGuest}
-            onDecline={declineGuest}
-            onRemove={removeGuest}
-            onCheckIn={handleCheckIn}
-            isCheckingIn={checkingInId === guest.id}
-          />
-        ))}
+      <div className="mb-4">
+        <IconInput
+          icon={Search}
+          type="text"
+          placeholder="Search guests by name or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
+
+      {searchQuery.trim() && (
+        <p className="text-sm text-white/50 mb-3">
+          Showing {filteredGuests.length} of {guests.length} guests
+        </p>
+      )}
+
+      {filteredGuests.length === 0 && searchQuery.trim() ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Search size={36} className="text-white/20 mb-3" />
+          <p className="text-white/50">No guests match "{searchQuery}"</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/10">
+          {filteredGuests.map(guest => (
+            <TableRow
+              key={guest.id}
+              guest={guest}
+              variant="basic"
+              requireApproval={requireApproval}
+              onApprove={approveGuest}
+              onDecline={declineGuest}
+              onRemove={removeGuest}
+              onCheckIn={handleCheckIn}
+              isCheckingIn={checkingInId === guest.id}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

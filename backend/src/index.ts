@@ -10,7 +10,11 @@ import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
+import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
+import displayRoutes from './routes/display.routes.js';
+import raffleRoutes from './routes/raffle.routes.js';
+import staffRoutes from './routes/staff.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -74,6 +78,8 @@ app.use('/api/rsvp', rsvpLimiter);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', donationRoutes); // Donation routes (some are public)
+app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', partyRoutes); // Party routes have global auth
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
@@ -81,6 +87,9 @@ app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
+app.use('/api/parties', displayRoutes); // Display routes (host management)
+app.use('/api/display', displayRoutes); // Public display viewer routes
+app.use('/api/parties', raffleRoutes); // Raffle routes (some public, some require auth)
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);

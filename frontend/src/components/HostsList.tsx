@@ -9,6 +9,7 @@ interface CoHost {
   twitter?: string;
   instagram?: string;
   showOnEvent?: boolean;
+  canEdit?: boolean;
 }
 
 // Host profile from user account (matches API response)

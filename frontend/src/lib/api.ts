@@ -13,6 +13,9 @@ interface ApiOptions {
   requireAuth?: boolean;
 }
 
+// Custom event name for auth expiration
+export const AUTH_EXPIRED_EVENT = 'auth-expired';
+
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiOptions = {}
@@ -38,7 +41,18 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401 && requireAuth) {
+      // Clear the invalid token
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+
+      // Dispatch custom event for AuthContext to handle
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+    }
+
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
+
     throw new Error(error.message || `API error: ${response.status}`);
   }
 
