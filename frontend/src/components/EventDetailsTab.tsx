@@ -13,7 +13,7 @@ import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
 
 export const EventDetailsTab: React.FC = () => {
-  const { party, loadParty } = usePizza();
+  const { party } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -66,6 +66,7 @@ export const EventDetailsTab: React.FC = () => {
   const [showAddHostModal, setShowAddHostModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toast, setToast] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
   // Track original values to detect changes
@@ -493,10 +494,8 @@ export const EventDetailsTab: React.FC = () => {
         }
 
         setSaved(true);
-        // Refresh party data from server
-        if (party?.inviteCode) {
-          await loadParty(party.inviteCode);
-        }
+        setToast(true);
+        setTimeout(() => setToast(false), 2000);
         // Update original values to match current form state
         setOriginalValues({
           name: name.trim(),
@@ -567,10 +566,8 @@ export const EventDetailsTab: React.FC = () => {
     try {
       const success = await updateParty(party.id, updates);
       if (success) {
-        // Refresh party data from server
-        if (party?.inviteCode) {
-          await loadParty(party.inviteCode);
-        }
+        setToast(true);
+        setTimeout(() => setToast(false), 2000);
         // Update original values for the saved fields
         setOriginalValues((prev: any) => ({
           ...prev,
@@ -752,6 +749,12 @@ export const EventDetailsTab: React.FC = () => {
   }
 
   return (
+    <>
+    {toast && (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#39d98a]/90 text-black text-sm font-medium px-4 py-2 rounded-xl shadow-lg animate-fade-in">
+        Event updated
+      </div>
+    )}
     <div className="card p-8">
       <div className="space-y-3">
         {/* Name */}
@@ -1536,5 +1539,6 @@ export const EventDetailsTab: React.FC = () => {
       )}
 
     </div>
+    </>
   );
 };
