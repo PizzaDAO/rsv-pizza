@@ -405,7 +405,37 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
   }
 }
 
+// GPP API functions
 // ============================================
+
+export interface CreateGPPEventData {
+  city: string;
+  hostName: string;
+  email: string;
+}
+
+export interface GPPEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    eventType: string;
+    eventTags: string[];
+  };
+  hostPageUrl: string;
+  eventPageUrl: string;
+  message: string;
+}
+
+export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEventResponse> {
+  return apiRequest<GPPEventResponse>('/api/gpp/events', {
+    method: 'POST',
+    body: data,
+    requireAuth: false,
+  });
+}
+
 // Budget API functions
 // ============================================
 
