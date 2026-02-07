@@ -84,8 +84,8 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
-  const handleBlur = () => {
-    // Save immediately on blur if there's a pending change
+  const handleSaveGoal = () => {
+    // Save immediately if there's a pending change
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -123,13 +123,23 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
                 type="number"
                 value={goalInput}
                 onChange={e => handleGoalChange(e.target.value)}
-                onBlur={handleBlur}
-                onKeyDown={e => e.key === 'Enter' && handleBlur()}
+                onBlur={handleSaveGoal}
+                onKeyDown={e => e.key === 'Enter' && handleSaveGoal()}
                 placeholder="Goal amount"
                 className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
               />
-              {isSaving && (
+              {isSaving ? (
                 <Loader2 size={16} className="animate-spin text-white/40" />
+              ) : (
+                <button
+                  type="button"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={handleSaveGoal}
+                  className="flex items-center gap-1 px-2 py-1 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white text-xs rounded transition-colors"
+                >
+                  <Check size={14} />
+                  Set
+                </button>
               )}
             </div>
           ) : (

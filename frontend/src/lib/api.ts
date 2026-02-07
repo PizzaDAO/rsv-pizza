@@ -184,6 +184,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       photoModeration: data.photoModeration,
       nftEnabled: data.nftEnabled,
       nftChain: data.nftChain,
+      fundraisingGoal: data.fundraisingGoal,
     },
   });
 }

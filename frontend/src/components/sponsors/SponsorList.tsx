@@ -312,7 +312,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                   {/* Type */}
                   <td className="p-3 hidden lg:table-cell">
                     <span className="text-sm text-white/60 capitalize">
-                      {sponsor.sponsorshipType?.replace('-', ' ') || '-'}
+                      {sponsor.sponsorshipType === 'cash' ? 'Funds' : (sponsor.sponsorshipType?.replace('-', ' ') || '-')}
                     </span>
                   </td>
 

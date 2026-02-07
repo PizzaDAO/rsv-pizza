@@ -38,7 +38,7 @@ const STATUS_OPTIONS: { value: SponsorStatus; label: string; color: string }[] =
 ];
 
 const TYPE_OPTIONS: { value: SponsorshipType; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
+  { value: 'cash', label: 'Funds' },
   { value: 'in-kind', label: 'In-Kind' },
   { value: 'venue', label: 'Venue' },
   { value: 'pizza', label: 'Pizza' },
