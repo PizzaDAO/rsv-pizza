@@ -28,14 +28,6 @@ const defaultFormData: SongFormData = {
   file: null,
 };
 
-const platformOptions: { value: MusicPlatform; label: string; icon: string }[] = [
-  { value: 'spotify', label: 'Spotify', icon: '\uD83D\uDFE2' },
-  { value: 'apple_music', label: 'Apple Music', icon: '\uD83C\uDF4E' },
-  { value: 'youtube', label: 'YouTube', icon: '\uD83D\uDCFA' },
-  { value: 'soundcloud', label: 'SoundCloud', icon: '\uD83C\uDF25\uFE0F' },
-  { value: 'other', label: 'Other', icon: '\uD83C\uDFB5' },
-];
-
 // Detect platform from URL
 function detectPlatform(url: string): MusicPlatform {
   const lowercaseUrl = url.toLowerCase();
@@ -123,11 +115,11 @@ export const SongForm: React.FC<SongFormProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full p-5 my-4"
+        className="bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -154,30 +146,7 @@ export const SongForm: React.FC<SongFormProps> = ({
           <IconInput icon={User} type="text" value={formData.artist} onChange={(e) => handleChange('artist', e.target.value)} placeholder="Artist name" required />
 
           {/* URL */}
-          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange("url", e.target.value)} placeholder="https://open.spotify.com/track/..." />
-            <p className="text-xs text-white/40 mt-1">Paste a Spotify, Apple Music, YouTube, or SoundCloud link</p>
-
-          {/* Platform */}
-          <div>
-
-            <div className="flex flex-wrap gap-2">
-              {platformOptions.map((platform) => (
-                <button
-                  key={platform.value}
-                  type="button"
-                  onClick={() => handleChange('platform', platform.value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 ${
-                    formData.platform === platform.value
-                      ? 'bg-[#ff393a] text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20'
-                  }`}
-                >
-                  <span>{platform.icon}</span>
-                  <span>{platform.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange("url", e.target.value)} placeholder="Paste a link (Spotify, Apple Music, YouTube, etc.)" />
 
 
           {/* File Upload */}

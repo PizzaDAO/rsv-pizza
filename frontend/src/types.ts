@@ -359,6 +359,7 @@ export interface Song {
   artist: string;
   platform: MusicPlatform;
   url: string | null;
+  fileUrl: string | null;
   addedBy: string | null;
   sortOrder: number;
   createdAt: string;
