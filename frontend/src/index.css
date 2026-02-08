@@ -82,6 +82,9 @@ input[type="password"],
 input[type="url"],
 input[type="date"],
 input[type="datetime-local"],
+input[type="tel"],
+input[type="time"],
+input[type="search"],
 textarea,
 select {
   background: rgba(255, 255, 255, 0.06);
@@ -111,6 +114,9 @@ input[type="email"],
 input[type="number"],
 input[type="password"],
 input[type="url"],
+input[type="tel"],
+input[type="time"],
+input[type="search"],
 textarea {
   text-align: left !important;
 }
