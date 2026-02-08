@@ -13,6 +13,9 @@ interface ApiOptions {
   requireAuth?: boolean;
 }
 
+// Custom event name for auth expiration
+export const AUTH_EXPIRED_EVENT = 'auth-expired';
+
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiOptions = {}
@@ -38,14 +41,17 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-
-    // If token is expired or invalid, clear auth and trigger re-login
+    // Handle 401 Unauthorized - token expired or invalid
     if (response.status === 401 && requireAuth) {
+      // Clear the invalid token
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      window.dispatchEvent(new CustomEvent('auth-expired'));
+
+      // Dispatch custom event for AuthContext to handle
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
     }
+
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
 
     throw new Error(error.message || `API error: ${response.status}`);
   }
@@ -452,5 +458,44 @@ export async function verifyTweet(slug: string, tweetUrl: string): Promise<{ ver
     method: 'POST',
     body: { tweetUrl },
     requireAuth: false,
+  });
+}
+
+// Check-in API functions
+export interface CheckInResponse {
+  success: boolean;
+  alreadyCheckedIn: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: string;
+    checkedInBy?: string;
+  };
+  message: string;
+}
+
+export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
+  return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'POST',
+    requireAuth: true,
+  });
+}
+
+export interface CheckInStatusResponse {
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt?: string;
+    checkedInBy?: string;
+  };
+  isCheckedIn: boolean;
+}
+
+export async function getCheckInStatus(inviteCode: string, guestId: string): Promise<CheckInStatusResponse> {
+  return apiRequest<CheckInStatusResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'GET',
+    requireAuth: true,
   });
 }

@@ -20,6 +20,7 @@ import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
+import { stripMarkdown } from '../lib/utils';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -58,8 +59,9 @@ export function EventPage() {
           setEvent(foundEvent);
 
           // Check if logged-in user has already RSVP'd and fetch their data
+          let hasRSVPd = false;
           if (user?.email) {
-            const hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
+            hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
             setUserHasRSVPd(hasRSVPd);
 
             if (hasRSVPd) {
@@ -69,25 +71,23 @@ export function EventPage() {
             }
           }
 
-          // Check if event has password protection
-          if (foundEvent.hasPassword) {
-            // Skip password for logged-in guests (hosts are added as guests too)
-            const userIsGuest = user?.email && await isUserGuestAtParty(foundEvent.id, user.email);
-            const userIsHost = user?.id && user.id === foundEvent.userId;
+          // Check if current user is a host (primary or co-host)
+          const isHost = user?.id === foundEvent.userId ||
+            (user?.email && foundEvent.coHosts?.some((h: any) => h.email?.toLowerCase() === user.email?.toLowerCase()));
 
-            if (userIsGuest || userIsHost) {
-              setIsAuthenticated(true);
-            } else {
-              // Check if already authenticated in this session
-              // Use inviteCode as key to be consistent with RSVPPage
-              const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
-              const storedAuth = sessionStorage.getItem(authKey);
+          // Skip password for hosts and already-RSVP'd guests
+          if (isHost || hasRSVPd) {
+            setIsAuthenticated(true);
+          } else if (foundEvent.hasPassword) {
+            // Check if already authenticated in this session
+            // Use inviteCode as key to be consistent with RSVPPage
+            const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
+            const storedAuth = sessionStorage.getItem(authKey);
 
-              if (storedAuth) {
-                const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
-                if (isValid) {
-                  setIsAuthenticated(true);
-                }
+            if (storedAuth) {
+              const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
+              if (isValid) {
+                setIsAuthenticated(true);
               }
             }
           } else {
@@ -253,6 +253,7 @@ export function EventPage() {
               placeholder="What's the password?"
               required
               autoFocus
+              autoComplete="off"
             />
 
             <button
@@ -422,9 +423,10 @@ export function EventPage() {
   let metaDescription = details;
 
   if (event.description) {
+    const cleanDescription = stripMarkdown(event.description);
     const remainingChars = 300 - details.length;
     if (remainingChars > 10) {
-      metaDescription += `. ${event.description.substring(0, remainingChars)}${event.description.length > remainingChars ? '...' : ''}`;
+      metaDescription += `. ${cleanDescription.substring(0, remainingChars)}${cleanDescription.length > remainingChars ? '...' : ''}`;
     }
   } else if (!metaDescription) {
     metaDescription = `Join us for ${event.name}! RSVP now.`;

@@ -237,6 +237,7 @@ export interface DbParty {
   address: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
+  selected_pizzerias: any[] | null;
   co_hosts: any[];
   share_to_unlock?: boolean;
   share_tweet_text?: string | null;
@@ -260,6 +261,8 @@ export interface DbGuest {
   submitted_at: string;
   submitted_via: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
 }
 
 // Party operations
@@ -504,6 +507,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const safeColumns = `
     id, name, invite_code, custom_url, date, duration, timezone,
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+    require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
     share_to_unlock, share_tweet_text
   `;
@@ -957,6 +961,7 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    selected_pizzerias?: any[];  // Pizzeria objects
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
   }
@@ -976,6 +981,7 @@ export async function updateParty(
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
+        selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,
         description: updates.description,

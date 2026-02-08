@@ -34,6 +34,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         selectedPizzerias: true,
         eventType: true,
         eventTags: true,
+        donationEnabled: true,
         shareToUnlock: true,
         shareTweetText: true,
         password: true, // Just to check if it exists
@@ -82,6 +83,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           selectedPizzerias: true,
           eventType: true,
           eventTags: true,
+          donationEnabled: true,
           shareToUnlock: true,
           shareTweetText: true,
           password: true,
@@ -144,6 +146,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
         eventTags: party.eventTags,
+        donationEnabled: party.donationEnabled,
         shareToUnlock: party.shareToUnlock,
         shareTweetText: party.shareTweetText,
         hasPassword: !!party.password,

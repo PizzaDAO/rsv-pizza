@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX } from 'lucide-react';
+import { UserRoundX, Search, CheckCircle2 } from 'lucide-react';
+import { IconInput } from './IconInput';
+import { checkInGuest } from '../lib/api';
 
 export const GuestList: React.FC = () => {
-  const { guests, removeGuest, approveGuest, declineGuest, party } = usePizza();
+  const { guests, removeGuest, approveGuest, declineGuest, party, loadParty } = usePizza();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [checkingInId, setCheckingInId] = useState<string | null>(null);
+
+  const filteredGuests = useMemo(() => {
+    if (!searchQuery.trim()) return guests;
+    const query = searchQuery.toLowerCase().trim();
+    return guests.filter(guest =>
+      guest.name.toLowerCase().includes(query) ||
+      (guest.email && guest.email.toLowerCase().includes(query))
+    );
+  }, [guests, searchQuery]);
 
   if (guests.length === 0) {
     return (
@@ -20,6 +33,25 @@ export const GuestList: React.FC = () => {
 
   const requireApproval = party?.requireApproval || false;
 
+  // Count checked-in guests
+  const checkedInCount = guests.filter(g => g.checkedInAt).length;
+
+  // Handle manual check-in
+  const handleCheckIn = async (guestId: string) => {
+    if (!party?.inviteCode || !guestId) return;
+
+    setCheckingInId(guestId);
+    try {
+      await checkInGuest(party.inviteCode, guestId);
+      // Reload party data to get updated check-in status
+      await loadParty(party.inviteCode);
+    } catch (error) {
+      console.error('Failed to check in guest:', error);
+    } finally {
+      setCheckingInId(null);
+    }
+  };
+
   return (
     <div className="card p-6">
       <div className="flex justify-between items-center mb-4">
@@ -28,22 +60,53 @@ export const GuestList: React.FC = () => {
           <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
             {guests.length}
           </span>
+          {checkedInCount > 0 && (
+            <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
+              <CheckCircle2 size={14} />
+              {checkedInCount} checked in
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="divide-y divide-white/10">
-        {guests.map(guest => (
-          <TableRow
-            key={guest.id}
-            guest={guest}
-            variant="basic"
-            requireApproval={requireApproval}
-            onApprove={approveGuest}
-            onDecline={declineGuest}
-            onRemove={removeGuest}
-          />
-        ))}
+      <div className="mb-4">
+        <IconInput
+          icon={Search}
+          type="text"
+          placeholder="Search guests by name or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
+
+      {searchQuery.trim() && (
+        <p className="text-sm text-white/50 mb-3">
+          Showing {filteredGuests.length} of {guests.length} guests
+        </p>
+      )}
+
+      {filteredGuests.length === 0 && searchQuery.trim() ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Search size={36} className="text-white/20 mb-3" />
+          <p className="text-white/50">No guests match "{searchQuery}"</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/10">
+          {filteredGuests.map(guest => (
+            <TableRow
+              key={guest.id}
+              guest={guest}
+              variant="basic"
+              requireApproval={requireApproval}
+              onApprove={approveGuest}
+              onDecline={declineGuest}
+              onRemove={removeGuest}
+              onCheckIn={handleCheckIn}
+              isCheckingIn={checkingInId === guest.id}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

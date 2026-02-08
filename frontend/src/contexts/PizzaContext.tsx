@@ -66,6 +66,8 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
     submittedAt: dbGuest.submitted_at,
     approved: dbGuest.approved ?? null,
+    checkedInAt: dbGuest.checked_in_at ?? null,
+    checkedInBy: dbGuest.checked_in_by ?? null,
   };
 }
 
@@ -94,6 +96,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || [],
+    selectedPizzerias: dbParty.selected_pizzerias || [],
+    venueName: dbParty.venue_name,
     shareToUnlock: dbParty.share_to_unlock || false,
     shareTweetText: dbParty.share_tweet_text || null,
     createdAt: dbParty.created_at,

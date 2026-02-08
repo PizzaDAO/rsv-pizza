@@ -75,6 +75,43 @@ model Party {
   donationMessage    String?   @map("donation_message")
   suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
   donationRecipient  String?   @map("donation_recipient")
+  donationEthAddress String?   @map("donation_eth_address")
+
+  // Share-to-unlock settings
+  shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
+  shareTweetText   String?  @map("share_tweet_text")
+
+  // Music settings
+  musicEnabled Boolean @default(false) @map("music_enabled")
+  musicNotes   String? @map("music_notes")
+
+  // Fundraising (Sponsor CRM)
+  fundraisingGoal Decimal? @map("fundraising_goal") @db.Decimal(10, 2)
+
+  // Budget settings
+  budgetEnabled Boolean  @default(false) @map("budget_enabled")
+  budgetTotal   Decimal? @map("budget_total") @db.Decimal(10, 2)
+
+  // Report-specific fields
+  reportRecap        String?   @map("report_recap")       // Host-written event summary
+  reportVideoUrl     String?   @map("report_video_url")   // Link to party video
+  reportPhotosUrl    String?   @map("report_photos_url")  // Link to raw photos/video
+  flyerArtist        String?   @map("flyer_artist")       // Flyer artist credit
+
+  // KPI tracking
+  xPostUrl           String?   @map("x_post_url")         // Main X/Twitter post
+  xPostViews         Int?      @map("x_post_views")       // X post view count
+  farcasterPostUrl   String?   @map("farcaster_post_url") // Main Farcaster post
+  farcasterViews     Int?      @map("farcaster_views")    // Farcaster view count
+  lumaUrl            String?   @map("luma_url")           // Luma event URL
+  lumaViews          Int?      @map("luma_views")         // Luma page views
+  poapEventId        String?   @map("poap_event_id")      // POAP event ID
+  poapMints          Int?      @map("poap_mints")         // POAP mint count
+  poapMoments        Int?      @map("poap_moments")       // POAP moments count
+
+  // Report settings
+  reportPublished    Boolean   @default(false) @map("report_published")
+  reportPublicSlug   String?   @unique @map("report_public_slug")
 
   // Share-to-unlock settings
   shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
@@ -83,10 +120,19 @@ model Party {
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests    Guest[]
-  orders    Order[]
-  photos    Photo[]
-  donations Donation[]
+  guests      Guest[]
+  orders      Order[]
+  photos      Photo[]
+  donations   Donation[]
+  raffles     Raffle[]
+  displays    Display[]
+  staff       Staff[]
+  performers  Performer[]
+  venues      Venue[]
+  sponsors         Sponsor[]
+  budgetItems      BudgetItem[]
+  socialPosts      SocialPost[]
+  notableAttendees NotableAttendee[]
 
   @@map("parties")
 }
@@ -97,6 +143,7 @@ model Guest {
   email               String?  @db.VarChar
   ethereumAddress     String?  @map("ethereum_address") @db.VarChar
   roles               String[]
+  role                String?  // Single role for report chart: "dev", "designer", "artist", etc.
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")
@@ -113,14 +160,53 @@ model Guest {
   nftTransactionHash String?   @map("nft_transaction_hash")
   nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
 
+  // Check-in fields
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+  checkedInBy String?   @map("checked_in_by")
+
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   pizzaMappings GuestPizzaMapping[]
   photos        Photo[]
   donations     Donation[]
+  raffleEntries RaffleEntry[]
+  raffleWins    RaffleWinner[]
 
   @@map("guests")
+}
+
+// Social media posts about the event (for reports)
+model SocialPost {
+  id           String   @id @default(uuid()) @db.Uuid
+  partyId      String   @map("party_id") @db.Uuid
+  party        Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  platform     String   // "twitter", "farcaster", "instagram"
+  url          String   // Full URL to the post
+  authorHandle String?  @map("author_handle")
+
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("social_posts")
+}
+
+// Notable attendees for event reports
+model NotableAttendee {
+  id        String   @id @default(uuid()) @db.Uuid
+  partyId   String   @map("party_id") @db.Uuid
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name      String   // Person or company name
+  link      String?  // Optional link to profile/website
+
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("notable_attendees")
 }
 
 model Donation {
@@ -346,4 +432,304 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@map("photos")
+}
+
+// ============================================
+// Raffle Widget Models
+// ============================================
+
+model Raffle {
+  id              String    @id @default(uuid()) @db.Uuid
+  partyId         String    @map("party_id") @db.Uuid
+  party           Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name            String    @db.VarChar(255)
+  description     String?
+  status          String    @default("draft") @db.VarChar(50) // draft, open, closed, drawn
+  entriesPerGuest Int       @default(1) @map("entries_per_guest")
+
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  prizes          RafflePrize[]
+  entries         RaffleEntry[]
+  winners         RaffleWinner[]
+
+  @@index([partyId])
+  @@map("raffles")
+}
+
+model RafflePrize {
+  id          String    @id @default(uuid()) @db.Uuid
+  raffleId    String    @map("raffle_id") @db.Uuid
+  raffle      Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  name        String    @db.VarChar(255)
+  description String?
+  imageUrl    String?   @map("image_url")
+  quantity    Int       @default(1)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  winners     RaffleWinner[]
+
+  @@index([raffleId])
+  @@map("raffle_prizes")
+}
+
+model RaffleEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  raffleId  String   @map("raffle_id") @db.Uuid
+  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  guestId   String   @map("guest_id") @db.Uuid
+  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([raffleId, guestId])
+  @@index([raffleId])
+  @@index([guestId])
+  @@map("raffle_entries")
+}
+
+model RaffleWinner {
+  id        String    @id @default(uuid()) @db.Uuid
+  raffleId  String    @map("raffle_id") @db.Uuid
+  raffle    Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  prizeId   String    @map("prize_id") @db.Uuid
+  prize     RafflePrize @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  guestId   String    @map("guest_id") @db.Uuid
+  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  claimedAt DateTime? @map("claimed_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([raffleId])
+  @@index([guestId])
+  @@map("raffle_winners")
+}
+
+// ============================================
+// Display Widget Models
+// ============================================
+
+model Display {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name String
+  slug String
+
+  // Content Configuration
+  contentType   String @default("slideshow") @map("content_type") // slideshow, qr_code, event_info, photos, custom
+  contentConfig Json   @default("{}") @map("content_config") // Type-specific settings
+
+  // Display Settings
+  rotationInterval Int     @default(10) @map("rotation_interval") // Seconds between slides
+  backgroundColor  String  @default("#000000") @map("background_color")
+  showClock        Boolean @default(false) @map("show_clock")
+  showEventName    Boolean @default(true) @map("show_event_name")
+
+  // Access Control
+  isActive Boolean @default(true) @map("is_active")
+  password String?
+
+  // Analytics
+  lastViewedAt DateTime? @map("last_viewed_at") @db.Timestamptz
+  viewCount    Int       @default(0) @map("view_count")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([partyId, slug])
+  @@index([partyId])
+  @@map("displays")
+}
+
+// ============================================
+// Staffing Widget Models
+// ============================================
+
+model Staff {
+  id          String    @id @default(uuid()) @db.Uuid
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Staff info
+  name        String
+  email       String?
+  phone       String?
+  role        String    // Role/position (e.g., "Coordinator", "Door", "Bar", "DJ", etc.)
+
+  // Status
+  status      String    @default("invited") // invited, confirmed, declined, checked_in
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz
+  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
+
+  // Notes
+  notes       String?
+
+  // Metadata
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, status])
+  @@map("staff")
+}
+
+// ============================================
+// Music/DJ Lineup Models
+// ============================================
+
+model Performer {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name  String                    // DJ/performer name
+  type  String @default("dj")     // dj, live_band, solo, playlist
+  genre String?                   // Music genre/style
+
+  // Schedule
+  setTime     String? @map("set_time")     // Time as string (e.g., "21:00")
+  setDuration Int?    @map("set_duration") // Duration in minutes
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  // Contact
+  contactName  String? @map("contact_name")
+  contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
+  instagram    String?
+  soundcloud   String?
+
+  // Status
+  status String @default("confirmed") // pending, confirmed, cancelled
+
+  // Logistics
+  equipmentProvided Boolean @default(false) @map("equipment_provided")
+  equipmentNotes    String? @map("equipment_notes")
+  fee               Decimal? @db.Decimal(10, 2)
+  feePaid           Boolean @default(false) @map("fee_paid")
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, sortOrder])
+  @@map("performers")
+}
+
+// ============================================
+// Venue Model (for venue picker tool)
+// ============================================
+
+model Venue {
+  id           String    @id @default(uuid()) @db.Uuid
+  partyId      String    @map("party_id") @db.Uuid
+  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Venue info
+  name         String
+  address      String?
+  website      String?
+  capacity     Int?
+  cost         Decimal?  @db.Decimal(10, 2)
+  organization String?
+
+  // Contact
+  pointPerson   String?  @map("point_person")
+  contactName   String?  @map("contact_name")
+  contactEmail  String?  @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+
+  // Status tracking
+  status       String    @default("researching")  // researching, contacted, negotiating, confirmed, deposit_paid, paid_in_full, declined
+
+  // Selection
+  isSelected   Boolean   @default(false) @map("is_selected")
+
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, isSelected])
+  @@map("venues")
+}
+
+// ============================================
+// Sponsor CRM Models
+// ============================================
+
+model Sponsor {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name         String  // Sponsor/company name
+  website      String? // Company website
+  brandTwitter String? @map("brand_twitter") // Brand's X/Twitter handle
+
+  // Contact Info
+  pointPerson    String? @map("point_person") // Who's managing this relationship
+  contactName    String? @map("contact_name") // Contact at the sponsor company
+  contactEmail   String? @map("contact_email")
+  contactPhone   String? @map("contact_phone")
+  contactTwitter String? @map("contact_twitter") // Contact person's X/Twitter handle
+  telegram       String? // Telegram handle
+
+  // Pipeline Status: todo, asked, yes, billed, paid, stuck, alum, skip
+  status String @default("todo")
+
+  // Fundraising
+  amount          Decimal? @db.Decimal(10, 2) // Contribution amount
+  sponsorshipType String?  @map("sponsorship_type") // cash, in-kind, venue, pizza, drinks, other
+  productService  String?  @map("product_service") // For non-monetary contributions
+
+  // Assets (for confirmed sponsors)
+  logoUrl String? @map("logo_url")
+
+  // Tracking
+  notes           String? // Communication history, notes
+  lastContactedAt DateTime? @map("last_contacted_at") @db.Timestamptz
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, status])
+  @@index([partyId, createdAt])
+  @@map("sponsors")
+}
+
+// ============================================
+// Budget Models
+// ============================================
+
+model BudgetItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String
+  cost        Decimal  @db.Decimal(10, 2)
+  status      String   @default("pending")
+
+  pointPerson String?  @map("point_person")
+  notes       String?
+  receiptUrl  String?  @map("receipt_url")
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, category])
+  @@map("budget_items")
 }
