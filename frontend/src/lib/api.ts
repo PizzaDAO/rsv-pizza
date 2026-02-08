@@ -99,6 +99,8 @@ export interface UpdatePartyData {
   description?: string | null;
   customUrl?: string | null;
   coHosts?: any[];
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -123,6 +125,8 @@ export async function createPartyApi(data: CreatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      shareToUnlock: data.shareToUnlock,
+      shareTweetText: data.shareTweetText,
     },
   });
 }
@@ -148,6 +152,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      shareToUnlock: data.shareToUnlock,
+      shareTweetText: data.shareTweetText,
     },
   });
 }
@@ -257,6 +263,8 @@ export interface PublicEvent {
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null;
   eventTags?: string[];
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 // Public Event API (no auth required)
@@ -441,6 +449,14 @@ export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEvent
   return apiRequest<GPPEventResponse>('/api/gpp/events', {
     method: 'POST',
     body: data,
+    requireAuth: false,
+  });
+}
+
+export async function verifyTweet(slug: string, tweetUrl: string): Promise<{ verified: boolean; error?: string }> {
+  return apiRequest(`/api/events/${slug}/verify-tweet`, {
+    method: 'POST',
+    body: { tweetUrl },
     requireAuth: false,
   });
 }

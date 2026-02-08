@@ -1,13 +1,18 @@
 import React, { forwardRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 
-interface IconInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+type BaseProps = {
   icon: LucideIcon;
   iconSize?: number;
-}
+};
 
-export const IconInput = forwardRef<HTMLInputElement, IconInputProps>(
-  ({ icon: Icon, iconSize = 20, className = '', placeholder, required, ...props }, ref) => {
+type InputProps = BaseProps & React.InputHTMLAttributes<HTMLInputElement> & { multiline?: false };
+type TextareaProps = BaseProps & React.TextareaHTMLAttributes<HTMLTextAreaElement> & { multiline: true };
+
+type IconInputProps = InputProps | TextareaProps;
+
+export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
+  ({ icon: Icon, iconSize = 20, className = '', multiline, placeholder, required, ...props }, ref) => {
     const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
       ? `${placeholder} *`
       : placeholder;
@@ -16,15 +21,26 @@ export const IconInput = forwardRef<HTMLInputElement, IconInputProps>(
       <div className="relative">
         <Icon
           size={iconSize}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+          className={`absolute left-3 ${multiline ? 'top-3' : 'top-1/2 -translate-y-1/2'} text-white/40 pointer-events-none`}
         />
-        <input
-          ref={ref}
-          className={`w-full !pl-14 ${className}`}
-          placeholder={displayPlaceholder}
-          required={required}
-          {...props}
-        />
+        {multiline ? (
+          <textarea
+            ref={ref as React.Ref<HTMLTextAreaElement>}
+            className={`w-full !pl-14 resize-none ${className}`}
+            rows={(props as TextareaProps).rows || 3}
+            placeholder={displayPlaceholder}
+            required={required}
+            {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+          />
+        ) : (
+          <input
+            ref={ref as React.Ref<HTMLInputElement>}
+            className={`w-full !pl-14 ${className}`}
+            placeholder={displayPlaceholder}
+            required={required}
+            {...(props as React.InputHTMLAttributes<HTMLInputElement>)}
+          />
+        )}
       </div>
     );
   }

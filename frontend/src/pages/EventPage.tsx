@@ -4,15 +4,17 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Camera } from 'lucide-react';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Camera, Link2, LogIn } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent, getPhotoStats } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet } from '../lib/api';
+import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
+import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
@@ -43,6 +45,11 @@ export function EventPage() {
   const [showPhotos, setShowPhotos] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showTweetInput, setShowTweetInput] = useState(false);
+  const [tweetUrl, setTweetUrl] = useState('');
+  const [tweetError, setTweetError] = useState<string | null>(null);
+  const [verifyingTweet, setVerifyingTweet] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -120,6 +127,28 @@ export function EventPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPizzaChef, showPizzaDAO, showRSVPModal]);
+
+  const handleTweetVerify = async () => {
+    if (!slug || !tweetUrl.trim()) return;
+    setVerifyingTweet(true);
+    setTweetError(null);
+    try {
+      const result = await verifyTweet(slug, tweetUrl.trim());
+      if (result.verified) {
+        setIsAuthenticated(true);
+        if (event) {
+          const authKey = `rsvpizza_auth_${event.inviteCode}`;
+          sessionStorage.setItem(authKey, '__shared_on_x__');
+        }
+      } else {
+        setTweetError(result.error || 'Could not verify your tweet. Please check the URL.');
+      }
+    } catch {
+      setTweetError('Could not verify your tweet. Please try again.');
+    } finally {
+      setVerifyingTweet(false);
+    }
+  };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,29 +238,23 @@ export function EventPage() {
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
-          <p className="text-white/60 mb-6 text-center">
-            This event is password-protected
-          </p>
-
-          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+          <form onSubmit={handlePasswordSubmit} className="space-y-3 mt-4">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {passwordError}
               </div>
             )}
 
-            <div>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Event Password"
-                className="w-full"
-                required
-                autoFocus
-                autoComplete="off"
-              />
-            </div>
+            <IconInput
+              icon={Lock}
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="What's the password?"
+              required
+              autoFocus
+              autoComplete="off"
+            />
 
             <button
               type="submit"
@@ -240,16 +263,93 @@ export function EventPage() {
               Continue
             </button>
           </form>
+
+          {/* Already RSVP'd? Log in */}
+          {!user && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#ff393a] hover:bg-[#ff5a5b] text-white rounded-xl border border-[#ff393a]/30 transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+                Already RSVP'd? Log in
+              </button>
+            </div>
+          )}
+
+          {/* Post to Get In */}
+          {event.shareToUnlock && (
+            <div className="mt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-white/40 text-sm">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+              {!showTweetInput ? (
+                <button
+                  onClick={() => {
+                    const eventUrl = `https://rsv.pizza/${slug}`;
+                    const tweetText = event.shareTweetText
+                      ? event.shareTweetText + '\n\n' + eventUrl
+                      : `I'm going to ${event.name}! RSVP at ${eventUrl}`;
+                    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+                    window.open(intentUrl, '_blank');
+                    setShowTweetInput(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-white rounded-xl border border-white/10 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                  Post to Get In
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-white/60 text-sm text-center">
+                    Paste your tweet URL to unlock the event
+                  </p>
+
+                  {tweetError && (
+                    <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
+                      {tweetError}
+                    </div>
+                  )}
+
+                  <IconInput
+                    icon={Link2}
+                    type="text"
+                    value={tweetUrl}
+                    onChange={(e) => setTweetUrl(e.target.value)}
+                    placeholder="https://x.com/you/status/..."
+                  />
+
+                  <button
+                    onClick={handleTweetVerify}
+                    disabled={verifyingTweet || !tweetUrl.trim()}
+                    className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {verifyingTweet ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      'Verify & Unlock'
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+        />
       </div>
     );
   }
-
-  // Debug logging
-  console.log('DEBUG - user:', user);
-  console.log('DEBUG - user.id:', user?.id);
-  console.log('DEBUG - event.userId:', event.userId);
-  console.log('DEBUG - match:', user?.id === event.userId);
 
   // Generate meta tags for social sharing
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rsv.pizza';

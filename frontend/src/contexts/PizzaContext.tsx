@@ -98,6 +98,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     coHosts: dbParty.co_hosts || [],
     selectedPizzerias: dbParty.selected_pizzerias || [],
     venueName: dbParty.venue_name,
+    shareToUnlock: dbParty.share_to_unlock || false,
+    shareTweetText: dbParty.share_tweet_text || null,
     createdAt: dbParty.created_at,
     guests,
   };

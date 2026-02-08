@@ -37,6 +37,8 @@ export const EventDetailsTab: React.FC = () => {
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
   const [hideGuests, setHideGuests] = useState(false);
+  const [shareToUnlock, setShareToUnlock] = useState(false);
+  const [shareTweetText, setShareTweetText] = useState('');
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
@@ -129,6 +131,8 @@ export const EventDetailsTab: React.FC = () => {
       const partyHideGuests = party.hideGuests || false;
       const partyRequireApproval = party.requireApproval || false;
       const partyCoHosts = party.coHosts || [];
+      const partyShareToUnlock = party.shareToUnlock || false;
+      const partyShareTweetText = party.shareTweetText || '';
 
       // Set form values
       setName(partyName);
@@ -150,6 +154,8 @@ export const EventDetailsTab: React.FC = () => {
       setHideGuests(partyHideGuests);
       setRequireApproval(partyRequireApproval);
       setCoHosts(partyCoHosts);
+      setShareToUnlock(partyShareToUnlock);
+      setShareTweetText(partyShareTweetText);
 
       // Store original values
       setOriginalValues({
@@ -170,6 +176,8 @@ export const EventDetailsTab: React.FC = () => {
         hideGuests: partyHideGuests,
         requireApproval: partyRequireApproval,
         coHosts: JSON.stringify(partyCoHosts),
+        shareToUnlock: partyShareToUnlock,
+        shareTweetText: partyShareTweetText,
       });
     }
   }, [party]);
@@ -962,6 +970,33 @@ export const EventDetailsTab: React.FC = () => {
                   autoComplete="new-password"
                 />
               </div>
+              {password && (
+                <Checkbox
+                  checked={shareToUnlock}
+                  onChange={() => {
+                    const newValue = !shareToUnlock;
+                    setShareToUnlock(newValue);
+                    saveOptions({ share_to_unlock: newValue });
+                    if (!newValue) {
+                      setShareTweetText('');
+                      saveOptions({ share_to_unlock: false, share_tweet_text: null });
+                    }
+                  }}
+                  label="Share to Unlock"
+                />
+              )}
+              {password && shareToUnlock && (
+                <IconInput
+                  icon={Lock}
+                  multiline
+                  value={shareTweetText}
+                  onChange={(e) => setShareTweetText(e.target.value)}
+                  onBlur={() => {
+                    saveOptions({ share_tweet_text: shareTweetText.trim() || null });
+                  }}
+                  placeholder="Custom tweet text (optional)"
+                />
+              )}
 
               <CustomUrlInput
                 value={customUrl}
