@@ -73,9 +73,9 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/70 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full my-4"
+        className="bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
