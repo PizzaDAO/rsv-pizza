@@ -92,6 +92,27 @@ model Party {
   budgetEnabled Boolean  @default(false) @map("budget_enabled")
   budgetTotal   Decimal? @map("budget_total") @db.Decimal(10, 2)
 
+  // Report-specific fields
+  reportRecap        String?   @map("report_recap")       // Host-written event summary
+  reportVideoUrl     String?   @map("report_video_url")   // Link to party video
+  reportPhotosUrl    String?   @map("report_photos_url")  // Link to raw photos/video
+  flyerArtist        String?   @map("flyer_artist")       // Flyer artist credit
+
+  // KPI tracking
+  xPostUrl           String?   @map("x_post_url")         // Main X/Twitter post
+  xPostViews         Int?      @map("x_post_views")       // X post view count
+  farcasterPostUrl   String?   @map("farcaster_post_url") // Main Farcaster post
+  farcasterViews     Int?      @map("farcaster_views")    // Farcaster view count
+  lumaUrl            String?   @map("luma_url")           // Luma event URL
+  lumaViews          Int?      @map("luma_views")         // Luma page views
+  poapEventId        String?   @map("poap_event_id")      // POAP event ID
+  poapMints          Int?      @map("poap_mints")         // POAP mint count
+  poapMoments        Int?      @map("poap_moments")       // POAP moments count
+
+  // Report settings
+  reportPublished    Boolean   @default(false) @map("report_published")
+  reportPublicSlug   String?   @unique @map("report_public_slug")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -104,8 +125,10 @@ model Party {
   staff       Staff[]
   performers  Performer[]
   venues      Venue[]
-  sponsors    Sponsor[]
-  budgetItems BudgetItem[]
+  sponsors         Sponsor[]
+  budgetItems      BudgetItem[]
+  socialPosts      SocialPost[]
+  notableAttendees NotableAttendee[]
 
   @@map("parties")
 }
@@ -116,6 +139,7 @@ model Guest {
   email               String?  @db.VarChar
   ethereumAddress     String?  @map("ethereum_address") @db.VarChar
   roles               String[]
+  role                String?  // Single role for report chart: "dev", "designer", "artist", etc.
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")
@@ -146,6 +170,39 @@ model Guest {
   raffleWins    RaffleWinner[]
 
   @@map("guests")
+}
+
+// Social media posts about the event (for reports)
+model SocialPost {
+  id           String   @id @default(uuid()) @db.Uuid
+  partyId      String   @map("party_id") @db.Uuid
+  party        Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  platform     String   // "twitter", "farcaster", "instagram"
+  url          String   // Full URL to the post
+  authorHandle String?  @map("author_handle")
+
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("social_posts")
+}
+
+// Notable attendees for event reports
+model NotableAttendee {
+  id        String   @id @default(uuid()) @db.Uuid
+  partyId   String   @map("party_id") @db.Uuid
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name      String   // Person or company name
+  link      String?  // Optional link to profile/website
+
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("notable_attendees")
 }
 
 model Donation {

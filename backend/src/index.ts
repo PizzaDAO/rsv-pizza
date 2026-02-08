@@ -19,6 +19,7 @@ import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import reportRoutes from './routes/report.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -90,6 +91,7 @@ app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
@@ -98,6 +100,7 @@ app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
+app.use('/api/reports', reportRoutes); // Public report viewing via slug
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
