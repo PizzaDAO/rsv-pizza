@@ -119,7 +119,7 @@ model Guest {
 
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
-  checkedInBy String?   @map("checked_in_by") @db.Uuid
+  checkedInBy String?   @map("checked_in_by")
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
