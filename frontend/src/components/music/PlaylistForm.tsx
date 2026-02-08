@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Playlist, MusicPlatform } from '../../types';
 import { IconInput } from '../IconInput';
 import { X, Loader2, ListMusic, Link as LinkIcon, FileText } from 'lucide-react';
@@ -88,7 +89,7 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
   const isEditing = !!playlist;
   const currentPlatform = platformOptions.find(p => p.value === formData.platform);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
@@ -115,11 +116,10 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Playlist Name */}
-          
+          <IconInput icon={ListMusic} type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Playlist name" required />
 
           {/* Platform */}
           <div>
-            
             <div className="flex flex-wrap gap-2">
               {platformOptions.map((platform) => (
                 <button
@@ -140,10 +140,10 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
           </div>
 
           {/* URL */}
-          
+          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange('url', e.target.value)} placeholder={currentPlatform?.placeholder || 'Paste playlist URL'} required />
 
           {/* Description */}
-          
+          <IconInput icon={FileText} multiline rows={2} value={formData.description} onChange={(e) => handleChange('description', e.target.value)} placeholder="Optional description..." />
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
@@ -174,6 +174,7 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Performer, PerformerType, PerformerStatus } from '../../types';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -116,7 +117,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
 
   const isEditing = !!performer;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
@@ -212,6 +213,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

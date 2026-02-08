@@ -17,7 +17,7 @@ import { SongForm, SongFormData } from './SongForm';
 import { PlaylistCard } from './PlaylistCard';
 import { PlaylistForm, PlaylistFormData } from './PlaylistForm';
 import { LineupOverview } from './LineupOverview';
-import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload } from 'lucide-react';
+import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload, Share2, Check } from 'lucide-react';
 
 interface MusicWidgetProps {
   isHost?: boolean;
@@ -64,6 +64,9 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   // File upload state for songs
   const [isSongDragOver, setIsSongDragOver] = useState(false);
   const songFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Share button state
+  const [copied, setCopied] = useState(false);
 
   // Drag state for performers
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -373,9 +376,38 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   return (
     <div className="card p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Music size={20} className="text-[#ff393a]" />
-        <h2 className="text-lg font-semibold text-white">Music</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Music size={20} className="text-[#ff393a]" />
+          <h2 className="text-lg font-semibold text-white">Music</h2>
+        </div>
+        {isHost && (
+          <button
+            onClick={() => {
+              const inviteCode = pizzaContext?.party?.inviteCode;
+              if (!inviteCode) return;
+              const djUrl = `${window.location.origin}/dj/${inviteCode}`;
+              navigator.clipboard.writeText(djUrl).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-sm text-white/70 hover:text-white transition-colors"
+            title="Copy DJ share link"
+          >
+            {copied ? (
+              <>
+                <Check size={14} className="text-green-400" />
+                <span className="text-green-400">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 size={14} />
+                <span>Share with DJ</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Error */}

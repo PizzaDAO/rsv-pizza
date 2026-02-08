@@ -13,6 +13,7 @@ import { NewEventPage } from './pages/NewEventPage';
 import { AccountPage } from './pages/AccountPage';
 import { GPPLandingPage } from './pages/GPPLandingPage';
 import { CheckInPage } from './pages/CheckInPage';
+import { DJPage } from './pages/DJPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
+            <Route path="/dj/:inviteCode" element={<DJPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

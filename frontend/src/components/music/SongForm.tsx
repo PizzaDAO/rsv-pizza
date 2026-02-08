@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Song, MusicPlatform } from '../../types';
 import { IconInput } from '../IconInput';
 import { X, Loader2, Music, Link as LinkIcon, Upload, User } from 'lucide-react';
@@ -120,7 +121,7 @@ export const SongForm: React.FC<SongFormProps> = ({
 
   const isEditing = !!song;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
@@ -158,7 +159,7 @@ export const SongForm: React.FC<SongFormProps> = ({
 
           {/* Platform */}
           <div>
-            
+
             <div className="flex flex-wrap gap-2">
               {platformOptions.map((platform) => (
                 <button
@@ -243,6 +244,7 @@ export const SongForm: React.FC<SongFormProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
