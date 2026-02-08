@@ -1,137 +1,7 @@
-# RSV.Pizza - Claude Instructions
+# RSV.Pizza
 
 ## Project Overview
 RSV.Pizza is an event RSVP platform with pizza ordering integration, built with React/TypeScript frontend and Supabase backend.
-
-## Task Management Workflow
-
-### Project Sheet
-Tasks are tracked in the project Google Sheet, accessible via the sheets-claude MCP.
-- Config: `.sheets-claude.json` contains the sheet URL
-- Use `mcp__sheets-claude__get_project_tasks` to list tasks
-
-### Complete Workflow
-
-```
-1. GET TASKS      →  Fetch from project sheet
-2. PLAN           →  Spawn planning agents (background, parallel)
-3. SAVE PLANS     →  Plans saved to plans/{task-id}-{slug}.md
-4. REVIEW PLANS   →  Snax and Claude review together
-5. IMPLEMENT      →  Spawn implementation agents on feature branches
-6. REVIEW CODE    →  Snax and Claude review changes
-7. MERGE          →  Merge approved branches to master
-8. MARK DONE      →  Update project sheet
-```
-
-### Phase 1: Planning
-
-**Do NOT enter plan mode directly** - spawn background planning agents instead.
-
-```
-Task tool:
-- subagent_type: "Plan"
-- run_in_background: true
-- prompt: Include task ID, read codebase, write plan to plans/{task-id}-{slug}.md
-```
-
-**Batch planning**: Queue multiple planning agents in parallel for efficiency.
-
-**Plan file format** (`plans/{task-id}-{slug}.md`):
-- Task ID and priority
-- Problem/feature description
-- Root cause (for bugs)
-- Database changes needed
-- Files to create/modify
-- Step-by-step implementation
-- Verification steps
-
-### Phase 2: Review Plans
-
-- Claude summarizes each plan for Snax
-- Discuss approach, ask clarifying questions
-- Approve or adjust plans before implementation
-
-### Presenting Tasks to Snax
-
-**Always include task IDs** when listing or discussing tasks:
-
-```
-| Task ID | Task | Priority |
-|---------|------|----------|
-| burrata-71044 | Code entry bug fix | High |
-```
-
-This makes it easy for Snax to refer to specific tasks in conversation.
-
-### Phase 3: Implementation
-
-**Each task gets its own git worktree** for isolated parallel work, with **draft PRs** for Vercel previews.
-
-#### Worktree Setup
-```bash
-# Agent creates isolated worktree with feature branch
-git worktree add ../rsvpizza-{task-id} -b feature/{task-id}-{name}
-cd ../rsvpizza-{task-id}
-```
-
-#### Agent Instructions
-```
-Task tool:
-- subagent_type: "general-purpose"
-- run_in_background: true
-- prompt:
-  1. Create worktree: git worktree add ../rsvpizza-{task-id} -b feature/{task-id}-{name}
-  2. cd into the worktree directory
-  3. Read plan from plans/{task-id}.md (copy from main repo if needed)
-  4. Implement the approved changes
-  5. Commit with descriptive message including task ID
-  6. Push branch: git push -u origin feature/{task-id}-{name}
-  7. Create draft PR: gh pr create --draft --title "Task ID: Description" --body "..."
-  8. Report:
-     - PR URL
-     - Vercel preview URL: https://rsvpizza-git-feature-{task-id}-{name}-pizza-dao.vercel.app
-     - Files changed
-```
-
-#### Vercel Preview URLs
-PRs automatically get Vercel preview deployments:
-```
-https://rsvpizza-git-{branch-name}-pizza-dao.vercel.app
-```
-
-Example: `feature/diavola-85351-photo-widget` →
-`https://rsvpizza-git-feature-diavola-85351-photo-widget-pizza-dao.vercel.app`
-
-#### After Review
-```bash
-# Merge the PR via GitHub (or locally)
-gh pr merge {pr-number} --merge
-
-# Clean up worktree
-git worktree remove ../rsvpizza-{task-id}
-```
-
-**Parallel implementation**: Multiple agents work in separate worktrees simultaneously - no conflicts.
-
-**Small tasks** (< 10 lines, single file): Can be done directly by Claude in main repo after plan review.
-
-### Phase 4: Review & Merge
-
-For each feature branch:
-1. Review the changes with Snax
-2. Test if needed
-3. Commit with descriptive message
-4. Merge to master (or create PR)
-5. Mark task done in project sheet
-
-### Branching Convention
-
-| Branch | Purpose |
-|--------|---------|
-| `master` | Production-ready code |
-| `feature/{task-id}-{name}` | Individual task implementation |
-
-Example: `feature/bellpepper-71328-ios-scroll`
 
 ## Tech Stack
 - **Frontend**: React, TypeScript, Vite, TailwindCSS
@@ -150,6 +20,48 @@ Example: `feature/bellpepper-71328-ios-scroll`
 - `supabase/functions/` - Edge functions
 - `plans/` - Task implementation plans
 
-## Notes
-- Project sheet MCP update has a bug (updates header instead of row) - mark tasks done manually for now
+## Vercel Preview URL Pattern
+```
+https://rsvpizza-git-{branch-name}-pizza-dao.vercel.app
+```
+
+## Default Branch
+This project uses `master` instead of `main`.
+
+## Supabase MCP
+Use **`mcp__supabase-pizzadao__`** for this project (not `supabase-snax`).
+- Project ID: `znpiwdvvsqaxuskpfleo`
+- Project Name: RSV.Pizza
+
+## Branching Convention
+- Use `{task-id}-{short-name}` for branches (no `feature/` prefix)
+- Example: `buffalo-39031-donation` not `feature/buffalo-39031-donation-option`
+- Shorter branch names = shorter Vercel preview URLs
+
+## Reusable Components
+
+**ALWAYS use these existing components instead of writing custom markup:**
+
+| Component | Use For |
+|-----------|---------|
+| `IconInput` | All text inputs and textareas. Use `multiline` prop for textarea mode. |
+| `Checkbox` | All checkboxes/toggles |
+| `ClickableEmail` | Displaying emails (makes domain clickable) |
+| `CustomUrlInput` | URL slug inputs with `rsv.pizza/` prefix + live validation |
+| `LocationAutocomplete` | Address/location inputs (Google Maps autocomplete) |
+| `TimezonePickerInput` | Timezone selection |
+| `Layout` | Page wrapper (Header + Footer + CornerLinks) |
+| `HostsList` | Displaying co-hosts with avatars |
+| `TableRow` | Guest/pizza/beverage list rows (multi-variant) |
+| `LoginModal` | Auth modal pattern (backdrop + card + close button) |
+
+**Rules:**
+- Never create raw `<input>` elements — use `IconInput`
+- Never create raw `<textarea>` elements — use `IconInput` with `multiline`
+- Never create raw checkboxes — use `Checkbox`
+- **Always use placeholders instead of labels** — no `<label>` elements above fields. Put descriptive text in the placeholder. Use small helper text below (`text-xs text-white/40`) only when necessary.
+- Follow existing modal patterns (fixed backdrop + `z-50` + click-outside-to-close)
+
+## Project-Specific Notes
 - Supabase storage buckets must be created via dashboard, not code
+- **Preview deploys share production backend + DB.** Frontend previews auto-deploy per branch, but the backend only deploys from `master` and the database is a single Supabase instance. New DB columns and backend endpoints must be applied to production **before** they'll work on preview branches.

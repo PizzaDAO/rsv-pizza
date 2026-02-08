@@ -4,9 +4,9 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart } from 'lucide-react';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats } from '../lib/api';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -14,6 +14,12 @@ import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
+import { PhotoGallery } from '../components/photos';
+import { GPPBadge } from '../components/gpp';
+import { PhotoStats } from '../types';
+import { PizzaChefModal } from '../components/PizzaChefModal';
+import { PizzaDAOModal } from '../components/PizzaDAOModal';
+import { stripMarkdown } from '../lib/utils';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -35,6 +41,10 @@ export function EventPage() {
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [userHasRSVPd, setUserHasRSVPd] = useState(false);
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
+  const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
+  const [showPhotos, setShowPhotos] = useState(false);
+  const [showPizzaChef, setShowPizzaChef] = useState(false);
+  const [showPizzaDAO, setShowPizzaDAO] = useState(false);
 
   useEffect(() => {
     async function loadEvent() {
@@ -44,8 +54,9 @@ export function EventPage() {
           setEvent(foundEvent);
 
           // Check if logged-in user has already RSVP'd and fetch their data
+          let hasRSVPd = false;
           if (user?.email) {
-            const hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
+            hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
             setUserHasRSVPd(hasRSVPd);
 
             if (hasRSVPd) {
@@ -55,8 +66,14 @@ export function EventPage() {
             }
           }
 
-          // Check if event has password protection
-          if (foundEvent.hasPassword) {
+          // Check if current user is a host (primary or co-host)
+          const isHost = user?.id === foundEvent.userId ||
+            (user?.email && foundEvent.coHosts?.some((h: any) => h.email?.toLowerCase() === user.email?.toLowerCase()));
+
+          // Skip password for hosts and already-RSVP'd guests
+          if (isHost || hasRSVPd) {
+            setIsAuthenticated(true);
+          } else if (foundEvent.hasPassword) {
             // Check if already authenticated in this session
             // Use inviteCode as key to be consistent with RSVPPage
             const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
@@ -72,6 +89,12 @@ export function EventPage() {
             // No password, automatically authenticated
             setIsAuthenticated(true);
           }
+
+          // Load photo stats to see if photos are enabled and have content
+          const stats = await getPhotoStats(foundEvent.id);
+          if (stats) {
+            setPhotoStats(stats);
+          }
         } else {
           setError('Event not found. The link may be invalid or expired.');
         }
@@ -80,6 +103,25 @@ export function EventPage() {
     }
     loadEvent();
   }, [slug, user?.email]);
+
+  // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      const isEditable = (e.target as HTMLElement).isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
+
+      if ((e.key === 'p' || e.key === 'P') && !showPizzaChef) {
+        setShowPizzaChef(true);
+      }
+
+      if (e.key === 'Enter' && !showPizzaDAO && !showRSVPModal) {
+        setShowPizzaDAO(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPizzaChef, showPizzaDAO, showRSVPModal]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,6 +231,7 @@ export function EventPage() {
                 className="w-full"
                 required
                 autoFocus
+                autoComplete="off"
               />
             </div>
 
@@ -272,19 +315,20 @@ export function EventPage() {
 
   const metaTitle = event.name;
 
-  // Construct description: Host • Date @ Time • Location. Description
+  // Construct description: Host * Date @ Time * Location. Description
   const detailsParts: string[] = [];
   if (event.hostName) detailsParts.push(`Hosted by ${event.hostName}`);
   if (formattedDate) detailsParts.push(`${formattedDate}${formattedTime ? ` @ ${formattedTime}` : ''}`);
   if (event.address) detailsParts.push(event.address);
 
-  const details = detailsParts.join(' • ');
+  const details = detailsParts.join(' \u2022 ');
   let metaDescription = details;
 
   if (event.description) {
+    const cleanDescription = stripMarkdown(event.description);
     const remainingChars = 300 - details.length;
     if (remainingChars > 10) {
-      metaDescription += `. ${event.description.substring(0, remainingChars)}${event.description.length > remainingChars ? '...' : ''}`;
+      metaDescription += `. ${cleanDescription.substring(0, remainingChars)}${cleanDescription.length > remainingChars ? '...' : ''}`;
     }
   } else if (!metaDescription) {
     metaDescription = `Join us for ${event.name}! RSVP now.`;
@@ -465,15 +509,17 @@ export function EventPage() {
                 />
 
                 {/* Guest Count */}
-                <div className="pt-4 border-t border-white/10 mt-4">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="pt-4 border-t border-white/10 mt-4">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -534,6 +580,11 @@ export function EventPage() {
 
               {/* Event Title */}
               <div className="p-6 pb-1 md:border-b md:border-white/10">
+                {event.eventType === 'gpp' && (
+                  <div className="mb-3">
+                    <GPPBadge />
+                  </div>
+                )}
                 <h1 className="text-4xl md:text-5xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
@@ -667,15 +718,17 @@ export function EventPage() {
                 </div>
 
                 {/* Guest Count - Mobile */}
-                <div className="md:hidden pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-2 text-white/60 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                      {event.maxGuests && ` • ${event.maxGuests} expected`}
-                    </span>
+                {!event.hideGuests && (
+                  <div className="md:hidden pt-4 border-t border-white/10">
+                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Description */}
                 {event.description && (
@@ -783,6 +836,33 @@ export function EventPage() {
                     showTitle={true}
                   />
                 </div>
+
+                {/* Photo Gallery Section */}
+                {photoStats?.photosEnabled && (
+                  <div className="border-t border-white/10 pt-6 mt-6">
+                    {showPhotos ? (
+                      <PhotoGallery
+                        partyId={event.id}
+                        isHost={false}
+                        uploaderName={existingGuestData?.name || user?.name || undefined}
+                        uploaderEmail={existingGuestData?.email || user?.email}
+                        guestId={existingGuestData?.id}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setShowPhotos(true)}
+                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/10"
+                      >
+                        <Camera className="w-5 h-5 text-[#ff393a]" />
+                        <span className="text-white font-medium">
+                          {photoStats.totalPhotos > 0
+                            ? `View Photos (${photoStats.totalPhotos})`
+                            : 'Share Photos'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -809,6 +889,18 @@ export function EventPage() {
       )}
 
       <CornerLinks />
+
+      {/* Pizza Chef Easter Egg Modal */}
+      <PizzaChefModal
+        isOpen={showPizzaChef}
+        onClose={() => setShowPizzaChef(false)}
+      />
+
+      {/* PizzaDAO Easter Egg Modal */}
+      <PizzaDAOModal
+        isOpen={showPizzaDAO}
+        onClose={() => setShowPizzaDAO(false)}
+      />
     </div>
   );
 }

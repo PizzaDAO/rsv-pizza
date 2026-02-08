@@ -97,6 +97,7 @@ export interface CoHost {
   instagram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
+  canEdit?: boolean;
 }
 
 // Host profile from the user account
@@ -142,6 +143,8 @@ export interface Party {
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
+  eventType?: string | null; // 'standard', 'gpp', 'private', etc.
+  eventTags?: string[]; // Tags for filtering/grouping (e.g., 'Global Pizza Party')
   createdAt: string;
   guests: Guest[];
   // Donation settings
@@ -256,3 +259,37 @@ export type OrderStatus =
   | 'completed'
   | 'cancelled'
   | 'failed';
+
+// Photo Gallery types
+export interface Photo {
+  id: string;
+  partyId: string;
+  url: string;
+  thumbnailUrl: string | null;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  uploadedBy: string | null;
+  uploaderName: string | null;
+  uploaderEmail: string | null;
+  caption: string | null;
+  tags: string[];
+  starred: boolean;
+  starredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  guest?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface PhotoStats {
+  totalPhotos: number;
+  starredPhotos: number;
+  uniqueTags: string[];
+  uniqueUploadersCount: number;
+  photosEnabled: boolean;
+}

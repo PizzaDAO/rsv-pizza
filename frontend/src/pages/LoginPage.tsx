@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,9 +8,18 @@ import { IconInput } from '../components/IconInput';
 export function LoginPage() {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get('email') || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Store redirect URL from query params
+  useEffect(() => {
+    const redirect = searchParams.get('redirect');
+    if (redirect) {
+      sessionStorage.setItem('authReturnUrl', redirect);
+    }
+  }, [searchParams]);
 
   // Redirect if already logged in
   useEffect(() => {

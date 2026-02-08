@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -12,11 +12,12 @@ import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { DonationSummary } from '../components/DonationSummary';
+import { PhotoGallery } from '../components/photos';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'pizza' | 'guests';
+type TabType = 'details' | 'pizza' | 'guests' | 'photos';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -32,7 +33,15 @@ function HostPageContent() {
     // Super admin can edit any party
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
     // Party owner can edit
-    return party.userId === user.id;
+    if (party.userId === user.id) return true;
+    // Co-host with editor permission can edit
+    if (party.coHosts && Array.isArray(party.coHosts)) {
+      const isEditor = party.coHosts.some(
+        (h: any) => h.email?.toLowerCase() === user.email.toLowerCase() && h.canEdit === true
+      );
+      if (isEditor) return true;
+    }
+    return false;
   }, [party, user]);
 
   // Redirect unauthorized users to RSVP page after auth and party have loaded
@@ -43,7 +52,7 @@ function HostPageContent() {
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -156,6 +165,7 @@ function HostPageContent() {
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
+    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
   ];
 
   return (
@@ -289,6 +299,17 @@ function HostPageContent() {
 
             {activeTab === 'details' && (
               <EventDetailsTab />
+            )}
+
+            {activeTab === 'photos' && party && (
+              <div className="card p-6">
+                <PhotoGallery
+                  partyId={party.id}
+                  isHost={true}
+                  uploaderName={user?.name || undefined}
+                  uploaderEmail={user?.email}
+                />
+              </div>
             )}
           </div>
         </div>

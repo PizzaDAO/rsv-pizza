@@ -97,6 +97,109 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
   }
 }
 
+/**
+ * Upload an event photo to Supabase Storage
+ * @param file The image file to upload
+ * @param partyId The party ID for organizing uploads
+ * @returns Object with URL and metadata, or null if upload failed
+ */
+export async function uploadEventPhoto(
+  file: File,
+  partyId: string
+): Promise<{
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+} | null> {
+  try {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      console.error('Invalid file type:', file.type);
+      return null;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      console.error('File too large:', file.size);
+      return null;
+    }
+
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const fileName = `${partyId}/${timestamp}-${random}.${fileExt}`;
+
+    // Get image dimensions
+    let width: number | undefined;
+    let height: number | undefined;
+
+    try {
+      const dimensions = await getImageDimensions(file);
+      width = dimensions.width;
+      height = dimensions.height;
+    } catch (e) {
+      console.warn('Could not get image dimensions:', e);
+    }
+
+    // Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from('event-photos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-photos')
+      .getPublicUrl(fileName);
+
+    return {
+      url: urlData.publicUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      width,
+      height,
+    };
+  } catch (error) {
+    console.error('Error uploading photo:', error);
+    return null;
+  }
+}
+
+/**
+ * Get image dimensions from a File object
+ */
+function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ width: img.width, height: img.height });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 // Types for database tables
 // Host profile from user account
 export interface DbHostProfile {
@@ -134,6 +237,7 @@ export interface DbParty {
   address: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
+  selected_pizzerias: any[] | null;
   co_hosts: any[];
   created_at: string;
   donation_enabled?: boolean;
@@ -405,7 +509,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const safeColumns = `
     id, name, invite_code, custom_url, date, duration, timezone,
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
-    require_approval, venue_name,
+    require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
     donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
     donation_eth_address
@@ -860,6 +964,7 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    selected_pizzerias?: any[];  // Pizzeria objects
     donation_enabled?: boolean;
     donation_goal?: number | null;
     donation_message?: string | null;
@@ -883,6 +988,7 @@ export async function updateParty(
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
+        selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,
         description: updates.description,

@@ -8,7 +8,17 @@ import rsvpRoutes from './routes/rsvp.routes.js';
 import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
+import photoRoutes from './routes/photo.routes.js';
+import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
+import checkinRoutes from './routes/checkin.routes.js';
+import displayRoutes from './routes/display.routes.js';
+import raffleRoutes from './routes/raffle.routes.js';
+import staffRoutes from './routes/staff.routes.js';
+import performerRoutes from './routes/performer.routes.js';
+import venueRoutes from './routes/venue.routes.js';
+import sponsorRoutes from './routes/sponsor.routes.js';
+import budgetRoutes from './routes/budget.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -71,12 +81,23 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/parties', partyRoutes);
+app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', donationRoutes); // Donation routes (some are public)
+app.use('/api/parties', staffRoutes); // Staff routes (host only)
+app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
+app.use('/api/parties', displayRoutes); // Display routes (host management, some public)
+app.use('/api/parties', performerRoutes); // Performer/music routes
+app.use('/api/parties', venueRoutes); // Venue routes (host only)
+app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
+app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
-app.use('/api/parties', donationRoutes);
+app.use('/api/gpp', gppRoutes);
+app.use('/api/checkin', checkinRoutes);
+app.use('/api/display', displayRoutes); // Public display viewer routes
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
@@ -86,7 +107,7 @@ setupSwagger(app);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.1.0' });
 });
 
 // Error handler (must be last)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart } from 'lucide-react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,6 +56,34 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     }
   };
 
+  // Wallet connection
+  const [walletConnecting, setWalletConnecting] = useState(false);
+  const [hasWallet, setHasWallet] = useState(false);
+
+  // Detect browser wallet on mount
+  useEffect(() => {
+    setHasWallet(typeof window !== 'undefined' && !!(window as any).ethereum);
+  }, []);
+
+  const connectWallet = async () => {
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) return;
+
+    setWalletConnecting(true);
+    try {
+      const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0];
+        setEthereumAddress(address);
+        validateWalletAddress(address);
+      }
+    } catch (err) {
+      console.error('Wallet connection failed:', err);
+    } finally {
+      setWalletConnecting(false);
+    }
+  };
+
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [likedToppings, setLikedToppings] = useState<string[]>([]);
@@ -75,9 +103,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [mintResult, setMintResult] = useState<MintResult>({});
   const { mint: mintNFT } = useMintNFT();
 
+  // Track whether the modal was previously open so we only reset state
+  // when transitioning from closed -> open, not when props change while open
+  const wasOpenRef = useRef(false);
+
   // Reset state when modal opens and lock body scroll
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      // Modal just opened: reset all state
       setSubmitted(false);
       setAlreadyRegistered(false);
       setPendingApproval(false);
@@ -107,9 +140,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
       // Prevent body scroll when modal is open (use class for iOS compatibility)
       document.body.classList.add('modal-open');
-    } else {
+    } else if (!isOpen) {
       document.body.classList.remove('modal-open');
     }
+    wasOpenRef.current = isOpen;
     return () => {
       document.body.classList.remove('modal-open');
     };
@@ -527,21 +561,42 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               required
             />
 
-            <div className="relative">
-              <IconInput
-                icon={Wallet}
-                type="text"
-                value={ethereumAddress}
-                onChange={(e) => {
-                  setEthereumAddress(e.target.value);
-                  validateWalletAddress(e.target.value);
-                }}
-                placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
-                className={walletValidation === 'valid' ? 'pr-10 border-[#39d98a]/50' : walletValidation === 'invalid' ? 'border-[#ff393a]/50' : ''}
-              />
-              {walletValidation === 'valid' && (
-                <Check size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#39d98a]" />
-              )}
+            <div>
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <IconInput
+                    icon={Wallet}
+                    type="text"
+                    value={ethereumAddress}
+                    onChange={(e) => {
+                      setEthereumAddress(e.target.value);
+                      validateWalletAddress(e.target.value);
+                    }}
+                    placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
+                    className={walletValidation === 'valid' ? 'border-[#39d98a]/50' : walletValidation === 'invalid' ? 'border-[#ff393a]/50' : ''}
+                  />
+                  {walletValidation === 'valid' && (
+                    <Check size={14} className="absolute left-[2.35rem] top-1/2 -translate-y-1/2 text-[#39d98a]" />
+                  )}
+                </div>
+                {hasWallet && (
+                  <button
+                    type="button"
+                    onClick={ethereumAddress.trim() ? () => { setEthereumAddress(''); setWalletValidation('idle'); } : connectWallet}
+                    disabled={walletConnecting}
+                    className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+                  >
+                    {walletConnecting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : ethereumAddress.trim() ? (
+                      <X size={14} />
+                    ) : (
+                      <Wallet size={14} />
+                    )}
+                    <span className="hidden sm:inline">{walletConnecting ? 'Connecting...' : ethereumAddress.trim() ? 'Clear' : 'Connect'}</span>
+                  </button>
+                )}
+              </div>
               {walletValidation === 'invalid' && ethereumAddress.trim() && (
                 <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
               )}

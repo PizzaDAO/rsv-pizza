@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AUTH_EXPIRED_EVENT } from '../lib/api';
 
 interface User {
   id: string;
@@ -32,6 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Handle auth expiration event from API
+  const handleAuthExpired = useCallback(() => {
+    console.log('Auth token expired, clearing user state');
+    setUser(null);
+    // Storage is already cleared by apiRequest, but ensure consistency
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }, []);
+
   // Check for stored token on mount
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -49,6 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(false);
   }, []);
+
+  // Listen for auth expiration events
+  useEffect(() => {
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    };
+  }, [handleAuthExpired]);
 
   const signIn = async (email: string) => {
     const response = await fetch(`${API_URL}/api/auth/magic-link`, {

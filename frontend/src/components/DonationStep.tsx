@@ -36,6 +36,13 @@ export const DonationStep: React.FC<DonationStepProps> = ({
     fetchStats();
   }, [partyId]);
 
+  // Auto-skip if donations are not enabled (after loading completes)
+  useEffect(() => {
+    if (!loading && !stats?.enabled) {
+      onComplete();
+    }
+  }, [loading, stats, onComplete]);
+
   if (loading) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">
@@ -44,12 +51,8 @@ export const DonationStep: React.FC<DonationStepProps> = ({
     );
   }
 
-  // If donations not enabled, skip this step
+  // If donations not enabled, render nothing (useEffect above handles the skip)
   if (!stats?.enabled) {
-    // Auto-skip after a brief moment
-    useEffect(() => {
-      onComplete();
-    }, []);
     return null;
   }
 

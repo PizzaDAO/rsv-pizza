@@ -11,7 +11,11 @@ type IconInputProps = IconInputBaseProps &
   ({ multiline?: false } & React.InputHTMLAttributes<HTMLInputElement>));
 
 export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
-  ({ icon: Icon, iconSize = 20, className = '', multiline, ...props }, ref) => {
+  ({ icon: Icon, iconSize = 20, className = '', multiline, placeholder, required, ...props }, ref) => {
+    const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
+      ? `${placeholder} *`
+      : placeholder;
+
     return (
       <div className="relative">
         <Icon
@@ -22,12 +26,16 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
           <textarea
             ref={ref as React.Ref<HTMLTextAreaElement>}
             className={`w-full !pl-14 min-h-[80px] resize-y ${className}`}
+            placeholder={displayPlaceholder}
+            required={required}
             {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
           />
         ) : (
           <input
             ref={ref as React.Ref<HTMLInputElement>}
             className={`w-full !pl-14 ${className}`}
+            placeholder={displayPlaceholder}
+            required={required}
             {...(props as React.InputHTMLAttributes<HTMLInputElement>)}
           />
         )}

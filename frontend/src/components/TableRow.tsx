@@ -3,6 +3,7 @@ import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
 import { Trash2, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
+import { ClickableEmail } from './ClickableEmail';
 
 // Generate a consistent color based on name
 const getAvatarColor = (name: string) => {
@@ -174,7 +175,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-white">{guest.name}</span>
           {guest.email && (
-            <span className="text-white/50 text-sm truncate">{guest.email}</span>
+            <ClickableEmail email={guest.email} className="text-white/50 text-sm truncate" />
           )}
           {guest.roles && guest.roles.length > 0 && (
             <div className="flex gap-1">

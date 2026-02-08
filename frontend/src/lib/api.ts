@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
 
 // Authenticated API helper functions
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -12,6 +12,9 @@ interface ApiOptions {
   body?: any;
   requireAuth?: boolean;
 }
+
+// Custom event name for auth expiration
+export const AUTH_EXPIRED_EVENT = 'auth-expired';
 
 export async function apiRequest<T>(
   endpoint: string,
@@ -38,7 +41,18 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401 && requireAuth) {
+      // Clear the invalid token
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+
+      // Dispatch custom event for AuthContext to handle
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+    }
+
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
+
     throw new Error(error.message || `API error: ${response.status}`);
   }
 
@@ -85,6 +99,7 @@ export interface UpdatePartyData {
   description?: string | null;
   customUrl?: string | null;
   coHosts?: any[];
+  selectedPizzerias?: any[];
   donationEnabled?: boolean;
   donationGoal?: number | null;
   donationMessage?: string | null;
@@ -140,6 +155,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      selectedPizzerias: data.selectedPizzerias,
       donationEnabled: data.donationEnabled,
       donationGoal: data.donationGoal,
       donationMessage: data.donationMessage,
@@ -253,6 +269,8 @@ export interface PublicEvent {
   guestCount: number;
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
+  eventType?: string | null;
+  eventTags?: string[];
   donationEnabled?: boolean;
 }
 
@@ -360,4 +378,173 @@ export async function updateDonationStatus(
     console.error('Error updating donation status:', error);
     return null;
   }
+}
+
+// Photo API functions
+export interface PhotoUploadData {
+  url: string;
+  thumbnailUrl?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  uploaderName?: string;
+  uploaderEmail?: string;
+  guestId?: string;
+  caption?: string;
+  tags?: string[];
+}
+
+export interface PhotosListResponse {
+  photos: Photo[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PhotoFilters {
+  starred?: boolean;
+  tag?: string;
+  uploadedBy?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Get photos for a party (public endpoint)
+export async function getPartyPhotos(
+  partyId: string,
+  filters: PhotoFilters = {}
+): Promise<PhotosListResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.starred) params.append('starred', 'true');
+    if (filters.tag) params.append('tag', filters.tag);
+    if (filters.uploadedBy) params.append('uploadedBy', filters.uploadedBy);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/photos${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<PhotosListResponse>(url, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photos:', error);
+    return null;
+  }
+}
+
+// Upload a photo (public endpoint - guest can upload)
+export async function uploadPhoto(
+  partyId: string,
+  data: PhotoUploadData
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos`, {
+      method: 'POST',
+      body: data,
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error uploading photo:', error);
+    return null;
+  }
+}
+
+// Get single photo details
+export async function getPhoto(
+  partyId: string,
+  photoId: string
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photo:', error);
+    return null;
+  }
+}
+
+// Update photo (host only)
+export async function updatePhoto(
+  partyId: string,
+  photoId: string,
+  data: { caption?: string; tags?: string[]; starred?: boolean }
+): Promise<{ photo: Photo } | null> {
+  try {
+    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating photo:', error);
+    return null;
+  }
+}
+
+// Delete photo (host or uploader)
+export async function deletePhoto(
+  partyId: string,
+  photoId: string,
+  uploaderEmail?: string
+): Promise<boolean> {
+  try {
+    const params = uploaderEmail ? `?uploaderEmail=${encodeURIComponent(uploaderEmail)}` : '';
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/photos/${photoId}${params}`, {
+      method: 'DELETE',
+      requireAuth: false,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    return false;
+  }
+}
+
+// Get photo statistics
+export async function getPhotoStats(partyId: string): Promise<PhotoStats | null> {
+  try {
+    return await apiRequest<PhotoStats>(`/api/parties/${partyId}/photos/stats`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photo stats:', error);
+    return null;
+  }
+}
+
+// GPP API functions
+export interface CreateGPPEventData {
+  city: string;
+  hostName: string;
+  email: string;
+}
+
+export interface GPPEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    eventType: string;
+    eventTags: string[];
+  };
+  hostPageUrl: string;
+  eventPageUrl: string;
+  message: string;
+}
+
+export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEventResponse> {
+  return apiRequest<GPPEventResponse>('/api/gpp/events', {
+    method: 'POST',
+    body: data,
+    requireAuth: false,
+  });
 }
