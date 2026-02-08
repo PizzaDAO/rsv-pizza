@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2 } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Link } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { VenueCreateData } from '../../lib/api';
 import { IconInput } from '../IconInput';
@@ -20,9 +20,90 @@ const venueStatusOptions: { value: VenueStatus; label: string }[] = [
   { value: 'declined', label: 'Declined' },
 ];
 
+/** Check if a string looks like a Google Maps URL */
+function isGoogleMapsUrl(text: string): boolean {
+  return /google\.\w+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text);
+}
+
+/** Extract a place name query from a Google Maps URL */
+function extractPlaceQuery(url: string): string | null {
+  try {
+    const u = new URL(url);
+
+    // /maps/place/Place+Name/... → "Place Name"
+    const placeMatch = u.pathname.match(/\/place\/([^/@]+)/);
+    if (placeMatch) {
+      return decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+    }
+
+    // /maps/search/query/... → "query"
+    const searchMatch = u.pathname.match(/\/search\/([^/@]+)/);
+    if (searchMatch) {
+      return decodeURIComponent(searchMatch[1].replace(/\+/g, ' '));
+    }
+
+    // ?q=Place+Name
+    const q = u.searchParams.get('q');
+    if (q) return q;
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Use Google Places API to look up a place by text query */
+function lookupPlace(query: string): Promise<google.maps.places.PlaceResult | null> {
+  return new Promise((resolve) => {
+    if (!window.google?.maps?.places) {
+      resolve(null);
+      return;
+    }
+
+    // PlacesService needs a DOM element (can be a hidden div)
+    const div = document.createElement('div');
+    const service = new google.maps.places.PlacesService(div);
+
+    service.findPlaceFromQuery(
+      {
+        query,
+        fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'place_id'],
+      },
+      (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
+          // findPlaceFromQuery doesn't return phone/website — need getDetails
+          const placeId = results[0].place_id;
+          if (placeId) {
+            service.getDetails(
+              {
+                placeId,
+                fields: ['name', 'formatted_address', 'formatted_phone_number', 'website'],
+              },
+              (place, detailStatus) => {
+                if (detailStatus === google.maps.places.PlacesServiceStatus.OK && place) {
+                  resolve(place);
+                } else {
+                  resolve(results[0]);
+                }
+              }
+            );
+          } else {
+            resolve(results[0]);
+          }
+        } else {
+          resolve(null);
+        }
+      }
+    );
+  });
+}
+
 export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [mapsLink, setMapsLink] = useState('');
+  const mapsInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [name, setName] = useState(venue?.name || '');
@@ -37,6 +118,56 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
   const [contactPhone, setContactPhone] = useState(venue?.contactPhone || '');
   const [status, setStatus] = useState<VenueStatus>(venue?.status || 'researching');
   const [notes, setNotes] = useState(venue?.notes || '');
+
+  const handleMapsLinkPaste = useCallback(async (text: string) => {
+    if (!isGoogleMapsUrl(text)) return;
+
+    setMapsLink(text);
+    const query = extractPlaceQuery(text);
+    if (!query) {
+      // Still set the link as the website
+      if (!website) setWebsite(text);
+      return;
+    }
+
+    setLookingUp(true);
+    try {
+      const place = await lookupPlace(query);
+      if (place) {
+        if (place.name && !name) setName(place.name);
+        if (place.formatted_address && !address) setAddress(place.formatted_address);
+        if ((place as any).formatted_phone_number && !contactPhone) {
+          setContactPhone((place as any).formatted_phone_number);
+        }
+        if (place.website && !website) setWebsite(place.website);
+        else if (!website) setWebsite(text);
+      } else {
+        // Couldn't look up, just fill what we can
+        if (!name) setName(query);
+        if (!website) setWebsite(text);
+      }
+    } catch {
+      if (!name) setName(query);
+      if (!website) setWebsite(text);
+    }
+    setLookingUp(false);
+  }, [name, address, website, contactPhone]);
+
+  const handleMapsInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setMapsLink(val);
+    if (isGoogleMapsUrl(val)) {
+      handleMapsLinkPaste(val);
+    }
+  };
+
+  const handleMapsInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (isGoogleMapsUrl(text)) {
+      e.preventDefault();
+      handleMapsLinkPaste(text);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +227,26 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          {/* Google Maps Link Quick-Fill */}
+          {!venue && (
+            <div className="relative">
+              <Link size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+              <input
+                ref={mapsInputRef}
+                type="text"
+                value={mapsLink}
+                onChange={handleMapsInputChange}
+                onPaste={handleMapsInputPaste}
+                placeholder="Paste a Google Maps link to auto-fill"
+                className="w-full !pl-10 bg-white/5 border border-dashed border-white/20 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-transparent py-2.5 pr-3 placeholder:text-white/30"
+                autoFocus
+              />
+              {lookingUp && (
+                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-white/40" />
+              )}
+            </div>
+          )}
+
           {/* Venue Info Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/60">Venue Details</h3>
@@ -107,7 +258,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Venue Name *"
-              autoFocus
+              autoFocus={!!venue}
             />
 
             <IconInput
