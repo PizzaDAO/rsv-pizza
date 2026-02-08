@@ -16,6 +16,7 @@ import {
 import { RaffleForm } from './RaffleForm';
 import { PrizeForm } from './PrizeForm';
 import { RaffleCard } from './RaffleCard';
+import { WinnerPicker } from './WinnerPicker';
 
 interface RaffleWidgetProps {
   partyId: string;
@@ -160,6 +161,9 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
 
   return (
     <div className="space-y-4">
+      {/* Random Winner Picker */}
+      <WinnerPicker />
+
       {/* Header */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
