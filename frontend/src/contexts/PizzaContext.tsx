@@ -94,6 +94,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || [],
+    selectedPizzerias: dbParty.selected_pizzerias || [],
+    venueName: dbParty.venue_name,
     createdAt: dbParty.created_at,
     guests,
   };

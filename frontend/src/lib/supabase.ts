@@ -237,6 +237,7 @@ export interface DbParty {
   address: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
+  selected_pizzerias: any[] | null;
   co_hosts: any[];
   created_at: string;
 }
@@ -502,6 +503,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const safeColumns = `
     id, name, invite_code, custom_url, date, duration, timezone,
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+    require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id
   `;
 
