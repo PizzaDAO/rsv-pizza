@@ -269,13 +269,7 @@ export function EventPage() {
 
           {/* Share to unlock */}
           {event.shareToUnlock && (
-            <div className="mt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-white/40 text-sm">or</span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
-
+            <div className="mt-4">
               {!showTweetInput ? (
                 <button
                   onClick={() => {
@@ -335,16 +329,10 @@ export function EventPage() {
 
           {/* Already RSVP'd? Log in */}
           {!user && (
-            <div className="mt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-white/40 text-sm">or</span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
-
+            <div className="mt-4">
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="w-full flex items-center justify-center gap-2 text-white/60 hover:text-white transition-colors text-sm py-2"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#ff393a] hover:bg-[#ff5a5b] text-white rounded-xl border border-[#ff393a]/30 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 Already RSVP'd? Log in
