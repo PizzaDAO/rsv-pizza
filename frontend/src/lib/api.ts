@@ -444,3 +444,42 @@ export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEvent
     requireAuth: false,
   });
 }
+
+// Check-in API functions
+export interface CheckInResponse {
+  success: boolean;
+  alreadyCheckedIn: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: string;
+    checkedInBy?: string;
+  };
+  message: string;
+}
+
+export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
+  return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'POST',
+    requireAuth: true,
+  });
+}
+
+export interface CheckInStatusResponse {
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt?: string;
+    checkedInBy?: string;
+  };
+  isCheckedIn: boolean;
+}
+
+export async function getCheckInStatus(inviteCode: string, guestId: string): Promise<CheckInStatusResponse> {
+  return apiRequest<CheckInStatusResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'GET',
+    requireAuth: true,
+  });
+}

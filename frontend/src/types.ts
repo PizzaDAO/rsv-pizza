@@ -25,6 +25,8 @@ export interface Guest {
   pizzeriaRankings?: string[];
   submittedAt?: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
+  checkedInAt?: string | null;
+  checkedInBy?: string | null;
 }
 
 export interface PizzaStyle {
