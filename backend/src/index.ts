@@ -15,6 +15,10 @@ import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
 import staffRoutes from './routes/staff.routes.js';
+import performerRoutes from './routes/performer.routes.js';
+import venueRoutes from './routes/venue.routes.js';
+import sponsorRoutes from './routes/sponsor.routes.js';
+import budgetRoutes from './routes/budget.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -90,6 +94,10 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/parties', displayRoutes); // Display routes (host management)
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/parties', raffleRoutes); // Raffle routes (some public, some require auth)
+app.use('/api/parties', performerRoutes); // Performer/music routes
+app.use('/api/parties', venueRoutes); // Venue routes (host only)
+app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
+app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);

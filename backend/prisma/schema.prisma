@@ -81,16 +81,31 @@ model Party {
   shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
   shareTweetText   String?  @map("share_tweet_text")
 
+  // Music settings
+  musicEnabled Boolean @default(false) @map("music_enabled")
+  musicNotes   String? @map("music_notes")
+
+  // Fundraising (Sponsor CRM)
+  fundraisingGoal Decimal? @map("fundraising_goal") @db.Decimal(10, 2)
+
+  // Budget settings
+  budgetEnabled Boolean  @default(false) @map("budget_enabled")
+  budgetTotal   Decimal? @map("budget_total") @db.Decimal(10, 2)
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests    Guest[]
-  orders    Order[]
-  photos    Photo[]
-  donations Donation[]
-  raffles   Raffle[]
-  displays  Display[]
-  staff     Staff[]
+  guests      Guest[]
+  orders      Order[]
+  photos      Photo[]
+  donations   Donation[]
+  raffles     Raffle[]
+  displays    Display[]
+  staff       Staff[]
+  performers  Performer[]
+  venues      Venue[]
+  sponsors    Sponsor[]
+  budgetItems BudgetItem[]
 
   @@map("parties")
 }
@@ -119,7 +134,7 @@ model Guest {
 
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
-  checkedInBy String?   @map("checked_in_by") @db.Uuid
+  checkedInBy String?   @map("checked_in_by")
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -502,4 +517,159 @@ model Staff {
 
   @@index([partyId, status])
   @@map("staff")
+}
+
+// ============================================
+// Music/DJ Lineup Models
+// ============================================
+
+model Performer {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name  String                    // DJ/performer name
+  type  String @default("dj")     // dj, live_band, solo, playlist
+  genre String?                   // Music genre/style
+
+  // Schedule
+  setTime     String? @map("set_time")     // Time as string (e.g., "21:00")
+  setDuration Int?    @map("set_duration") // Duration in minutes
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  // Contact
+  contactName  String? @map("contact_name")
+  contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
+  instagram    String?
+  soundcloud   String?
+
+  // Status
+  status String @default("confirmed") // pending, confirmed, cancelled
+
+  // Logistics
+  equipmentProvided Boolean @default(false) @map("equipment_provided")
+  equipmentNotes    String? @map("equipment_notes")
+  fee               Decimal? @db.Decimal(10, 2)
+  feePaid           Boolean @default(false) @map("fee_paid")
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, sortOrder])
+  @@map("performers")
+}
+
+// ============================================
+// Venue Model (for venue picker tool)
+// ============================================
+
+model Venue {
+  id           String    @id @default(uuid()) @db.Uuid
+  partyId      String    @map("party_id") @db.Uuid
+  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Venue info
+  name         String
+  address      String?
+  website      String?
+  capacity     Int?
+  cost         Decimal?  @db.Decimal(10, 2)
+  organization String?
+
+  // Contact
+  pointPerson   String?  @map("point_person")
+  contactName   String?  @map("contact_name")
+  contactEmail  String?  @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+
+  // Status tracking
+  status       String    @default("researching")  // researching, contacted, negotiating, confirmed, deposit_paid, paid_in_full, declined
+
+  // Selection
+  isSelected   Boolean   @default(false) @map("is_selected")
+
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, isSelected])
+  @@map("venues")
+}
+
+// ============================================
+// Sponsor CRM Models
+// ============================================
+
+model Sponsor {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name         String  // Sponsor/company name
+  website      String? // Company website
+  brandTwitter String? @map("brand_twitter") // Brand's X/Twitter handle
+
+  // Contact Info
+  pointPerson    String? @map("point_person") // Who's managing this relationship
+  contactName    String? @map("contact_name") // Contact at the sponsor company
+  contactEmail   String? @map("contact_email")
+  contactPhone   String? @map("contact_phone")
+  contactTwitter String? @map("contact_twitter") // Contact person's X/Twitter handle
+  telegram       String? // Telegram handle
+
+  // Pipeline Status: todo, asked, yes, invoiced, paid, stuck, alum, skip
+  status String @default("todo")
+
+  // Fundraising
+  amount          Decimal? @db.Decimal(10, 2) // Contribution amount (pledged or confirmed)
+  amountReceived  Decimal? @map("amount_received") @db.Decimal(10, 2) // Actually received
+  sponsorshipType String?  @map("sponsorship_type") // cash, in-kind, venue, pizza, drinks, other
+  productService  String?  @map("product_service") // For non-monetary contributions
+
+  // Assets (for confirmed sponsors)
+  logoUrl String? @map("logo_url")
+
+  // Tracking
+  notes           String? // Communication history, notes
+  lastContactedAt DateTime? @map("last_contacted_at") @db.Timestamptz
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, status])
+  @@index([partyId, createdAt])
+  @@map("sponsors")
+}
+
+// ============================================
+// Budget Models
+// ============================================
+
+model BudgetItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String
+  cost        Decimal  @db.Decimal(10, 2)
+  status      String   @default("pending")
+
+  pointPerson String?  @map("point_person")
+  notes       String?
+  receiptUrl  String?  @map("receipt_url")
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, category])
+  @@map("budget_items")
 }
