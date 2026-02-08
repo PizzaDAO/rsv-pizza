@@ -263,7 +263,20 @@ export function EventPage() {
             </button>
           </form>
 
-          {/* Share to unlock */}
+          {/* Already RSVP'd? Log in */}
+          {!user && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#ff393a] hover:bg-[#ff5a5b] text-white rounded-xl border border-[#ff393a]/30 transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+                Already RSVP'd? Log in
+              </button>
+            </div>
+          )}
+
+          {/* Post to Get In */}
           {event.shareToUnlock && (
             <div className="mt-4">
               <div className="flex items-center gap-3 mb-4">
@@ -287,7 +300,7 @@ export function EventPage() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
-                  Share to unlock
+                  Post to Get In
                 </button>
               ) : (
                 <div className="space-y-3">
@@ -325,19 +338,6 @@ export function EventPage() {
                   </button>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Already RSVP'd? Log in */}
-          {!user && (
-            <div className="mt-4">
-              <button
-                onClick={() => setShowLoginModal(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-[#ff393a] hover:bg-[#ff5a5b] text-white rounded-xl border border-[#ff393a]/30 transition-colors"
-              >
-                <LogIn className="w-4 h-4" />
-                Already RSVP'd? Log in
-              </button>
             </div>
           )}
         </div>
