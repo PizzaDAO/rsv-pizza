@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Camera, Link2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Camera, Link2, LogIn } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet } from '../lib/api';
 import { IconInput } from '../components/IconInput';
@@ -14,6 +14,7 @@ import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
 import { RSVPModal } from '../components/RSVPModal';
+import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { PhotoStats } from '../types';
@@ -43,6 +44,7 @@ export function EventPage() {
   const [showPhotos, setShowPhotos] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showTweetInput, setShowTweetInput] = useState(false);
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
@@ -69,15 +71,23 @@ export function EventPage() {
 
           // Check if event has password protection
           if (foundEvent.hasPassword) {
-            // Check if already authenticated in this session
-            // Use inviteCode as key to be consistent with RSVPPage
-            const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
-            const storedAuth = sessionStorage.getItem(authKey);
+            // Skip password for logged-in guests (hosts are added as guests too)
+            const userIsGuest = user?.email && await isUserGuestAtParty(foundEvent.id, user.email);
+            const userIsHost = user?.id && user.id === foundEvent.userId;
 
-            if (storedAuth) {
-              const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
-              if (isValid) {
-                setIsAuthenticated(true);
+            if (userIsGuest || userIsHost) {
+              setIsAuthenticated(true);
+            } else {
+              // Check if already authenticated in this session
+              // Use inviteCode as key to be consistent with RSVPPage
+              const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
+              const storedAuth = sessionStorage.getItem(authKey);
+
+              if (storedAuth) {
+                const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
+                if (isValid) {
+                  setIsAuthenticated(true);
+                }
               }
             }
           } else {
@@ -239,17 +249,15 @@ export function EventPage() {
               </div>
             )}
 
-            <div>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="What's the password?"
-                className="w-full"
-                required
-                autoFocus
-              />
-            </div>
+            <IconInput
+              icon={Lock}
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="What's the password?"
+              required
+              autoFocus
+            />
 
             <button
               type="submit"
@@ -324,7 +332,31 @@ export function EventPage() {
               )}
             </div>
           )}
+
+          {/* Already RSVP'd? Log in */}
+          {!user && (
+            <div className="mt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-white/40 text-sm">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="w-full flex items-center justify-center gap-2 text-white/60 hover:text-white transition-colors text-sm py-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Already RSVP'd? Log in
+              </button>
+            </div>
+          )}
         </div>
+
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+        />
       </div>
     );
   }
