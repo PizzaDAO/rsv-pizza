@@ -169,6 +169,13 @@ export interface Donation {
   message?: string;
   partyId: string;
   guestId?: string;
+  // Crypto donation fields
+  paymentMethod?: 'stripe' | 'crypto';
+  chainId?: number;
+  tokenSymbol?: string;
+  tokenAddress?: string;
+  txHash?: string;
+  walletAddress?: string;
   createdAt: string;
   updatedAt: string;
 }

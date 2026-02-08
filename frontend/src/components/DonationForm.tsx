@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, EyeOff, CreditCard, Copy, ExternalLink } from 'lucide-react';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { createDonation, updateDonationStatus } from '../lib/api';
+import { createDonation } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { Checkbox } from './Checkbox';
 import { IconInput } from './IconInput';
+import { CryptoDonationWidget } from './CryptoDonationWidget';
 
 // Initialize Stripe (lazy-load only when key exists to avoid empty key error)
 const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -35,6 +36,7 @@ interface DonationFormInnerProps {
   isAnonymous: boolean;
   onSuccess?: () => void;
   guestId?: string;
+  clientSecret: string;
 }
 
 // The inner form component that uses Stripe hooks
@@ -47,6 +49,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
   isAnonymous,
   onSuccess,
   guestId,
+  clientSecret,
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -61,18 +64,20 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
       return;
     }
 
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      return;
+    }
+
     setProcessing(true);
     setError(null);
 
     try {
       // Confirm the payment
-      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: 'if_required',
-      });
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret!,
+        { payment_method: { card: cardElement } }
+      );
 
       if (confirmError) {
         setError(confirmError.message || 'Payment failed');
@@ -119,9 +124,19 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-        <PaymentElement
+        <CardElement
           options={{
-            layout: 'tabs',
+            style: {
+              base: {
+                color: '#ffffff',
+                fontFamily: 'system-ui, sans-serif',
+                fontSize: '16px',
+                '::placeholder': { color: 'rgba(255,255,255,0.4)' },
+                iconColor: '#ffffff',
+              },
+              invalid: { color: '#ff393a', iconColor: '#ff393a' },
+            },
+            hidePostalCode: true,
           }}
         />
       </div>
@@ -151,78 +166,6 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
         )}
       </button>
     </form>
-  );
-};
-
-// Crypto donation component
-const CryptoDonation: React.FC<{
-  onSuccess?: () => void;
-  cryptoAddress: string;
-}> = ({ onSuccess, cryptoAddress }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(cryptoAddress);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-        <p className="text-white/60 text-sm mb-3">
-          Send any amount of ETH, USDC, or other tokens to:
-        </p>
-
-        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-          <div className="flex items-center justify-between gap-2">
-            <code className="text-[#ff393a] font-mono text-sm break-all">
-              {cryptoAddress}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Copy address"
-            >
-              {copied ? (
-                <Check size={16} className="text-[#39d98a]" />
-              ) : (
-                <Copy size={16} className="text-white/60" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <p className="text-white/50 text-xs">
-            Accepts ETH, USDC, and other ERC-20 tokens on Ethereum mainnet.
-          </p>
-        </div>
-      </div>
-
-      <a
-        href={`https://etherscan.io/address/${cryptoAddress}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 text-white/60 hover:text-white text-sm transition-colors"
-      >
-        <ExternalLink size={14} />
-        View on Etherscan
-      </a>
-
-      <button
-        type="button"
-        onClick={onSuccess}
-        className="w-full btn-secondary"
-      >
-        Done
-      </button>
-    </div>
   );
 };
 
@@ -330,7 +273,17 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         >
           &larr; Back to payment options
         </button>
-        <CryptoDonation onSuccess={onSuccess} cryptoAddress={cryptoAddress} />
+        <CryptoDonationWidget
+          partyId={partyId}
+          cryptoAddress={cryptoAddress}
+          suggestedAmounts={suggestedAmounts}
+          onSuccess={onSuccess}
+          guestId={guestId}
+          donorName={donorName}
+          donorEmail={donorEmail}
+          isAnonymous={isAnonymous}
+          message={message}
+        />
       </div>
     );
   }
@@ -516,6 +469,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         isAnonymous={isAnonymous}
         onSuccess={onSuccess}
         guestId={guestId}
+        clientSecret={clientSecret!}
       />
     </Elements>
   );

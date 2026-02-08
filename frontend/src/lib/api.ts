@@ -342,6 +342,13 @@ export async function createDonation(
     isAnonymous?: boolean;
     message?: string;
     guestId?: string;
+    // Crypto donation fields
+    paymentMethod?: 'stripe' | 'crypto';
+    chainId?: number;
+    tokenSymbol?: string;
+    tokenAddress?: string;
+    txHash?: string;
+    walletAddress?: string;
   }
 ): Promise<{ donation: Donation } | null> {
   try {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Users, Target, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Users, Target, Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { getDonations } from '../lib/api';
 import { Donation } from '../types';
+import { getExplorerTxUrl, getChainName } from '../lib/tokens';
 
 export const DonationSummary: React.FC = () => {
   const { party } = usePizza();
@@ -147,16 +148,38 @@ export const DonationSummary: React.FC = () => {
                     }`}>
                       {donation.status}
                     </span>
+                    {donation.paymentMethod === 'crypto' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-[#627eea]/20 text-[#627eea]">
+                        {donation.tokenSymbol || 'crypto'}
+                        {donation.chainId ? ` (${getChainName(donation.chainId)})` : ''}
+                      </span>
+                    )}
                   </div>
                   {donation.message && (
                     <p className="text-white/50 text-sm truncate mt-0.5">"{donation.message}"</p>
                   )}
-                  <p className="text-white/40 text-xs mt-0.5">
-                    {formatDate(donation.createdAt)}
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-white/40 text-xs">
+                      {formatDate(donation.createdAt)}
+                    </p>
+                    {donation.txHash && donation.chainId && (
+                      <a
+                        href={getExplorerTxUrl(donation.chainId, donation.txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[#627eea] hover:text-[#627eea]/80 text-xs transition-colors"
+                      >
+                        <ExternalLink size={10} />
+                        tx
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div className="text-lg font-bold text-[#39d98a] ml-4">
-                  {formatAmount(Number(donation.amount) * 100)}
+                  {donation.paymentMethod === 'crypto'
+                    ? `${Number(donation.amount)} ${donation.tokenSymbol || ''}`
+                    : formatAmount(Number(donation.amount) * 100)
+                  }
                 </div>
               </div>
             ))}
