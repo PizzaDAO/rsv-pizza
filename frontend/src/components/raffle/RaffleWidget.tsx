@@ -54,10 +54,13 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
 
   const handleCreateRaffle = async (data: { name: string; description?: string; entriesPerGuest?: number }) => {
     setActionLoading('create');
+    setError(null);
     const result = await createRaffle(partyId, data);
     if (result) {
       await loadRaffles();
       setShowRaffleForm(false);
+    } else {
+      setError('Failed to create raffle. Please try again.');
     }
     setActionLoading(null);
   };
