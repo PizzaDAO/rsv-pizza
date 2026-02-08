@@ -41,6 +41,7 @@ import {
   DollarSign,
   ChevronRight,
 } from 'lucide-react';
+import { IconInput } from './IconInput';
 
 interface OrderCheckoutProps {
   pizzeria: Pizzeria;
@@ -624,9 +625,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
         {/* Fulfillment Type */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-white/80 mb-2">
-            Fulfillment Type
-          </label>
+          <p className="text-sm font-medium text-white/80 mb-2">Fulfillment Type</p>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -655,76 +654,52 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
         {/* Customer Info */}
         <div className="space-y-3 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              <User size={14} className="inline mr-1" />
-              Your Name *
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="John Doe"
-              className="w-full"
-              required
-            />
-          </div>
+          <IconInput
+            icon={User}
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder={`Your name${isAIPhoneOrder ? ' *' : ''}`}
+            required
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
-              <Phone size={14} className="inline mr-1" />
-              Phone Number {isAIPhoneOrder && '*'}
-            </label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="(555) 123-4567"
-              className="w-full"
-            />
-          </div>
+          <IconInput
+            icon={Phone}
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder={`Phone number${isAIPhoneOrder ? ' *' : ''}`}
+          />
 
           {(isDirectOrder || isAIPhoneOrder) && (
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <Mail size={14} className="inline mr-1" />
-                Email {isAIPhoneOrder && payWithCard && '*'}
-              </label>
-              <input
-                type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full"
-              />
-            </div>
+            <IconInput
+              icon={Mail}
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder={`Email${isAIPhoneOrder && payWithCard ? ' *' : ''}`}
+            />
           )}
 
           {fulfillmentType === 'DELIVERY' && (
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                <MapPin size={14} className="inline mr-1" />
-                Delivery Address *
-              </label>
-              <input
-                type="text"
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder="123 Main St, City, State ZIP"
-                className="w-full"
-                required
-              />
-            </div>
+            <IconInput
+              icon={MapPin}
+              type="text"
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
+              placeholder="Delivery address *"
+              required
+            />
           )}
         </div>
 
         {/* Payment Option for AI Orders */}
         {isAIPhoneOrder && (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-white/80 mb-2">
+            <p className="text-sm font-medium text-white/80 mb-2">
               <DollarSign size={14} className="inline mr-1" />
               Payment Method
-            </label>
+            </p>
             <div className="space-y-2">
               <button
                 type="button"
