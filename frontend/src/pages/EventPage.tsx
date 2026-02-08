@@ -238,11 +238,7 @@ export function EventPage() {
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
-          <p className="text-white/60 mb-6 text-center">
-            This event is password-protected
-          </p>
-
-          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+          <form onSubmit={handlePasswordSubmit} className="space-y-3 mt-4">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
                 {passwordError}
@@ -270,6 +266,11 @@ export function EventPage() {
           {/* Share to unlock */}
           {event.shareToUnlock && (
             <div className="mt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-white/40 text-sm">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
               {!showTweetInput ? (
                 <button
                   onClick={() => {
