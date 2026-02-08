@@ -15,6 +15,7 @@ const contentTypeLabels: Record<DisplayContentType, string> = {
   qr_code: 'QR Code',
   event_info: 'Event Info',
   photos: 'Photo Wall',
+  upload: 'Upload',
   custom: 'Custom',
 };
 
@@ -23,6 +24,7 @@ const contentTypeIcons: Record<DisplayContentType, string> = {
   qr_code: '🔲',
   event_info: '📋',
   photos: '🖼️',
+  upload: '📤',
   custom: '⚙️',
 };
 
@@ -64,12 +66,19 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
         return config?.message || 'RSVP QR';
       case 'event_info':
         return 'Event details';
+      case 'upload':
+        return config?.mediaType === 'video' ? 'Video' : 'Image';
       case 'custom':
         return 'Custom content';
       default:
         return '';
     }
   };
+
+  // Parse physical dimensions for mockup
+  const physW = display.physicalWidth ? parseFloat(display.physicalWidth) : 0;
+  const physH = display.physicalHeight ? parseFloat(display.physicalHeight) : 0;
+  const hasPhysicalDimensions = physW > 0 && physH > 0;
 
   return (
     <div className={`card p-4 border ${display.isActive ? 'border-white/10' : 'border-red-500/30 bg-red-950/10'}`}>
@@ -91,6 +100,11 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
           </div>
         </div>
       </div>
+
+      {/* Screen Size Mockup */}
+      {hasPhysicalDimensions && (
+        <ScreenMockup width={physW} height={physH} resolution={display.resolution} />
+      )}
 
       {/* URL Display */}
       <div className="bg-white/5 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
@@ -153,6 +167,52 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
           <Trash2 size={14} />
           Delete
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ScreenMockup({ width, height, resolution }: { width: number; height: number; resolution?: string }) {
+  // Scale the physical dimensions to fit in a reasonable card-sized area
+  const maxMockupWidth = 180;
+  const maxMockupHeight = 80;
+  const aspectRatio = width / height;
+
+  let mockupWidth: number;
+  let mockupHeight: number;
+
+  if (aspectRatio > maxMockupWidth / maxMockupHeight) {
+    // Width-constrained
+    mockupWidth = maxMockupWidth;
+    mockupHeight = maxMockupWidth / aspectRatio;
+  } else {
+    // Height-constrained
+    mockupHeight = maxMockupHeight;
+    mockupWidth = maxMockupHeight * aspectRatio;
+  }
+
+  return (
+    <div className="flex items-center justify-center mb-3 py-2">
+      <div className="flex flex-col items-center gap-1">
+        <div className="relative flex items-center gap-1">
+          {/* Width label on top */}
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-white/40 whitespace-nowrap">
+            {width}"
+          </div>
+          {/* Height label on the left */}
+          <div className="text-[10px] text-white/40 mr-1">
+            {height}"
+          </div>
+          {/* Screen rectangle */}
+          <div
+            className="border-2 border-white/20 rounded bg-white/5 flex items-center justify-center"
+            style={{ width: mockupWidth, height: mockupHeight }}
+          >
+            {resolution && (
+              <span className="text-[9px] text-white/30">{resolution}</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

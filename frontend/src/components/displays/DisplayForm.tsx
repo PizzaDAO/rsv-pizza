@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Monitor, Image, QrCode, Info, Camera, Code, Ruler, ScreenShare } from 'lucide-react';
+import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import {
   Display,
   DisplayContentType,
@@ -8,6 +9,7 @@ import {
   QRCodeConfig,
   PhotosConfig,
   EventInfoConfig,
+  UploadConfig,
 } from '../../types';
 
 interface DisplayFormProps {
@@ -26,18 +28,25 @@ export interface DisplayFormData {
   backgroundColor: string;
   showClock: boolean;
   showEventName: boolean;
-  password?: string;
   physicalWidth?: string;
   physicalHeight?: string;
   resolution?: string;
 }
 
 const contentTypes: { value: DisplayContentType; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: 'slideshow', label: 'Slideshow', icon: <Image size={20} />, description: 'Rotating images and text' },
+  { value: 'slideshow', label: 'Slideshow', icon: <Image size={20} />, description: 'Google Slides presentation' },
   { value: 'qr_code', label: 'QR Code', icon: <QrCode size={20} />, description: 'RSVP link QR code' },
   { value: 'event_info', label: 'Event Info', icon: <Info size={20} />, description: 'Event details display' },
   { value: 'photos', label: 'Photo Wall', icon: <Camera size={20} />, description: 'Live photo gallery' },
-  { value: 'custom', label: 'Custom', icon: <Code size={20} />, description: 'Custom HTML content' },
+  { value: 'upload', label: 'Upload', icon: <Upload size={20} />, description: 'Image or video upload' },
+];
+
+const RESOLUTION_PRESETS = [
+  { value: '1920x1080', label: '1920x1080 (Full HD)' },
+  { value: '3840x2160', label: '3840x2160 (4K)' },
+  { value: '1280x720', label: '1280x720 (HD)' },
+  { value: '1024x768', label: '1024x768 (XGA)' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 export function DisplayForm({ display, onSave, onClose, isLoading, error }: DisplayFormProps) {
@@ -47,12 +56,21 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [backgroundColor, setBackgroundColor] = useState(display?.backgroundColor || '#000000');
   const [showClock, setShowClock] = useState(display?.showClock || false);
   const [showEventName, setShowEventName] = useState(display?.showEventName ?? true);
-  const [password, setPassword] = useState('');
 
   // Display dimensions
   const [physicalWidth, setPhysicalWidth] = useState(display?.physicalWidth || '');
   const [physicalHeight, setPhysicalHeight] = useState(display?.physicalHeight || '');
   const [resolution, setResolution] = useState(display?.resolution || '');
+  const [resolutionPreset, setResolutionPreset] = useState(() => {
+    const existing = display?.resolution || '';
+    const match = RESOLUTION_PRESETS.find(p => p.value === existing);
+    return match ? existing : existing ? 'custom' : '';
+  });
+  const [customResolution, setCustomResolution] = useState(() => {
+    const existing = display?.resolution || '';
+    const isPreset = RESOLUTION_PRESETS.some(p => p.value === existing);
+    return isPreset ? '' : existing;
+  });
 
   // Content type specific config
   const [googleSlidesUrl, setGoogleSlidesUrl] = useState('');
@@ -66,6 +84,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [eventShowCountdown, setEventShowCountdown] = useState(true);
   const [eventShowGuestCount, setEventShowGuestCount] = useState(true);
   const [eventShowLocation, setEventShowLocation] = useState(true);
+  const [uploadMediaUrl, setUploadMediaUrl] = useState('');
+  const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
 
   // Initialize from existing display config
   useEffect(() => {
@@ -91,9 +111,22 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
           setEventShowGuestCount(config.showGuestCount ?? true);
           setEventShowLocation(config.showLocation ?? true);
           break;
+        case 'upload':
+          setUploadMediaUrl(config.mediaUrl || '');
+          setUploadMediaType(config.mediaType || 'image');
+          break;
       }
     }
   }, [display]);
+
+  // Keep resolution in sync with preset/custom
+  useEffect(() => {
+    if (resolutionPreset === 'custom') {
+      setResolution(customResolution);
+    } else {
+      setResolution(resolutionPreset);
+    }
+  }, [resolutionPreset, customResolution]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +160,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
           showLocation: eventShowLocation,
         } as EventInfoConfig;
         break;
+      case 'upload':
+        contentConfig = {
+          mediaUrl: uploadMediaUrl.trim(),
+          mediaType: uploadMediaType,
+        } as UploadConfig;
+        break;
       case 'custom':
         contentConfig = {};
         break;
@@ -140,7 +179,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
       backgroundColor,
       showClock,
       showEventName,
-      password: password || undefined,
       physicalWidth: physicalWidth || undefined,
       physicalHeight: physicalHeight || undefined,
       resolution: resolution || undefined,
@@ -148,7 +186,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-[#1a1a2e] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-[#1a1a2e] border-b border-white/10 p-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">
@@ -186,18 +224,32 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               onChange={(e) => setPhysicalHeight(e.target.value)}
               placeholder="Height (in)"
             />
+            <div>
+              <select
+                value={resolutionPreset}
+                onChange={(e) => setResolutionPreset(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white h-[42px]"
+              >
+                <option value="">Resolution</option>
+                {RESOLUTION_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {resolutionPreset === 'custom' && (
             <IconInput
               icon={Monitor}
               type="text"
-              value={resolution}
-              onChange={(e) => setResolution(e.target.value)}
-              placeholder="Resolution"
+              value={customResolution}
+              onChange={(e) => setCustomResolution(e.target.value)}
+              placeholder="Custom resolution (e.g., 2560x1440)"
             />
-          </div>
+          )}
 
           {/* Content Type */}
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">Content Type</label>
+            <p className="text-sm font-medium text-white/70 mb-2">Content Type</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {contentTypes.map((type) => (
                 <button
@@ -240,7 +292,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
             {contentType === 'qr_code' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-white/70 mb-1">QR Size</label>
                   <select
                     value={qrSize}
                     onChange={(e) => setQrSize(e.target.value as 'small' | 'medium' | 'large')}
@@ -251,32 +302,24 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     <option value="large">Large</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm text-white/70 mb-1">Message</label>
-                  <input
-                    type="text"
-                    value={qrMessage}
-                    onChange={(e) => setQrMessage(e.target.value)}
-                    placeholder="Scan to RSVP!"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
-                  />
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={qrShowEventInfo}
-                    onChange={(e) => setQrShowEventInfo(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white/70">Show event info below QR</span>
-                </label>
+                <IconInput
+                  icon={Type}
+                  type="text"
+                  value={qrMessage}
+                  onChange={(e) => setQrMessage(e.target.value)}
+                  placeholder="Message (e.g., Scan to RSVP!)"
+                />
+                <Checkbox
+                  checked={qrShowEventInfo}
+                  onChange={() => setQrShowEventInfo(!qrShowEventInfo)}
+                  label="Show event info below QR"
+                />
               </div>
             )}
 
             {contentType === 'photos' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-white/70 mb-1">Filter</label>
                   <select
                     value={photosFilter}
                     onChange={(e) => setPhotosFilter(e.target.value as 'all' | 'starred')}
@@ -287,7 +330,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-white/70 mb-1">Layout</label>
                   <select
                     value={photosLayout}
                     onChange={(e) => setPhotosLayout(e.target.value as 'grid' | 'slideshow')}
@@ -299,7 +341,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                 </div>
                 {photosLayout === 'grid' && (
                   <div>
-                    <label className="block text-sm text-white/70 mb-1">Columns</label>
                     <input
                       type="number"
                       min={1}
@@ -307,11 +348,11 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                       value={photosColumns}
                       onChange={(e) => setPhotosColumns(parseInt(e.target.value) || 3)}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                      placeholder="Columns (1-6)"
                     />
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm text-white/70 mb-1">Auto-refresh (seconds)</label>
                   <input
                     type="number"
                     min={5}
@@ -319,6 +360,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     value={photosAutoRefresh}
                     onChange={(e) => setPhotosAutoRefresh(parseInt(e.target.value) || 30)}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    placeholder="Auto-refresh interval (seconds)"
                   />
                 </div>
               </div>
@@ -326,40 +368,57 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
             {contentType === 'event_info' && (
               <div className="space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={eventShowCountdown}
-                    onChange={(e) => setEventShowCountdown(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white/70">Show countdown timer</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={eventShowGuestCount}
-                    onChange={(e) => setEventShowGuestCount(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white/70">Show guest count</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={eventShowLocation}
-                    onChange={(e) => setEventShowLocation(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white/70">Show location</span>
-                </label>
+                <Checkbox
+                  checked={eventShowCountdown}
+                  onChange={() => setEventShowCountdown(!eventShowCountdown)}
+                  label="Show countdown timer"
+                />
+                <Checkbox
+                  checked={eventShowGuestCount}
+                  onChange={() => setEventShowGuestCount(!eventShowGuestCount)}
+                  label="Show guest count"
+                />
+                <Checkbox
+                  checked={eventShowLocation}
+                  onChange={() => setEventShowLocation(!eventShowLocation)}
+                  label="Show location"
+                />
               </div>
             )}
 
-            {contentType === 'custom' && (
-              <p className="text-sm text-white/50">
-                Custom content configuration coming soon. For now, create a slideshow with your content.
-              </p>
+            {contentType === 'upload' && (
+              <div className="space-y-4">
+                <div>
+                  <select
+                    value={uploadMediaType}
+                    onChange={(e) => setUploadMediaType(e.target.value as 'image' | 'video')}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                  </select>
+                </div>
+                <IconInput
+                  icon={Link}
+                  type="url"
+                  value={uploadMediaUrl}
+                  onChange={(e) => setUploadMediaUrl(e.target.value)}
+                  placeholder="Media URL (image or video link)"
+                />
+                <p className="text-xs text-white/40 pl-1">
+                  Paste a direct link to an image or video file
+                </p>
+                {uploadMediaUrl && uploadMediaType === 'image' && (
+                  <div className="rounded-lg overflow-hidden border border-white/10">
+                    <img
+                      src={uploadMediaUrl}
+                      alt="Preview"
+                      className="w-full max-h-48 object-contain bg-black/50"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -369,9 +428,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
             {(contentType === 'slideshow' || contentType === 'photos') && (
               <div>
-                <label className="block text-sm text-white/70 mb-1">
-                  Rotation Interval (seconds)
-                </label>
                 <input
                   type="number"
                   min={3}
@@ -379,12 +435,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   value={rotationInterval}
                   onChange={(e) => setRotationInterval(parseInt(e.target.value) || 10)}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                  placeholder="Rotation interval (seconds)"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm text-white/70 mb-1">Background Color</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
@@ -397,44 +453,23 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   value={backgroundColor}
                   onChange={(e) => setBackgroundColor(e.target.value)}
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono"
+                  placeholder="Background color"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showClock}
-                  onChange={(e) => setShowClock(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm text-white/70">Show clock overlay</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showEventName}
-                  onChange={(e) => setShowEventName(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm text-white/70">Show event name</span>
-              </label>
+              <Checkbox
+                checked={showClock}
+                onChange={() => setShowClock(!showClock)}
+                label="Show clock overlay"
+              />
+              <Checkbox
+                checked={showEventName}
+                onChange={() => setShowEventName(!showEventName)}
+                label="Show event name"
+              />
             </div>
-          </div>
-
-          {/* Password Protection */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">
-              Password Protection (optional)
-            </label>
-            <input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave empty for no password"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-            />
           </div>
 
           {/* Error Message */}

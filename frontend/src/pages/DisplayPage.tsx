@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
-import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, Photo } from '../types';
-import { IconInput } from '../components/IconInput';
+import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo } from '../types';
 
 export function DisplayPage() {
   const { partyId, slug } = useParams<{ partyId: string; slug: string }>();
@@ -12,23 +11,20 @@ export function DisplayPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [needsPassword, setNeedsPassword] = useState(false);
-  const [password, setPassword] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
-  const loadDisplay = useCallback(async (pw?: string) => {
+  const loadDisplay = useCallback(async () => {
     if (!partyId || !slug) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await getDisplayForViewer(partyId, slug, pw);
+      const result = await getDisplayForViewer(partyId, slug);
       if (result) {
         setData(result);
-        setNeedsPassword(false);
         if (result.photos) setPhotos(result.photos);
       } else {
-        setNeedsPassword(true);
+        setError('Display not found');
       }
     } catch (err) {
       setError('Failed to load display');
@@ -74,39 +70,10 @@ export function DisplayPage() {
     return () => clearInterval(interval);
   }, [data, photos.length]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadDisplay(password);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-white/50" />
-      </div>
-    );
-  }
-
-  if (needsPassword) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <form onSubmit={handlePasswordSubmit} className="w-full max-w-sm space-y-4">
-          <div className="text-center mb-6">
-            <Lock className="w-12 h-12 text-white/30 mx-auto mb-3" />
-            <p className="text-white/50">This display is password protected</p>
-          </div>
-          <IconInput
-            icon={Lock}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password"
-            autoFocus
-          />
-          <button type="submit" className="w-full btn-primary">
-            View Display
-          </button>
-        </form>
       </div>
     );
   }
@@ -153,6 +120,7 @@ export function DisplayPage() {
           {display.contentType === 'event_info' && <EventInfoDisplay config={display.contentConfig as EventInfoConfig} party={party} />}
           {display.contentType === 'slideshow' && <SlideshowDisplay config={display.contentConfig as SlideshowConfig} />}
           {display.contentType === 'photos' && <PhotosDisplay config={display.contentConfig as PhotosConfig} photos={photos} currentIndex={currentSlideIndex} />}
+          {display.contentType === 'upload' && <UploadDisplay config={display.contentConfig as UploadConfig} />}
         </div>
       </div>
     </>
@@ -166,6 +134,14 @@ function QRCodeDisplay({ config, rsvpUrl, party }: { config: QRCodeConfig; rsvpU
 
   return (
     <div className="flex flex-col items-center gap-8">
+      {/* Event image */}
+      {party.eventImageUrl && (
+        <img
+          src={party.eventImageUrl}
+          alt={party.name}
+          className="max-w-[300px] max-h-[200px] object-contain rounded-xl"
+        />
+      )}
       {config.message && (
         <p className="text-white text-3xl font-semibold text-center">{config.message}</p>
       )}
@@ -297,5 +273,32 @@ function PhotosDisplay({ config, photos, currentIndex }: { config: PhotosConfig;
         </div>
       ))}
     </div>
+  );
+}
+
+function UploadDisplay({ config }: { config: UploadConfig }) {
+  if (!config.mediaUrl) {
+    return <p className="text-white/50 text-xl">No media uploaded</p>;
+  }
+
+  if (config.mediaType === 'video') {
+    return (
+      <video
+        src={config.mediaUrl}
+        className="max-w-full max-h-full object-contain"
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+    );
+  }
+
+  return (
+    <img
+      src={config.mediaUrl}
+      alt="Display content"
+      className="max-w-full max-h-full object-contain"
+    />
   );
 }

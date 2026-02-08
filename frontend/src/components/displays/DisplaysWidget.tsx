@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Monitor, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Monitor, Loader2, AlertCircle, Map, Link } from 'lucide-react';
 import { Display } from '../../types';
 import { getPartyDisplays, createDisplay, updateDisplay, deleteDisplay } from '../../lib/api';
 import { DisplayCard } from './DisplayCard';
 import { DisplayForm, DisplayFormData } from './DisplayForm';
+import { IconInput } from '../IconInput';
 
 interface DisplaysWidgetProps {
   partyId: string;
@@ -17,6 +18,11 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingDisplay, setEditingDisplay] = useState<Display | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Floorplan state
+  const [floorplanUrl, setFloorplanUrl] = useState('');
+  const [floorplanInput, setFloorplanInput] = useState('');
+  const [showFloorplanInput, setShowFloorplanInput] = useState(false);
 
   const loadDisplays = useCallback(async () => {
     try {
@@ -36,6 +42,15 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   useEffect(() => {
     loadDisplays();
   }, [loadDisplays]);
+
+  // Load floorplan from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(`floorplan-${partyId}`);
+    if (saved) {
+      setFloorplanUrl(saved);
+      setFloorplanInput(saved);
+    }
+  }, [partyId]);
 
   const handleCreate = () => {
     setEditingDisplay(null);
@@ -102,6 +117,18 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
     }
   };
 
+  const handleSaveFloorplan = () => {
+    const url = floorplanInput.trim();
+    if (url) {
+      localStorage.setItem(`floorplan-${partyId}`, url);
+      setFloorplanUrl(url);
+    } else {
+      localStorage.removeItem(`floorplan-${partyId}`);
+      setFloorplanUrl('');
+    }
+    setShowFloorplanInput(false);
+  };
+
   if (loading) {
     return (
       <div className="card p-8 flex items-center justify-center">
@@ -147,6 +174,76 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
           <Plus size={18} />
           New Display
         </button>
+      </div>
+
+      {/* Floorplan Section */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Map className="text-white/50" size={18} />
+            <h3 className="font-medium text-white text-sm">Venue Floorplan</h3>
+          </div>
+          <button
+            onClick={() => setShowFloorplanInput(!showFloorplanInput)}
+            className="text-xs text-[#ff393a] hover:underline"
+          >
+            {floorplanUrl ? 'Change' : 'Add Floorplan'}
+          </button>
+        </div>
+
+        {showFloorplanInput && (
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex-1">
+              <IconInput
+                icon={Link}
+                type="url"
+                value={floorplanInput}
+                onChange={(e) => setFloorplanInput(e.target.value)}
+                placeholder="Floorplan image URL"
+              />
+            </div>
+            <button
+              onClick={handleSaveFloorplan}
+              className="px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/90 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
+            >
+              Save
+            </button>
+          </div>
+        )}
+
+        {floorplanUrl ? (
+          <div className="relative rounded-lg overflow-hidden border border-white/10">
+            <img
+              src={floorplanUrl}
+              alt="Venue Floorplan"
+              className="w-full max-h-[300px] object-contain bg-black/30"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            {/* Display name overlays */}
+            {displays.length > 0 && (
+              <div className="absolute inset-0 flex flex-wrap items-start justify-start gap-2 p-3">
+                {displays.map((d) => (
+                  <div
+                    key={d.id}
+                    className={`px-2 py-1 rounded text-xs font-medium shadow-lg ${
+                      d.isActive
+                        ? 'bg-[#ff393a]/90 text-white'
+                        : 'bg-white/20 text-white/60'
+                    }`}
+                  >
+                    {d.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-white/30 text-center py-3">
+            Add a floorplan image to see where displays are placed
+          </p>
+        )}
       </div>
 
       {/* Display List */}

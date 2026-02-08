@@ -316,7 +316,7 @@ export interface PhotoStats {
 }
 
 // Display Widget types
-export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'custom';
+export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom';
 
 export interface SlideContent {
   type: 'image' | 'text' | 'qr';
@@ -354,12 +354,17 @@ export interface EventInfoConfig {
   showDescription?: boolean;
 }
 
+export interface UploadConfig {
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+}
+
 export interface CustomConfig {
   html?: string;
   refreshInterval?: number;
 }
 
-export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | CustomConfig;
+export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | UploadConfig | CustomConfig;
 
 export interface Display {
   id: string;
