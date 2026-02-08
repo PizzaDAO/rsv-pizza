@@ -1,10 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Monitor, Loader2, AlertCircle, Map, Link } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Monitor, Loader2, AlertCircle, Map, Link, MapPin, X } from 'lucide-react';
 import { Display } from '../../types';
 import { getPartyDisplays, createDisplay, updateDisplay, deleteDisplay } from '../../lib/api';
 import { DisplayCard } from './DisplayCard';
 import { DisplayForm, DisplayFormData } from './DisplayForm';
 import { IconInput } from '../IconInput';
+
+interface FloorplanPin {
+  displayId: string;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+}
+
+interface FloorplanData {
+  url: string;
+  pins: FloorplanPin[];
+}
 
 interface DisplaysWidgetProps {
   partyId: string;
@@ -23,6 +34,14 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const [floorplanUrl, setFloorplanUrl] = useState('');
   const [floorplanInput, setFloorplanInput] = useState('');
   const [showFloorplanInput, setShowFloorplanInput] = useState(false);
+  const [pins, setPins] = useState<FloorplanPin[]>([]);
+
+  // Pin placement state
+  const [pendingClick, setPendingClick] = useState<{ x: number; y: number } | null>(null);
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
+  const floorplanRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const loadDisplays = useCallback(async () => {
     try {
@@ -43,14 +62,53 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
     loadDisplays();
   }, [loadDisplays]);
 
-  // Load floorplan from localStorage
+  // Load floorplan data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(`floorplan-${partyId}`);
     if (saved) {
-      setFloorplanUrl(saved);
-      setFloorplanInput(saved);
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed === 'object' && parsed.url) {
+          // New format: { url, pins }
+          setFloorplanUrl(parsed.url);
+          setFloorplanInput(parsed.url);
+          setPins(parsed.pins || []);
+        } else if (typeof parsed === 'string') {
+          // Legacy format: just a URL string
+          setFloorplanUrl(parsed);
+          setFloorplanInput(parsed);
+          setPins([]);
+        }
+      } catch {
+        // Legacy format: plain string (not JSON)
+        setFloorplanUrl(saved);
+        setFloorplanInput(saved);
+        setPins([]);
+      }
     }
   }, [partyId]);
+
+  // Save floorplan data to localStorage whenever pins or URL change
+  const saveFloorplanData = useCallback((url: string, pinData: FloorplanPin[]) => {
+    if (url) {
+      const data: FloorplanData = { url, pins: pinData };
+      localStorage.setItem(`floorplan-${partyId}`, JSON.stringify(data));
+    } else {
+      localStorage.removeItem(`floorplan-${partyId}`);
+    }
+  }, [partyId]);
+
+  // Close popovers when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPendingClick(null);
+        setSelectedPinId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleCreate = () => {
     setEditingDisplay(null);
@@ -100,6 +158,10 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
       const success = await deleteDisplay(partyId, display.id);
       if (success) {
         setDisplays(displays.filter(d => d.id !== display.id));
+        // Also remove any pin for this display
+        const newPins = pins.filter(p => p.displayId !== display.id);
+        setPins(newPins);
+        saveFloorplanData(floorplanUrl, newPins);
       }
     } catch (err) {
       console.error('Error deleting display:', err);
@@ -120,13 +182,183 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const handleSaveFloorplan = () => {
     const url = floorplanInput.trim();
     if (url) {
-      localStorage.setItem(`floorplan-${partyId}`, url);
       setFloorplanUrl(url);
+      saveFloorplanData(url, pins);
     } else {
-      localStorage.removeItem(`floorplan-${partyId}`);
       setFloorplanUrl('');
+      setPins([]);
+      localStorage.removeItem(`floorplan-${partyId}`);
     }
     setShowFloorplanInput(false);
+  };
+
+  // Get displays that haven't been placed on the floorplan yet
+  const unplacedDisplays = displays.filter(d => !pins.some(p => p.displayId === d.id));
+
+  // Handle click on the floorplan image to place a pin
+  const handleFloorplanClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't handle if we're dragging or clicking on a pin/popover
+    if (draggingPinId) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-pin]') || target.closest('[data-popover]')) return;
+
+    // Close any open popover first
+    if (pendingClick || selectedPinId) {
+      setPendingClick(null);
+      setSelectedPinId(null);
+      return;
+    }
+
+    // No unplaced displays - nothing to place
+    if (unplacedDisplays.length === 0) return;
+
+    const rect = floorplanRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setPendingClick({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
+    setSelectedPinId(null);
+  };
+
+  // Place a display at the pending click location
+  const handlePlaceDisplay = (displayId: string) => {
+    if (!pendingClick) return;
+    const newPin: FloorplanPin = { displayId, x: pendingClick.x, y: pendingClick.y };
+    const newPins = [...pins, newPin];
+    setPins(newPins);
+    saveFloorplanData(floorplanUrl, newPins);
+    setPendingClick(null);
+  };
+
+  // Remove a pin from the floorplan
+  const handleRemovePin = (displayId: string) => {
+    const newPins = pins.filter(p => p.displayId !== displayId);
+    setPins(newPins);
+    saveFloorplanData(floorplanUrl, newPins);
+    setSelectedPinId(null);
+  };
+
+  // Handle pin click to show remove option
+  const handlePinClick = (e: React.MouseEvent, displayId: string) => {
+    e.stopPropagation();
+    if (draggingPinId) return;
+    setSelectedPinId(selectedPinId === displayId ? null : displayId);
+    setPendingClick(null);
+  };
+
+  // Drag handling
+  const handleDragStart = (e: React.MouseEvent, displayId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDraggingPinId(displayId);
+    setSelectedPinId(null);
+    setPendingClick(null);
+
+    const rect = floorplanRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const handleDragMove = (moveEvent: MouseEvent) => {
+      const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      const y = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+      const clampedX = Math.max(0, Math.min(100, x));
+      const clampedY = Math.max(0, Math.min(100, y));
+
+      setPins(prev => prev.map(p =>
+        p.displayId === displayId ? { ...p, x: clampedX, y: clampedY } : p
+      ));
+    };
+
+    const handleDragEnd = () => {
+      setDraggingPinId(null);
+      // Save after drag ends
+      setPins(prev => {
+        saveFloorplanData(floorplanUrl, prev);
+        return prev;
+      });
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
+
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+  };
+
+  // Touch drag handling for mobile
+  const handleTouchStart = (e: React.TouchEvent, displayId: string) => {
+    e.stopPropagation();
+    setDraggingPinId(displayId);
+    setSelectedPinId(null);
+    setPendingClick(null);
+
+    const rect = floorplanRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      moveEvent.preventDefault();
+      const touch = moveEvent.touches[0];
+      const x = ((touch.clientX - rect.left) / rect.width) * 100;
+      const y = ((touch.clientY - rect.top) / rect.height) * 100;
+      const clampedX = Math.max(0, Math.min(100, x));
+      const clampedY = Math.max(0, Math.min(100, y));
+
+      setPins(prev => prev.map(p =>
+        p.displayId === displayId ? { ...p, x: clampedX, y: clampedY } : p
+      ));
+    };
+
+    const handleTouchEnd = () => {
+      setDraggingPinId(null);
+      setPins(prev => {
+        saveFloorplanData(floorplanUrl, prev);
+        return prev;
+      });
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
+  // Get display name by ID
+  const getDisplayName = (displayId: string): string => {
+    const display = displays.find(d => d.id === displayId);
+    return display?.name || 'Unknown';
+  };
+
+  // Check if a display is active
+  const isDisplayActive = (displayId: string): boolean => {
+    const display = displays.find(d => d.id === displayId);
+    return display?.isActive ?? false;
+  };
+
+  // Compute popover position to keep it within the floorplan bounds
+  const getPopoverStyle = (xPercent: number, yPercent: number): React.CSSProperties => {
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      zIndex: 50,
+    };
+
+    // Position below the click point by default, flip above if near bottom
+    if (yPercent > 70) {
+      style.bottom = `${100 - yPercent + 3}%`;
+    } else {
+      style.top = `${yPercent + 3}%`;
+    }
+
+    // Center horizontally, but clamp to edges
+    if (xPercent < 20) {
+      style.left = '2%';
+    } else if (xPercent > 80) {
+      style.right = '2%';
+    } else {
+      style.left = `${xPercent}%`;
+      style.transform = 'translateX(-50%)';
+    }
+
+    return style;
   };
 
   if (loading) {
@@ -212,37 +444,169 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
         )}
 
         {floorplanUrl ? (
-          <div className="relative rounded-lg overflow-hidden border border-white/10">
+          <div
+            ref={floorplanRef}
+            className="relative rounded-lg overflow-hidden border border-white/10 cursor-crosshair select-none"
+            onClick={handleFloorplanClick}
+          >
             <img
               src={floorplanUrl}
               alt="Venue Floorplan"
-              className="w-full max-h-[300px] object-contain bg-black/30"
+              className="w-full max-h-[400px] object-contain bg-black/30 pointer-events-none"
+              draggable={false}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-            {/* Display name overlays */}
-            {displays.length > 0 && (
-              <div className="absolute inset-0 flex flex-wrap items-start justify-start gap-2 p-3">
-                {displays.map((d) => (
-                  <div
-                    key={d.id}
-                    className={`px-2 py-1 rounded text-xs font-medium shadow-lg ${
-                      d.isActive
-                        ? 'bg-[#ff393a]/90 text-white'
-                        : 'bg-white/20 text-white/60'
-                    }`}
-                  >
-                    {d.name}
-                  </div>
-                ))}
+
+            {/* "Click to place" hint when no pins are placed and there are displays */}
+            {pins.length === 0 && displays.length > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10">
+                  <p className="text-white/60 text-sm flex items-center gap-2">
+                    <MapPin size={14} className="text-[#ff393a]" />
+                    Click to place displays
+                  </p>
+                </div>
               </div>
+            )}
+
+            {/* Placed pins */}
+            {pins.map((pin) => (
+              <div
+                key={pin.displayId}
+                data-pin="true"
+                className="absolute group"
+                style={{
+                  left: `${pin.x}%`,
+                  top: `${pin.y}%`,
+                  transform: 'translate(-50%, -100%)',
+                  zIndex: draggingPinId === pin.displayId ? 40 : selectedPinId === pin.displayId ? 30 : 20,
+                }}
+              >
+                {/* Drag handle + pin icon */}
+                <div
+                  className={`flex flex-col items-center ${draggingPinId === pin.displayId ? 'scale-110' : ''} transition-transform`}
+                >
+                  {/* Pin marker */}
+                  <div
+                    className="relative cursor-grab active:cursor-grabbing"
+                    onMouseDown={(e) => handleDragStart(e, pin.displayId)}
+                    onTouchStart={(e) => handleTouchStart(e, pin.displayId)}
+                    onClick={(e) => handlePinClick(e, pin.displayId)}
+                  >
+                    <MapPin
+                      size={28}
+                      className="drop-shadow-lg"
+                      fill={isDisplayActive(pin.displayId) ? '#ff393a' : 'rgba(255,255,255,0.3)'}
+                      color={isDisplayActive(pin.displayId) ? '#cc2e2f' : 'rgba(255,255,255,0.5)'}
+                    />
+                  </div>
+
+                  {/* Label below pin */}
+                  <div
+                    className={`mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-lg whitespace-nowrap
+                      ${isDisplayActive(pin.displayId)
+                        ? 'bg-black/80 text-white'
+                        : 'bg-black/60 text-white/60'
+                      }
+                      ${selectedPinId === pin.displayId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                      transition-opacity`}
+                  >
+                    {getDisplayName(pin.displayId)}
+                  </div>
+                </div>
+
+                {/* Remove popover on pin click */}
+                {selectedPinId === pin.displayId && (
+                  <div
+                    data-popover="true"
+                    ref={popoverRef}
+                    className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50"
+                  >
+                    <div className="bg-black/90 backdrop-blur border border-white/10 rounded-lg shadow-xl p-2 min-w-[120px]">
+                      <div className="text-xs text-white/70 px-2 py-1 truncate max-w-[150px]">
+                        {getDisplayName(pin.displayId)}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePin(pin.displayId);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-white/5 rounded transition-colors"
+                      >
+                        <X size={12} />
+                        Remove from floorplan
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Pending click - display picker popover */}
+            {pendingClick && unplacedDisplays.length > 0 && (
+              <div
+                data-popover="true"
+                ref={popoverRef}
+                style={getPopoverStyle(pendingClick.x, pendingClick.y)}
+              >
+                <div className="bg-black/90 backdrop-blur border border-white/10 rounded-lg shadow-xl p-2 min-w-[160px] max-h-[200px] overflow-y-auto">
+                  <div className="text-xs text-white/50 px-2 py-1 mb-1">Place a display here</div>
+                  {unplacedDisplays.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlaceDisplay(d.id);
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-white hover:bg-white/10 rounded transition-colors text-left"
+                    >
+                      <MapPin size={14} className="text-[#ff393a] shrink-0" />
+                      <span className="truncate">{d.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Crosshair indicator at pending click location */}
+            {pendingClick && (
+              <div
+                className="absolute w-2 h-2 bg-[#ff393a] rounded-full border border-white/50 pointer-events-none"
+                style={{
+                  left: `${pendingClick.x}%`,
+                  top: `${pendingClick.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10,
+                }}
+              />
             )}
           </div>
         ) : (
           <p className="text-xs text-white/30 text-center py-3">
             Add a floorplan image to see where displays are placed
           </p>
+        )}
+
+        {/* Pin summary below floorplan */}
+        {floorplanUrl && pins.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {pins.map((pin) => (
+              <span
+                key={pin.displayId}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60"
+              >
+                <MapPin size={10} className="text-[#ff393a]" />
+                {getDisplayName(pin.displayId)}
+              </span>
+            ))}
+            {unplacedDisplays.length > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] text-white/30">
+                +{unplacedDisplays.length} unplaced
+              </span>
+            )}
+          </div>
         )}
       </div>
 
