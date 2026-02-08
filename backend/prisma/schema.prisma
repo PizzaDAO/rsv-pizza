@@ -681,12 +681,11 @@ model Sponsor {
   contactTwitter String? @map("contact_twitter") // Contact person's X/Twitter handle
   telegram       String? // Telegram handle
 
-  // Pipeline Status: todo, asked, yes, invoiced, paid, stuck, alum, skip
+  // Pipeline Status: todo, asked, yes, billed, paid, stuck, alum, skip
   status String @default("todo")
 
   // Fundraising
-  amount          Decimal? @db.Decimal(10, 2) // Contribution amount (pledged or confirmed)
-  amountReceived  Decimal? @map("amount_received") @db.Decimal(10, 2) // Actually received
+  amount          Decimal? @db.Decimal(10, 2) // Contribution amount
   sponsorshipType String?  @map("sponsorship_type") // cash, in-kind, venue, pizza, drinks, other
   productService  String?  @map("product_service") // For non-monetary contributions
 
