@@ -30,7 +30,7 @@ const STATUS_OPTIONS: { value: SponsorStatus; label: string; color: string }[] =
   { value: 'todo', label: 'To Do', color: 'bg-gray-500' },
   { value: 'asked', label: 'Asked', color: 'bg-orange-500' },
   { value: 'yes', label: 'Yes', color: 'bg-green-500' },
-  { value: 'invoiced', label: 'Invoiced', color: 'bg-yellow-500' },
+  { value: 'billed', label: 'Billed', color: 'bg-yellow-500' },
   { value: 'paid', label: 'Paid', color: 'bg-blue-500' },
   { value: 'stuck', label: 'Stuck', color: 'bg-red-500' },
   { value: 'alum', label: 'Alum', color: 'bg-purple-500' },
@@ -59,7 +59,6 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
     telegram: '',
     status: 'todo',
     amount: null,
-    amountReceived: null,
     sponsorshipType: null,
     productService: '',
     logoUrl: '',
@@ -87,7 +86,6 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
         telegram: sponsor.telegram || '',
         status: sponsor.status,
         amount: sponsor.amount,
-        amountReceived: sponsor.amountReceived,
         sponsorshipType: sponsor.sponsorshipType,
         productService: sponsor.productService || '',
         logoUrl: sponsor.logoUrl || '',
@@ -323,16 +321,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 step="0.01"
                 value={formData.amount ?? ''}
                 onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
-                placeholder="Amount Pledged"
-              />
-              <IconInput
-                icon={DollarSign}
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.amountReceived ?? ''}
-                onChange={e => handleChange('amountReceived', e.target.value ? parseFloat(e.target.value) : null)}
-                placeholder="Amount Received"
+                placeholder="Amount"
               />
               <div className="relative">
                 <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />

@@ -12,7 +12,7 @@ const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgCol
   todo: { label: 'To Do', color: 'text-gray-400', bgColor: 'bg-gray-500' },
   asked: { label: 'Asked', color: 'text-orange-400', bgColor: 'bg-orange-500' },
   yes: { label: 'Yes', color: 'text-green-400', bgColor: 'bg-green-500' },
-  invoiced: { label: 'Invoiced', color: 'text-yellow-400', bgColor: 'bg-yellow-500' },
+  billed: { label: 'Billed', color: 'text-yellow-400', bgColor: 'bg-yellow-500' },
   paid: { label: 'Paid', color: 'text-blue-400', bgColor: 'bg-blue-500' },
   stuck: { label: 'Stuck', color: 'text-red-400', bgColor: 'bg-red-500' },
   alum: { label: 'Alum', color: 'text-purple-400', bgColor: 'bg-purple-500' },
@@ -20,7 +20,7 @@ const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgCol
 };
 
 // Main pipeline flow
-const PIPELINE_STATUSES: SponsorStatus[] = ['todo', 'asked', 'yes', 'invoiced', 'paid'];
+const PIPELINE_STATUSES: SponsorStatus[] = ['todo', 'asked', 'yes', 'billed', 'paid'];
 // Secondary statuses
 const SECONDARY_STATUSES: SponsorStatus[] = ['stuck', 'skip', 'alum'];
 
@@ -32,10 +32,8 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
   const inputRef = useRef<HTMLInputElement>(null);
 
   const goal = stats?.fundraisingGoal || 0;
-  const received = stats?.totalReceived || 0;
   const confirmed = stats?.totalConfirmed || 0;
-  const progressPercent = goal > 0 ? Math.min((received / goal) * 100, 100) : 0;
-  const confirmedPercent = goal > 0 ? Math.min((confirmed / goal) * 100, 100) : 0;
+  const progressPercent = goal > 0 ? Math.min((confirmed / goal) * 100, 100) : 0;
 
   // Initialize goalInput when editing starts
   useEffect(() => {
@@ -155,35 +153,20 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
 
         {/* Progress Bar */}
         <div className="relative h-4 bg-white/10 rounded-full overflow-hidden mb-2">
-          {/* Confirmed amount (lighter) */}
-          {confirmedPercent > 0 && (
-            <div
-              className="absolute inset-y-0 left-0 bg-green-500/30 transition-all duration-500"
-              style={{ width: `${confirmedPercent}%` }}
-            />
-          )}
-          {/* Received amount (solid) */}
           <div
-            className="absolute inset-y-0 left-0 bg-blue-500 transition-all duration-500"
+            className="absolute inset-y-0 left-0 bg-green-500 transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
         {/* Legend */}
         <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="text-white/60">Received: {formatCurrency(received)}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-500/50" />
-              <span className="text-white/60">Confirmed: {formatCurrency(confirmed)}</span>
-            </span>
-          </div>
+          <span className="text-white/60">
+            {formatCurrency(confirmed)}{goal > 0 ? ` of ${formatCurrency(goal)}` : ''}
+          </span>
           {goal > 0 && (
             <span className="text-white/40">
-              {Math.round(progressPercent)}% of goal
+              {Math.round(progressPercent)}%
             </span>
           )}
         </div>

@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgCol
   todo: { label: 'To Do', color: 'text-gray-300', bgColor: 'bg-gray-500' },
   asked: { label: 'Asked', color: 'text-orange-300', bgColor: 'bg-orange-500' },
   yes: { label: 'Yes', color: 'text-green-300', bgColor: 'bg-green-500' },
-  invoiced: { label: 'Invoiced', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
+  billed: { label: 'Billed', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
   paid: { label: 'Paid', color: 'text-blue-300', bgColor: 'bg-blue-500' },
   stuck: { label: 'Stuck', color: 'text-red-300', bgColor: 'bg-red-500' },
   alum: { label: 'Alum', color: 'text-purple-300', bgColor: 'bg-purple-500' },
@@ -30,7 +30,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   todo: 0,
   asked: 1,
   yes: 2,
-  invoiced: 3,
+  billed: 3,
   paid: 4,
   stuck: 5,
   alum: 6,
@@ -302,11 +302,6 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                     <div className="text-white font-medium">
                       {formatCurrency(sponsor.amount)}
                     </div>
-                    {sponsor.amountReceived !== null && sponsor.amountReceived > 0 && (
-                      <div className="text-xs text-green-400">
-                        {formatCurrency(sponsor.amountReceived)} received
-                      </div>
-                    )}
                   </td>
 
                   {/* Type */}

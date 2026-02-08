@@ -317,7 +317,7 @@ export interface PhotoStats {
 }
 
 // Sponsor CRM types
-export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'invoiced' | 'paid' | 'stuck' | 'alum' | 'skip';
+export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
 export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
 
 export interface Sponsor {
@@ -334,7 +334,6 @@ export interface Sponsor {
   telegram: string | null;
   status: SponsorStatus;
   amount: number | null;
-  amountReceived: number | null;
   sponsorshipType: SponsorshipType | null;
   productService: string | null;
   logoUrl: string | null;
@@ -347,7 +346,6 @@ export interface Sponsor {
 export interface SponsorStats {
   fundraisingGoal: number | null;
   totalConfirmed: number;
-  totalReceived: number;
   totalSponsors: number;
   statusCounts: Record<SponsorStatus, number>;
 }

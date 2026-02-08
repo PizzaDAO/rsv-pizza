@@ -593,7 +593,6 @@ export interface CreateSponsorData {
   telegram?: string;
   status?: SponsorStatus;
   amount?: number | null;
-  amountReceived?: number | null;
   sponsorshipType?: SponsorshipType | null;
   productService?: string;
   logoUrl?: string;
