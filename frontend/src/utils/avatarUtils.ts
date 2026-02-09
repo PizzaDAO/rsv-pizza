@@ -7,3 +7,10 @@ export function getXAvatarUrl(username: string): string | null {
   if (!/^[a-zA-Z0-9_]{1,15}$/.test(cleaned)) return null;
   return `https://unavatar.io/x/${cleaned}`;
 }
+
+/**
+ * Check if a URL is an auto-filled unavatar.io X avatar
+ */
+export function isAutoFilledXAvatar(url: string): boolean {
+  return url.trim().startsWith('https://unavatar.io/x/');
+}

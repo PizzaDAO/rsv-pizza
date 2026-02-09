@@ -6,7 +6,7 @@ import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, A
 import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
-import { getXAvatarUrl } from '../utils/avatarUtils';
+import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -419,7 +419,7 @@ export function AccountPage() {
                     value={twitter}
                     onChange={(e) => setTwitter(e.target.value)}
                     onBlur={() => {
-                      if (twitter.trim() && !profilePicture && !profilePictureFile) {
+                      if (twitter.trim() && !profilePictureFile && (!profilePicture || isAutoFilledXAvatar(profilePicture))) {
                         const avatarUrl = getXAvatarUrl(twitter);
                         if (avatarUrl) setProfilePicture(avatarUrl);
                       }

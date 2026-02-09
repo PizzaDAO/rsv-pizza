@@ -11,7 +11,7 @@ import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
-import { getXAvatarUrl } from '../utils/avatarUtils';
+import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -1424,11 +1424,11 @@ export const EventDetailsTab: React.FC = () => {
                       onChange={(e) => {
                         const val = e.target.value;
                         setEditHostTwitter(val);
-                        if (!editHostAvatarUrl) {
+                        if (!editHostAvatarUrl.trim() || isAutoFilledXAvatar(editHostAvatarUrl)) {
                           const avatarUrl = getXAvatarUrl(val);
                           if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
                         }
-                      }}
+                      }
                       placeholder="Twitter (no @)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
@@ -1525,7 +1525,7 @@ export const EventDetailsTab: React.FC = () => {
                   onChange={(e) => {
                     const val = e.target.value;
                     setNewCoHostTwitter(val);
-                    if (!newCoHostAvatarUrl) {
+                    if (!newCoHostAvatarUrl.trim() || isAutoFilledXAvatar(newCoHostAvatarUrl)) {
                       const avatarUrl = getXAvatarUrl(val);
                       if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
                     }
