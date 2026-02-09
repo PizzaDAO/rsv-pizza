@@ -258,6 +258,7 @@ export interface DbGuest {
   liked_beverages: string[];
   disliked_beverages: string[];
   pizzeria_rankings?: string[];
+  suggested_pizzerias?: any[];
   submitted_at: string;
   submitted_via: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
@@ -630,7 +631,8 @@ export async function addGuestToParty(
   roles?: string[],
   mailingListOptIn?: boolean,
   inviteCode?: string,
-  pizzeriaRankings?: string[]
+  pizzeriaRankings?: string[],
+  suggestedPizzerias?: any[]
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -653,6 +655,7 @@ export async function addGuestToParty(
         likedBeverages,
         dislikedBeverages,
         pizzeriaRankings: pizzeriaRankings || [],
+        suggestedPizzerias: suggestedPizzerias || [],
       }),
     });
 
@@ -679,6 +682,7 @@ export async function addGuestToParty(
       liked_beverages: likedBeverages,
       disliked_beverages: dislikedBeverages,
       pizzeria_rankings: pizzeriaRankings || [],
+      suggested_pizzerias: suggestedPizzerias || [],
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
     } as DbGuest;
@@ -703,6 +707,7 @@ export interface ExistingGuestData {
   likedBeverages: string[];
   dislikedBeverages: string[];
   pizzeriaRankings: string[];
+  suggestedPizzerias: any[];
 }
 
 export async function getExistingGuest(
@@ -736,6 +741,7 @@ export async function getExistingGuest(
       likedBeverages: guest.likedBeverages || [],
       dislikedBeverages: guest.dislikedBeverages || [],
       pizzeriaRankings: guest.pizzeriaRankings || [],
+      suggestedPizzerias: guest.suggestedPizzerias || [],
     };
   } catch (error) {
     console.error('Error fetching guest:', error);
