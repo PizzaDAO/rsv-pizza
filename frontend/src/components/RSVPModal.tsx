@@ -332,7 +332,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               inviteCode: event.customUrl || event.inviteCode,
               chain: event.nftChain || 'base',
             });
-            setMintResult({ txHash: mintRes.txHash, tokenId: mintRes.tokenId });
+            setMintResult({ txHash: mintRes.txHash, tokenId: mintRes.tokenId, alreadyMinted: mintRes.alreadyMinted });
             setMintStatus('success');
 
             // Save NFT data to backend (requires email for verification)
@@ -478,9 +478,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                   <span>Minting your NFT...</span>
                 </div>
               )}
-              {mintStatus === 'success' && mintResult.txHash && (
+              {mintStatus === 'success' && (mintResult.txHash || mintResult.tokenId) && (
                 <div className="space-y-2">
-                  <p className="text-[#39d98a] font-medium">NFT Minted!</p>
+                  <p className="text-[#39d98a] font-medium">
+                    {mintResult.alreadyMinted ? 'NFT Already Claimed!' : 'NFT Minted!'}
+                  </p>
                   {mintResult.tokenId ? (
                     <a
                       href={getNFTViewUrl((event.nftChain || 'base') as NFTChain, mintResult.tokenId)}
@@ -490,7 +492,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     >
                       {(event.nftChain || 'base') === 'monad' ? 'View on Explorer' : 'View on OpenSea'}
                     </a>
-                  ) : (
+                  ) : mintResult.txHash ? (
                     <a
                       href={`${getChainConfig((event.nftChain || 'base') as NFTChain).explorerUrl}/tx/${mintResult.txHash}`}
                       target="_blank"
@@ -499,7 +501,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     >
                       View Transaction
                     </a>
-                  )}
+                  ) : null}
                 </div>
               )}
               {mintStatus === 'error' && (
