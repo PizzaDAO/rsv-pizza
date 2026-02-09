@@ -9,7 +9,7 @@ import { IconInput } from './IconInput';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PublicEvent } from '../lib/api';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
-import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, NFTChain } from '../lib/nftContract';
+import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -481,7 +481,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               {mintStatus === 'success' && mintResult.txHash && (
                 <div className="space-y-2">
                   <p className="text-[#39d98a] font-medium">NFT Minted!</p>
-                  {mintResult.tokenId && (
+                  {mintResult.tokenId ? (
                     <a
                       href={getNFTViewUrl((event.nftChain || 'base') as NFTChain, mintResult.tokenId)}
                       target="_blank"
@@ -489,6 +489,15 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       className="text-sm text-white/60 hover:text-white underline"
                     >
                       {(event.nftChain || 'base') === 'monad' ? 'View on Explorer' : 'View on OpenSea'}
+                    </a>
+                  ) : (
+                    <a
+                      href={`${getChainConfig((event.nftChain || 'base') as NFTChain).explorerUrl}/tx/${mintResult.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-white/60 hover:text-white underline"
+                    >
+                      View Transaction
                     </a>
                   )}
                 </div>
