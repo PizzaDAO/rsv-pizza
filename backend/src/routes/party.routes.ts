@@ -246,7 +246,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      shareToUnlock, shareTweetText
+      shareToUnlock, shareTweetText, fundraisingGoal
     } = req.body;
 
     // Verify ownership or super admin
@@ -294,6 +294,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
         ...(shareToUnlock !== undefined && { shareToUnlock }),
         ...(shareTweetText !== undefined && { shareTweetText: shareTweetText || null }),
+        ...(fundraisingGoal !== undefined && { fundraisingGoal: fundraisingGoal !== null && fundraisingGoal !== '' ? fundraisingGoal : null }),
       },
       include: {
         user: { select: { name: true } },
