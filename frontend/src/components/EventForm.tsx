@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
-import { parseDateTimeInTimezone } from '../utils/dateUtils';
+import { parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 
 export function EventForm() {
   const navigate = useNavigate();
@@ -123,35 +123,6 @@ export function EventForm() {
     } catch (error) {
       console.error('Error creating party:', error);
       setCreating(false);
-    }
-  };
-
-  const formatDateDisplay = (date: string) => {
-    if (!date) return '';
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone || undefined });
-  };
-
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  const getTimezoneAbbr = () => {
-    if (!timezone) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        timeZoneName: 'short'
-      });
-      const parts = formatter.formatToParts(new Date());
-      const tzPart = parts.find(p => p.type === 'timeZoneName');
-      return tzPart?.value || '';
-    } catch {
-      return '';
     }
   };
 
@@ -331,16 +302,16 @@ export function EventForm() {
             {startDate && startTime && endDate && endTime ? (
               <div>
                 <div className="text-white font-medium">
-                  {formatDateDisplay(startDate)}
+                  {formatDateDisplay(startDate, timezone)}
                 </div>
                 <div className="text-white/60 text-sm mt-1">
-                  {formatTimeDisplay(startTime)} â€” {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                  {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                 </div>
               </div>
             ) : (
               <div>
                 <span className="text-white/60">Thursday, January 15</span>
-                <div className="text-white/40 text-sm mt-1">2:00 PM â€” 3:00 PM EST</div>
+                <div className="text-white/40 text-sm mt-1">2:00 PM – 3:00 PM EST</div>
               </div>
             )}
           </div>

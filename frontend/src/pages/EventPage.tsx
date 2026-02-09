@@ -21,6 +21,7 @@ import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
+import { formatTimezoneDisplay } from '../utils/dateUtils';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -377,22 +378,7 @@ export function EventPage() {
     timeZone: event.timezone || undefined,
   });
 
-  // Get timezone abbreviation for display
-  const getTimezoneAbbr = () => {
-    if (!event.timezone || !eventDate) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: event.timezone,
-        timeZoneName: 'short'
-      });
-      const parts = formatter.formatToParts(eventDate);
-      const tzPart = parts.find(p => p.type === 'timeZoneName');
-      return tzPart?.value || '';
-    } catch {
-      return '';
-    }
-  };
-  const timezoneAbbr = getTimezoneAbbr();
+  const timezoneAbbr = formatTimezoneDisplay(event.timezone || '');
 
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -785,7 +771,7 @@ export function EventPage() {
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
-                    {userHasRSVPd ? "Update RSVP" : "RSVP"}
+                    {userHasRSVPd ? "Edit RSVP" : "RSVP"}
                   </button>
                   {event.rsvpClosedAt && (
                     <p className="text-center text-white/50 text-sm mt-3">

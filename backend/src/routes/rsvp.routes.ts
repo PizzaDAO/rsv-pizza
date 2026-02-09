@@ -163,7 +163,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       dislikedToppings,
       likedBeverages,
       dislikedBeverages,
-      pizzeriaRankings
+      pizzeriaRankings,
+      suggestedPizzerias
     } = req.body;
 
     // Validate required fields
@@ -265,6 +266,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             likedBeverages: likedBeverages || [],
             dislikedBeverages: dislikedBeverages || [],
             pizzeriaRankings: pizzeriaRankings || [],
+            suggestedPizzerias: suggestedPizzerias || [],
           },
         });
 
@@ -297,6 +299,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         likedBeverages: likedBeverages || [],
         dislikedBeverages: dislikedBeverages || [],
         pizzeriaRankings: pizzeriaRankings || [],
+        suggestedPizzerias: suggestedPizzerias || [],
         submittedVia: 'link',
         partyId: party.id,
       },

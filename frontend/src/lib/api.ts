@@ -94,6 +94,7 @@ export interface UpdatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
   description?: string | null;
@@ -149,6 +150,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
       description: data.description,

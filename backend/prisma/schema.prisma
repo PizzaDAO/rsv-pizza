@@ -65,6 +65,10 @@ model Party {
   photosEnabled Boolean @default(true) @map("photos_enabled")
   photosPublic  Boolean @default(true) @map("photos_public")
 
+  // Party Kit settings
+  kitEnabled  Boolean   @default(false) @map("kit_enabled")
+  kitDeadline DateTime? @map("kit_deadline") @db.Date
+
   // Event type and tagging (for GPP and other special events)
   eventType  String?  @map("event_type")  // 'standard', 'gpp', 'private', etc.
   eventTags  String[] @default([]) @map("event_tags")  // Tags for filtering/grouping
@@ -123,6 +127,7 @@ model Party {
   guests      Guest[]
   orders      Order[]
   photos      Photo[]
+  partyKit    PartyKit?
   donations   Donation[]
   raffles     Raffle[]
   displays    Display[]
@@ -159,6 +164,9 @@ model Guest {
   nftTokenId         Int?      @map("nft_token_id")
   nftTransactionHash String?   @map("nft_transaction_hash")
   nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
+
+  // Guest-suggested pizzerias
+  suggestedPizzerias Json @default("[]") @map("suggested_pizzerias")
 
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
@@ -441,6 +449,49 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@map("photos")
+}
+
+// ============================================
+// Party Kit Models
+// ============================================
+
+model PartyKit {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @unique @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Kit Selection
+  requestedTier String  @map("requested_tier") // basic, large, deluxe
+  allocatedTier String? @map("allocated_tier") // What they actually get (may differ)
+
+  // Shipping Info
+  recipientName String  @map("recipient_name")
+  addressLine1  String  @map("address_line1")
+  addressLine2  String? @map("address_line2")
+  city          String
+  state         String?
+  postalCode    String  @map("postal_code")
+  country       String  @default("USA")
+  phone         String?
+
+  // Status: pending, approved, shipped, delivered, declined
+  status         String    @default("pending")
+  trackingNumber String?   @map("tracking_number")
+  trackingUrl    String?   @map("tracking_url")
+
+  // Notes
+  notes      String? // Host notes/special requests
+  adminNotes String? @map("admin_notes") // Internal notes
+
+  // Dates
+  requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz
+  shippedAt   DateTime? @map("shipped_at") @db.Timestamptz
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("party_kits")
 }
 
 // ============================================

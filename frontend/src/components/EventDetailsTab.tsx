@@ -10,7 +10,8 @@ import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
+import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -726,38 +727,6 @@ export const EventDetailsTab: React.FC = () => {
     return name.trim() !== originalValues.name;
   };
 
-  // Format date for display
-  const formatDateDisplay = (date: string) => {
-    if (!date) return '';
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone || undefined });
-  };
-
-  // Format time for display (12-hour)
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  // Get timezone abbreviation
-  const getTimezoneAbbr = () => {
-    if (!timezone) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        timeZoneName: 'short'
-      });
-      const parts = formatter.formatToParts(new Date());
-      const tzPart = parts.find(p => p.type === 'timeZoneName');
-      return tzPart?.value || '';
-    } catch {
-      return '';
-    }
-  };
-
   if (!party) {
     return <div className="card p-6 text-white/60">No party loaded</div>;
   }
@@ -825,10 +794,10 @@ export const EventDetailsTab: React.FC = () => {
               {startDate && startTime && endDate && endTime ? (
                 <div>
                   <div className="text-white font-medium">
-                    {formatDateDisplay(startDate)}
+                    {formatDateDisplay(startDate, timezone)}
                   </div>
                   <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} â€” {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
               ) : (
@@ -1360,7 +1329,7 @@ export const EventDetailsTab: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                     <span className="text-sm text-white/60">Click to upload square image</span>
-                    <span className="text-xs text-white/40 mt-1">Max 5MB â€¢ 1:1 aspect ratio</span>
+                    <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
                   </label>
                 </div>
               )}
@@ -1463,7 +1432,14 @@ export const EventDetailsTab: React.FC = () => {
                     <input
                       type="text"
                       value={editHostTwitter}
-                      onChange={(e) => setEditHostTwitter(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditHostTwitter(val);
+                        if (!editHostAvatarUrl.trim() || isAutoFilledXAvatar(editHostAvatarUrl)) {
+                          const avatarUrl = getXAvatarUrl(val);
+                          if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
+                        }
+                      }}
                       placeholder="Twitter (no @)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
@@ -1478,6 +1454,19 @@ export const EventDetailsTab: React.FC = () => {
                 </>
               )}
             </div>
+
+            {/* Avatar Preview */}
+            {editHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={editHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button
@@ -1544,7 +1533,14 @@ export const EventDetailsTab: React.FC = () => {
                 <input
                   type="text"
                   value={newCoHostTwitter}
-                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewCoHostTwitter(val);
+                    if (!newCoHostAvatarUrl.trim() || isAutoFilledXAvatar(newCoHostAvatarUrl)) {
+                      const avatarUrl = getXAvatarUrl(val);
+                      if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
+                    }
+                  }}
                   placeholder="Twitter (no @)"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -1557,6 +1553,19 @@ export const EventDetailsTab: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Avatar Preview */}
+            {newCoHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={newCoHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button

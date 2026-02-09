@@ -226,6 +226,54 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
 }
 
 /**
+ * Format a date string (YYYY-MM-DD) for short display in a specific timezone.
+ * e.g., "Mon, Feb 17"
+ */
+export function formatDateDisplay(date: string, timezone?: string): string {
+  if (!date) return '';
+  const d = new Date(date + 'T12:00:00');
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: timezone || undefined,
+  });
+}
+
+/**
+ * Format a 24h time string (HH:MM) to 12-hour display.
+ * e.g., "20:30" → "8:30 PM"
+ */
+export function formatTimeDisplay(time: string): string {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Format a timezone for display matching the timepicker modal.
+ * e.g., "America/Denver" → "GMT-7 / Denver"
+ */
+export function formatTimezoneDisplay(timezone: string): string {
+  if (!timezone) return '';
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    });
+    const parts = formatter.formatToParts(new Date());
+    const offsetPart = parts.find(p => p.type === 'timeZoneName');
+    const offset = offsetPart?.value || '';
+    const city = timezone.split('/').pop()?.replace(/_/g, ' ') || '';
+    return city ? `${offset} / ${city}` : offset;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Format a date relative to now (e.g., "Today", "Tomorrow", "Mon, Jan 15")
  */
 export function formatRelativeDate(date: string | Date): string {

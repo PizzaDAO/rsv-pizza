@@ -23,6 +23,7 @@ export interface Guest {
   likedBeverages?: string[];
   dislikedBeverages?: string[];
   pizzeriaRankings?: string[];
+  suggestedPizzerias?: Pizzeria[];
   submittedAt?: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checkedInAt?: string | null;
