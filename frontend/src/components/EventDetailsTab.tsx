@@ -11,6 +11,7 @@ import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { getXAvatarUrl } from '../utils/avatarUtils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -1420,7 +1421,14 @@ export const EventDetailsTab: React.FC = () => {
                     <input
                       type="text"
                       value={editHostTwitter}
-                      onChange={(e) => setEditHostTwitter(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditHostTwitter(val);
+                        if (!editHostAvatarUrl) {
+                          const avatarUrl = getXAvatarUrl(val);
+                          if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
+                        }
+                      }}
                       placeholder="Twitter (no @)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
@@ -1435,6 +1443,19 @@ export const EventDetailsTab: React.FC = () => {
                 </>
               )}
             </div>
+
+            {/* Avatar Preview */}
+            {editHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={editHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button
@@ -1501,7 +1522,14 @@ export const EventDetailsTab: React.FC = () => {
                 <input
                   type="text"
                   value={newCoHostTwitter}
-                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewCoHostTwitter(val);
+                    if (!newCoHostAvatarUrl) {
+                      const avatarUrl = getXAvatarUrl(val);
+                      if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
+                    }
+                  }}
                   placeholder="Twitter (no @)"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -1514,6 +1542,19 @@ export const EventDetailsTab: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Avatar Preview */}
+            {newCoHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={newCoHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button
