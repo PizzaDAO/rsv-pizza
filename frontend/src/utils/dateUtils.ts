@@ -231,7 +231,7 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
  */
 export function formatDateDisplay(date: string, timezone?: string): string {
   if (!date) return '';
-  const d = new Date(date + 'T00:00:00');
+  const d = new Date(date + 'T12:00:00');
   return d.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',

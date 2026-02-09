@@ -1396,7 +1396,7 @@ export const EventDetailsTab: React.FC = () => {
                           const avatarUrl = getXAvatarUrl(val);
                           if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
                         }
-                      }
+                      }}
                       placeholder="Twitter (no @)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
