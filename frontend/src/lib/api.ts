@@ -1,7 +1,7 @@
 import { Pizzeria, Photo, PhotoStats } from '../types';
 
 // Authenticated API helper functions
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
 
 function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
