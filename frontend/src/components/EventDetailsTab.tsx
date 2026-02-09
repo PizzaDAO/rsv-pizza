@@ -10,7 +10,7 @@ import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -720,38 +720,6 @@ export const EventDetailsTab: React.FC = () => {
     return name.trim() !== originalValues.name;
   };
 
-  // Format date for display
-  const formatDateDisplay = (date: string) => {
-    if (!date) return '';
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone || undefined });
-  };
-
-  // Format time for display (12-hour)
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  // Get timezone abbreviation
-  const getTimezoneAbbr = () => {
-    if (!timezone) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        timeZoneName: 'short'
-      });
-      const parts = formatter.formatToParts(new Date());
-      const tzPart = parts.find(p => p.type === 'timeZoneName');
-      return tzPart?.value || '';
-    } catch {
-      return '';
-    }
-  };
-
   if (!party) {
     return <div className="card p-6 text-white/60">No party loaded</div>;
   }
@@ -819,10 +787,10 @@ export const EventDetailsTab: React.FC = () => {
               {startDate && startTime && endDate && endTime ? (
                 <div>
                   <div className="text-white font-medium">
-                    {formatDateDisplay(startDate)}
+                    {formatDateDisplay(startDate, timezone)}
                   </div>
                   <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} â€” {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                    {formatTimeDisplay(startTime)} â€" {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
               ) : (
