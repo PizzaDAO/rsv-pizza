@@ -3,7 +3,7 @@ import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRig
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -86,6 +86,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // NFT minting state
   const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
@@ -124,6 +125,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setLikedBeverages(existingGuest.likedBeverages);
         setDislikedBeverages(existingGuest.dislikedBeverages);
         setPizzeriaRankings(existingGuest.pizzeriaRankings);
+        setSuggestedPizzerias(existingGuest.suggestedPizzerias || []);
         setPreferencesLoaded(true); // Mark as loaded so we don't override with profile preferences
       }
 
@@ -184,6 +186,19 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     }
   }, [user, isOpen]);
 
+  // Merge existing suggested pizzerias into nearby list when editing
+  useEffect(() => {
+    if (isOpen && isEditing && existingGuest?.suggestedPizzerias) {
+      const sug = (existingGuest.suggestedPizzerias as any[]).filter((s: any) => s && s.name);
+      if (sug.length > 0) {
+        setNearbyPizzerias(prev => {
+          const newOnes = sug.filter((s: any) => !prev.some(p => p.id === s.id));
+          return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+        });
+      }
+    }
+  }, [isOpen, isEditing, existingGuest]);
+
   // Use host-selected pizzerias if available, otherwise fetch nearby pizzerias
   useEffect(() => {
     async function fetchPizzerias() {
@@ -192,6 +207,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       // If host has selected specific pizzerias, use those
       if (event.selectedPizzerias && event.selectedPizzerias.length > 0) {
         setNearbyPizzerias(event.selectedPizzerias);
+        // Geocode venue for distance calculation
+        if (event.address) {
+          geocodeAddress(event.address).then(loc => { if (loc) setVenueLocation(loc); });
+        }
         return;
       }
 
@@ -201,6 +220,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setLoadingPizzerias(true);
       try {
         const location = await geocodeAddress(event.address);
+        if (location) setVenueLocation(location);
         if (location) {
           const results = await searchPizzerias(location.lat, location.lng);
           setNearbyPizzerias(results.slice(0, 3));
@@ -884,6 +904,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                               <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
                                 <Star size={10} className="fill-yellow-400" />
                                 {pizzeria.rating.toFixed(1)}
+                              </span>
+                            )}
+                            {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
+                              <span className="text-xs text-white/40">
+                                {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                               </span>
                             )}
                           </div>

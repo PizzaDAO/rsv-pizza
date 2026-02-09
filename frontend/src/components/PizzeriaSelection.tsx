@@ -4,6 +4,8 @@ import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria, OrderingOption } from '../types';
+import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
+import { Pizzeria } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
@@ -48,6 +50,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [showAddPizzeriaModal, setShowAddPizzeriaModal] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
+  const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // Modal state
   const [selectedPlace, setSelectedPlace] = useState<Partial<Pizzeria> | null>(null);
@@ -76,6 +79,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       setLoadingPizzerias(true);
       try {
         const location = await geocodeAddress(party.address);
+        if (location) setVenueLocation(location);
         if (location) {
           const results = await searchPizzerias(location.lat, location.lng);
           setNearbyPizzerias(results);
@@ -298,6 +302,11 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                     ) : (
                       <MapPin className="w-5 h-5 text-[#ff393a]" />
                     )}
+                    {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
+                      <span className="text-xs text-white/40">
+                        {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -416,6 +425,11 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                       <span className="text-xs text-purple-400 bg-purple-400/10 px-1.5 py-0.5 rounded">
                         {suggestion.count} {suggestion.count === 1 ? 'vote' : 'votes'}
                       </span>
+                      {venueLocation && suggestion.pizzeria.location && suggestion.pizzeria.location.lat !== 0 && (
+                        <span className="text-xs text-white/40">
+                          {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, suggestion.pizzeria.location.lat, suggestion.pizzeria.location.lng))}
+                        </span>
+                      )}
                     </div>
                     {suggestion.pizzeria.address && (
                       <p className="text-white/50 text-xs truncate">{suggestion.pizzeria.address}</p>
@@ -464,6 +478,11 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
                           <Star size={12} className="fill-yellow-400" />
                           {pizzeria.rating.toFixed(1)}
+                        </span>
+                      )}
+                      {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
+                        <span className="text-xs text-white/40">
+                          {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                         </span>
                       )}
                     </div>
