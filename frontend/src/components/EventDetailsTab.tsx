@@ -791,7 +791,7 @@ export const EventDetailsTab: React.FC = () => {
                     {formatDateDisplay(startDate, timezone)}
                   </div>
                   <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} â€" {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
+                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
               ) : (
