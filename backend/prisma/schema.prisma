@@ -161,6 +161,9 @@ model Guest {
   nftTransactionHash String?   @map("nft_transaction_hash")
   nftMintedAt        DateTime? @map("nft_minted_at") @db.Timestamptz
 
+  // Guest-suggested pizzerias
+  suggestedPizzerias Json @default("[]") @map("suggested_pizzerias")
+
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy String?   @map("checked_in_by")
