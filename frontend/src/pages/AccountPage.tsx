@@ -6,6 +6,7 @@ import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, A
 import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
+import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -80,6 +81,7 @@ export function AccountPage() {
     linkedin !== originalValues.linkedin ||
     website !== originalValues.website ||
     profilePictureFile !== null ||
+    (profilePicture !== null && !profilePicture.startsWith('blob:') && profilePicture !== (user?.profilePictureUrl || null)) ||
     preferencesChanged;
 
   // Redirect if not logged in
@@ -211,6 +213,13 @@ export function AccountPage() {
         if (uploadedUrl) {
           newProfilePictureUrl = uploadedUrl;
         }
+      } else if (
+        profilePicture &&
+        !profilePicture.startsWith('blob:') &&
+        profilePicture !== user?.profilePictureUrl
+      ) {
+        // Profile picture was set via URL (e.g. X avatar auto-fill), not file upload
+        newProfilePictureUrl = profilePicture;
       }
 
       // Save profile to backend
@@ -409,6 +418,12 @@ export function AccountPage() {
                     type="text"
                     value={twitter}
                     onChange={(e) => setTwitter(e.target.value)}
+                    onBlur={() => {
+                      if (twitter.trim() && !profilePictureFile && (!profilePicture || isAutoFilledXAvatar(profilePicture))) {
+                        const avatarUrl = getXAvatarUrl(twitter);
+                        if (avatarUrl) setProfilePicture(avatarUrl);
+                      }
+                    }}
                     placeholder="username"
                     className="flex-1 min-w-0"
                   />
