@@ -100,6 +100,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     venueName: dbParty.venue_name,
     shareToUnlock: dbParty.share_to_unlock || false,
     shareTweetText: dbParty.share_tweet_text || null,
+    nftEnabled: dbParty.nft_enabled || false,
+    nftChain: dbParty.nft_chain || null,
     createdAt: dbParty.created_at,
     guests,
   };

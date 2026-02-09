@@ -101,6 +101,8 @@ export interface UpdatePartyData {
   coHosts?: any[];
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  nftEnabled?: boolean;
+  nftChain?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -154,6 +156,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       coHosts: data.coHosts,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
+      nftEnabled: data.nftEnabled,
+      nftChain: data.nftChain,
     },
   });
 }
@@ -265,6 +269,8 @@ export interface PublicEvent {
   eventTags?: string[];
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  nftEnabled?: boolean;
+  nftChain?: string | null;
 }
 
 // Public Event API (no auth required)

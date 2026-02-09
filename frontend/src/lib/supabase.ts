@@ -241,6 +241,8 @@ export interface DbParty {
   co_hosts: any[];
   share_to_unlock?: boolean;
   share_tweet_text?: string | null;
+  nft_enabled?: boolean;
+  nft_chain?: string | null;
   created_at: string;
 }
 
@@ -509,7 +511,8 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
     require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
-    share_to_unlock, share_tweet_text
+    share_to_unlock, share_tweet_text,
+    nft_enabled, nft_chain
   `;
 
   let party: DbParty | null = null;
@@ -964,6 +967,8 @@ export async function updateParty(
     selected_pizzerias?: any[];  // Pizzeria objects
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
+    nft_enabled?: boolean;
+    nft_chain?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -989,6 +994,8 @@ export async function updateParty(
         coHosts: updates.co_hosts,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
+        nftEnabled: updates.nft_enabled,
+        nftChain: updates.nft_chain,
       });
       return true;
     } catch (error) {

@@ -81,6 +81,10 @@ model Party {
   shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
   shareTweetText   String?  @map("share_tweet_text")
 
+  // NFT settings
+  nftEnabled              Boolean   @default(false) @map("nft_enabled")
+  nftChain                String?   @map("nft_chain")
+
   // Music settings
   musicEnabled Boolean @default(false) @map("music_enabled")
   musicNotes   String? @map("music_notes")

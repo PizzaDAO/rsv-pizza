@@ -8,7 +8,7 @@ import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
 import { PublicEvent } from '../lib/api';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
-import { NFT_CONTRACT_ADDRESS } from '../lib/nftContract';
+import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, NFTChain } from '../lib/nftContract';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -285,8 +285,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         // Notify parent to refresh data
         onRSVPSuccess?.();
 
-        // Auto-mint NFT if wallet address provided and event has an image
-        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
+        // Auto-mint NFT if wallet address provided, event has an image, and NFT is enabled (backward compat: undefined = enabled)
+        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id && event.nftEnabled !== false) {
           setMintStatus('minting');
           try {
             const mintRes = await mintNFT({
@@ -300,6 +300,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               partyAddress: event.address || null,
               imageUrl: event.eventImageUrl,
               inviteCode: event.customUrl || event.inviteCode,
+              chain: event.nftChain || 'base',
             });
             setMintResult({ txHash: mintRes.txHash, tokenId: mintRes.tokenId });
             setMintStatus('success');
@@ -450,14 +451,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               {mintStatus === 'success' && mintResult.txHash && (
                 <div className="space-y-2">
                   <p className="text-[#39d98a] font-medium">NFT Minted!</p>
-                  {mintResult.tokenId && NFT_CONTRACT_ADDRESS && (
+                  {mintResult.tokenId && (
                     <a
-                      href={`https://opensea.io/assets/base/${NFT_CONTRACT_ADDRESS}/${mintResult.tokenId}`}
+                      href={getNFTViewUrl((event.nftChain || 'base') as NFTChain, mintResult.tokenId)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-white/60 hover:text-white underline"
                     >
-                      View on OpenSea
+                      {(event.nftChain || 'base') === 'monad' ? 'View on Explorer' : 'View on OpenSea'}
                     </a>
                   )}
                 </div>
