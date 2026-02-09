@@ -927,13 +927,11 @@ export function EventPage() {
                 </div>
 
                 {/* Raffle Section */}
-                <div className="border-t border-white/10 pt-6 mt-6">
-                  <RaffleEntry
-                    partyId={event.id}
-                    guestId={existingGuestData?.id}
-                    guestName={existingGuestData?.name || user?.name}
-                  />
-                </div>
+                <RaffleEntry
+                  partyId={event.id}
+                  guestId={existingGuestData?.id}
+                  guestName={existingGuestData?.name || user?.name}
+                />
 
                 {/* Photo Gallery Section */}
                 {photoStats?.photosEnabled && (

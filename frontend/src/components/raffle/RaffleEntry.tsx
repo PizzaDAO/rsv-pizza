@@ -83,7 +83,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="border-t border-white/10 pt-6 mt-6 space-y-4">
       <div className="flex items-center gap-3 mb-4">
         <Gift className="w-6 h-6 text-[#ff393a]" />
         <h2 className="text-xl font-semibold text-white">Raffles</h2>
