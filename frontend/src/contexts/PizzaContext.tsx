@@ -64,6 +64,7 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     likedBeverages: dbGuest.liked_beverages || [],
     dislikedBeverages: dbGuest.disliked_beverages || [],
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
+    suggestedPizzerias: dbGuest.suggested_pizzerias || [],
     submittedAt: dbGuest.submitted_at,
     approved: dbGuest.approved ?? null,
     checkedInAt: dbGuest.checked_in_at ?? null,

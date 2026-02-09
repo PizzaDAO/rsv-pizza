@@ -55,7 +55,25 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           return;
         }
 
-        // Create script tag
+        // Check if another component already added the script tag
+        const existingScript = document.querySelector(
+          'script[src*="maps.googleapis.com/maps/api/js"]'
+        );
+
+        if (existingScript) {
+          // Script tag exists but hasn't finished loading yet — wait for it
+          const waitForMaps = () => {
+            if (window.google?.maps?.places) {
+              initAutocomplete();
+            } else {
+              setTimeout(waitForMaps, 100);
+            }
+          };
+          waitForMaps();
+          return;
+        }
+
+        // No script tag exists — create one
         const script = document.createElement('script');
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
         script.async = true;
