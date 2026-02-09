@@ -178,15 +178,7 @@ export function EventPage() {
 
   const handleEditEvent = () => {
     if (!event) return;
-
-    // If no password, just navigate to host page
-    if (!event.hasPassword) {
-      navigate(`/host/${event.inviteCode}`);
-      return;
-    }
-
-    // Show password prompt
-    setShowEditPasswordPrompt(true);
+    navigate(`/host/${event.inviteCode}`);
   };
 
   const handleEditPasswordSubmit = async (e: React.FormEvent) => {
@@ -269,7 +261,7 @@ export function EventPage() {
             <div className="mt-4">
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-[#ff393a] hover:bg-[#ff5a5b] text-white rounded-xl border border-[#ff393a]/30 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-white rounded-xl border border-white/10 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 Already RSVP'd? Log in
