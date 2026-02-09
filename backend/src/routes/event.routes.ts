@@ -37,6 +37,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         donationEnabled: true,
         shareToUnlock: true,
         shareTweetText: true,
+        nftEnabled: true,
+        nftChain: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -86,6 +88,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           donationEnabled: true,
           shareToUnlock: true,
           shareTweetText: true,
+          nftEnabled: true,
+          nftChain: true,
           password: true,
           userId: true,
           user: {
@@ -149,6 +153,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         donationEnabled: party.donationEnabled,
         shareToUnlock: party.shareToUnlock,
         shareTweetText: party.shareTweetText,
+        nftEnabled: party.nftEnabled,
+        nftChain: party.nftChain,
         hasPassword: !!party.password,
         hostName: party.user?.name || null,
         hostProfile,
