@@ -490,7 +490,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       rel="noopener noreferrer"
                       className="text-sm text-white/60 hover:text-white underline"
                     >
-                      {(event.nftChain || 'base') === 'monad' ? 'View on Explorer' : 'View on OpenSea'}
+                      View on OpenSea
                     </a>
                   ) : mintResult.txHash ? (
                     <a
