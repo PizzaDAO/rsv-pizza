@@ -135,7 +135,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Name *"
+              placeholder="Name"
               required
             />
             <div className="relative">
@@ -149,7 +149,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                 }}
                 onFocus={() => setShowRoleSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowRoleSuggestions(false), 200)}
-                placeholder="Role *"
+                placeholder="Role"
                 required
               />
               {showRoleSuggestions && filteredRoleSuggestions.length > 0 && (
