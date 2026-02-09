@@ -75,9 +75,11 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
     }
   };
 
-  // Parse physical dimensions for mockup
-  const physW = display.physicalWidth ? parseFloat(display.physicalWidth) : 0;
-  const physH = display.physicalHeight ? parseFloat(display.physicalHeight) : 0;
+  // Parse physical dimensions for mockup (stored in contentConfig as _physicalWidth/_physicalHeight/_resolution)
+  const meta = display.contentConfig as any;
+  const physW = meta?._physicalWidth ? parseFloat(meta._physicalWidth) : 0;
+  const physH = meta?._physicalHeight ? parseFloat(meta._physicalHeight) : 0;
+  const displayResolution = meta?._resolution || '';
   const hasPhysicalDimensions = physW > 0 && physH > 0;
 
   return (
@@ -103,7 +105,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
 
       {/* Screen Size Mockup */}
       {hasPhysicalDimensions && (
-        <ScreenMockup width={physW} height={physH} resolution={display.resolution} />
+        <ScreenMockup width={physW} height={physH} resolution={displayResolution} />
       )}
 
       {/* URL Display */}

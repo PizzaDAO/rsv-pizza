@@ -381,9 +381,6 @@ export interface Display {
   password?: string | null;
   lastViewedAt?: string | null;
   viewCount: number;
-  physicalWidth?: string;
-  physicalHeight?: string;
-  resolution?: string;
   createdAt: string;
   updatedAt: string;
 }

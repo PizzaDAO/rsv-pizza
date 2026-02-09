@@ -28,9 +28,6 @@ export interface DisplayFormData {
   backgroundColor: string;
   showClock: boolean;
   showEventName: boolean;
-  physicalWidth?: string;
-  physicalHeight?: string;
-  resolution?: string;
 }
 
 const contentTypes: { value: DisplayContentType; label: string; icon: React.ReactNode; description: string }[] = [
@@ -57,17 +54,18 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [showClock, setShowClock] = useState(display?.showClock || false);
   const [showEventName, setShowEventName] = useState(display?.showEventName ?? true);
 
-  // Display dimensions
-  const [physicalWidth, setPhysicalWidth] = useState(display?.physicalWidth || '');
-  const [physicalHeight, setPhysicalHeight] = useState(display?.physicalHeight || '');
-  const [resolution, setResolution] = useState(display?.resolution || '');
+  // Display dimensions (stored inside contentConfig for persistence)
+  const displayMeta = (display?.contentConfig as any) || {};
+  const [physicalWidth, setPhysicalWidth] = useState(displayMeta._physicalWidth || '');
+  const [physicalHeight, setPhysicalHeight] = useState(displayMeta._physicalHeight || '');
+  const [resolution, setResolution] = useState(displayMeta._resolution || '');
   const [resolutionPreset, setResolutionPreset] = useState(() => {
-    const existing = display?.resolution || '';
+    const existing = displayMeta._resolution || '';
     const match = RESOLUTION_PRESETS.find(p => p.value === existing);
     return match ? existing : existing ? 'custom' : '';
   });
   const [customResolution, setCustomResolution] = useState(() => {
-    const existing = display?.resolution || '';
+    const existing = displayMeta._resolution || '';
     const isPreset = RESOLUTION_PRESETS.some(p => p.value === existing);
     return isPreset ? '' : existing;
   });
@@ -171,6 +169,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
         break;
     }
 
+    // Store physical dimensions as metadata inside contentConfig
+    // (prefixed with _ to distinguish from content-type-specific settings)
+    if (physicalWidth) contentConfig._physicalWidth = physicalWidth;
+    if (physicalHeight) contentConfig._physicalHeight = physicalHeight;
+    if (resolution) contentConfig._resolution = resolution;
+
     onSave({
       name,
       contentType,
@@ -179,9 +183,6 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
       backgroundColor,
       showClock,
       showEventName,
-      physicalWidth: physicalWidth || undefined,
-      physicalHeight: physicalHeight || undefined,
-      resolution: resolution || undefined,
     });
   };
 
