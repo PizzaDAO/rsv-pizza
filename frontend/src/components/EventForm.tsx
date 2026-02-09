@@ -311,7 +311,7 @@ export function EventForm() {
             ) : (
               <div>
                 <span className="text-white/60">Thursday, January 15</span>
-                <div className="text-white/40 text-sm mt-1">2:00 PM â€” 3:00 PM EST</div>
+                <div className="text-white/40 text-sm mt-1">2:00 PM – 3:00 PM EST</div>
               </div>
             )}
           </div>
