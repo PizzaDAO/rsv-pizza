@@ -101,6 +101,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     venueName: dbParty.venue_name,
     shareToUnlock: dbParty.share_to_unlock || false,
     shareTweetText: dbParty.share_tweet_text || null,
+    photoModeration: dbParty.photo_moderation || false,
     createdAt: dbParty.created_at,
     guests,
   };

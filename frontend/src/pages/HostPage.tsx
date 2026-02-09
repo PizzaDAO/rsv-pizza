@@ -12,6 +12,8 @@ import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { PhotoGallery } from '../components/photos';
+import { Checkbox } from '../components/Checkbox';
+import { updateParty } from '../lib/supabase';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -300,12 +302,32 @@ function HostPageContent() {
             )}
 
             {activeTab === 'photos' && party && (
-              <div className="card p-6">
+              <div className="card p-6 space-y-4">
+                <Checkbox
+                  checked={party.photoModeration || false}
+                  onChange={async () => {
+                    const newValue = !party.photoModeration;
+                    // Optimistic update
+                    const prev = party.photoModeration;
+                    (party as any).photoModeration = newValue;
+                    const success = await updateParty(party.id, { photo_moderation: newValue });
+                    if (!success) {
+                      (party as any).photoModeration = prev;
+                    }
+                  }}
+                  label="Require Photo Approval"
+                />
+                {party.photoModeration && (
+                  <p className="text-xs text-white/40 -mt-2 ml-8">
+                    Guest photos must be approved by a host before appearing in the gallery.
+                  </p>
+                )}
                 <PhotoGallery
                   partyId={party.id}
                   isHost={true}
                   uploaderName={user?.name || undefined}
                   uploaderEmail={user?.email}
+                  photoModeration={party.photoModeration || false}
                 />
               </div>
             )}

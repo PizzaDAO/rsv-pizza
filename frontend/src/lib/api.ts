@@ -102,6 +102,7 @@ export interface UpdatePartyData {
   coHosts?: any[];
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  photoModeration?: boolean;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -156,6 +157,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       coHosts: data.coHosts,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
+      photoModeration: data.photoModeration,
     },
   });
 }
@@ -313,6 +315,7 @@ export interface PhotoFilters {
   starred?: boolean;
   tag?: string;
   uploadedBy?: string;
+  status?: 'approved' | 'pending' | 'rejected' | 'all';
   limit?: number;
   offset?: number;
 }
@@ -327,6 +330,7 @@ export async function getPartyPhotos(
     if (filters.starred) params.append('starred', 'true');
     if (filters.tag) params.append('tag', filters.tag);
     if (filters.uploadedBy) params.append('uploadedBy', filters.uploadedBy);
+    if (filters.status) params.append('status', filters.status);
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.offset) params.append('offset', filters.offset.toString());
 
@@ -380,7 +384,7 @@ export async function getPhoto(
 export async function updatePhoto(
   partyId: string,
   photoId: string,
-  data: { caption?: string; tags?: string[]; starred?: boolean }
+  data: { caption?: string; tags?: string[]; starred?: boolean; status?: string }
 ): Promise<{ photo: Photo } | null> {
   try {
     return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
@@ -422,6 +426,24 @@ export async function getPhotoStats(partyId: string): Promise<PhotoStats | null>
     });
   } catch (error) {
     console.error('Error fetching photo stats:', error);
+    return null;
+  }
+}
+
+// Batch review photos (host only)
+export async function batchReviewPhotos(
+  partyId: string,
+  photoIds: string[],
+  status: 'approved' | 'rejected'
+): Promise<{ updated: number } | null> {
+  try {
+    return await apiRequest<{ updated: number }>(`/api/parties/${partyId}/photos/batch-review`, {
+      method: 'POST',
+      body: { photoIds, status },
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error batch reviewing photos:', error);
     return null;
   }
 }

@@ -150,6 +150,7 @@ export interface Party {
   eventTags?: string[]; // Tags for filtering/grouping
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  photoModeration?: boolean;
   createdAt: string;
   guests: Guest[];
 }
@@ -243,6 +244,9 @@ export interface Photo {
   tags: string[];
   starred: boolean;
   starredAt: string | null;
+  status: 'approved' | 'pending' | 'rejected';
+  reviewedAt: string | null;
+  reviewedBy: string | null;
   createdAt: string;
   updatedAt: string;
   guest?: {
@@ -254,6 +258,7 @@ export interface Photo {
 export interface PhotoStats {
   totalPhotos: number;
   starredPhotos: number;
+  pendingPhotos: number;
   uniqueTags: string[];
   uniqueUploadersCount: number;
   photosEnabled: boolean;

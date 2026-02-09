@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Camera, Star, Loader2, Upload, Filter } from 'lucide-react';
+import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
-import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto } from '../../lib/api';
+import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos } from '../../lib/api';
 import { PhotoCard } from './PhotoCard';
 import { PhotoModal } from './PhotoModal';
 import { PhotoUpload } from './PhotoUpload';
@@ -12,9 +12,10 @@ interface PhotoGalleryProps {
   uploaderName?: string;
   uploaderEmail?: string;
   guestId?: string;
+  photoModeration?: boolean;
 }
 
-type FilterOption = 'all' | 'starred';
+type FilterOption = 'all' | 'starred' | 'pending';
 
 export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   partyId,
@@ -22,6 +23,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   uploaderName,
   uploaderEmail,
   guestId,
+  photoModeration = false,
 }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [stats, setStats] = useState<PhotoStats | null>(null);
@@ -32,6 +34,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   const [filter, setFilter] = useState<FilterOption>('all');
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const loadPhotos = useCallback(async (reset = false) => {
     if (reset) {
@@ -45,6 +48,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       const offset = reset ? 0 : photos.length;
       const result = await getPartyPhotos(partyId, {
         starred: filter === 'starred' ? true : undefined,
+        status: filter === 'pending' ? 'pending' : (isHost ? 'all' : undefined),
         limit: 20,
         offset,
       });
@@ -65,7 +69,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [partyId, filter, photos.length]);
+  }, [partyId, filter, photos.length, isHost]);
 
   const loadStats = useCallback(async () => {
     const result = await getPhotoStats(partyId);
@@ -81,8 +85,14 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   }, [partyId, filter]);
 
   const handleUploadComplete = (photo: Photo) => {
+    // If moderation is on and we're viewing approved photos, don't add to the list
+    if (photoModeration && filter !== 'pending') {
+      // Just refresh stats to show pending count
+      loadStats();
+      return;
+    }
     setPhotos(prev => [photo, ...prev]);
-    loadStats(); // Refresh stats
+    loadStats();
   };
 
   const handleStar = async (photoId: string, starred: boolean) => {
@@ -116,6 +126,66 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         setSelectedPhoto(result.photo);
       }
     }
+  };
+
+  const handleApprove = async (photoId: string) => {
+    const result = await updatePhoto(partyId, photoId, { status: 'approved' });
+    if (result) {
+      if (filter === 'pending') {
+        // Remove from pending list
+        setPhotos(prev => prev.filter(p => p.id !== photoId));
+      } else {
+        setPhotos(prev =>
+          prev.map(p => (p.id === photoId ? result.photo : p))
+        );
+      }
+      if (selectedPhoto?.id === photoId) {
+        if (filter === 'pending') {
+          setSelectedPhoto(null);
+        } else {
+          setSelectedPhoto(result.photo);
+        }
+      }
+      loadStats();
+    }
+  };
+
+  const handleReject = async (photoId: string) => {
+    const result = await updatePhoto(partyId, photoId, { status: 'rejected' });
+    if (result) {
+      if (filter === 'pending') {
+        setPhotos(prev => prev.filter(p => p.id !== photoId));
+      } else {
+        setPhotos(prev =>
+          prev.map(p => (p.id === photoId ? result.photo : p))
+        );
+      }
+      if (selectedPhoto?.id === photoId) {
+        if (filter === 'pending') {
+          setSelectedPhoto(null);
+        } else {
+          setSelectedPhoto(result.photo);
+        }
+      }
+      loadStats();
+    }
+  };
+
+  const handleApproveAll = async () => {
+    if (!stats || stats.pendingPhotos === 0) return;
+    setBatchLoading(true);
+    const pendingPhotoIds = photos.filter(p => p.status === 'pending').map(p => p.id);
+    if (pendingPhotoIds.length === 0) {
+      setBatchLoading(false);
+      return;
+    }
+    const result = await batchReviewPhotos(partyId, pendingPhotoIds, 'approved');
+    if (result) {
+      // Refresh the list
+      loadPhotos(true);
+      loadStats();
+    }
+    setBatchLoading(false);
   };
 
   if (loading) {
@@ -165,18 +235,18 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Filter */}
-          {stats && stats.starredPhotos > 0 && (
-            <div className="flex items-center bg-white/5 rounded-lg p-1">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  filter === 'all'
-                    ? 'bg-[#ff393a] text-white'
-                    : 'text-white/60 hover:text-white'
-                }`}
-              >
-                All
-              </button>
+          <div className="flex items-center bg-white/5 rounded-lg p-1">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filter === 'all'
+                  ? 'bg-[#ff393a] text-white'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            {stats && stats.starredPhotos > 0 && (
               <button
                 onClick={() => setFilter('starred')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
@@ -188,8 +258,21 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 <Star size={14} />
                 Starred
               </button>
-            </div>
-          )}
+            )}
+            {isHost && photoModeration && stats && stats.pendingPhotos > 0 && (
+              <button
+                onClick={() => setFilter('pending')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  filter === 'pending'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-amber-400/70 hover:text-amber-400'
+                }`}
+              >
+                <Clock size={14} />
+                Pending ({stats.pendingPhotos})
+              </button>
+            )}
+          </div>
 
           {/* Upload Button */}
           <button
@@ -202,6 +285,30 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         </div>
       </div>
 
+      {/* Approve All Banner (for pending filter) */}
+      {isHost && filter === 'pending' && photos.length > 0 && (
+        <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 text-amber-400">
+            <Clock size={18} />
+            <span className="text-sm font-medium">
+              {photos.length} photo{photos.length !== 1 ? 's' : ''} awaiting review
+            </span>
+          </div>
+          <button
+            onClick={handleApproveAll}
+            disabled={batchLoading}
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            {batchLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckCheck size={16} />
+            )}
+            Approve All
+          </button>
+        </div>
+      )}
+
       {/* Upload Modal */}
       {showUpload && (
         <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50">
@@ -211,6 +318,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               uploaderName={uploaderName}
               uploaderEmail={uploaderEmail}
               guestId={guestId}
+              photoModeration={photoModeration}
               onUploadComplete={handleUploadComplete}
               onClose={() => setShowUpload(false)}
             />
@@ -223,7 +331,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         <div className="text-center py-12 bg-white/5 rounded-xl">
           <Camera className="w-12 h-12 text-white/20 mx-auto mb-3" />
           <p className="text-white/60 mb-4">
-            {filter === 'starred' ? 'No starred photos yet' : 'No photos yet'}
+            {filter === 'starred' ? 'No starred photos yet' : filter === 'pending' ? 'No pending photos' : 'No photos yet'}
           </p>
           {filter === 'all' && (
             <button
@@ -246,6 +354,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 onClick={() => setSelectedPhoto(photo)}
                 onStar={handleStar}
                 onDelete={handleDelete}
+                onApprove={isHost && photo.status === 'pending' ? handleApprove : undefined}
+                onReject={isHost && photo.status === 'pending' ? handleReject : undefined}
               />
             ))}
           </div>
@@ -283,6 +393,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           onStar={handleStar}
           onDelete={handleDelete}
           onUpdateCaption={handleUpdateCaption}
+          onApprove={isHost ? handleApprove : undefined}
+          onReject={isHost ? handleReject : undefined}
         />
       )}
     </div>
