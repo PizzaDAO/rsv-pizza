@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { createDonation } from '../lib/api';
@@ -64,20 +64,18 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
       return;
     }
 
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      return;
-    }
-
     setProcessing(true);
     setError(null);
 
     try {
-      // Confirm the payment
-      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret!,
-        { payment_method: { card: cardElement } }
-      );
+      // Confirm the payment using PaymentElement (supports cards, Klarna, etc.)
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
 
       if (confirmError) {
         setError(confirmError.message || 'Payment failed');
@@ -123,23 +121,11 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                color: '#ffffff',
-                fontFamily: 'system-ui, sans-serif',
-                fontSize: '16px',
-                '::placeholder': { color: 'rgba(255,255,255,0.4)' },
-                iconColor: '#ffffff',
-              },
-              invalid: { color: '#ff393a', iconColor: '#ff393a' },
-            },
-            hidePostalCode: true,
-          }}
-        />
-      </div>
+      <PaymentElement
+        options={{
+          layout: 'accordion',
+        }}
+      />
 
       {error && (
         <div className="flex items-center gap-2 p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
@@ -303,8 +289,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 <CreditCard size={24} className="text-[#635bff]" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-white font-medium">Card Payment</p>
-                <p className="text-white/50 text-sm">Credit/debit card via Stripe</p>
+                <p className="text-white font-medium">Pay with Card or Wallet</p>
+                <p className="text-white/50 text-sm">Credit/debit card, Apple Pay, Google Pay & more</p>
               </div>
             </button>
 
