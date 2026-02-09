@@ -572,8 +572,11 @@ export function EventPage() {
                     className="btn-secondary w-full flex items-center justify-center gap-2"
                   >
                     <Heart size={16} />
-                    Support This Event
+                    Donate
                   </button>
+                  <p className="text-white/60 text-sm text-center mt-1">
+                    {event.donationRecipient ? `Supporting ${event.donationRecipient}` : `Supporting ${event.name}`}
+                  </p>
                 </div>
               )}
 
@@ -899,8 +902,11 @@ export function EventPage() {
                       className="btn-secondary w-full flex items-center justify-center gap-2"
                     >
                       <Heart size={16} />
-                      Support This Event
+                      Donate
                     </button>
+                    <p className="text-white/60 text-sm text-center mt-1">
+                      {event.donationRecipient ? `Supporting ${event.donationRecipient}` : `Supporting ${event.name}`}
+                    </p>
                   </div>
                 )}
 

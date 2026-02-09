@@ -509,8 +509,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               className="w-full bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-white/80"
             >
               <Heart size={18} className="text-[#ff393a]" />
-              Support This Event
+              Donate
             </button>
+            <p className="text-white/60 text-sm text-center mt-1">
+              {event.donationRecipient ? `Supporting ${event.donationRecipient}` : `Supporting ${event.name}`}
+            </p>
           )}
           {showDonation && (
             <div className="mt-4">

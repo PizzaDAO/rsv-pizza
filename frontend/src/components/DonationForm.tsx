@@ -123,7 +123,11 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
     <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement
         options={{
-          layout: 'accordion',
+          layout: {
+            type: 'accordion',
+            defaultCollapsed: false,
+          },
+          paymentMethodOrder: ['card'],
         }}
       />
 

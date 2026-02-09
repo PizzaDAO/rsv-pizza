@@ -100,7 +100,10 @@ export const DonationStep: React.FC<DonationStepProps> = ({
         <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
           <Heart className="w-8 h-8 text-[#ff393a]" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Support This Event</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Donate</h2>
+        <p className="text-sm text-white/60 mb-1">
+          {stats.recipient ? `Supporting ${stats.recipient}` : `Supporting ${partyName}`}
+        </p>
         <p className="text-white/60">
           {stats.message || 'Would you like to make a donation to help make this event possible?'}
         </p>

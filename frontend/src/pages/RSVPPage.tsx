@@ -815,7 +815,7 @@ export function RSVPPage() {
                   <Heart size={24} className="text-[#ff393a]" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-white font-medium">Support this event</p>
+                  <p className="text-white font-medium">Donate</p>
                   <p className="text-white/50 text-sm">
                     {donationStats.message || 'Make a donation to help make this event possible'}
                   </p>
