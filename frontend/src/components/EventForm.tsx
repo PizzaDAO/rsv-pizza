@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
@@ -128,8 +128,8 @@ export function EventForm() {
 
   const formatDateDisplay = (date: string) => {
     if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone || undefined });
   };
 
   const formatTimeDisplay = (time: string) => {
@@ -334,13 +334,13 @@ export function EventForm() {
                   {formatDateDisplay(startDate)}
                 </div>
                 <div className="text-white/60 text-sm mt-1">
-                  {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                  {formatTimeDisplay(startTime)} â€” {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
                 </div>
               </div>
             ) : (
               <div>
                 <span className="text-white/60">Thursday, January 15</span>
-                <div className="text-white/40 text-sm mt-1">2:00 PM — 3:00 PM EST</div>
+                <div className="text-white/40 text-sm mt-1">2:00 PM â€” 3:00 PM EST</div>
               </div>
             )}
           </div>

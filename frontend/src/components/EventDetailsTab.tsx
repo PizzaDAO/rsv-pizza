@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
 import { IconInput } from './IconInput';
@@ -723,8 +723,8 @@ export const EventDetailsTab: React.FC = () => {
   // Format date for display
   const formatDateDisplay = (date: string) => {
     if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone || undefined });
   };
 
   // Format time for display (12-hour)
@@ -822,7 +822,7 @@ export const EventDetailsTab: React.FC = () => {
                     {formatDateDisplay(startDate)}
                   </div>
                   <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                    {formatTimeDisplay(startTime)} â€” {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
                   </div>
                 </div>
               ) : (
@@ -1317,7 +1317,7 @@ export const EventDetailsTab: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                     <span className="text-sm text-white/60">Click to upload square image</span>
-                    <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                    <span className="text-xs text-white/40 mt-1">Max 5MB â€¢ 1:1 aspect ratio</span>
                   </label>
                 </div>
               )}
