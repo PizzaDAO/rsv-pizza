@@ -167,6 +167,13 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Helper: convert value to integer or null (handles string, number, null)
+    const toIntOrNull = (val: any): number | null => {
+      if (val === null || val === undefined || val === '') return null;
+      const num = typeof val === 'string' ? parseInt(val, 10) : val;
+      return isNaN(num) ? null : num;
+    };
+
     const party = await prisma.party.update({
       where: { id: partyId },
       data: {
@@ -175,14 +182,14 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
         ...(reportPhotosUrl !== undefined && { reportPhotosUrl }),
         ...(flyerArtist !== undefined && { flyerArtist }),
         ...(xPostUrl !== undefined && { xPostUrl }),
-        ...(xPostViews !== undefined && { xPostViews: xPostViews ? parseInt(xPostViews, 10) : null }),
+        ...(xPostViews !== undefined && { xPostViews: toIntOrNull(xPostViews) }),
         ...(farcasterPostUrl !== undefined && { farcasterPostUrl }),
-        ...(farcasterViews !== undefined && { farcasterViews: farcasterViews ? parseInt(farcasterViews, 10) : null }),
+        ...(farcasterViews !== undefined && { farcasterViews: toIntOrNull(farcasterViews) }),
         ...(lumaUrl !== undefined && { lumaUrl }),
-        ...(lumaViews !== undefined && { lumaViews: lumaViews ? parseInt(lumaViews, 10) : null }),
+        ...(lumaViews !== undefined && { lumaViews: toIntOrNull(lumaViews) }),
         ...(poapEventId !== undefined && { poapEventId }),
-        ...(poapMints !== undefined && { poapMints: poapMints ? parseInt(poapMints, 10) : null }),
-        ...(poapMoments !== undefined && { poapMoments: poapMoments ? parseInt(poapMoments, 10) : null }),
+        ...(poapMints !== undefined && { poapMints: toIntOrNull(poapMints) }),
+        ...(poapMoments !== undefined && { poapMoments: toIntOrNull(poapMoments) }),
       },
     });
 
