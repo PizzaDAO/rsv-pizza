@@ -68,7 +68,7 @@ serve(async (req) => {
     }
 
     const request: MintRequest = await req.json();
-    const { recipient, partyId, guestName, partyName, partyDate, partyVenue, partyAddress, imageUrl, inviteCode } = request;
+    const { recipient, partyId } = request;
 
     // Validate recipient address or ENS name
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
@@ -148,22 +148,8 @@ serve(async (req) => {
       console.log('Could not check existing token, proceeding with mint:', e);
     }
 
-    // Build NFT metadata
-    const metadata = {
-      name: partyName,
-      description: `Proof of attendance at ${partyName}`,
-      image: imageUrl,
-      external_url: `https://rsv.pizza/${inviteCode}`,
-      attributes: [
-        { trait_type: 'Party Name', value: partyName },
-        ...(partyDate ? [{ trait_type: 'Party Date', value: partyDate }] : []),
-        ...(partyVenue ? [{ trait_type: 'Venue', value: partyVenue }] : []),
-        ...(partyAddress ? [{ trait_type: 'Location', value: partyAddress }] : []),
-      ],
-    };
-
-    // Create data URI for metadata
-    const metadataUri = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+    // Use API URL for metadata - allows metadata to auto-update when event details change
+    const metadataUri = `https://backend-pizza-dao.vercel.app/api/nft/metadata/${partyId}/${resolvedAddress}`;
 
     // Setup wallet client for minting (publicClient already created above)
     const account = privateKeyToAccount(MINTER_PRIVATE_KEY as `0x${string}`);
