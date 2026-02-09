@@ -9,6 +9,7 @@ import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
+import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
@@ -83,6 +84,7 @@ app.use('/api/rsvp', rsvpLimiter);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
