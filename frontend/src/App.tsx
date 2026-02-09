@@ -12,6 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { AccountPage } from './pages/AccountPage';
 import { GPPLandingPage } from './pages/GPPLandingPage';
+import { CheckInPage } from './pages/CheckInPage';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />
+            <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

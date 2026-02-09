@@ -1,7 +1,7 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
 
 // Authenticated API helper functions
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
 
 function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
@@ -94,18 +94,20 @@ export interface UpdatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
   description?: string | null;
   customUrl?: string | null;
   coHosts?: any[];
-  selectedPizzerias?: any[];
   donationEnabled?: boolean;
   donationGoal?: number | null;
   donationMessage?: string | null;
   suggestedAmounts?: number[];
   donationRecipient?: string | null;
   donationEthAddress?: string | null;
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -130,6 +132,8 @@ export async function createPartyApi(data: CreatePartyData) {
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
+      shareToUnlock: data.shareToUnlock,
+      shareTweetText: data.shareTweetText,
     },
   });
 }
@@ -150,18 +154,20 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
       description: data.description,
       customUrl: data.customUrl,
       coHosts: data.coHosts,
-      selectedPizzerias: data.selectedPizzerias,
       donationEnabled: data.donationEnabled,
       donationGoal: data.donationGoal,
       donationMessage: data.donationMessage,
       suggestedAmounts: data.suggestedAmounts,
       donationRecipient: data.donationRecipient,
       donationEthAddress: data.donationEthAddress,
+      shareToUnlock: data.shareToUnlock,
+      shareTweetText: data.shareTweetText,
     },
   });
 }
@@ -272,6 +278,8 @@ export interface PublicEvent {
   eventType?: string | null;
   eventTags?: string[];
   donationEnabled?: boolean;
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 // Public Event API (no auth required)
@@ -553,5 +561,52 @@ export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEvent
     method: 'POST',
     body: data,
     requireAuth: false,
+  });
+}
+
+export async function verifyTweet(slug: string, tweetUrl: string): Promise<{ verified: boolean; error?: string }> {
+  return apiRequest(`/api/events/${slug}/verify-tweet`, {
+    method: 'POST',
+    body: { tweetUrl },
+    requireAuth: false,
+  });
+}
+
+// Check-in API functions
+export interface CheckInResponse {
+  success: boolean;
+  alreadyCheckedIn: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: string;
+    checkedInBy?: string;
+  };
+  message: string;
+}
+
+export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
+  return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'POST',
+    requireAuth: true,
+  });
+}
+
+export interface CheckInStatusResponse {
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt?: string;
+    checkedInBy?: string;
+  };
+  isCheckedIn: boolean;
+}
+
+export async function getCheckInStatus(inviteCode: string, guestId: string): Promise<CheckInStatusResponse> {
+  return apiRequest<CheckInStatusResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'GET',
+    requireAuth: true,
   });
 }

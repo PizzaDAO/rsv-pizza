@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -32,6 +32,8 @@ interface TableRowProps {
   onApprove?: (id: string) => void;
   onDecline?: (id: string) => void;
   onRemove?: (id: string) => void;
+  onCheckIn?: (id: string) => void;
+  isCheckingIn?: boolean;
   // For requests variant - lookup functions
   toppingNameById?: (id: string) => string;
   beverageNameById?: (id: string) => string;
@@ -47,6 +49,8 @@ export const TableRow: React.FC<TableRowProps> = ({
   onApprove,
   onDecline,
   onRemove,
+  onCheckIn,
+  isCheckingIn = false,
   toppingNameById = (id) => id,
   beverageNameById = (id) => id,
 }) => {
@@ -259,6 +263,33 @@ export const TableRow: React.FC<TableRowProps> = ({
       )}
       {requireApproval && guest.approved === false && (
         <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+      )}
+
+      {/* Check-in status badge or button */}
+      {variant === 'basic' && onCheckIn && (
+        guest.checkedInAt ? (
+          <div
+            className="flex items-center gap-1 text-green-400 text-xs flex-shrink-0 cursor-help"
+            title={`Checked in: ${format(new Date(guest.checkedInAt), 'MMM d, h:mm a')}`}
+          >
+            <CheckCircle2 size={14} />
+            <span className="hidden sm:inline">Checked in</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => guest.id && onCheckIn(guest.id)}
+            disabled={isCheckingIn}
+            className="flex items-center gap-1 text-white/50 hover:text-green-400 hover:bg-green-500/10 px-2 py-1 rounded transition-colors text-xs flex-shrink-0 disabled:opacity-50"
+            title="Check in guest"
+          >
+            {isCheckingIn ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={14} />
+            )}
+            <span className="hidden sm:inline">Check in</span>
+          </button>
+        )
       )}
 
       {/* Date - only for basic variant */}

@@ -82,7 +82,6 @@ router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res
       select: {
         status: true,
         amount: true,
-        amountReceived: true,
       },
     });
 
@@ -91,7 +90,7 @@ router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res
       todo: 0,
       asked: 0,
       yes: 0,
-      invoiced: 0,
+      billed: 0,
       paid: 0,
       stuck: 0,
       alum: 0,
@@ -99,26 +98,19 @@ router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res
     };
 
     let totalConfirmed = 0;
-    let totalReceived = 0;
 
     for (const sponsor of sponsors) {
       statusCounts[sponsor.status] = (statusCounts[sponsor.status] || 0) + 1;
 
-      // Count confirmed amounts (yes, invoiced, paid statuses)
-      if (['yes', 'invoiced', 'paid'].includes(sponsor.status) && sponsor.amount) {
+      // Only count amounts for yes, billed, paid statuses
+      if (['yes', 'billed', 'paid'].includes(sponsor.status) && sponsor.amount) {
         totalConfirmed += Number(sponsor.amount);
-      }
-
-      // Count received amounts
-      if (sponsor.amountReceived) {
-        totalReceived += Number(sponsor.amountReceived);
       }
     }
 
     res.json({
       fundraisingGoal: party.fundraisingGoal ? Number(party.fundraisingGoal) : null,
       totalConfirmed,
-      totalReceived,
       totalSponsors: sponsors.length,
       statusCounts,
     });
@@ -143,7 +135,6 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       telegram,
       status,
       amount,
-      amountReceived,
       sponsorshipType,
       productService,
       logoUrl,
@@ -163,7 +154,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
     }
 
     // Validate status if provided
-    const validStatuses = ['todo', 'asked', 'yes', 'invoiced', 'paid', 'stuck', 'alum', 'skip'];
+    const validStatuses = ['todo', 'asked', 'yes', 'billed', 'paid', 'stuck', 'alum', 'skip'];
     if (status && !validStatuses.includes(status)) {
       throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
@@ -188,7 +179,6 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
         telegram: telegram?.trim() || null,
         status: status || 'todo',
         amount: amount !== undefined && amount !== null && amount !== '' ? amount : null,
-        amountReceived: amountReceived !== undefined && amountReceived !== null && amountReceived !== '' ? amountReceived : null,
         sponsorshipType: sponsorshipType || null,
         productService: productService?.trim() || null,
         logoUrl: logoUrl?.trim() || null,
@@ -244,7 +234,6 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       telegram,
       status,
       amount,
-      amountReceived,
       sponsorshipType,
       productService,
       logoUrl,
@@ -268,7 +257,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
     }
 
     // Validate status if provided
-    const validStatuses = ['todo', 'asked', 'yes', 'invoiced', 'paid', 'stuck', 'alum', 'skip'];
+    const validStatuses = ['todo', 'asked', 'yes', 'billed', 'paid', 'stuck', 'alum', 'skip'];
     if (status && !validStatuses.includes(status)) {
       throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
@@ -293,7 +282,6 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
         ...(telegram !== undefined && { telegram: telegram?.trim() || null }),
         ...(status !== undefined && { status }),
         ...(amount !== undefined && { amount: amount !== null && amount !== '' ? amount : null }),
-        ...(amountReceived !== undefined && { amountReceived: amountReceived !== null && amountReceived !== '' ? amountReceived : null }),
         ...(sponsorshipType !== undefined && { sponsorshipType: sponsorshipType || null }),
         ...(productService !== undefined && { productService: productService?.trim() || null }),
         ...(logoUrl !== undefined && { logoUrl: logoUrl?.trim() || null }),

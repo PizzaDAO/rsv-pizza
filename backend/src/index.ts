@@ -9,6 +9,7 @@ import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
+import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
@@ -19,6 +20,7 @@ import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import reportRoutes from './routes/report.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 
@@ -82,6 +84,7 @@ app.use('/api/rsvp', rsvpLimiter);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
@@ -90,6 +93,7 @@ app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
@@ -98,6 +102,7 @@ app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
+app.use('/api/reports', reportRoutes); // Public report viewing via slug
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);

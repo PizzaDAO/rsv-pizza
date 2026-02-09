@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
+import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PublicEvent } from '../lib/api';
 import { DonationStep } from './DonationStep';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
@@ -97,6 +98,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
   const [pizzeriaRankings, setPizzeriaRankings] = useState<string[]>([]);
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
+  const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
 
   // NFT minting state
   const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
@@ -236,6 +239,32 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     });
   };
 
+  const handleSuggestPizzeria = (place: Partial<Pizzeria>) => {
+    const pizzeria: Pizzeria = {
+      id: place.id || `suggested-${crypto.randomUUID()}`,
+      placeId: place.placeId || '',
+      name: place.name || '',
+      address: place.address || '',
+      phone: place.phone,
+      url: place.url,
+      rating: place.rating,
+      reviewCount: place.reviewCount,
+      priceLevel: place.priceLevel,
+      isOpen: place.isOpen,
+      location: place.location || { lat: 0, lng: 0 },
+      orderingOptions: place.orderingOptions || [],
+    };
+
+    // Add to suggestions list
+    setSuggestedPizzerias(prev => [...prev, pizzeria]);
+    // Also add to nearby list so guest can rank it
+    setNearbyPizzerias(prev => {
+      if (prev.some(p => p.id === pizzeria.id)) return prev;
+      return [...prev, pizzeria];
+    });
+    setShowSuggestModal(false);
+  };
+
   const handleStep1Continue = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -269,7 +298,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         roles,
         mailingListOptIn,
         inviteCode,
-        pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined
+        pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined,
+        suggestedPizzerias.length > 0 ? suggestedPizzerias : undefined
       );
 
       if (result) {
@@ -856,6 +886,37 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                   })}
                 </div>
               )}
+
+              {/* Suggest a Pizzeria button */}
+              <button
+                type="button"
+                onClick={() => setShowSuggestModal(true)}
+                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-white/20 text-white/50 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm"
+              >
+                <Plus size={14} />
+                Suggest a Pizzeria
+              </button>
+            </div>
+          )}
+
+          {/* Suggest Pizzeria Sub-Modal */}
+          {showSuggestModal && (
+            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-white">Suggest a pizzeria</p>
+                <button
+                  type="button"
+                  onClick={() => setShowSuggestModal(false)}
+                  className="text-white/40 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <PlaceAutocomplete
+                onPlaceSelected={(place) => handleSuggestPizzeria(place)}
+                placeholder="Search for a pizzeria..."
+                autoFocus
+              />
             </div>
           )}
 

@@ -309,10 +309,16 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
   );
 
   function renderPizzeriaCard(pizzeria: Pizzeria, apiKey: string | undefined, ranking?: PizzeriaRanking) {
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`;
+    // Guard against {lat:0, lng:0} from legacy manual entries
+    const hasValidCoords = pizzeria.location &&
+      !(pizzeria.location.lat === 0 && pizzeria.location.lng === 0);
 
-    // Construct static map URL
-    const staticMapUrl = apiKey && pizzeria.location
+    const googleMapsUrl = hasValidCoords
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`
+      : null;
+
+    // Construct static map URL (only for valid coords)
+    const staticMapUrl = apiKey && hasValidCoords
       ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${apiKey}`
       : null;
 
@@ -324,15 +330,19 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
         <div className="flex justify-between items-start gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
-              >
-                {pizzeria.name}
-                <ExternalLink size={12} className="opacity-50" />
-              </a>
+              {googleMapsUrl ? (
+                <a
+                  href={googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
+                >
+                  {pizzeria.name}
+                  <ExternalLink size={12} className="opacity-50" />
+                </a>
+              ) : (
+                <span className="font-semibold text-white">{pizzeria.name}</span>
+              )}
               {renderStars(pizzeria.rating)}
               {pizzeria.reviewCount && (
                 <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
@@ -381,27 +391,29 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
             {renderOrderingOptions(pizzeria)}
           </div>
 
-          {/* Right side: Map Thumbnail */}
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
-            title="View on Google Maps"
-          >
-            {staticMapUrl ? (
-              <img
-                src={staticMapUrl}
-                alt="Map"
-                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-              />
-            ) : (
-              <>
-                <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
-              </>
-            )}
-          </a>
+          {/* Right side: Map Thumbnail (only if valid coords) */}
+          {googleMapsUrl && (
+            <a
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
+              title="View on Google Maps"
+            >
+              {staticMapUrl ? (
+                <img
+                  src={staticMapUrl}
+                  alt="Map"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                />
+              ) : (
+                <>
+                  <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                </>
+              )}
+            </a>
+          )}
         </div>
       </div>
     );

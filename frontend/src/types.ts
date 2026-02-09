@@ -23,8 +23,11 @@ export interface Guest {
   likedBeverages?: string[];
   dislikedBeverages?: string[];
   pizzeriaRankings?: string[];
+  suggestedPizzerias?: Pizzeria[];
   submittedAt?: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
+  checkedInAt?: string | null;
+  checkedInBy?: string | null;
 }
 
 export interface PizzaStyle {
@@ -144,7 +147,9 @@ export interface Party {
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null; // 'standard', 'gpp', 'private', etc.
-  eventTags?: string[]; // Tags for filtering/grouping (e.g., 'Global Pizza Party')
+  eventTags?: string[]; // Tags for filtering/grouping
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
   createdAt: string;
   guests: Guest[];
   // Donation settings

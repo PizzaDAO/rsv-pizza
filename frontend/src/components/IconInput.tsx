@@ -1,14 +1,15 @@
 import React, { forwardRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 
-interface IconInputBaseProps {
+type BaseProps = {
   icon: LucideIcon;
   iconSize?: number;
-}
+};
 
-type IconInputProps = IconInputBaseProps &
-  (({ multiline: true } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) |
-  ({ multiline?: false } & React.InputHTMLAttributes<HTMLInputElement>));
+type InputProps = BaseProps & React.InputHTMLAttributes<HTMLInputElement> & { multiline?: false };
+type TextareaProps = BaseProps & React.TextareaHTMLAttributes<HTMLTextAreaElement> & { multiline: true };
+
+type IconInputProps = InputProps | TextareaProps;
 
 export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
   ({ icon: Icon, iconSize = 20, className = '', multiline, placeholder, required, ...props }, ref) => {
@@ -25,7 +26,8 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
         {multiline ? (
           <textarea
             ref={ref as React.Ref<HTMLTextAreaElement>}
-            className={`w-full !pl-14 min-h-[80px] resize-y ${className}`}
+            className={`w-full !pl-14 resize-none ${className}`}
+            rows={(props as TextareaProps).rows || 3}
             placeholder={displayPlaceholder}
             required={required}
             {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}

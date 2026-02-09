@@ -8,8 +8,8 @@ import {
   updateGuestApprovalApi,
 } from './api';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env.local file.');
@@ -239,6 +239,8 @@ export interface DbParty {
   rsvp_closed_at: string | null;
   selected_pizzerias: any[] | null;
   co_hosts: any[];
+  share_to_unlock?: boolean;
+  share_tweet_text?: string | null;
   created_at: string;
   donation_enabled?: boolean;
   donation_goal?: number | null;
@@ -262,9 +264,12 @@ export interface DbGuest {
   liked_beverages: string[];
   disliked_beverages: string[];
   pizzeria_rankings?: string[];
+  suggested_pizzerias?: any[];
   submitted_at: string;
   submitted_via: string;
   approved?: boolean | null; // null = pending, true = approved, false = declined
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
 }
 
 // Party operations
@@ -512,7 +517,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
     donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
-    donation_eth_address
+    donation_eth_address, share_to_unlock, share_tweet_text
   `;
 
   let party: DbParty | null = null;
@@ -633,7 +638,8 @@ export async function addGuestToParty(
   roles?: string[],
   mailingListOptIn?: boolean,
   inviteCode?: string,
-  pizzeriaRankings?: string[]
+  pizzeriaRankings?: string[],
+  suggestedPizzerias?: any[]
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -656,6 +662,7 @@ export async function addGuestToParty(
         likedBeverages,
         dislikedBeverages,
         pizzeriaRankings: pizzeriaRankings || [],
+        suggestedPizzerias: suggestedPizzerias || [],
       }),
     });
 
@@ -682,6 +689,7 @@ export async function addGuestToParty(
       liked_beverages: likedBeverages,
       disliked_beverages: dislikedBeverages,
       pizzeria_rankings: pizzeriaRankings || [],
+      suggested_pizzerias: suggestedPizzerias || [],
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
     } as DbGuest;
@@ -706,6 +714,7 @@ export interface ExistingGuestData {
   likedBeverages: string[];
   dislikedBeverages: string[];
   pizzeriaRankings: string[];
+  suggestedPizzerias: any[];
 }
 
 export async function getExistingGuest(
@@ -739,6 +748,7 @@ export async function getExistingGuest(
       likedBeverages: guest.likedBeverages || [],
       dislikedBeverages: guest.dislikedBeverages || [],
       pizzeriaRankings: guest.pizzeriaRankings || [],
+      suggestedPizzerias: guest.suggestedPizzerias || [],
     };
   } catch (error) {
     console.error('Error fetching guest:', error);
@@ -971,6 +981,8 @@ export async function updateParty(
     suggested_amounts?: number[];
     donation_recipient?: string | null;
     donation_eth_address?: string | null;
+    share_to_unlock?: boolean;
+    share_tweet_text?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1000,6 +1012,8 @@ export async function updateParty(
         suggestedAmounts: updates.suggested_amounts,
         donationRecipient: updates.donation_recipient,
         donationEthAddress: updates.donation_eth_address,
+        shareToUnlock: updates.share_to_unlock,
+        shareTweetText: updates.share_tweet_text,
       });
       return true;
     } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
 import { IconInput } from './IconInput';
@@ -10,7 +10,8 @@ import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
+import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
+import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { DonationSettings } from './DonationSettings';
 
 export const EventDetailsTab: React.FC = () => {
@@ -38,6 +39,8 @@ export const EventDetailsTab: React.FC = () => {
   const [requireApproval, setRequireApproval] = useState(false);
   const [limitGuests, setLimitGuests] = useState(false);
   const [hideGuests, setHideGuests] = useState(false);
+  const [shareToUnlock, setShareToUnlock] = useState(false);
+  const [shareTweetText, setShareTweetText] = useState('');
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
@@ -130,6 +133,8 @@ export const EventDetailsTab: React.FC = () => {
       const partyHideGuests = party.hideGuests || false;
       const partyRequireApproval = party.requireApproval || false;
       const partyCoHosts = party.coHosts || [];
+      const partyShareToUnlock = party.shareToUnlock || false;
+      const partyShareTweetText = party.shareTweetText || '';
 
       // Set form values
       setName(partyName);
@@ -151,6 +156,8 @@ export const EventDetailsTab: React.FC = () => {
       setHideGuests(partyHideGuests);
       setRequireApproval(partyRequireApproval);
       setCoHosts(partyCoHosts);
+      setShareToUnlock(partyShareToUnlock);
+      setShareTweetText(partyShareTweetText);
 
       // Store original values
       setOriginalValues({
@@ -171,6 +178,8 @@ export const EventDetailsTab: React.FC = () => {
         hideGuests: partyHideGuests,
         requireApproval: partyRequireApproval,
         coHosts: JSON.stringify(partyCoHosts),
+        shareToUnlock: partyShareToUnlock,
+        shareTweetText: partyShareTweetText,
       });
     }
   }, [party]);
@@ -713,38 +722,6 @@ export const EventDetailsTab: React.FC = () => {
     return name.trim() !== originalValues.name;
   };
 
-  // Format date for display
-  const formatDateDisplay = (date: string) => {
-    if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  };
-
-  // Format time for display (12-hour)
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  // Get timezone abbreviation
-  const getTimezoneAbbr = () => {
-    if (!timezone) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        timeZoneName: 'short'
-      });
-      const parts = formatter.formatToParts(new Date());
-      const tzPart = parts.find(p => p.type === 'timeZoneName');
-      return tzPart?.value || '';
-    } catch {
-      return '';
-    }
-  };
-
   if (!party) {
     return <div className="card p-6 text-white/60">No party loaded</div>;
   }
@@ -812,10 +789,10 @@ export const EventDetailsTab: React.FC = () => {
               {startDate && startTime && endDate && endTime ? (
                 <div>
                   <div className="text-white font-medium">
-                    {formatDateDisplay(startDate)}
+                    {formatDateDisplay(startDate, timezone)}
                   </div>
                   <div className="text-white/60 text-sm mt-1">
-                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {getTimezoneAbbr()}
+                    {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
               ) : (
@@ -963,6 +940,33 @@ export const EventDetailsTab: React.FC = () => {
                   autoComplete="new-password"
                 />
               </div>
+              {password && (
+                <Checkbox
+                  checked={shareToUnlock}
+                  onChange={() => {
+                    const newValue = !shareToUnlock;
+                    setShareToUnlock(newValue);
+                    saveOptions({ share_to_unlock: newValue });
+                    if (!newValue) {
+                      setShareTweetText('');
+                      saveOptions({ share_to_unlock: false, share_tweet_text: null });
+                    }
+                  }}
+                  label="Share to Unlock"
+                />
+              )}
+              {password && shareToUnlock && (
+                <IconInput
+                  icon={Lock}
+                  multiline
+                  value={shareTweetText}
+                  onChange={(e) => setShareTweetText(e.target.value)}
+                  onBlur={() => {
+                    saveOptions({ share_tweet_text: shareTweetText.trim() || null });
+                  }}
+                  placeholder="Custom tweet text (optional)"
+                />
+              )}
 
               <CustomUrlInput
                 value={customUrl}
@@ -1389,7 +1393,14 @@ export const EventDetailsTab: React.FC = () => {
                     <input
                       type="text"
                       value={editHostTwitter}
-                      onChange={(e) => setEditHostTwitter(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditHostTwitter(val);
+                        if (!editHostAvatarUrl.trim() || isAutoFilledXAvatar(editHostAvatarUrl)) {
+                          const avatarUrl = getXAvatarUrl(val);
+                          if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
+                        }
+                      }}
                       placeholder="Twitter (no @)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
@@ -1404,6 +1415,19 @@ export const EventDetailsTab: React.FC = () => {
                 </>
               )}
             </div>
+
+            {/* Avatar Preview */}
+            {editHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={editHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button
@@ -1470,7 +1494,14 @@ export const EventDetailsTab: React.FC = () => {
                 <input
                   type="text"
                   value={newCoHostTwitter}
-                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewCoHostTwitter(val);
+                    if (!newCoHostAvatarUrl.trim() || isAutoFilledXAvatar(newCoHostAvatarUrl)) {
+                      const avatarUrl = getXAvatarUrl(val);
+                      if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
+                    }
+                  }}
                   placeholder="Twitter (no @)"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -1483,6 +1514,19 @@ export const EventDetailsTab: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Avatar Preview */}
+            {newCoHostAvatarUrl && (
+              <div className="flex items-center gap-2 mt-2">
+                <img
+                  src={newCoHostAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <span className="text-xs text-white/40">Avatar preview</span>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-4">
               <button
