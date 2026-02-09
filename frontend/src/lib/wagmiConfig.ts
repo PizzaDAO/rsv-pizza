@@ -11,7 +11,7 @@ const monad = defineChain({
     default: { http: ['https://rpc.monad.xyz'] },
   },
   blockExplorers: {
-    default: { name: 'MonadVision', url: 'https://explorer.monad.xyz' },
+    default: { name: 'Monadscan', url: 'https://monadscan.com' },
   },
 });
 

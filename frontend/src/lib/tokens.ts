@@ -101,7 +101,7 @@ export const SUPPORTED_TOKENS: Record<number, ChainTokens> = {
 export function getExplorerUrl(chainId: number): string {
   switch (chainId) {
     case 143:
-      return 'https://explorer.monad.xyz';
+      return 'https://monadscan.com';
     case 8453:
       return 'https://basescan.org';
     default:
