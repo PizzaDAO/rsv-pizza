@@ -216,6 +216,15 @@ model Donation {
   donorEmail      String?  @map("donor_email")
   isAnonymous     Boolean  @default(false) @map("is_anonymous")
   message         String?
+
+  // Crypto donation fields
+  paymentMethod   String   @default("stripe") @map("payment_method") // "stripe" or "crypto"
+  chainId         Int?     @map("chain_id")         // 1 = Ethereum, 8453 = Base
+  tokenSymbol     String?  @map("token_symbol")     // "ETH", "USDC", etc.
+  tokenAddress    String?  @map("token_address")    // null for native ETH
+  txHash          String?  @map("tx_hash")          // on-chain tx hash
+  walletAddress   String?  @map("wallet_address")   // donor's wallet
+
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

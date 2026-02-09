@@ -145,6 +145,13 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
       isAnonymous = false,
       message,
       guestId,
+      // Crypto donation fields
+      paymentMethod = 'stripe',
+      chainId,
+      tokenSymbol,
+      tokenAddress,
+      txHash,
+      walletAddress,
     } = req.body;
 
     // Validate party exists and has donations enabled
@@ -170,7 +177,7 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
       data: {
         amount,
         currency,
-        status: paymentIntentId ? 'succeeded' : 'pending',
+        status: paymentIntentId || txHash ? 'succeeded' : 'pending',
         paymentIntentId,
         chargeId,
         donorName: donorName || null,
@@ -179,6 +186,13 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
         message: message || null,
         partyId: id,
         guestId: guestId || null,
+        // Crypto donation fields
+        paymentMethod: paymentMethod || 'stripe',
+        chainId: chainId ? Number(chainId) : null,
+        tokenSymbol: tokenSymbol || null,
+        tokenAddress: tokenAddress || null,
+        txHash: txHash || null,
+        walletAddress: walletAddress || null,
       },
     });
 
