@@ -125,6 +125,63 @@ export const EVENT_PLATFORMS: Record<EventPlatform, { name: string; color: strin
 };
 
 /**
+ * Generate a Twitter/X thread (3 posts) for the party.
+ * Post 1: Event name, date, location, CTA
+ * Post 2: RSVP link only
+ * Post 3: Hosts/co-hosts with Twitter handles
+ */
+export function generateTwitterThread(party: Party): string[] {
+  const rsvpUrl = getRsvpUrl(party);
+  const dateStr = formatEventDateShort(party);
+  const location = getLocationString(party);
+
+  // Post 1: Main tweet
+  const post1Lines: string[] = [];
+  post1Lines.push(party.name);
+  if (party.date && location !== 'TBD') {
+    post1Lines.push(`${dateStr} at ${location}`);
+  } else if (party.date) {
+    post1Lines.push(dateStr);
+  } else if (location !== 'TBD') {
+    post1Lines.push(location);
+  }
+  post1Lines.push('');
+  post1Lines.push('RSVP Below \u{1F447}');
+  const post1 = post1Lines.join('\n');
+
+  // Post 2: Just the link
+  const post2 = rsvpUrl;
+
+  // Post 3: Hosts
+  const hostLines: string[] = ['At the event, connect w/:'];
+
+  // Primary host
+  if (party.hostProfile?.twitter) {
+    const handle = party.hostProfile.twitter.replace(/^@/, '');
+    hostLines.push(`@${handle}`);
+  } else if (party.hostName) {
+    hostLines.push(party.hostName);
+  }
+
+  // Co-hosts (only those shown on event)
+  if (party.coHosts) {
+    for (const coHost of party.coHosts) {
+      if (coHost.showOnEvent === false) continue;
+      if (coHost.twitter) {
+        const handle = coHost.twitter.replace(/^@/, '');
+        hostLines.push(`@${handle}`);
+      } else {
+        hostLines.push(coHost.name);
+      }
+    }
+  }
+
+  const post3 = hostLines.join('\n');
+
+  return [post1, post2, post3];
+}
+
+/**
  * Generate a social media post for the given platform.
  */
 export function generateSocialPost(party: Party, platform: SocialPlatform): string {
@@ -136,17 +193,9 @@ export function generateSocialPost(party: Party, platform: SocialPlatform): stri
 
   switch (platform) {
     case 'twitter': {
-      // Keep it tight for 280 chars
-      const lines = [];
-      lines.push(`${party.name}`);
-      lines.push('');
-      if (party.date) lines.push(`${dateStr}`);
-      if (location !== 'TBD') lines.push(`${location}`);
-      lines.push('');
-      lines.push(`RSVP: ${rsvpUrl}`);
-      lines.push('');
-      lines.push(hashtags.slice(0, 4).join(' '));
-      return lines.join('\n');
+      // Twitter now uses thread mode - return post 1 as fallback
+      const thread = generateTwitterThread(party);
+      return thread[0];
     }
 
     case 'instagram': {
