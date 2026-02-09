@@ -18,7 +18,7 @@ export const CHAIN_CONFIG: Record<NFTChain, {
     chainId: 143,
     name: 'Monad',
     contractAddress: '0xf6eb17d1e4bb9ae499a5a57a1e3a97fad8d0938e',
-    explorerUrl: 'https://explorer.monad.xyz',
+    explorerUrl: 'https://monadscan.com',
   },
 };
 
