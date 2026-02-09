@@ -29,37 +29,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
+      console.warn('PlaceAutocomplete: VITE_GOOGLE_MAPS_API_KEY is not set');
       setIsLoaded(true);
       return;
     }
-
-    const loadGoogleMaps = async () => {
-      try {
-        if (window.google?.maps?.places) {
-          initAutocomplete();
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
-        script.async = true;
-        script.defer = true;
-
-        script.onload = () => {
-          initAutocomplete();
-        };
-
-        script.onerror = () => {
-          console.error('Error loading Google Maps');
-          setIsLoaded(true);
-        };
-
-        document.head.appendChild(script);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setIsLoaded(true);
-      }
-    };
 
     const initAutocomplete = () => {
       if (inputRef.current && window.google?.maps?.places) {
@@ -120,6 +93,54 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         });
 
         autocompleteRef.current = autocompleteInstance;
+        setIsLoaded(true);
+      }
+    };
+
+    const loadGoogleMaps = () => {
+      try {
+        // Already loaded — init immediately
+        if (window.google?.maps?.places) {
+          initAutocomplete();
+          return;
+        }
+
+        // Check if another component already added the script tag
+        const existingScript = document.querySelector(
+          'script[src*="maps.googleapis.com/maps/api/js"]'
+        );
+
+        if (existingScript) {
+          // Script tag exists but hasn't finished loading yet — wait for it
+          const waitForMaps = () => {
+            if (window.google?.maps?.places) {
+              initAutocomplete();
+            } else {
+              setTimeout(waitForMaps, 100);
+            }
+          };
+          waitForMaps();
+          return;
+        }
+
+        // No script tag exists — create one
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+        script.async = true;
+        script.defer = true;
+
+        script.onload = () => {
+          initAutocomplete();
+        };
+
+        script.onerror = () => {
+          console.error('PlaceAutocomplete: Error loading Google Maps script');
+          setIsLoaded(true);
+        };
+
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('PlaceAutocomplete: Error loading Google Maps:', error);
         setIsLoaded(true);
       }
     };
