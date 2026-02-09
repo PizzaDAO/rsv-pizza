@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, DollarSign, Target, Loader2, ChevronRight } from 'lucide-react';
+import { Heart, DollarSign, Target, Loader2 } from 'lucide-react';
 import { getDonationStats } from '../lib/api';
 import { DonationForm } from './DonationForm';
 import { DonationPublicStats } from '../types';
@@ -172,8 +172,7 @@ export const DonationStep: React.FC<DonationStepProps> = ({
           onClick={onSkip}
           className="w-full btn-secondary flex items-center justify-center gap-2"
         >
-          Skip
-          <ChevronRight size={18} />
+          Back
         </button>
       </div>
     </div>

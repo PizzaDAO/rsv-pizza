@@ -54,6 +54,16 @@ export const SUPPORTED_TOKENS: Record<number, ChainTokens> = {
       logoColor: '#627eea',
     },
   },
+  // Monad
+  143: {
+    MON: {
+      symbol: 'MON',
+      name: 'Monad',
+      decimals: 18,
+      address: null,
+      logoColor: '#836EF9',
+    },
+  },
   // Base
   8453: {
     ETH: {
@@ -90,6 +100,8 @@ export const SUPPORTED_TOKENS: Record<number, ChainTokens> = {
 /** Get the block explorer URL for a given chain */
 export function getExplorerUrl(chainId: number): string {
   switch (chainId) {
+    case 143:
+      return 'https://explorer.monad.xyz';
     case 8453:
       return 'https://basescan.org';
     default:
@@ -107,6 +119,8 @@ export function getChainName(chainId: number): string {
   switch (chainId) {
     case 1:
       return 'Ethereum';
+    case 143:
+      return 'Monad';
     case 8453:
       return 'Base';
     default:

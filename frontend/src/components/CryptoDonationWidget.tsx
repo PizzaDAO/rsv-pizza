@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useAccount, useSwitchChain } from 'wagmi';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useAccount, useSwitchChain, useEnsAddress } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
 import { type Address, isAddress } from 'viem';
 import { Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
@@ -46,14 +46,55 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
   const [showChainMenu, setShowChainMenu] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [usdPrice, setUsdPrice] = useState<number | null>(null);
+
   const recipientAddress = cryptoAddress || DEFAULT_CRYPTO_ADDRESS;
 
-  // Resolve whether the recipient is a valid ETH address
+  // Resolve whether the recipient is a valid ETH address or ENS name
   const isValidAddress = isAddress(recipientAddress);
   const isENS = recipientAddress.endsWith('.eth');
-  const canSendTx = isValidAddress; // ENS needs resolution - for now we require a hex address
+
+  // Resolve ENS name to address on mainnet
+  const { data: resolvedEnsAddress, isLoading: ensLoading } = useEnsAddress({
+    name: isENS ? recipientAddress : undefined,
+    chainId: 1, // ENS resolves on mainnet
+  });
+
+  const effectiveAddress = isENS
+    ? (resolvedEnsAddress || undefined)
+    : (isValidAddress ? recipientAddress : undefined);
+  const canSendTx = !!effectiveAddress;
 
   const supportedChainIds = Object.keys(SUPPORTED_TOKENS).map(Number);
+
+  // CoinGecko ID mapping for USD price lookup
+  const COINGECKO_IDS: Record<string, string> = {
+    ETH: 'ethereum',
+    WETH: 'ethereum',
+    USDC: 'usd-coin',
+    USDT: 'tether',
+    DAI: 'dai',
+    MON: 'monad',
+  };
+
+  // Fetch USD price when token changes
+  useEffect(() => {
+    if (!selectedToken) { setUsdPrice(null); return; }
+    const symbol = selectedToken.token.symbol;
+    // Stablecoins are ~$1
+    if (['USDC', 'USDT', 'DAI'].includes(symbol)) {
+      setUsdPrice(1);
+      return;
+    }
+    const id = COINGECKO_IDS[symbol];
+    if (!id) { setUsdPrice(null); return; }
+    let cancelled = false;
+    fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`)
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setUsdPrice(data[id]?.usd || null); })
+      .catch(() => { if (!cancelled) setUsdPrice(null); });
+    return () => { cancelled = true; };
+  }, [selectedToken?.token.symbol]);
 
   const handleTokenSelect = useCallback((balance: TokenBalance) => {
     setSelectedToken(balance);
@@ -73,7 +114,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
   }, [selectedToken]);
 
   const handleSendDonation = useCallback(async () => {
-    if (!selectedToken || !amount || !canSendTx) return;
+    if (!selectedToken || !amount || !canSendTx || !effectiveAddress) return;
 
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
@@ -81,9 +122,9 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
     sendDonation({
       token: selectedToken.token,
       amount,
-      recipientAddress: recipientAddress as Address,
+      recipientAddress: effectiveAddress as Address,
     });
-  }, [selectedToken, amount, recipientAddress, canSendTx, sendDonation]);
+  }, [selectedToken, amount, effectiveAddress, canSendTx, sendDonation]);
 
   // Record the donation in the backend after success
   const handleDone = useCallback(async () => {
@@ -245,31 +286,49 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
           <div className="bg-white/5 rounded-xl p-3 border border-white/10">
             <div className="flex items-center justify-between">
               <span className="text-white/40 text-xs">Sending to</span>
-              <a
-                href={`${getExplorerUrl(chainId || 1)}/address/${recipientAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white/40 hover:text-white/60 transition-colors"
-              >
-                <ExternalLink size={12} />
-              </a>
+              {effectiveAddress && (
+                <a
+                  href={`${getExplorerUrl(chainId || 1)}/address/${effectiveAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/40 hover:text-white/60 transition-colors"
+                >
+                  <ExternalLink size={12} />
+                </a>
+              )}
             </div>
-            <code className="text-[#ff393a] font-mono text-xs break-all">
-              {recipientAddress}
-            </code>
+            {isENS && (
+              <p className="text-white/70 text-sm font-medium mb-1">{recipientAddress}</p>
+            )}
+            {ensLoading && isENS && (
+              <p className="text-white/40 text-xs">Resolving ENS name...</p>
+            )}
+            {effectiveAddress && (
+              <code className="text-[#ff393a] font-mono text-xs break-all">
+                {effectiveAddress}
+              </code>
+            )}
+            {!effectiveAddress && !ensLoading && isENS && (
+              <p className="text-yellow-400 text-xs">Could not resolve ENS name</p>
+            )}
+            {!isENS && !isValidAddress && (
+              <code className="text-[#ff393a] font-mono text-xs break-all">
+                {recipientAddress}
+              </code>
+            )}
           </div>
 
           {/* Unsupported chain warning */}
           {chainId && !supportedChainIds.includes(chainId) && (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-yellow-400 text-sm">
-              This chain is not supported. Please switch to Ethereum or Base.
+              This chain is not supported. Please switch to Ethereum, Base, or Monad.
             </div>
           )}
 
-          {/* ENS without resolved address info */}
-          {isENS && !isValidAddress && (
+          {/* ENS resolution failed */}
+          {isENS && !ensLoading && !resolvedEnsAddress && (
             <div className="bg-[#627eea]/10 border border-[#627eea]/30 rounded-xl p-3 text-[#627eea] text-sm">
-              ENS names require a resolved address. Please ask the host to provide an Ethereum address.
+              Could not resolve ENS name. You can still copy the address and send manually.
             </div>
           )}
 
@@ -313,26 +372,34 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                       Max
                     </button>
                   </div>
-                  <p className="text-white/30 text-xs">
-                    Balance: {parseFloat(selectedToken.formatted).toFixed(
-                      selectedToken.token.decimals <= 6 ? 2 : 4
-                    )} {selectedToken.token.symbol}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-white/30 text-xs">
+                      Balance: {parseFloat(selectedToken.formatted).toFixed(
+                        selectedToken.token.decimals <= 6 ? 2 : 4
+                      )} {selectedToken.token.symbol}
+                    </p>
+                    {usdPrice && amount && parseFloat(amount) > 0 && (
+                      <p className="text-white/40 text-xs">
+                        &asymp; ${(parseFloat(amount) * usdPrice).toFixed(2)} USD
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Send button */}
-              {selectedToken && amount && parseFloat(amount) > 0 && canSendTx && (
+              {selectedToken && (
                 <button
                   type="button"
                   onClick={handleSendDonation}
-                  className="w-full btn-primary flex items-center justify-center gap-2"
+                  disabled={!amount || parseFloat(amount) <= 0 || !canSendTx || ensLoading}
+                  className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-white">
                     <path d="M12 1.5L5.5 12.5L12 16.5L18.5 12.5L12 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M5.5 12.5L12 22.5L18.5 12.5L12 16.5L5.5 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Send {amount} {selectedToken.token.symbol}
+                  Send {amount && parseFloat(amount) > 0 ? `${amount} ${selectedToken.token.symbol}` : selectedToken.token.symbol}
                 </button>
               )}
             </>
