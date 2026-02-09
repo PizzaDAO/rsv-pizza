@@ -119,6 +119,8 @@ export interface UpdatePartyData {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  musicEnabled?: boolean;
+  musicNotes?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -183,6 +185,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       photoModeration: data.photoModeration,
       nftEnabled: data.nftEnabled,
       nftChain: data.nftChain,
+      musicEnabled: data.musicEnabled,
+      musicNotes: data.musicNotes,
     },
   });
 }

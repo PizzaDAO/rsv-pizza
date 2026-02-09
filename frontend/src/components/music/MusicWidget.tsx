@@ -10,6 +10,7 @@ import {
   CreatePerformerData,
   UpdatePerformerData,
 } from '../../lib/api';
+import { updateParty } from '../../lib/supabase';
 import { PerformerCard } from './PerformerCard';
 import { PerformerForm, PerformerFormData } from './PerformerForm';
 import { SongCard } from './SongCard';
@@ -17,7 +18,7 @@ import { SongForm, SongFormData } from './SongForm';
 import { PlaylistCard } from './PlaylistCard';
 import { PlaylistForm, PlaylistFormData } from './PlaylistForm';
 import { LineupOverview } from './LineupOverview';
-import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload, Share2, Check } from 'lucide-react';
+import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload, Share2, Check, Eye, EyeOff } from 'lucide-react';
 
 interface MusicWidgetProps {
   isHost?: boolean;
@@ -136,6 +137,18 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
     loadLocalMusicData();
   }, [loadPerformers, loadLocalMusicData]);
 
+  // Toggle music visibility for guests
+  const handleToggleMusicEnabled = async () => {
+    if (!effectivePartyId) return;
+    const newValue = !musicEnabled;
+    setMusicEnabled(newValue); // Optimistic update
+    const success = await updateParty(effectivePartyId, { music_enabled: newValue });
+    if (!success) {
+      setMusicEnabled(!newValue); // Revert on failure
+      setError('Failed to update music visibility');
+    }
+  };
+
   // ============================================
   // Performer handlers
   // ============================================
@@ -250,11 +263,14 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
     setSavingSong(true);
 
     try {
+      // Strip non-serializable file from formData before saving
+      const { file, ...savableData } = formData;
+
       if (editingSong) {
         // Update existing song
         const updatedSongs = songs.map(s =>
           s.id === editingSong.id
-            ? { ...s, ...formData }
+            ? { ...s, ...savableData }
             : s
         );
         saveSongsToLocal(updatedSongs);
@@ -263,10 +279,11 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
         const newSong: Song = {
           id: `song_${Date.now()}`,
           partyId: effectivePartyId,
-          title: formData.title,
-          artist: formData.artist,
-          platform: formData.platform,
-          url: formData.url || null,
+          title: savableData.title,
+          artist: savableData.artist,
+          platform: savableData.platform,
+          url: savableData.url || null,
+          fileUrl: null,
           addedBy: null,
           sortOrder: songs.length,
           createdAt: new Date().toISOString(),
@@ -382,31 +399,45 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
           <h2 className="text-lg font-semibold text-white">Music</h2>
         </div>
         {isHost && (
-          <button
-            onClick={() => {
-              const inviteCode = pizzaContext?.party?.inviteCode;
-              if (!inviteCode) return;
-              const djUrl = `${window.location.origin}/dj/${inviteCode}`;
-              navigator.clipboard.writeText(djUrl).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              });
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-sm text-white/70 hover:text-white transition-colors"
-            title="Copy DJ share link"
-          >
-            {copied ? (
-              <>
-                <Check size={14} className="text-green-400" />
-                <span className="text-green-400">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Share2 size={14} />
-                <span>Share with DJ</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleMusicEnabled}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+                musicEnabled
+                  ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
+                  : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white/60'
+              }`}
+              title={musicEnabled ? 'Music visible to guests' : 'Music hidden from guests'}
+            >
+              {musicEnabled ? <Eye size={14} /> : <EyeOff size={14} />}
+              <span className="hidden sm:inline">{musicEnabled ? 'Visible' : 'Hidden'}</span>
+            </button>
+            <button
+              onClick={() => {
+                const inviteCode = pizzaContext?.party?.inviteCode;
+                if (!inviteCode) return;
+                const djUrl = `${window.location.origin}/dj/${inviteCode}`;
+                navigator.clipboard.writeText(djUrl).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-sm text-white/70 hover:text-white transition-colors"
+              title="Copy DJ share link"
+            >
+              {copied ? (
+                <>
+                  <Check size={14} className="text-green-400" />
+                  <span className="text-green-400">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 size={14} />
+                  <span>Share with DJ</span>
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 

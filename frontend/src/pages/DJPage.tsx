@@ -6,6 +6,7 @@ import { getEventBySlug, PublicEvent, getPerformers } from '../lib/api';
 import { Performer, Song, Playlist, MusicPlatform, PerformerType } from '../types';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { PlatformIcon } from '../components/music/SongCard';
 
 // Type icons
 const typeIcons: Record<PerformerType, string> = {
@@ -20,15 +21,6 @@ const typeLabels: Record<PerformerType, string> = {
   live_band: 'Live Band',
   solo: 'Solo Artist',
   playlist: 'Playlist',
-};
-
-// Platform icons
-const platformIcons: Record<MusicPlatform, string> = {
-  spotify: '\uD83D\uDFE2',
-  apple_music: '\uD83C\uDF4E',
-  youtube: '\uD83D\uDCFA',
-  soundcloud: '\uD83C\uDF25\uFE0F',
-  other: '\uD83C\uDFB5',
 };
 
 const platformLabels: Record<MusicPlatform, string> = {
@@ -336,7 +328,9 @@ export function DJPage() {
                   key={song.id}
                   className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center gap-3"
                 >
-                  <span className="text-lg flex-shrink-0">{platformIcons[song.platform]}</span>
+                  <div className="flex-shrink-0">
+                    <PlatformIcon platform={song.platform} size={20} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium text-sm truncate">{song.title}</p>
                     <p className="text-white/60 text-xs truncate">{song.artist}</p>
@@ -376,7 +370,9 @@ export function DJPage() {
                   className="block bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/[0.07] transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl flex-shrink-0">{platformIcons[playlist.platform]}</span>
+                    <div className="flex-shrink-0">
+                      <PlatformIcon platform={playlist.platform} size={22} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-medium truncate">{playlist.name}</p>
                       <p className="text-white/50 text-sm">{platformLabels[playlist.platform]}</p>

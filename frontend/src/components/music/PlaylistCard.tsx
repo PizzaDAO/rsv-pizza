@@ -1,6 +1,7 @@
 import React from 'react';
 import { Playlist, MusicPlatform } from '../../types';
-import { Edit2, Trash2, ExternalLink, ListMusic } from 'lucide-react';
+import { Edit2, Trash2, ExternalLink } from 'lucide-react';
+import { PlatformIcon } from './SongCard';
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -8,15 +9,6 @@ interface PlaylistCardProps {
   onDelete: (playlistId: string) => void;
   isHost?: boolean;
 }
-
-// Platform icons with emoji
-const platformIcons: Record<MusicPlatform, string> = {
-  spotify: '\uD83D\uDFE2',
-  apple_music: '\uD83C\uDF4E',
-  youtube: '\uD83D\uDCFA',
-  soundcloud: '\uD83C\uDF25\uFE0F',
-  other: '\uD83C\uDFB5',
-};
 
 // Platform labels
 const platformLabels: Record<MusicPlatform, string> = {
@@ -42,7 +34,6 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
   onDelete,
   isHost = false,
 }) => {
-  const platformIcon = platformIcons[playlist.platform];
   const platformLabel = platformLabels[playlist.platform];
   const platformStyle = platformColors[playlist.platform];
 
@@ -51,15 +42,15 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
       <div className="flex items-start gap-3">
         {/* Platform Icon */}
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${platformStyle.bg}`}>
-          <ListMusic size={20} className={platformStyle.text} />
+          <PlatformIcon platform={playlist.platform} size={22} />
         </div>
 
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h4 className="text-white font-medium truncate">{playlist.name}</h4>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${platformStyle.bg} ${platformStyle.text}`}>
-              {platformIcon} {platformLabel}
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${platformStyle.bg} ${platformStyle.text}`}>
+              <PlatformIcon platform={playlist.platform} size={12} /> {platformLabel}
             </span>
           </div>
           {playlist.description && (

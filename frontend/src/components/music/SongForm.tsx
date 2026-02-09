@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Song, MusicPlatform } from '../../types';
 import { IconInput } from '../IconInput';
 import { X, Loader2, Music, Link as LinkIcon, Upload, User } from 'lucide-react';
+import { PlatformIcon } from './SongCard';
 
 interface SongFormProps {
   song?: Song | null;
@@ -69,15 +70,22 @@ export const SongForm: React.FC<SongFormProps> = ({
   };
 
   const handleChange = (field: keyof SongFormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-
     // Auto-detect platform when URL changes
     if (field === 'url' && value) {
       const detectedPlatform = detectPlatform(value);
-      if (detectedPlatform !== formData.platform) {
-        setFormData((prev) => ({ ...prev, platform: detectedPlatform }));
-      }
+      setFormData((prev) => ({ ...prev, [field]: value, platform: detectedPlatform }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  // Platform labels for display
+  const platformLabels: Record<MusicPlatform, string> = {
+    spotify: 'Spotify',
+    apple_music: 'Apple Music',
+    youtube: 'YouTube',
+    soundcloud: 'SoundCloud',
+    other: 'Link',
   };
 
 
@@ -146,8 +154,15 @@ export const SongForm: React.FC<SongFormProps> = ({
           <IconInput icon={User} type="text" value={formData.artist} onChange={(e) => handleChange('artist', e.target.value)} placeholder="Artist name" required />
 
           {/* URL */}
-          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange("url", e.target.value)} placeholder="Paste a link (Spotify, Apple Music, YouTube, etc.)" />
-
+          <div>
+            <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange("url", e.target.value)} placeholder="Paste a link (Spotify, Apple Music, YouTube, etc.)" />
+            {formData.url && formData.platform !== 'other' && (
+              <div className="flex items-center gap-1.5 mt-1.5 ml-1">
+                <PlatformIcon platform={formData.platform} size={14} />
+                <span className="text-xs text-white/50">{platformLabels[formData.platform]} detected</span>
+              </div>
+            )}
+          </div>
 
           {/* File Upload */}
           <div

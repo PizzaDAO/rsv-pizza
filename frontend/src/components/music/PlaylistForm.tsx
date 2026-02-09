@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Playlist, MusicPlatform } from '../../types';
 import { IconInput } from '../IconInput';
 import { X, Loader2, ListMusic, Link as LinkIcon, FileText } from 'lucide-react';
+import { PlatformIcon } from './SongCard';
 
 interface PlaylistFormProps {
   playlist?: Playlist | null;
@@ -26,13 +27,14 @@ const defaultFormData: PlaylistFormData = {
   description: '',
 };
 
-const platformOptions: { value: MusicPlatform; label: string; icon: string; placeholder: string }[] = [
-  { value: 'spotify', label: 'Spotify', icon: '\uD83D\uDFE2', placeholder: 'https://open.spotify.com/playlist/...' },
-  { value: 'apple_music', label: 'Apple Music', icon: '\uD83C\uDF4E', placeholder: 'https://music.apple.com/playlist/...' },
-  { value: 'youtube', label: 'YouTube', icon: '\uD83D\uDCFA', placeholder: 'https://youtube.com/playlist?list=...' },
-  { value: 'soundcloud', label: 'SoundCloud', icon: '\uD83C\uDF25\uFE0F', placeholder: 'https://soundcloud.com/user/sets/...' },
-  { value: 'other', label: 'Other', icon: '\uD83C\uDFB5', placeholder: 'Paste playlist URL' },
-];
+// Platform labels
+const platformLabels: Record<MusicPlatform, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+  other: 'Link',
+};
 
 // Detect platform from URL
 function detectPlatform(url: string): MusicPlatform {
@@ -73,21 +75,18 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
   };
 
   const handleChange = (field: keyof PlaylistFormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-
     // Auto-detect platform when URL changes
     if (field === 'url' && value) {
       const detectedPlatform = detectPlatform(value);
-      if (detectedPlatform !== formData.platform) {
-        setFormData((prev) => ({ ...prev, platform: detectedPlatform }));
-      }
+      setFormData((prev) => ({ ...prev, [field]: value, platform: detectedPlatform }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
     }
   };
 
   if (!isOpen) return null;
 
   const isEditing = !!playlist;
-  const currentPlatform = platformOptions.find(p => p.value === formData.platform);
 
   return createPortal(
     <div
@@ -118,29 +117,16 @@ export const PlaylistForm: React.FC<PlaylistFormProps> = ({
           {/* Playlist Name */}
           <IconInput icon={ListMusic} type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Playlist name" required />
 
-          {/* Platform */}
+          {/* URL with auto-detect */}
           <div>
-            <div className="flex flex-wrap gap-2">
-              {platformOptions.map((platform) => (
-                <button
-                  key={platform.value}
-                  type="button"
-                  onClick={() => handleChange('platform', platform.value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 ${
-                    formData.platform === platform.value
-                      ? 'bg-[#ff393a] text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20'
-                  }`}
-                >
-                  <span>{platform.icon}</span>
-                  <span>{platform.label}</span>
-                </button>
-              ))}
-            </div>
+            <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange('url', e.target.value)} placeholder="Paste a link (Spotify, Apple Music, YouTube, etc.)" required />
+            {formData.url && formData.platform !== 'other' && (
+              <div className="flex items-center gap-1.5 mt-1.5 ml-1">
+                <PlatformIcon platform={formData.platform} size={14} />
+                <span className="text-xs text-white/50">{platformLabels[formData.platform]} detected</span>
+              </div>
+            )}
           </div>
-
-          {/* URL */}
-          <IconInput icon={LinkIcon} type="url" value={formData.url} onChange={(e) => handleChange('url', e.target.value)} placeholder={currentPlatform?.placeholder || 'Paste playlist URL'} required />
 
           {/* Description */}
           <IconInput icon={FileText} multiline rows={2} value={formData.description} onChange={(e) => handleChange('description', e.target.value)} placeholder="Optional description..." />
