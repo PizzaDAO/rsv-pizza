@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Plus } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
-import { Pizzeria } from '../types';
+import { Pizzeria, DonationPublicStats } from '../types';
 import { IconInput } from '../components/IconInput';
+import { DonationForm } from '../components/DonationForm';
+import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 
 export function RSVPPage() {
@@ -22,6 +24,10 @@ export function RSVPPage() {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
   const [step, setStep] = useState(1); // 1 or 2
+  const [guestId, setGuestId] = useState<string | null>(null);
+  const [donationsEnabled, setDonationsEnabled] = useState(false);
+  const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
+  const [showDonationForm, setShowDonationForm] = useState(false);
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -104,6 +110,11 @@ export function RSVPPage() {
           setParty(foundParty);
           setAvailableBeverages(foundParty.available_beverages || []);
           setAvailableToppings(foundParty.available_toppings || []);
+
+          // Check if donations are enabled
+          const stats = await getDonationStats(foundParty.id);
+          setDonationStats(stats);
+          setDonationsEnabled(stats?.enabled || false);
 
           // Check if party has password protection
           if (foundParty.has_password) {
@@ -277,6 +288,9 @@ export function RSVPPage() {
         }
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
+        setGuestId(result.guest?.id || null);
+
+        // Go directly to success - donation is handled on step 2
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -786,6 +800,55 @@ export function RSVPPage() {
           {error && (
             <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Donation Option - only show if donations are enabled */}
+          {donationsEnabled && donationStats && !showDonationForm && (
+            <div className="border-t border-white/10 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowDonationForm(true)}
+                className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-[#ff393a]/10 to-[#ff6b6b]/10 rounded-xl border border-[#ff393a]/20 hover:border-[#ff393a]/40 transition-all"
+              >
+                <div className="w-12 h-12 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30 flex-shrink-0">
+                  <Heart size={24} className="text-[#ff393a]" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-white font-medium">Donate</p>
+                  <p className="text-white/50 text-sm">
+                    {donationStats.message || 'Make a donation to help make this event possible'}
+                  </p>
+                </div>
+                <ChevronRight size={20} className="text-white/40" />
+              </button>
+            </div>
+          )}
+
+          {/* Donation Form - shows when user clicks to donate */}
+          {donationsEnabled && donationStats && showDonationForm && (
+            <div className="border-t border-white/10 pt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30">
+                  <Heart size={20} className="text-[#ff393a]" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Make a Donation</h3>
+                  <p className="text-white/50 text-sm">
+                    {donationStats.recipient ? (
+                      <>Buy Pizza for {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
+                    ) : 'Buy Pizza for this event'}
+                  </p>
+                </div>
+              </div>
+              <DonationForm
+                partyId={party!.id}
+                stats={donationStats}
+                guestName={name}
+                guestEmail={email}
+                onSuccess={() => setShowDonationForm(false)}
+                onCancel={() => setShowDonationForm(false)}
+              />
             </div>
           )}
 

@@ -152,6 +152,55 @@ export interface Party {
   shareTweetText?: string | null;
   createdAt: string;
   guests: Guest[];
+  // Donation settings
+  donationEnabled?: boolean;
+  donationGoal?: number | null;
+  donationMessage?: string | null;
+  suggestedAmounts?: number[];
+  donationRecipient?: string | null;
+  donationRecipientUrl?: string | null;
+  donationEthAddress?: string | null;
+}
+
+export interface Donation {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+  paymentIntentId?: string;
+  chargeId?: string;
+  donorName?: string;
+  donorEmail?: string;
+  isAnonymous: boolean;
+  message?: string;
+  partyId: string;
+  guestId?: string;
+  // Crypto donation fields
+  paymentMethod?: 'stripe' | 'crypto';
+  chainId?: number;
+  tokenSymbol?: string;
+  tokenAddress?: string;
+  txHash?: string;
+  walletAddress?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DonationPublicStats {
+  enabled: boolean;
+  totalAmount?: number;
+  donorCount?: number;
+  goal?: number | null;
+  message?: string | null;
+  recipient?: string | null;
+  recipientUrl?: string | null;
+  suggestedAmounts?: number[];
+  donationEthAddress?: string | null;
+  recentDonors?: {
+    name: string | null;
+    message: string | null;
+    createdAt: string;
+  }[];
 }
 
 // Ordering types

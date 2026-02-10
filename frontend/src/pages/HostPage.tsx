@@ -11,6 +11,7 @@ import { BeverageSettings } from '../components/BeverageSettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
+import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 
 // Super admin email that can edit any party
@@ -201,6 +202,7 @@ function HostPageContent() {
             {activeTab === 'guests' && (
               <>
                 <GuestList />
+                <DonationSummary />
               </>
             )}
 

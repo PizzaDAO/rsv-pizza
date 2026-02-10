@@ -242,6 +242,13 @@ export interface DbParty {
   share_to_unlock?: boolean;
   share_tweet_text?: string | null;
   created_at: string;
+  donation_enabled?: boolean;
+  donation_goal?: number | null;
+  donation_message?: string | null;
+  suggested_amounts?: number[];
+  donation_recipient?: string | null;
+  donation_recipient_url?: string | null;
+  donation_eth_address?: string | null;
 }
 
 export interface DbGuest {
@@ -510,7 +517,8 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
     require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
-    share_to_unlock, share_tweet_text
+    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
+    donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text
   `;
 
   let party: DbParty | null = null;
@@ -985,6 +993,13 @@ export async function updateParty(
     available_beverages?: string[];
     available_toppings?: string[];
     selected_pizzerias?: any[];  // Pizzeria objects
+    donation_enabled?: boolean;
+    donation_goal?: number | null;
+    donation_message?: string | null;
+    suggested_amounts?: number[];
+    donation_recipient?: string | null;
+    donation_recipient_url?: string | null;
+    donation_eth_address?: string | null;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
   }
@@ -1010,6 +1025,13 @@ export async function updateParty(
         description: updates.description,
         customUrl: updates.custom_url,
         coHosts: updates.co_hosts,
+        donationEnabled: updates.donation_enabled,
+        donationGoal: updates.donation_goal,
+        donationMessage: updates.donation_message,
+        suggestedAmounts: updates.suggested_amounts,
+        donationRecipient: updates.donation_recipient,
+        donationRecipientUrl: updates.donation_recipient_url,
+        donationEthAddress: updates.donation_eth_address,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
       });
