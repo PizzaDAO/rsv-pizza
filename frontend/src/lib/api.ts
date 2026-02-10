@@ -278,6 +278,11 @@ export interface PublicEvent {
   eventType?: string | null;
   eventTags?: string[];
   donationEnabled?: boolean;
+  donationRecipient?: string | null;
+  donationGoal?: number | null;
+  donationMessage?: string | null;
+  suggestedAmounts?: number[];
+  donationEthAddress?: string | null;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
 }
