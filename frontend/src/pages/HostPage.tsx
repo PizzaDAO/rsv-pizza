@@ -11,6 +11,7 @@ import { BeverageSettings } from '../components/BeverageSettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
+import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
@@ -174,7 +175,7 @@ function HostPageContent() {
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    // { id: 'photos' as TabType, label: 'Photos', icon: Camera }, // temporarily disabled
   ];
 
   return (
@@ -211,6 +212,7 @@ function HostPageContent() {
             {activeTab === 'guests' && (
               <>
                 <GuestList />
+                <DonationSummary />
               </>
             )}
 

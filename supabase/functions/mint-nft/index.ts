@@ -1,12 +1,40 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createPublicClient, createWalletClient, http, parseAbi } from 'https://esm.sh/viem@2.21.0';
+import { createPublicClient, createWalletClient, http, parseAbi, defineChain } from 'https://esm.sh/viem@2.21.0';
 import { privateKeyToAccount } from 'https://esm.sh/viem@2.21.0/accounts';
 import { base, mainnet } from 'https://esm.sh/viem@2.21.0/chains';
 import { normalize } from 'https://esm.sh/viem@2.21.0/ens';
 
 const MINTER_PRIVATE_KEY = Deno.env.get('MINTER_PRIVATE_KEY') || '';
-const NFT_CONTRACT_ADDRESS = Deno.env.get('NFT_CONTRACT_ADDRESS') || '';
+const BASE_NFT_CONTRACT_ADDRESS = Deno.env.get('BASE_NFT_CONTRACT_ADDRESS') || Deno.env.get('NFT_CONTRACT_ADDRESS') || '';
 const BASE_RPC_URL = Deno.env.get('BASE_RPC_URL') || 'https://mainnet.base.org';
+const MONAD_NFT_CONTRACT_ADDRESS = Deno.env.get('MONAD_NFT_CONTRACT_ADDRESS') || '';
+const MONAD_RPC_URL = Deno.env.get('MONAD_RPC_URL') || 'https://rpc.monad.xyz';
+
+// Monad chain definition (not yet built into viem)
+const monad = defineChain({
+  id: 143,
+  name: 'Monad',
+  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://rpc.monad.xyz'] },
+  },
+});
+
+// Chain configuration map
+const CHAIN_CONFIG = {
+  base: {
+    chain: base,
+    contractAddress: BASE_NFT_CONTRACT_ADDRESS,
+    rpcUrl: BASE_RPC_URL,
+  },
+  monad: {
+    chain: monad,
+    contractAddress: MONAD_NFT_CONTRACT_ADDRESS,
+    rpcUrl: MONAD_RPC_URL,
+  },
+} as const;
+
+type SupportedChain = keyof typeof CHAIN_CONFIG;
 
 // Allowed origins for CORS
 const ALLOWED_ORIGINS = [
@@ -48,6 +76,7 @@ interface MintRequest {
   partyAddress: string | null;
   imageUrl: string;
   inviteCode: string;
+  chain?: SupportedChain;
 }
 
 serve(async (req) => {
@@ -60,15 +89,32 @@ serve(async (req) => {
   }
 
   try {
-    if (!MINTER_PRIVATE_KEY || !NFT_CONTRACT_ADDRESS) {
+    if (!MINTER_PRIVATE_KEY) {
       return new Response(
-        JSON.stringify({ error: 'NFT minting not configured' }),
+        JSON.stringify({ error: 'NFT minting not configured (missing minter key)' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const request: MintRequest = await req.json();
-    const { recipient, partyId, guestName, partyName, partyDate, partyVenue, partyAddress, imageUrl, inviteCode } = request;
+    const { recipient, partyId } = request;
+
+    // Select chain config (default to base for backwards compatibility)
+    const selectedChain: SupportedChain = request.chain || 'base';
+    if (!CHAIN_CONFIG[selectedChain]) {
+      return new Response(
+        JSON.stringify({ error: `Unsupported chain: ${selectedChain}. Supported: ${Object.keys(CHAIN_CONFIG).join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const chainConfig = CHAIN_CONFIG[selectedChain];
+    if (!chainConfig.contractAddress) {
+      return new Response(
+        JSON.stringify({ error: `NFT contract not configured for chain: ${selectedChain}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate recipient address or ENS name
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
@@ -111,14 +157,14 @@ serve(async (req) => {
 
     // Setup viem public client early for idempotency check
     const publicClient = createPublicClient({
-      chain: base,
-      transport: http(BASE_RPC_URL),
+      chain: chainConfig.chain,
+      transport: http(chainConfig.rpcUrl),
     });
 
     // Idempotency check: see if wallet already has an NFT for this event
     try {
       const hasExistingToken = await publicClient.readContract({
-        address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+        address: chainConfig.contractAddress as `0x${string}`,
         abi: NFT_ABI,
         functionName: 'hasToken',
         args: [resolvedAddress as `0x${string}`, partyId],
@@ -127,7 +173,7 @@ serve(async (req) => {
       if (hasExistingToken) {
         // Get existing token ID
         const existingTokenId = await publicClient.readContract({
-          address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+          address: chainConfig.contractAddress as `0x${string}`,
           abi: NFT_ABI,
           functionName: 'tokenOfOwner',
           args: [resolvedAddress as `0x${string}`, partyId],
@@ -139,6 +185,8 @@ serve(async (req) => {
             alreadyMinted: true,
             tokenId: existingTokenId.toString(),
             message: 'NFT already exists for this wallet and event',
+            chain: selectedChain,
+            chainId: chainConfig.chain.id,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -148,35 +196,21 @@ serve(async (req) => {
       console.log('Could not check existing token, proceeding with mint:', e);
     }
 
-    // Build NFT metadata
-    const metadata = {
-      name: partyName,
-      description: `Proof of attendance at ${partyName}`,
-      image: imageUrl,
-      external_url: `https://rsv.pizza/${inviteCode}`,
-      attributes: [
-        { trait_type: 'Party Name', value: partyName },
-        ...(partyDate ? [{ trait_type: 'Party Date', value: partyDate }] : []),
-        ...(partyVenue ? [{ trait_type: 'Venue', value: partyVenue }] : []),
-        ...(partyAddress ? [{ trait_type: 'Location', value: partyAddress }] : []),
-      ],
-    };
-
-    // Create data URI for metadata
-    const metadataUri = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+    // Use API URL for metadata - allows metadata to auto-update when event details change
+    const metadataUri = `https://backend-pizza-dao.vercel.app/api/nft/metadata/${partyId}/${resolvedAddress}`;
 
     // Setup wallet client for minting (publicClient already created above)
     const account = privateKeyToAccount(MINTER_PRIVATE_KEY as `0x${string}`);
 
     const walletClient = createWalletClient({
       account,
-      chain: base,
-      transport: http(BASE_RPC_URL),
+      chain: chainConfig.chain,
+      transport: http(chainConfig.rpcUrl),
     });
 
     // Mint the NFT
     const txHash = await walletClient.writeContract({
-      address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+      address: chainConfig.contractAddress as `0x${string}`,
       abi: NFT_ABI,
       functionName: 'mintOrUpdate',
       args: [resolvedAddress as `0x${string}`, partyId, metadataUri],
@@ -189,7 +223,7 @@ serve(async (req) => {
     let tokenId: string | null = null;
     try {
       const tokenIdBigInt = await publicClient.readContract({
-        address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+        address: chainConfig.contractAddress as `0x${string}`,
         abi: NFT_ABI,
         functionName: 'tokenOfOwner',
         args: [resolvedAddress as `0x${string}`, partyId],
@@ -205,6 +239,8 @@ serve(async (req) => {
         txHash,
         tokenId,
         blockNumber: receipt.blockNumber.toString(),
+        chain: selectedChain,
+        chainId: chainConfig.chain.id,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

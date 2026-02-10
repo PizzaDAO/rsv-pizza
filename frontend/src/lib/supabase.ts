@@ -242,7 +242,16 @@ export interface DbParty {
   share_to_unlock?: boolean;
   share_tweet_text?: string | null;
   photo_moderation?: boolean;
+  nft_enabled?: boolean;
+  nft_chain?: string | null;
   created_at: string;
+  donation_enabled?: boolean;
+  donation_goal?: number | null;
+  donation_message?: string | null;
+  suggested_amounts?: number[];
+  donation_recipient?: string | null;
+  donation_recipient_url?: string | null;
+  donation_eth_address?: string | null;
 }
 
 export interface DbGuest {
@@ -511,7 +520,9 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
     require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
-    share_to_unlock, share_tweet_text, photo_moderation
+    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
+    donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
+    photo_moderation, nft_enabled, nft_chain
   `;
 
   let party: DbParty | null = null;
@@ -561,14 +572,31 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
 }
 
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
-  const { data: party, error: partyError } = await supabase
+  // Try custom URL first, then invite code (same pattern as getPartyByInviteCodeOrCustomUrl)
+  let party: DbParty | null = null;
+
+  const { data: customUrlData } = await supabase
     .from('parties')
     .select('*')
-    .eq('invite_code', inviteCode)
-    .single();
+    .eq('custom_url', inviteCode)
+    .maybeSingle();
 
-  if (partyError || !party) {
-    console.error('Error fetching party:', partyError);
+  if (customUrlData) {
+    party = customUrlData;
+  } else {
+    const { data: inviteCodeData, error: partyError } = await supabase
+      .from('parties')
+      .select('*')
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+
+    if (partyError) {
+      console.error('Error fetching party:', partyError);
+    }
+    party = inviteCodeData;
+  }
+
+  if (!party) {
     return null;
   }
 
@@ -969,9 +997,18 @@ export async function updateParty(
     available_beverages?: string[];
     available_toppings?: string[];
     selected_pizzerias?: any[];  // Pizzeria objects
+    donation_enabled?: boolean;
+    donation_goal?: number | null;
+    donation_message?: string | null;
+    suggested_amounts?: number[];
+    donation_recipient?: string | null;
+    donation_recipient_url?: string | null;
+    donation_eth_address?: string | null;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
     photo_moderation?: boolean;
+    nft_enabled?: boolean;
+    nft_chain?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -995,9 +1032,18 @@ export async function updateParty(
         description: updates.description,
         customUrl: updates.custom_url,
         coHosts: updates.co_hosts,
+        donationEnabled: updates.donation_enabled,
+        donationGoal: updates.donation_goal,
+        donationMessage: updates.donation_message,
+        suggestedAmounts: updates.suggested_amounts,
+        donationRecipient: updates.donation_recipient,
+        donationRecipientUrl: updates.donation_recipient_url,
+        donationEthAddress: updates.donation_eth_address,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
         photoModeration: updates.photo_moderation,
+        nftEnabled: updates.nft_enabled,
+        nftChain: updates.nft_chain,
       });
       return true;
     } catch (error) {

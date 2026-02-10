@@ -13,6 +13,82 @@ const isValidTransactionHash = (hash: string): boolean => {
   return /^0x[a-fA-F0-9]{64}$/.test(hash);
 };
 
+// GET /api/nft/metadata/:partyId/:address - Public NFT metadata (ERC721 standard)
+// Called by NFT marketplaces (OpenSea, etc.) to display token metadata
+router.get('/metadata/:partyId/:address', async (req, res) => {
+  try {
+    const { partyId, address } = req.params;
+
+    // Validate ethereum address format
+    if (!isValidEthereumAddress(address)) {
+      return res.status(400).json({ error: 'Invalid ethereum address' });
+    }
+
+    // Look up party
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: {
+        name: true,
+        eventImageUrl: true,
+        date: true,
+        venueName: true,
+        address: true,
+        customUrl: true,
+        inviteCode: true,
+      },
+    });
+
+    if (!party) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Look up guest by party + ethereum address (case-insensitive)
+    const guest = await prisma.guest.findFirst({
+      where: {
+        partyId,
+        ethereumAddress: { equals: address, mode: 'insensitive' },
+      },
+      select: { name: true },
+    });
+
+    // Build ERC721-standard metadata
+    const eventUrl = party.customUrl || party.inviteCode;
+    const attributes: Array<{ trait_type: string; value: string }> = [
+      { trait_type: 'Event', value: party.name },
+    ];
+
+    if (party.date) {
+      attributes.push({
+        trait_type: 'Date',
+        value: party.date.toISOString().split('T')[0],
+      });
+    }
+    if (party.venueName) {
+      attributes.push({ trait_type: 'Venue', value: party.venueName });
+    }
+    if (party.address) {
+      attributes.push({ trait_type: 'Location', value: party.address });
+    }
+    if (guest?.name) {
+      attributes.push({ trait_type: 'Guest', value: guest.name });
+    }
+
+    const metadata = {
+      name: party.name,
+      description: `Proof of attendance at ${party.name}`,
+      image: party.eventImageUrl || '',
+      external_url: `https://rsv.pizza/${eventUrl}`,
+      attributes,
+    };
+
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json(metadata);
+  } catch (error) {
+    console.error('Failed to get NFT metadata:', error);
+    res.status(500).json({ error: 'Failed to get NFT metadata' });
+  }
+});
+
 // PATCH /api/nft/guest/:guestId - Save NFT data after minting
 // Requires email verification to prevent unauthorized updates
 router.patch('/guest/:guestId', async (req, res) => {
