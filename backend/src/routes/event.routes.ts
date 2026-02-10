@@ -88,6 +88,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           eventType: true,
           eventTags: true,
           donationEnabled: true,
+          donationRecipient: true,
+          donationRecipientUrl: true,
           shareToUnlock: true,
           shareTweetText: true,
           nftEnabled: true,
