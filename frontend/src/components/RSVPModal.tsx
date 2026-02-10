@@ -320,8 +320,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         // Notify parent to refresh data
         onRSVPSuccess?.();
 
-        // Auto-mint NFT if wallet address provided, event has an image, and NFT is enabled (backward compat: undefined = enabled)
-        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id && event.nftEnabled !== false) {
+        // Auto-mint NFT if wallet address provided and event has an image (idempotent — returns existing token if already minted)
+        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
           setMintStatus('minting');
           try {
             const mintRes = await mintNFT({
