@@ -399,7 +399,7 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
 });
 
 // DELETE /api/parties/:partyId/photos/:photoId - Delete a photo (host or uploader)
-router.delete('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
     const { uploaderEmail } = req.query;

@@ -27,6 +27,7 @@ function HostPageContent() {
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
+  const [photoModerationEnabled, setPhotoModerationEnabled] = useState(false);
 
   // Check if current user can edit this party (only valid after auth and party have loaded)
   const canEdit = useMemo(() => {
@@ -44,6 +45,13 @@ function HostPageContent() {
     }
     return false;
   }, [party, user]);
+
+  // Sync photo moderation state from party
+  useEffect(() => {
+    if (party) {
+      setPhotoModerationEnabled(party.photoModeration || false);
+    }
+  }, [party]);
 
   // Redirect unauthorized users to RSVP page after auth and party have loaded
   useEffect(() => {
@@ -304,20 +312,18 @@ function HostPageContent() {
             {activeTab === 'photos' && party && (
               <div className="card p-6 space-y-4">
                 <Checkbox
-                  checked={party.photoModeration || false}
+                  checked={photoModerationEnabled}
                   onChange={async () => {
-                    const newValue = !party.photoModeration;
-                    // Optimistic update
-                    const prev = party.photoModeration;
-                    (party as any).photoModeration = newValue;
+                    const newValue = !photoModerationEnabled;
+                    setPhotoModerationEnabled(newValue);
                     const success = await updateParty(party.id, { photo_moderation: newValue });
                     if (!success) {
-                      (party as any).photoModeration = prev;
+                      setPhotoModerationEnabled(!newValue);
                     }
                   }}
                   label="Require Photo Approval"
                 />
-                {party.photoModeration && (
+                {photoModerationEnabled && (
                   <p className="text-xs text-white/40 -mt-2 ml-8">
                     Guest photos must be approved by a host before appearing in the gallery.
                   </p>
@@ -327,7 +333,7 @@ function HostPageContent() {
                   isHost={true}
                   uploaderName={user?.name || undefined}
                   uploaderEmail={user?.email}
-                  photoModeration={party.photoModeration || false}
+                  photoModeration={photoModerationEnabled}
                 />
               </div>
             )}
