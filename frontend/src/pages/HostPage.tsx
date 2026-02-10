@@ -165,7 +165,7 @@ function HostPageContent() {
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    // { id: 'photos' as TabType, label: 'Photos', icon: Camera }, // temporarily disabled
   ];
 
   return (
@@ -301,16 +301,7 @@ function HostPageContent() {
               <EventDetailsTab />
             )}
 
-            {activeTab === 'photos' && party && (
-              <div className="card p-6">
-                <PhotoGallery
-                  partyId={party.id}
-                  isHost={true}
-                  uploaderName={user?.name || undefined}
-                  uploaderEmail={user?.email}
-                />
-              </div>
-            )}
+            {/* Photos tab temporarily disabled */}
           </div>
         </div>
       </div>

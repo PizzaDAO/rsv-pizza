@@ -256,7 +256,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
-      musicEnabled, musicNotes
+      musicEnabled, musicNotes,
+      nftEnabled, nftChain
     } = req.body;
 
     // Verify ownership or super admin
@@ -309,6 +310,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(fundraisingGoal !== undefined && { fundraisingGoal: fundraisingGoal !== null && fundraisingGoal !== '' ? fundraisingGoal : null }),
         ...(musicEnabled !== undefined && { musicEnabled }),
         ...(musicNotes !== undefined && { musicNotes: musicNotes || null }),
+        ...(nftEnabled !== undefined && { nftEnabled }),
+        ...(nftChain !== undefined && { nftChain: nftChain || null }),
       },
       include: {
         user: { select: { name: true } },

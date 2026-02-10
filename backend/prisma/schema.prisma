@@ -78,13 +78,17 @@ model Party {
   donationGoal       Decimal?  @db.Decimal(10, 2) @map("donation_goal")
   donationMessage    String?   @map("donation_message")
   suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
-  donationRecipient    String?   @map("donation_recipient")
-  donationRecipientUrl String?   @map("donation_recipient_url")
-  donationEthAddress   String?   @map("donation_eth_address")
+  donationRecipient     String?   @map("donation_recipient")
+  donationRecipientUrl  String?   @map("donation_recipient_url")
+  donationEthAddress    String?   @map("donation_eth_address")
 
   // Share-to-unlock settings
   shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
   shareTweetText   String?  @map("share_tweet_text")
+
+  // NFT settings
+  nftEnabled              Boolean   @default(false) @map("nft_enabled")
+  nftChain                String?   @map("nft_chain")
 
   // Music settings
   musicEnabled Boolean @default(false) @map("music_enabled")
