@@ -25,7 +25,7 @@ export const DonationStep: React.FC<DonationStepProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DonationPublicStats | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
 
   useEffect(() => {
     async function fetchStats() {
@@ -87,7 +87,7 @@ export const DonationStep: React.FC<DonationStepProps> = ({
           guestName={guestName}
           guestEmail={guestEmail}
           onSuccess={onComplete}
-          onCancel={() => setShowForm(false)}
+          onCancel={onSkip}
         />
       </div>
     );
