@@ -52,13 +52,30 @@ interface GetSetupIntentRequest {
   customerId: string;
 }
 
+interface CreateDonationIntentRequest {
+  action: 'create_donation_intent';
+  amount: number; // in cents
+  currency?: string;
+  customerEmail?: string;
+  customerName?: string;
+  partyId: string;
+  metadata?: Record<string, string>;
+}
+
+interface GetDonationStatusRequest {
+  action: 'get_donation_status';
+  paymentIntentId: string;
+}
+
 type StripeRequest =
   | CreatePaymentIntentRequest
   | CreateVirtualCardRequest
   | GetVirtualCardRequest
   | CapturePaymentRequest
   | CreateCustomerRequest
-  | GetSetupIntentRequest;
+  | GetSetupIntentRequest
+  | CreateDonationIntentRequest
+  | GetDonationStatusRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -116,6 +133,7 @@ serve(async (req) => {
           currency: 'usd',
           customer: request.customerId,
           capture_method: 'manual', // Pre-authorize, capture later
+          payment_method_types: ['card'],
           metadata: request.metadata || {},
         });
 
@@ -209,6 +227,51 @@ serve(async (req) => {
             paymentIntentId: paymentIntent.id,
             status: paymentIntent.status,
             amount: paymentIntent.amount_received,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'create_donation_intent': {
+        // Create a payment intent for immediate capture (donation)
+        // Use automatic_payment_methods to support cards, Klarna, Amazon Pay, etc.
+        const donationIntent = await stripe.paymentIntents.create({
+          amount: request.amount,
+          currency: request.currency || 'usd',
+          capture_method: 'automatic', // Immediate capture for donations
+          automatic_payment_methods: { enabled: true },
+          receipt_email: request.customerEmail,
+          metadata: {
+            type: 'donation',
+            partyId: request.partyId,
+            donorName: request.customerName || '',
+            ...(request.metadata || {}),
+          },
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            paymentIntentId: donationIntent.id,
+            clientSecret: donationIntent.client_secret,
+            status: donationIntent.status,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'get_donation_status': {
+        const donationStatus = await stripe.paymentIntents.retrieve(
+          request.paymentIntentId
+        );
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            paymentIntentId: donationStatus.id,
+            status: donationStatus.status,
+            amount: donationStatus.amount,
+            chargeId: donationStatus.latest_charge,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

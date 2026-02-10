@@ -1,0 +1,266 @@
+import React, { useState, useEffect } from 'react';
+import { DollarSign, Target, MessageSquare, User, Plus, X, Loader2, Wallet, Link } from 'lucide-react';
+import { usePizza } from '../contexts/PizzaContext';
+import { updateParty } from '../lib/supabase';
+import { Checkbox } from './Checkbox';
+import { IconInput } from './IconInput';
+
+export const DonationSettings: React.FC = () => {
+  const { party, loadParty } = usePizza();
+
+  const [donationEnabled, setDonationEnabled] = useState(false);
+  const [donationGoal, setDonationGoal] = useState('');
+  const [donationMessage, setDonationMessage] = useState('');
+  const [donationRecipient, setDonationRecipient] = useState('');
+  const [donationRecipientUrl, setDonationRecipientUrl] = useState('');
+  const [donationEthAddress, setDonationEthAddress] = useState('');
+  const [walletValidation, setWalletValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [suggestedAmounts, setSuggestedAmounts] = useState<number[]>([500, 1000, 2500, 5000]);
+  const [newAmount, setNewAmount] = useState('');
+  const [savingField, setSavingField] = useState<string | null>(null);
+
+  // Load party data
+  useEffect(() => {
+    if (party) {
+      setDonationEnabled(party.donationEnabled || false);
+      setDonationGoal(party.donationGoal ? String(party.donationGoal) : '');
+      setDonationMessage(party.donationMessage || '');
+      setDonationRecipient(party.donationRecipient || '');
+      setDonationRecipientUrl(party.donationRecipientUrl || '');
+      setDonationEthAddress(party.donationEthAddress || '');
+      if (party.donationEthAddress) {
+        validateWalletAddress(party.donationEthAddress);
+      }
+      setSuggestedAmounts(party.suggestedAmounts || [500, 1000, 2500, 5000]);
+    }
+  }, [party]);
+
+  const saveField = async (fieldName: string, updates: Record<string, any>) => {
+    if (!party) return false;
+
+    setSavingField(fieldName);
+
+    try {
+      const success = await updateParty(party.id, updates);
+      if (!success) {
+        // Revert optimistic update on failure by reloading
+        if (party.inviteCode) {
+          await loadParty(party.inviteCode);
+        }
+      }
+      return success;
+    } catch (error) {
+      console.error(`Error saving ${fieldName}:`, error);
+      // Revert on error
+      if (party.inviteCode) {
+        await loadParty(party.inviteCode);
+      }
+      return false;
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const handleToggleDonations = async () => {
+    const newValue = !donationEnabled;
+    setDonationEnabled(newValue);
+    await saveField('donationEnabled', { donation_enabled: newValue });
+  };
+
+  const handleGoalBlur = async () => {
+    const goalValue = donationGoal ? parseFloat(donationGoal) : null;
+    await saveField('donationGoal', { donation_goal: goalValue });
+  };
+
+  const handleMessageBlur = async () => {
+    await saveField('donationMessage', { donation_message: donationMessage || null });
+  };
+
+  const handleRecipientBlur = async () => {
+    await saveField('donationRecipient', { donation_recipient: donationRecipient || null });
+  };
+
+  const handleRecipientUrlBlur = async () => {
+    await saveField('donationRecipientUrl', { donation_recipient_url: donationRecipientUrl || null });
+  };
+
+  const validateWalletAddress = (address: string) => {
+    if (!address.trim()) {
+      setWalletValidation('idle');
+      return;
+    }
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
+    if (ethAddressRegex.test(address.trim()) || ensRegex.test(address.trim())) {
+      setWalletValidation('valid');
+    } else {
+      setWalletValidation('invalid');
+    }
+  };
+
+  const handleEthAddressBlur = async () => {
+    await saveField('donationEthAddress', { donation_eth_address: donationEthAddress || null });
+  };
+
+  const addSuggestedAmount = async () => {
+    const amount = parseFloat(newAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const amountInCents = Math.round(amount * 100);
+    if (suggestedAmounts.includes(amountInCents)) {
+      setNewAmount('');
+      return;
+    }
+
+    const newAmounts = [...suggestedAmounts, amountInCents].sort((a, b) => a - b);
+    setSuggestedAmounts(newAmounts);
+    setNewAmount('');
+    await saveField('suggestedAmounts', { suggested_amounts: newAmounts });
+  };
+
+  const removeSuggestedAmount = async (amount: number) => {
+    const newAmounts = suggestedAmounts.filter(a => a !== amount);
+    setSuggestedAmounts(newAmounts);
+    await saveField('suggestedAmounts', { suggested_amounts: newAmounts });
+  };
+
+  const formatAmount = (cents: number) => {
+    return `$${(cents / 100).toFixed(0)}`;
+  };
+
+  if (!party) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* Enable Donations Toggle */}
+      <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex items-center gap-3">
+          <DollarSign size={20} className="text-[#ff393a]" />
+          <div>
+            <p className="text-white font-medium">Accept Donations</p>
+            <p className="text-white/50 text-sm">Allow guests to contribute to your event</p>
+          </div>
+        </div>
+{savingField === 'donationEnabled' ? (
+          <Loader2 size={20} className="animate-spin text-[#ff393a]" />
+        ) : (
+          <Checkbox
+            checked={donationEnabled}
+            onChange={handleToggleDonations}
+            label=""
+          />
+        )}
+      </div>
+
+      {/* Donation Settings (only show when enabled) */}
+      {donationEnabled && (
+        <div className="space-y-3 border-l-2 border-[#ff393a]/30 pl-4 ml-2">
+          {/* Recipient Name */}
+          <IconInput
+            icon={User}
+            type="text"
+            value={donationRecipient}
+            onChange={(e) => setDonationRecipient(e.target.value)}
+            onBlur={handleRecipientBlur}
+            placeholder="Recipient name"
+          />
+
+          {/* Recipient URL */}
+          <IconInput
+            icon={Link}
+            type="url"
+            value={donationRecipientUrl}
+            onChange={(e) => setDonationRecipientUrl(e.target.value)}
+            onBlur={handleRecipientUrlBlur}
+            placeholder="Recipient website URL"
+          />
+
+          {/* ETH Address */}
+          <div className="relative">
+            <IconInput
+              icon={Wallet}
+              type="text"
+              value={donationEthAddress}
+              onChange={(e) => {
+                setDonationEthAddress(e.target.value);
+                validateWalletAddress(e.target.value);
+              }}
+              onBlur={handleEthAddressBlur}
+              placeholder="ETH/ENS address for crypto donations (e.g. vitalik.eth)"
+            />
+            {walletValidation === 'invalid' && donationEthAddress.trim() && (
+              <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
+            )}
+          </div>
+
+          {/* Donation Goal */}
+          <IconInput
+            icon={Target}
+            type="number"
+            min={0}
+            step={1}
+            value={donationGoal}
+            onChange={(e) => setDonationGoal(e.target.value)}
+            onBlur={handleGoalBlur}
+            placeholder="Goal amount in dollars"
+          />
+
+          {/* Custom Message */}
+          <IconInput
+            icon={MessageSquare}
+            multiline
+            value={donationMessage}
+            onChange={(e) => setDonationMessage(e.target.value)}
+            onBlur={handleMessageBlur}
+            placeholder="Message to donors"
+          />
+
+          {/* Suggested Amounts */}
+          <div>
+            <p className="text-sm font-medium text-white/80 mb-2">Suggested Amounts</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {suggestedAmounts.map((amount) => (
+                <div
+                  key={amount}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-lg"
+                >
+                  <span className="text-white text-sm font-medium">{formatAmount(amount)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeSuggestedAmount(amount)}
+                    className="text-white/50 hover:text-white ml-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <IconInput
+                  icon={DollarSign}
+                  iconSize={16}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addSuggestedAmount()}
+                  placeholder="Add amount"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addSuggestedAmount}
+                disabled={!newAmount}
+                className="px-3 py-2 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

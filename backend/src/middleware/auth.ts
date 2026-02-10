@@ -15,6 +15,29 @@ export function isSuperAdmin(email?: string): boolean {
   return email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 }
 
+// Optional auth: tries to parse the JWT but doesn't error if missing/invalid
+export const optionalAuth = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const secret = process.env.JWT_SECRET;
+      if (secret) {
+        const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+        req.userId = decoded.userId;
+        req.userEmail = decoded.email;
+      }
+    }
+  } catch {
+    // Silently ignore invalid tokens for optional auth
+  }
+  next();
+};
+
 export const requireAuth = (
   req: AuthRequest,
   res: Response,

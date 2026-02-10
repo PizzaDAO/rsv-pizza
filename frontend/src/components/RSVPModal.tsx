@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Plus } from 'lucide-react';
+import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
@@ -8,6 +8,7 @@ import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PublicEvent } from '../lib/api';
+import { DonationStep } from './DonationStep';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 
@@ -29,6 +30,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [pendingApproval, setPendingApproval] = useState(false);
   const [wasUpdated, setWasUpdated] = useState(false);
   const [step, setStep] = useState(1);
+  const [showDonation, setShowDonation] = useState(false);
+  const [donationComplete, setDonationComplete] = useState(false);
   const isEditing = !!existingGuest;
 
   // Step 1 - Personal Info
@@ -119,6 +122,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setError(null);
       setMintStatus('idle');
       setMintResult({});
+      setShowDonation(false);
+      setDonationComplete(false);
 
       // Pre-fill form with existing guest data if editing
       if (existingGuest) {
@@ -507,6 +512,44 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               {mintStatus === 'error' && (
                 <p className="text-[#ff393a] text-sm">{mintResult.error || 'NFT minting failed'}</p>
               )}
+            </div>
+          )}
+          {/* Donation Section */}
+          {event.donationEnabled && !donationComplete && !showDonation && (
+            <>
+              <button
+                onClick={() => setShowDonation(true)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-white/80"
+              >
+                <Heart size={18} className="text-[#ff393a]" />
+                Donate
+              </button>
+              <p className="text-white/60 text-sm text-center mt-1">
+                {event.donationRecipient ? (
+                  <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+                ) : `Buy Pizza for ${event.name}`}
+              </p>
+            </>
+          )}
+          {showDonation && (
+            <div className="mt-4">
+              <DonationStep
+                partyId={event.id}
+                partyName={event.name}
+                guestName={name}
+                guestEmail={email}
+                onComplete={() => {
+                  setDonationComplete(true);
+                  setShowDonation(false);
+                }}
+                onSkip={() => setShowDonation(false)}
+              />
+            </div>
+          )}
+          {donationComplete && (
+            <div className="flex items-center justify-center gap-2 mt-4 text-[#39d98a]">
+              <Check size={16} />
+              <span className="text-sm">Thanks for your support!</span>
             </div>
           )}
           <button

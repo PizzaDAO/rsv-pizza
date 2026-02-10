@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../lib/supabase';
@@ -12,6 +12,7 @@ import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
+import { DonationSettings } from './DonationSettings';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -1027,6 +1028,9 @@ export const EventDetailsTab: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Donations Section */}
+        <DonationSettings />
 
         {/* Hosts Section */}
         <div>
