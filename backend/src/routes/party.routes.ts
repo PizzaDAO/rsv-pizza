@@ -245,7 +245,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
-      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
+      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient, donationRecipientUrl,
       donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes,
       nftEnabled, nftChain
@@ -294,6 +294,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
         ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
+        ...(donationRecipientUrl !== undefined && { donationRecipientUrl: donationRecipientUrl || null }),
         ...(donationEthAddress !== undefined && { donationEthAddress: donationEthAddress || null }),
         ...(shareToUnlock !== undefined && { shareToUnlock }),
         ...(shareTweetText !== undefined && { shareTweetText: shareTweetText || null }),
