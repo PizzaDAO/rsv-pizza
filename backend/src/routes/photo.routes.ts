@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 
 // Helper function to check if user can access/edit a party
@@ -327,7 +327,7 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
 });
 
 // DELETE /api/parties/:partyId/photos/:photoId - Delete a photo (host or uploader)
-router.delete('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
     const { uploaderEmail } = req.query;

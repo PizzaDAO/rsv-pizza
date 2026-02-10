@@ -101,7 +101,16 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     venueName: dbParty.venue_name,
     shareToUnlock: dbParty.share_to_unlock || false,
     shareTweetText: dbParty.share_tweet_text || null,
+    nftEnabled: dbParty.nft_enabled || false,
+    nftChain: dbParty.nft_chain || null,
     createdAt: dbParty.created_at,
+    donationEnabled: dbParty.donation_enabled || false,
+    donationGoal: dbParty.donation_goal || null,
+    donationMessage: dbParty.donation_message || null,
+    suggestedAmounts: dbParty.suggested_amounts || null,
+    donationRecipient: dbParty.donation_recipient || null,
+    donationRecipientUrl: dbParty.donation_recipient_url || null,
+    donationEthAddress: dbParty.donation_eth_address || null,
     guests,
   };
 }

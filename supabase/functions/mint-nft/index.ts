@@ -116,6 +116,23 @@ serve(async (req) => {
       );
     }
 
+    // Determine chain (default to base for backward compatibility)
+    const chain = request.chain || 'base';
+    if (!CHAIN_CONFIGS[chain]) {
+      return new Response(
+        JSON.stringify({ error: `Unsupported chain: ${chain}. Supported: base, monad` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const chainConfig = CHAIN_CONFIGS[chain];
+    if (!chainConfig.contractAddress) {
+      return new Response(
+        JSON.stringify({ error: `NFT contract not configured for chain: ${chain}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate recipient address or ENS name
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
     const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;

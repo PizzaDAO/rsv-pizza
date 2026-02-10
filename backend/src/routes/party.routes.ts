@@ -120,7 +120,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
-      customUrl, timezone, hideGuests, requireApproval, coHosts
+      customUrl, timezone, hideGuests, requireApproval, coHosts,
+      donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
+      donationRecipientUrl, donationEthAddress
     } = req.body;
 
     // Generate default party name if not provided
@@ -174,6 +176,13 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         customUrl: customUrl || null,
         coHosts: finalCoHosts,
         userId: req.userId!,
+        donationEnabled: donationEnabled || false,
+        donationGoal: donationGoal || null,
+        donationMessage: donationMessage || null,
+        suggestedAmounts: suggestedAmounts || [500, 1000, 2500, 5000],
+        donationRecipient: donationRecipient || null,
+        donationRecipientUrl: donationRecipientUrl || null,
+        donationEthAddress: donationEthAddress || null,
       },
       include: {
         user: { select: { name: true } },
@@ -246,7 +255,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
+      donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes,
       nftEnabled, nftChain
     } = req.body;
@@ -294,6 +303,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
         ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
+        ...(donationRecipientUrl !== undefined && { donationRecipientUrl: donationRecipientUrl || null }),
         ...(donationEthAddress !== undefined && { donationEthAddress: donationEthAddress || null }),
         ...(shareToUnlock !== undefined && { shareToUnlock }),
         ...(shareTweetText !== undefined && { shareTweetText: shareTweetText || null }),

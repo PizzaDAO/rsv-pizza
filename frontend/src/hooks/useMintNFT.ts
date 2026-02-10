@@ -28,6 +28,7 @@ export interface MintNFTProps {
   partyAddress: string | null;
   imageUrl: string;
   inviteCode: string;
+  chain?: string;
 }
 
 export function useMintNFT() {

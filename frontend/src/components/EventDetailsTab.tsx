@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, UserPlus, X, Globe, Instagram, GripVertical, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty, addGuestByHost } from '../lib/supabase';
@@ -12,6 +12,7 @@ import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
+import { DonationSettings } from './DonationSettings';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -40,6 +41,8 @@ export const EventDetailsTab: React.FC = () => {
   const [hideGuests, setHideGuests] = useState(false);
   const [shareToUnlock, setShareToUnlock] = useState(false);
   const [shareTweetText, setShareTweetText] = useState('');
+  const [nftEnabled, setNftEnabled] = useState(false);
+  const [nftChain, setNftChain] = useState<string>('base');
 
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
@@ -134,6 +137,8 @@ export const EventDetailsTab: React.FC = () => {
       const partyCoHosts = party.coHosts || [];
       const partyShareToUnlock = party.shareToUnlock || false;
       const partyShareTweetText = party.shareTweetText || '';
+      const partyNftEnabled = party.nftEnabled || false;
+      const partyNftChain = party.nftChain || 'base';
 
       // Set form values
       setName(partyName);
@@ -157,6 +162,8 @@ export const EventDetailsTab: React.FC = () => {
       setCoHosts(partyCoHosts);
       setShareToUnlock(partyShareToUnlock);
       setShareTweetText(partyShareTweetText);
+      setNftEnabled(partyNftEnabled);
+      setNftChain(partyNftChain);
 
       // Store original values
       setOriginalValues({
@@ -981,9 +988,49 @@ export const EventDetailsTab: React.FC = () => {
                   }
                 }}
               />
+
+              {/* NFT Settings */}
+              <Checkbox
+                checked={nftEnabled}
+                onChange={() => {
+                  const newValue = !nftEnabled;
+                  setNftEnabled(newValue);
+                  if (newValue && !nftChain) {
+                    setNftChain('base');
+                    saveOptions({ nft_enabled: newValue, nft_chain: 'base' });
+                  } else {
+                    saveOptions({ nft_enabled: newValue });
+                  }
+                }}
+                label="Mint Attendance NFT"
+              />
+              {nftEnabled && (
+                <div className="flex gap-2">
+                  {(['base', 'monad'] as const).map((chain) => (
+                    <button
+                      key={chain}
+                      type="button"
+                      onClick={() => {
+                        setNftChain(chain);
+                        saveOptions({ nft_chain: chain });
+                      }}
+                      className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        nftChain === chain
+                          ? 'bg-[#ff393a] text-white'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                    >
+                      {chain === 'base' ? 'Base' : 'Monad'}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
+
+        {/* Donations Section */}
+        <DonationSettings />
 
         {/* Hosts Section */}
         <div>
