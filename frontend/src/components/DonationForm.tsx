@@ -34,6 +34,7 @@ interface DonationFormInnerProps {
   message: string;
   isAnonymous: boolean;
   onSuccess?: () => void;
+  onBack?: () => void;
   guestId?: string;
   clientSecret: string;
 }
@@ -47,6 +48,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
   message,
   isAnonymous,
   onSuccess,
+  onBack,
   guestId,
   clientSecret,
 }) => {
@@ -154,6 +156,16 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
           </>
         )}
       </button>
+
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full btn-secondary"
+        >
+          Back
+        </button>
+      )}
     </form>
   );
 };
@@ -420,6 +432,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         message=""
         isAnonymous={false}
         onSuccess={onSuccess}
+        onBack={() => setClientSecret(null)}
         guestId={guestId}
         clientSecret={clientSecret!}
       />
