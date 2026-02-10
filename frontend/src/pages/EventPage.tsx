@@ -887,32 +887,7 @@ export function EventPage() {
                   />
                 </div>
 
-                {/* Photo Gallery Section */}
-                {photoStats?.photosEnabled && (
-                  <div className="border-t border-white/10 pt-6 mt-6">
-                    {showPhotos ? (
-                      <PhotoGallery
-                        partyId={event.id}
-                        isHost={false}
-                        uploaderName={existingGuestData?.name || user?.name || undefined}
-                        uploaderEmail={existingGuestData?.email || user?.email}
-                        guestId={existingGuestData?.id}
-                      />
-                    ) : (
-                      <button
-                        onClick={() => setShowPhotos(true)}
-                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/10"
-                      >
-                        <Camera className="w-5 h-5 text-[#ff393a]" />
-                        <span className="text-white font-medium">
-                          {photoStats.totalPhotos > 0
-                            ? `View Photos (${photoStats.totalPhotos})`
-                            : 'Share Photos'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* Photo Gallery Section - temporarily disabled */}
               </div>
             </div>
           </div>
