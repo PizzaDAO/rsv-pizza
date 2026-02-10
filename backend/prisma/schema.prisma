@@ -62,8 +62,9 @@ model Party {
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Photo settings
-  photosEnabled Boolean @default(true) @map("photos_enabled")
-  photosPublic  Boolean @default(true) @map("photos_public")
+  photosEnabled   Boolean @default(true) @map("photos_enabled")
+  photosPublic    Boolean @default(true) @map("photos_public")
+  photoModeration Boolean @default(false) @map("photo_moderation")
 
   // Party Kit settings
   kitEnabled  Boolean   @default(false) @map("kit_enabled")
@@ -443,12 +444,18 @@ model Photo {
   starred   Boolean  @default(false) // Host can star photos
   starredAt DateTime? @map("starred_at") @db.Timestamptz
 
+  // Moderation
+  status     String    @default("approved")
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewedBy String?   @map("reviewed_by") @db.Uuid
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([partyId, createdAt])
   @@index([partyId, starred])
+  @@index([partyId, status])
   @@map("photos")
 }
 

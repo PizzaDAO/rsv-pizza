@@ -43,15 +43,15 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
 const router = Router();
 
 // GET /api/parties/:partyId/photos - List all photos for a party (public if photosPublic is true)
-router.get('/:partyId/photos', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { starred, tag, uploadedBy, limit = '50', offset = '0' } = req.query;
+    const { starred, tag, uploadedBy, limit = '50', offset = '0', status } = req.query;
 
     // Get party to check if photos are public
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { id: true, photosEnabled: true, photosPublic: true, userId: true },
+      select: { id: true, photosEnabled: true, photosPublic: true, userId: true, photoModeration: true },
     });
 
     if (!party) {
@@ -83,6 +83,27 @@ router.get('/:partyId/photos', async (req: AuthRequest, res: Response, next: Nex
 
     if (uploadedBy && typeof uploadedBy === 'string') {
       where.uploadedBy = uploadedBy;
+    }
+
+    // Status filtering: guests see only approved, hosts can filter
+    const statusFilter = status as string | undefined;
+    if (statusFilter === 'pending' || statusFilter === 'rejected') {
+      // Only hosts can see non-approved photos
+      const canAccess = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (canAccess) {
+        where.status = statusFilter;
+      } else {
+        where.status = 'approved';
+      }
+    } else if (statusFilter === 'all') {
+      const canAccess = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (!canAccess) {
+        where.status = 'approved';
+      }
+      // else: no status filter = show all for hosts
+    } else {
+      // Default: only show approved photos
+      where.status = 'approved';
     }
 
     const photos = await prisma.photo.findMany({
@@ -126,6 +147,7 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
 
     const totalPhotos = await prisma.photo.count({ where: { partyId } });
     const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
+    const pendingPhotos = await prisma.photo.count({ where: { partyId, status: 'pending' } });
 
     // Get unique tags
     const photos = await prisma.photo.findMany({
@@ -144,10 +166,51 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
     res.json({
       totalPhotos,
       starredPhotos,
+      pendingPhotos,
       uniqueTags,
       uniqueUploadersCount: uniqueUploaders.length,
       photosEnabled: party.photosEnabled,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/photos/batch-review - Batch approve/reject photos (host only)
+// NOTE: This route MUST be defined before /:partyId/photos/:photoId to avoid "batch-review" being matched as photoId
+router.post('/:partyId/photos/batch-review', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { photoIds, status } = req.body;
+
+    // Validate input
+    if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
+      throw new AppError('photoIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!['approved', 'rejected'].includes(status)) {
+      throw new AppError('status must be "approved" or "rejected"', 400, 'VALIDATION_ERROR');
+    }
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    const result = await prisma.photo.updateMany({
+      where: {
+        id: { in: photoIds },
+        partyId,
+      },
+      data: {
+        status,
+        reviewedAt: new Date(),
+        reviewedBy: req.userId || null,
+      },
+    });
+
+    res.json({ updated: result.count });
   } catch (error) {
     next(error);
   }
@@ -177,10 +240,10 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Missing required fields: url, fileName, fileSize, mimeType', 400, 'VALIDATION_ERROR');
     }
 
-    // Get party to check if photos are enabled
+    // Get party to check if photos are enabled and moderation setting
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { id: true, photosEnabled: true },
+      select: { id: true, photosEnabled: true, photoModeration: true },
     });
 
     if (!party) {
@@ -213,6 +276,9 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
+    // Set initial status based on moderation setting
+    const initialStatus = party.photoModeration ? 'pending' : 'approved';
+
     const photo = await prisma.photo.create({
       data: {
         partyId,
@@ -228,6 +294,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
         uploaderEmail: uploaderEmail?.toLowerCase() || null,
         caption: caption || null,
         tags: tags || [],
+        status: initialStatus,
       },
       include: {
         guest: { select: { id: true, name: true } },
@@ -288,7 +355,7 @@ router.get('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, 
 router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
-    const { caption, tags, starred } = req.body;
+    const { caption, tags, starred, status } = req.body;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -313,6 +380,11 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
         ...(starred !== undefined && {
           starred,
           starredAt: starred ? new Date() : null,
+        }),
+        ...(status !== undefined && ['approved', 'rejected', 'pending'].includes(status) && {
+          status,
+          reviewedAt: new Date(),
+          reviewedBy: req.userId || null,
         }),
       },
       include: {
