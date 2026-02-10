@@ -245,7 +245,7 @@ export function EventPage() {
               type="password"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="What's the password?"
+              placeholder="Password"
               required
               autoFocus
               autoComplete="off"
