@@ -150,6 +150,8 @@ export interface Party {
   eventTags?: string[]; // Tags for filtering/grouping
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  nftEnabled?: boolean;
+  nftChain?: string | null;
   createdAt: string;
   guests: Guest[];
   // Donation settings

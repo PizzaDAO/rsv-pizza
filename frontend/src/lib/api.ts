@@ -115,6 +115,8 @@ export interface UpdatePartyData {
   donationEthAddress?: string | null;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  nftEnabled?: boolean;
+  nftChain?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -176,6 +178,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       donationEthAddress: data.donationEthAddress,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
+      nftEnabled: data.nftEnabled,
+      nftChain: data.nftChain,
     },
   });
 }
@@ -294,6 +298,8 @@ export interface PublicEvent {
   donationEthAddress?: string | null;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  nftEnabled?: boolean;
+  nftChain?: string | null;
 }
 
 // Public Event API (no auth required)
