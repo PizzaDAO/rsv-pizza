@@ -32,6 +32,12 @@ export async function apiRequest<T>(
       throw new Error('Not authenticated');
     }
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    // Still send token if available (for optionalAuth endpoints)
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
