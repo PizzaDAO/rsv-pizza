@@ -1,36 +1,40 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createPublicClient, createWalletClient, http, parseAbi } from 'https://esm.sh/viem@2.21.0';
+import { createPublicClient, createWalletClient, http, parseAbi, defineChain } from 'https://esm.sh/viem@2.21.0';
 import { privateKeyToAccount } from 'https://esm.sh/viem@2.21.0/accounts';
 import { base, mainnet } from 'https://esm.sh/viem@2.21.0/chains';
 import { normalize } from 'https://esm.sh/viem@2.21.0/ens';
 
 const MINTER_PRIVATE_KEY = Deno.env.get('MINTER_PRIVATE_KEY') || '';
+const BASE_NFT_CONTRACT_ADDRESS = Deno.env.get('BASE_NFT_CONTRACT_ADDRESS') || Deno.env.get('NFT_CONTRACT_ADDRESS') || '';
+const BASE_RPC_URL = Deno.env.get('BASE_RPC_URL') || 'https://mainnet.base.org';
+const MONAD_NFT_CONTRACT_ADDRESS = Deno.env.get('MONAD_NFT_CONTRACT_ADDRESS') || '';
+const MONAD_RPC_URL = Deno.env.get('MONAD_RPC_URL') || 'https://rpc.monad.xyz';
 
-// Multi-chain configuration
-// Note: monad is not in viem@2.21.0, so we define it manually
-const monadChain = {
+// Monad chain definition (not yet built into viem)
+const monad = defineChain({
   id: 143,
   name: 'Monad',
   nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
-  rpcUrls: { default: { http: [Deno.env.get('MONAD_RPC_URL') || 'https://rpc.monad.xyz'] } },
-} as const;
+  rpcUrls: {
+    default: { http: ['https://rpc.monad.xyz'] },
+  },
+});
 
-const CHAIN_CONFIGS: Record<string, {
-  chain: any;
-  rpcUrl: string;
-  contractAddress: string;
-}> = {
+// Chain configuration map
+const CHAIN_CONFIG = {
   base: {
     chain: base,
-    rpcUrl: Deno.env.get('BASE_RPC_URL') || 'https://mainnet.base.org',
-    contractAddress: Deno.env.get('NFT_CONTRACT_ADDRESS') || '',
+    contractAddress: BASE_NFT_CONTRACT_ADDRESS,
+    rpcUrl: BASE_RPC_URL,
   },
   monad: {
-    chain: monadChain,
-    rpcUrl: Deno.env.get('MONAD_RPC_URL') || 'https://rpc.monad.xyz',
-    contractAddress: Deno.env.get('MONAD_CONTRACT_ADDRESS') || '',
+    chain: monad,
+    contractAddress: MONAD_NFT_CONTRACT_ADDRESS,
+    rpcUrl: MONAD_RPC_URL,
   },
-};
+} as const;
+
+type SupportedChain = keyof typeof CHAIN_CONFIG;
 
 // Allowed origins for CORS
 const ALLOWED_ORIGINS = [
@@ -72,7 +76,7 @@ interface MintRequest {
   partyAddress: string | null;
   imageUrl: string;
   inviteCode: string;
-  chain?: string;
+  chain?: SupportedChain;
 }
 
 serve(async (req) => {
@@ -87,13 +91,30 @@ serve(async (req) => {
   try {
     if (!MINTER_PRIVATE_KEY) {
       return new Response(
-        JSON.stringify({ error: 'NFT minting not configured' }),
+        JSON.stringify({ error: 'NFT minting not configured (missing minter key)' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const request: MintRequest = await req.json();
-    const { recipient, partyId, guestName, partyName, partyDate, partyVenue, partyAddress, imageUrl, inviteCode } = request;
+    const { recipient, partyId } = request;
+
+    // Select chain config (default to base for backwards compatibility)
+    const selectedChain: SupportedChain = request.chain || 'base';
+    if (!CHAIN_CONFIG[selectedChain]) {
+      return new Response(
+        JSON.stringify({ error: `Unsupported chain: ${selectedChain}. Supported: ${Object.keys(CHAIN_CONFIG).join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const chainConfig = CHAIN_CONFIG[selectedChain];
+    if (!chainConfig.contractAddress) {
+      return new Response(
+        JSON.stringify({ error: `NFT contract not configured for chain: ${selectedChain}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Determine chain (default to base for backward compatibility)
     const chain = request.chain || 'base';
@@ -181,6 +202,8 @@ serve(async (req) => {
             alreadyMinted: true,
             tokenId: existingTokenId.toString(),
             message: 'NFT already exists for this wallet and event',
+            chain: selectedChain,
+            chainId: chainConfig.chain.id,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -190,22 +213,8 @@ serve(async (req) => {
       console.log('Could not check existing token, proceeding with mint:', e);
     }
 
-    // Build NFT metadata
-    const metadata = {
-      name: partyName,
-      description: `Proof of attendance at ${partyName}`,
-      image: imageUrl,
-      external_url: `https://rsv.pizza/${inviteCode}`,
-      attributes: [
-        { trait_type: 'Party Name', value: partyName },
-        ...(partyDate ? [{ trait_type: 'Party Date', value: partyDate }] : []),
-        ...(partyVenue ? [{ trait_type: 'Venue', value: partyVenue }] : []),
-        ...(partyAddress ? [{ trait_type: 'Location', value: partyAddress }] : []),
-      ],
-    };
-
-    // Create data URI for metadata
-    const metadataUri = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+    // Use API URL for metadata - allows metadata to auto-update when event details change
+    const metadataUri = `https://backend-pizza-dao.vercel.app/api/nft/metadata/${partyId}/${resolvedAddress}`;
 
     // Setup wallet client for minting (publicClient already created above)
     const account = privateKeyToAccount(MINTER_PRIVATE_KEY as `0x${string}`);
@@ -247,6 +256,8 @@ serve(async (req) => {
         txHash,
         tokenId,
         blockNumber: receipt.blockNumber.toString(),
+        chain: selectedChain,
+        chainId: chainConfig.chain.id,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
