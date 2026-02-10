@@ -14,7 +14,7 @@ type IconInputProps = InputProps | TextareaProps;
 export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
   ({ icon: Icon, iconSize = 20, className = '', multiline, placeholder, required, ...props }, ref) => {
     const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
-      ? `${placeholder} *`
+      ? `${placeholder}*`
       : placeholder;
 
     return (
