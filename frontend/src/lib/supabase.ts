@@ -560,14 +560,31 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
 }
 
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
-  const { data: party, error: partyError } = await supabase
+  // Try custom URL first, then invite code (same pattern as getPartyByInviteCodeOrCustomUrl)
+  let party: DbParty | null = null;
+
+  const { data: customUrlData } = await supabase
     .from('parties')
     .select('*')
-    .eq('invite_code', inviteCode)
-    .single();
+    .eq('custom_url', inviteCode)
+    .maybeSingle();
 
-  if (partyError || !party) {
-    console.error('Error fetching party:', partyError);
+  if (customUrlData) {
+    party = customUrlData;
+  } else {
+    const { data: inviteCodeData, error: partyError } = await supabase
+      .from('parties')
+      .select('*')
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+
+    if (partyError) {
+      console.error('Error fetching party:', partyError);
+    }
+    party = inviteCodeData;
+  }
+
+  if (!party) {
     return null;
   }
 
