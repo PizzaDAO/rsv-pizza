@@ -411,8 +411,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
               </>
             ) : (
               <>
-                Continue
-                {finalAmount > 0 && ` - $${(finalAmount / 100).toFixed(2)}`}
+                Donate
+                {finalAmount > 0 && ` $${(finalAmount / 100).toFixed(2)}`}
               </>
             )}
           </button>
