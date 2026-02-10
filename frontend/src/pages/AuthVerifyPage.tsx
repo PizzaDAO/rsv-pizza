@@ -9,12 +9,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 export function AuthVerifyPage() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
   const [name, setName] = useState('');
+  const [pendingAuthData, setPendingAuthData] = useState<any>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -22,32 +23,17 @@ export function AuthVerifyPage() {
   useEffect(() => {
     const newUser = sessionStorage.getItem('isNewUser') === 'true';
     setIsNewUser(newUser);
-    // Focus name input if new user, otherwise focus code input
-    if (newUser) {
-      setTimeout(() => nameInputRef.current?.focus(), 100);
-    } else {
-      inputRefs.current[0]?.focus();
-    }
+    inputRefs.current[0]?.focus();
   }, []);
 
   async function verifyCode(fullCode: string) {
-    // Validate name for new users
-    if (isNewUser && !name.trim()) {
-      setStatus('error');
-      setError('Please enter your name');
-      return;
-    }
-
     setStatus('verifying');
     setLastSubmittedCode(fullCode);
     try {
       const response = await fetch(`${API_URL}/api/auth/verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: fullCode,
-          ...(isNewUser && name.trim() && { name: name.trim() }),
-        }),
+        body: JSON.stringify({ code: fullCode }),
       });
 
       if (!response.ok) {
@@ -56,13 +42,44 @@ export function AuthVerifyPage() {
       }
 
       const data = await response.json();
-      // Clean up session storage
       sessionStorage.removeItem('isNewUser');
-      handleSuccess(data);
+
+      // If new user, prompt for name before completing
+      if (isNewUser) {
+        setPendingAuthData(data);
+        // Store token so the name update call is authenticated
+        localStorage.setItem('authToken', data.accessToken);
+        setStatus('name_prompt');
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+      } else {
+        handleSuccess(data);
+      }
     } catch (err: any) {
       setStatus('error');
       setError(err.message || 'Failed to verify code');
     }
+  }
+
+  async function handleNameSubmit() {
+    if (!name.trim() || !pendingAuthData) return;
+    setStatus('saving_name');
+    try {
+      const response = await fetch(`${API_URL}/api/user/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${pendingAuthData.accessToken}`,
+        },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (response.ok) {
+        const { user } = await response.json();
+        pendingAuthData.user = user;
+      }
+    } catch {
+      // Name update failed but auth succeeded — continue anyway
+    }
+    handleSuccess(pendingAuthData);
   }
 
   function handleSuccess(data: any) {
@@ -125,13 +142,7 @@ export function AuthVerifyPage() {
     setError(null);
     setCode(['', '', '', '', '', '']);
     setLastSubmittedCode(null);
-    setTimeout(() => {
-      if (isNewUser) {
-        nameInputRef.current?.focus();
-      } else {
-        inputRefs.current[0]?.focus();
-      }
-    }, 100);
+    setTimeout(() => inputRefs.current[0]?.focus(), 100);
   }
 
   return (
@@ -142,32 +153,8 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Mail className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">
-              {isNewUser ? 'Complete Your Profile' : 'Enter Your Code'}
-            </h1>
-            <p className="text-white/60 mb-6">
-              {isNewUser
-                ? 'Enter your name and the 6-digit code we sent'
-                : 'We sent a 6-digit code to your email'}
-            </p>
-
-            {isNewUser && (
-              <div className="mb-4">
-                <IconInput
-                  ref={nameInputRef}
-                  icon={User}
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && name.trim()) {
-                      inputRefs.current[0]?.focus();
-                    }
-                  }}
-                />
-              </div>
-            )}
+            <h1 className="text-2xl font-bold text-white mb-2">Enter Your Code</h1>
+            <p className="text-white/60 mb-6">We sent a 6-digit code to your email</p>
 
             <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
               {code.map((digit, index) => (
@@ -181,7 +168,7 @@ export function AuthVerifyPage() {
                   onChange={(e) => handleCodeChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
-                  autoFocus={!isNewUser && index === 0}
+                  autoFocus={index === 0}
                 />
               ))}
             </div>
@@ -203,6 +190,39 @@ export function AuthVerifyPage() {
             <Loader2 className="w-16 h-16 animate-spin text-[#ff393a] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-white mb-2">Verifying...</h1>
             <p className="text-white/60">Please wait while we sign you in</p>
+          </>
+        )}
+
+        {(status === 'name_prompt' || status === 'saving_name') && (
+          <>
+            <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
+              <User className="w-8 h-8 text-[#ff393a]" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">Complete Your Profile</h1>
+            <p className="text-white/60 mb-6">What should we call you?</p>
+            <div className="mb-4">
+              <IconInput
+                ref={nameInputRef}
+                icon={User}
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                disabled={status === 'saving_name'}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && name.trim()) {
+                    handleNameSubmit();
+                  }
+                }}
+              />
+            </div>
+            <button
+              onClick={handleNameSubmit}
+              disabled={!name.trim() || status === 'saving_name'}
+              className="btn-primary w-full"
+            >
+              {status === 'saving_name' ? 'Saving...' : 'Continue'}
+            </button>
           </>
         )}
 
