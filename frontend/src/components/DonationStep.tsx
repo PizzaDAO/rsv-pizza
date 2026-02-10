@@ -76,8 +76,8 @@ export const DonationStep: React.FC<DonationStepProps> = ({
             <h2 className="text-xl font-bold text-white">Make a Donation</h2>
             <p className="text-sm text-white/60">
               {stats.recipient ? (
-                <>Supporting {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
-              ) : `Supporting ${partyName}`}
+                <>Buy Pizza for {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
+              ) : `Buy Pizza for ${partyName}`}
             </p>
           </div>
         </div>
