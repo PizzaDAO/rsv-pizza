@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { DollarSign, Loader2, Check, AlertCircle, User, Mail, MessageSquare, CreditCard } from 'lucide-react';
+import { DollarSign, Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { createDonation } from '../lib/api';
 import { DonationPublicStats } from '../types';
-import { Checkbox } from './Checkbox';
 import { IconInput } from './IconInput';
 import { CryptoDonationWidget } from './CryptoDonationWidget';
 
@@ -175,10 +174,6 @@ export const DonationForm: React.FC<DonationFormProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
-  const [donorName, setDonorName] = useState(guestName);
-  const [donorEmail, setDonorEmail] = useState(guestEmail);
-  const [message, setMessage] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,8 +199,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           action: 'create_donation_intent',
           amount: finalAmount,
           currency: 'usd',
-          customerEmail: donorEmail || undefined,
-          customerName: isAnonymous ? undefined : donorName || undefined,
+          customerEmail: guestEmail || undefined,
+          customerName: guestName || undefined,
           partyId,
         },
       });
@@ -269,10 +264,10 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           suggestedAmounts={suggestedAmounts}
           onSuccess={onSuccess}
           guestId={guestId}
-          donorName={donorName}
-          donorEmail={donorEmail}
-          isAnonymous={isAnonymous}
-          message={message}
+          donorName={guestName}
+          donorEmail={guestEmail}
+          isAnonymous={false}
+          message=""
         />
       </div>
     );
@@ -373,39 +368,6 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           placeholder="Custom amount"
         />
 
-        {/* Donor Info */}
-        <div className="space-y-3 border-t border-white/10 pt-4">
-          <IconInput
-            icon={User}
-            type="text"
-            value={donorName}
-            onChange={(e) => setDonorName(e.target.value)}
-            placeholder="Your name"
-          />
-
-          <IconInput
-            icon={Mail}
-            type="email"
-            value={donorEmail}
-            onChange={(e) => setDonorEmail(e.target.value)}
-            placeholder="Email (for receipt)"
-          />
-
-          <IconInput
-            icon={MessageSquare}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Add a message"
-            multiline
-          />
-
-          <Checkbox
-            checked={isAnonymous}
-            onChange={() => setIsAnonymous(!isAnonymous)}
-            label="Make my donation anonymous"
-          />
-        </div>
-
         {error && (
           <div className="flex items-center gap-2 p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
             <AlertCircle size={16} />
@@ -453,10 +415,10 @@ export const DonationForm: React.FC<DonationFormProps> = ({
       <DonationFormInner
         partyId={partyId}
         amount={finalAmount}
-        donorName={donorName}
-        donorEmail={donorEmail}
-        message={message}
-        isAnonymous={isAnonymous}
+        donorName={guestName}
+        donorEmail={guestEmail}
+        message=""
+        isAnonymous={false}
         onSuccess={onSuccess}
         guestId={guestId}
         clientSecret={clientSecret!}
