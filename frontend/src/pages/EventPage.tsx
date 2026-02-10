@@ -575,7 +575,9 @@ export function EventPage() {
                     Donate
                   </button>
                   <p className="text-white/60 text-sm text-center mt-1">
-                    {event.donationRecipient ? `Supporting ${event.donationRecipient}` : `Supporting ${event.name}`}
+                    {event.donationRecipient ? (
+                      <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+                    ) : `Supporting ${event.name}`}
                   </p>
                 </div>
               )}
@@ -905,7 +907,9 @@ export function EventPage() {
                       Donate
                     </button>
                     <p className="text-white/60 text-sm text-center mt-1">
-                      {event.donationRecipient ? `Supporting ${event.donationRecipient}` : `Supporting ${event.name}`}
+                      {event.donationRecipient ? (
+                        <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+                      ) : `Supporting ${event.name}`}
                     </p>
                   </div>
                 )}

@@ -107,6 +107,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationMessage: dbParty.donation_message || null,
     suggestedAmounts: dbParty.suggested_amounts || null,
     donationRecipient: dbParty.donation_recipient || null,
+    donationRecipientUrl: dbParty.donation_recipient_url || null,
     donationEthAddress: dbParty.donation_eth_address || null,
     guests,
   };

@@ -122,7 +122,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationEthAddress
+      donationRecipientUrl, donationEthAddress
     } = req.body;
 
     // Generate default party name if not provided
@@ -181,6 +181,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         donationMessage: donationMessage || null,
         suggestedAmounts: suggestedAmounts || [500, 1000, 2500, 5000],
         donationRecipient: donationRecipient || null,
+        donationRecipientUrl: donationRecipientUrl || null,
         donationEthAddress: donationEthAddress || null,
       },
       include: {
@@ -254,7 +255,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
+      donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes
     } = req.body;
 
@@ -301,6 +302,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
         ...(donationRecipient !== undefined && { donationRecipient: donationRecipient || null }),
+        ...(donationRecipientUrl !== undefined && { donationRecipientUrl: donationRecipientUrl || null }),
         ...(donationEthAddress !== undefined && { donationEthAddress: donationEthAddress || null }),
         ...(shareToUnlock !== undefined && { shareToUnlock }),
         ...(shareTweetText !== undefined && { shareTweetText: shareTweetText || null }),

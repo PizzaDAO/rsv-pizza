@@ -247,6 +247,7 @@ export interface DbParty {
   donation_message?: string | null;
   suggested_amounts?: number[];
   donation_recipient?: string | null;
+  donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
 }
 
@@ -517,7 +518,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     require_approval, venue_name, selected_pizzerias,
     event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
     donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
-    donation_eth_address, share_to_unlock, share_tweet_text
+    donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text
   `;
 
   let party: DbParty | null = null;
@@ -980,6 +981,7 @@ export async function updateParty(
     donation_message?: string | null;
     suggested_amounts?: number[];
     donation_recipient?: string | null;
+    donation_recipient_url?: string | null;
     donation_eth_address?: string | null;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
@@ -1011,6 +1013,7 @@ export async function updateParty(
         donationMessage: updates.donation_message,
         suggestedAmounts: updates.suggested_amounts,
         donationRecipient: updates.donation_recipient,
+        donationRecipientUrl: updates.donation_recipient_url,
         donationEthAddress: updates.donation_eth_address,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,

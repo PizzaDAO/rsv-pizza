@@ -158,6 +158,7 @@ export interface Party {
   donationMessage?: string | null;
   suggestedAmounts?: number[];
   donationRecipient?: string | null;
+  donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
 }
 
@@ -192,6 +193,7 @@ export interface DonationPublicStats {
   goal?: number | null;
   message?: string | null;
   recipient?: string | null;
+  recipientUrl?: string | null;
   suggestedAmounts?: number[];
   donationEthAddress?: string | null;
   recentDonors?: {

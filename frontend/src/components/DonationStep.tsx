@@ -75,7 +75,9 @@ export const DonationStep: React.FC<DonationStepProps> = ({
           <div>
             <h2 className="text-xl font-bold text-white">Make a Donation</h2>
             <p className="text-sm text-white/60">
-              {stats.recipient ? `Supporting ${stats.recipient}` : `Supporting ${partyName}`}
+              {stats.recipient ? (
+                <>Supporting {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
+              ) : `Supporting ${partyName}`}
             </p>
           </div>
         </div>
@@ -102,7 +104,9 @@ export const DonationStep: React.FC<DonationStepProps> = ({
         </div>
         <h2 className="text-2xl font-bold text-white mb-2">Donate</h2>
         <p className="text-sm text-white/60 mb-1">
-          {stats.recipient ? `Supporting ${stats.recipient}` : `Supporting ${partyName}`}
+          {stats.recipient ? (
+            <>Supporting {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
+          ) : `Supporting ${partyName}`}
         </p>
         <p className="text-white/60">
           {stats.message || 'Would you like to make a donation to help make this event possible?'}

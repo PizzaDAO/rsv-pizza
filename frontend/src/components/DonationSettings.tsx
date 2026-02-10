@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Target, MessageSquare, User, Plus, X, Loader2, Wallet } from 'lucide-react';
+import { DollarSign, Target, MessageSquare, User, Plus, X, Loader2, Wallet, Link } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { Checkbox } from './Checkbox';
@@ -12,6 +12,7 @@ export const DonationSettings: React.FC = () => {
   const [donationGoal, setDonationGoal] = useState('');
   const [donationMessage, setDonationMessage] = useState('');
   const [donationRecipient, setDonationRecipient] = useState('');
+  const [donationRecipientUrl, setDonationRecipientUrl] = useState('');
   const [donationEthAddress, setDonationEthAddress] = useState('');
   const [walletValidation, setWalletValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [suggestedAmounts, setSuggestedAmounts] = useState<number[]>([500, 1000, 2500, 5000]);
@@ -25,6 +26,7 @@ export const DonationSettings: React.FC = () => {
       setDonationGoal(party.donationGoal ? String(party.donationGoal) : '');
       setDonationMessage(party.donationMessage || '');
       setDonationRecipient(party.donationRecipient || '');
+      setDonationRecipientUrl(party.donationRecipientUrl || '');
       setDonationEthAddress(party.donationEthAddress || '');
       if (party.donationEthAddress) {
         validateWalletAddress(party.donationEthAddress);
@@ -76,6 +78,10 @@ export const DonationSettings: React.FC = () => {
 
   const handleRecipientBlur = async () => {
     await saveField('donationRecipient', { donation_recipient: donationRecipient || null });
+  };
+
+  const handleRecipientUrlBlur = async () => {
+    await saveField('donationRecipientUrl', { donation_recipient_url: donationRecipientUrl || null });
   };
 
   const validateWalletAddress = (address: string) => {
@@ -157,6 +163,16 @@ export const DonationSettings: React.FC = () => {
             onChange={(e) => setDonationRecipient(e.target.value)}
             onBlur={handleRecipientBlur}
             placeholder="Recipient name"
+          />
+
+          {/* Recipient URL */}
+          <IconInput
+            icon={Link}
+            type="url"
+            value={donationRecipientUrl}
+            onChange={(e) => setDonationRecipientUrl(e.target.value)}
+            onBlur={handleRecipientUrlBlur}
+            placeholder="Recipient website URL"
           />
 
           {/* ETH Address */}

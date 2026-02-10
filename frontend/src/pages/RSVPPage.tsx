@@ -835,7 +835,9 @@ export function RSVPPage() {
                 <div>
                   <h3 className="text-white font-medium">Make a Donation</h3>
                   <p className="text-white/50 text-sm">
-                    {donationStats.recipient ? `Supporting ${donationStats.recipient}` : 'Supporting this event'}
+                    {donationStats.recipient ? (
+                      <>Supporting {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
+                    ) : 'Supporting this event'}
                   </p>
                 </div>
               </div>

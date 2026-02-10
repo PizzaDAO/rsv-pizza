@@ -105,6 +105,7 @@ export interface UpdatePartyData {
   donationMessage?: string | null;
   suggestedAmounts?: number[];
   donationRecipient?: string | null;
+  donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
@@ -165,6 +166,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       donationMessage: data.donationMessage,
       suggestedAmounts: data.suggestedAmounts,
       donationRecipient: data.donationRecipient,
+      donationRecipientUrl: data.donationRecipientUrl,
       donationEthAddress: data.donationEthAddress,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
@@ -279,6 +281,7 @@ export interface PublicEvent {
   eventTags?: string[];
   donationEnabled?: boolean;
   donationRecipient?: string | null;
+  donationRecipientUrl?: string | null;
   donationGoal?: number | null;
   donationMessage?: string | null;
   suggestedAmounts?: number[];
