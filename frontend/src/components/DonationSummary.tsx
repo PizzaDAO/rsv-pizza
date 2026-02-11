@@ -178,7 +178,7 @@ export const DonationSummary: React.FC = () => {
                 <div className="text-lg font-bold text-[#39d98a] ml-4">
                   {donation.paymentMethod === 'crypto'
                     ? `${Number(donation.amount)} ${donation.tokenSymbol || ''}`
-                    : formatAmount(Number(donation.amount) * 100)
+                    : formatAmount(Number(donation.amount))
                   }
                 </div>
               </div>
