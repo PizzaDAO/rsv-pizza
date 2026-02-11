@@ -101,7 +101,7 @@ export default async function middleware(request: Request) {
   try {
     // Fetch event data from the backend API
     const apiUrl =
-      process.env.VITE_API_URL || 'https://rsvpizza-backend.vercel.app';
+      process.env.VITE_API_URL || 'https://backend-pizza-dao.vercel.app';
     const apiResponse = await fetch(
       `${apiUrl}/api/events/${encodeURIComponent(slug)}`,
       { headers: { Accept: 'application/json' } }
