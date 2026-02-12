@@ -175,7 +175,7 @@ function HostPageContent() {
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-    // { id: 'photos' as TabType, label: 'Photos', icon: Camera }, // temporarily disabled
+    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
   ];
 
   return (

@@ -300,6 +300,7 @@ export interface PublicEvent {
   donationEthAddress?: string | null;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
 }

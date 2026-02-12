@@ -43,6 +43,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         donationEthAddress: true,
         shareToUnlock: true,
         shareTweetText: true,
+        photoModeration: true,
         nftEnabled: true,
         nftChain: true,
         password: true, // Just to check if it exists
@@ -100,6 +101,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           donationEthAddress: true,
           shareToUnlock: true,
           shareTweetText: true,
+          photoModeration: true,
           nftEnabled: true,
           nftChain: true,
           password: true,
@@ -171,6 +173,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         donationEthAddress: party.donationEthAddress,
         shareToUnlock: party.shareToUnlock,
         shareTweetText: party.shareTweetText,
+        photoModeration: party.photoModeration,
         nftEnabled: party.nftEnabled,
         nftChain: party.nftChain,
         hasPassword: !!party.password,
