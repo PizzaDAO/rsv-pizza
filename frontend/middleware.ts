@@ -90,9 +90,9 @@ export default async function middleware(request: Request) {
     return next();
   }
 
-  // Only intercept crawler requests
+  // Skip the OG rewriter's own internal fetch to prevent infinite loop
   const userAgent = request.headers.get('user-agent');
-  if (!isCrawler(userAgent)) return next();
+  if (userAgent === 'RSVPizza-OG-Rewriter') return next();
 
   // Extract slug (remove leading slash and trailing slash)
   const slug = pathname.replace(/^\//, '').replace(/\/$/, '');
