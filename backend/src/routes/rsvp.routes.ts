@@ -197,6 +197,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         id: true,
         name: true,
         date: true,
+        timezone: true,
         address: true,
         customUrl: true,
         rsvpClosedAt: true,
@@ -216,6 +217,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           id: true,
           name: true,
           date: true,
+          timezone: true,
           address: true,
           customUrl: true,
           rsvpClosedAt: true,
@@ -317,6 +319,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           guestId: guest.id,
           partyName: party.name,
           partyDate: party.date,
+          partyTimezone: party.timezone,
           partyAddress: party.address,
           inviteCode,
           customUrl: party.customUrl,
@@ -361,6 +364,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
         id: true,
         name: true,
         date: true,
+        timezone: true,
         address: true,
         customUrl: true,
       },
@@ -373,6 +377,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
           id: true,
           name: true,
           date: true,
+          timezone: true,
           address: true,
           customUrl: true,
         },
@@ -390,6 +395,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
       guestId,
       partyName: party.name,
       partyDate: party.date,
+      partyTimezone: party.timezone,
       partyAddress: party.address,
       inviteCode,
       customUrl: party.customUrl,
@@ -408,6 +414,7 @@ async function sendRSVPConfirmationEmail(params: {
   guestId?: string;
   partyName: string;
   partyDate: Date | null;
+  partyTimezone: string | null;
   partyAddress: string | null;
   inviteCode: string;
   customUrl: string | null;
@@ -441,6 +448,7 @@ async function sendRSVPConfirmationEmail(params: {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: params.partyTimezone || undefined,
       })
     : 'Date TBD';
 
@@ -535,6 +543,7 @@ export async function sendApprovalEmail(params: {
   guestId: string;
   partyName: string;
   partyDate: Date | null;
+  partyTimezone: string | null;
   partyAddress: string | null;
   inviteCode: string;
   customUrl: string | null;
@@ -565,6 +574,7 @@ export async function sendApprovalEmail(params: {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: params.partyTimezone || undefined,
       })
     : 'Date TBD';
 
