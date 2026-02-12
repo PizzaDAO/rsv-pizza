@@ -45,6 +45,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         shareTweetText: true,
         nftEnabled: true,
         nftChain: true,
+        photosEnabled: true,
+        photosPublic: true,
+        photoModeration: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -102,6 +105,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           shareTweetText: true,
           nftEnabled: true,
           nftChain: true,
+          photosEnabled: true,
+          photosPublic: true,
+          photoModeration: true,
           password: true,
           userId: true,
           user: {
@@ -173,6 +179,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         shareTweetText: party.shareTweetText,
         nftEnabled: party.nftEnabled,
         nftChain: party.nftChain,
+        photosEnabled: party.photosEnabled,
+        photosPublic: party.photosPublic,
+        photoModeration: party.photoModeration,
         hasPassword: !!party.password,
         hostName: party.user?.name || null,
         hostProfile,
