@@ -7,6 +7,7 @@ import { Pizzeria } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
+import { uuid } from '../lib/utils';
 
 interface PizzeriaSelectionProps {
   embedded?: boolean;
@@ -113,7 +114,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     if (selectedPizzerias.length >= 3) return;
 
     const pizzeria: Pizzeria = {
-      id: selectedPlace.id || `custom-${crypto.randomUUID()}`,
+      id: selectedPlace.id || `custom-${uuid()}`,
       placeId: selectedPlace.placeId || '',
       name: selectedPlace.name,
       address: selectedPlace.address || '',
@@ -138,7 +139,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     if (selectedPizzerias.length >= 3) return;
 
     const customPizzeria: Pizzeria = {
-      id: `custom-${crypto.randomUUID()}`,
+      id: `custom-${uuid()}`,
       placeId: '',
       name: customPizzeriaName.trim(),
       address: customPizzeriaAddress.trim() || '',

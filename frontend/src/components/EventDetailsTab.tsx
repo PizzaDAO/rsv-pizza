@@ -13,6 +13,7 @@ import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { DonationSettings } from './DonationSettings';
+import { uuid } from '../lib/utils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -254,7 +255,7 @@ export const EventDetailsTab: React.FC = () => {
     if (!newCoHostName.trim()) return;
 
     const newCoHost: CoHost = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       name: newCoHostName.trim(),
       email: newCoHostEmail.trim().toLowerCase() || undefined,
       website: newCoHostWebsite.trim() || undefined,

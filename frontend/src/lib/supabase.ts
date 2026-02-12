@@ -7,6 +7,7 @@ import {
   removeGuestApi,
   updateGuestApprovalApi,
 } from './api';
+import { uuid } from './utils';
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -356,7 +357,7 @@ export async function createParty(
     partyName = `Pizza Party ${partyNumber}`;
   }
 
-  const coHosts = hostEmail ? [{ id: crypto.randomUUID(), name: hostName || '', email: hostEmail, showOnEvent: false }] : [];
+  const coHosts = hostEmail ? [{ id: uuid(), name: hostName || '', email: hostEmail, showOnEvent: false }] : [];
 
   const { data, error } = await supabase
     .from('parties')

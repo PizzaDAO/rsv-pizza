@@ -9,6 +9,7 @@ import { IconInput } from './IconInput';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PublicEvent } from '../lib/api';
 import { DonationStep } from './DonationStep';
+import { uuid } from '../lib/utils';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 
@@ -241,7 +242,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
   const handleSuggestPizzeria = (place: Partial<Pizzeria>) => {
     const pizzeria: Pizzeria = {
-      id: place.id || `suggested-${crypto.randomUUID()}`,
+      id: place.id || `suggested-${uuid()}`,
       placeId: place.placeId || '',
       name: place.name || '',
       address: place.address || '',

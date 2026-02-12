@@ -10,6 +10,7 @@ import { IconInput } from '../components/IconInput';
 import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
+import { uuid } from '../lib/utils';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -194,7 +195,7 @@ export function RSVPPage() {
 
   const handleSuggestPizzeria = (place: Partial<Pizzeria>) => {
     const pizzeria: Pizzeria = {
-      id: place.id || `suggested-${crypto.randomUUID()}`,
+      id: place.id || `suggested-${uuid()}`,
       placeId: place.placeId || '',
       name: place.name || '',
       address: place.address || '',
