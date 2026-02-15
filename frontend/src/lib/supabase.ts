@@ -276,6 +276,25 @@ export interface DbGuest {
   checked_in_by?: string | null;
 }
 
+// Safe column list for parties table — excludes password
+const SAFE_PARTY_COLUMNS = `
+  id, name, invite_code, custom_url, date, duration, end_time, timezone,
+  pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+  require_approval, venue_name, selected_pizzerias,
+  event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, updated_at, user_id,
+  donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
+  donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
+  nft_enabled, nft_chain,
+  photos_enabled, photos_public, photo_moderation,
+  event_type, event_tags, budget_total, budget_enabled,
+  music_enabled, music_notes,
+  kit_enabled, kit_deadline,
+  fundraising_goal, report_recap, report_video_url, report_photos_url,
+  flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
+  luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
+  report_published, report_public_slug
+`;
+
 // Party operations
 export async function createParty(
   name?: string,
@@ -407,7 +426,7 @@ export async function createParty(
 export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .eq('invite_code', inviteCode)
     .single();
 
@@ -421,7 +440,7 @@ export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty 
 export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .eq('custom_url', customUrl)
     .single();
 
@@ -513,25 +532,13 @@ export async function verifyPartyPassword(partyId: string, passwordAttempt: stri
 }
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
-  // Define safe columns to fetch (excluding password)
-  // Note: host_name was removed - now derived from User.name via API
-  const safeColumns = `
-    id, name, invite_code, custom_url, date, duration, timezone,
-    pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
-    require_approval, venue_name, selected_pizzerias,
-    event_image_url, description, address, rsvp_closed_at, co_hosts, created_at, user_id,
-    donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
-    donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
-    nft_enabled, nft_chain
-  `;
-
   let party: DbParty | null = null;
   let error = null;
 
   // Try custom URL first
   const { data: customUrlData, error: customUrlError } = await supabase
     .from('parties')
-    .select(safeColumns)
+    .select(SAFE_PARTY_COLUMNS)
     .eq('custom_url', slug)
     .maybeSingle();
 
@@ -541,7 +548,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     // If not found by custom URL, try invite code
     const { data: inviteCodeData, error: inviteCodeError } = await supabase
       .from('parties')
-      .select(safeColumns)
+      .select(SAFE_PARTY_COLUMNS)
       .eq('invite_code', slug)
       .maybeSingle();
 
@@ -557,7 +564,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     // Check if password exists (without fetching it)
     const { count } = await supabase
       .from('parties')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('id', party.id)
       .not('password', 'is', null);
 
@@ -577,7 +584,7 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
 
   const { data: customUrlData } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .eq('custom_url', inviteCode)
     .maybeSingle();
 
@@ -586,7 +593,7 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
   } else {
     const { data: inviteCodeData, error: partyError } = await supabase
       .from('parties')
-      .select('*')
+      .select(SAFE_PARTY_COLUMNS)
       .eq('invite_code', inviteCode)
       .maybeSingle();
 
@@ -622,7 +629,7 @@ export async function updatePartyBeverages(partyId: string, availableBeverages: 
   // Fetch the updated party
   const { data } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .eq('id', partyId)
     .single();
 
@@ -637,7 +644,7 @@ export async function updatePartyToppings(partyId: string, availableToppings: st
   // Fetch the updated party
   const { data } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .eq('id', partyId)
     .single();
 
@@ -940,7 +947,7 @@ export function isUserHostOfParty(party: DbParty, email: string): boolean {
 export async function getAllParties(): Promise<DbParty[]> {
   const { data, error } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -1112,7 +1119,7 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
   if (partyIdsAsGuest.length > 0) {
     const { data, error } = await supabase
       .from('parties')
-      .select('*')
+      .select(SAFE_PARTY_COLUMNS)
       .in('id', partyIdsAsGuest)
       .order('date', { ascending: true, nullsFirst: false });
 
@@ -1127,7 +1134,7 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
   // Note: Using filter with text match because .contains() doesn't work well with JSONB arrays of objects
   const { data: allPartiesForHost, error: hostError } = await supabase
     .from('parties')
-    .select('*')
+    .select(SAFE_PARTY_COLUMNS)
     .order('date', { ascending: true, nullsFirst: false });
 
   // Filter client-side for parties where user is in co_hosts
