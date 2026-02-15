@@ -90,9 +90,10 @@ export default async function middleware(request: Request) {
     return next();
   }
 
-  // Skip the OG rewriter's own internal fetch to prevent infinite loop
+  // Only rewrite OG tags for crawlers/bots — regular browsers don't use them.
+  // Also skip the OG rewriter's own internal fetch to prevent infinite loop.
   const userAgent = request.headers.get('user-agent');
-  if (userAgent === 'RSVPizza-OG-Rewriter') return next();
+  if (!userAgent || userAgent === 'RSVPizza-OG-Rewriter' || !isCrawler(userAgent)) return next();
 
   // Extract slug (remove leading slash and trailing slash)
   const slug = pathname.replace(/^\//, '').replace(/\/$/, '');
