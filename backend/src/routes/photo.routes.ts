@@ -398,11 +398,10 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
   }
 });
 
-// DELETE /api/parties/:partyId/photos/:photoId - Delete a photo (host or uploader)
-router.delete('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+// DELETE /api/parties/:partyId/photos/:photoId - Delete a photo (host or authenticated uploader)
+router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
-    const { uploaderEmail } = req.query;
 
     // Get the photo first
     const photo = await prisma.photo.findFirst({
@@ -415,11 +414,11 @@ router.delete('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest
 
     // Check if user can delete:
     // 1. Party host/owner can delete any photo
-    // 2. Original uploader can delete their own photo (by email match)
+    // 2. Authenticated user whose email matches the uploader can delete their own photo
     const isHost = await canUserEditParty(partyId, req.userId, req.userEmail);
-    const isUploader = uploaderEmail &&
+    const isUploader = req.userEmail &&
       photo.uploaderEmail &&
-      photo.uploaderEmail.toLowerCase() === (uploaderEmail as string).toLowerCase();
+      photo.uploaderEmail.toLowerCase() === req.userEmail.toLowerCase();
 
     if (!isHost && !isUploader) {
       throw new AppError('Unauthorized to delete this photo', 403, 'UNAUTHORIZED');

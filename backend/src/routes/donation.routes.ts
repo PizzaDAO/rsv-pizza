@@ -179,7 +179,7 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
       data: {
         amount,
         currency,
-        status: paymentIntentId || txHash ? 'succeeded' : 'pending',
+        status: 'pending', // Always start as pending — only webhooks/verification should mark succeeded
         paymentIntentId,
         chargeId,
         donorName: donorName || null,
@@ -204,11 +204,17 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-// PATCH /api/parties/:id/donations/:donationId - Update donation status (e.g., after webhook)
-router.patch('/:id/donations/:donationId', async (req: Request, res: Response, next: NextFunction) => {
+// PATCH /api/parties/:id/donations/:donationId - Update donation status (host only)
+router.patch('/:id/donations/:donationId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id, donationId } = req.params;
     const { status, chargeId } = req.body;
+
+    // Verify ownership or super admin
+    const canAccess = await canUserAccessDonations(id, req.userId, req.userEmail);
+    if (!canAccess) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
 
     // Validate donation exists and belongs to party
     const existingDonation = await prisma.donation.findFirst({

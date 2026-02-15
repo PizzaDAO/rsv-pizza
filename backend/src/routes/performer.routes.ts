@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 
 // Helper function to check if user can edit a party
@@ -21,7 +21,7 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
 const router = Router();
 
 // GET /api/parties/:partyId/performers - List all performers for a party
-router.get('/:partyId/performers', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/performers', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
@@ -40,8 +40,23 @@ router.get('/:partyId/performers', async (req: AuthRequest, res: Response, next:
       orderBy: { sortOrder: 'asc' },
     });
 
+    // Strip sensitive fields from public responses (non-host users)
+    const isHost = await canUserEditParty(partyId, req.userId, req.userEmail);
+    const safePerformers = isHost ? performers : performers.map(p => ({
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      genre: p.genre,
+      setTime: p.setTime,
+      setDuration: p.setDuration,
+      sortOrder: p.sortOrder,
+      partyId: p.partyId,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
     res.json({
-      performers,
+      performers: safePerformers,
       musicEnabled: party.musicEnabled,
       musicNotes: party.musicNotes,
     });

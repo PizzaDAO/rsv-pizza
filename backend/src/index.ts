@@ -50,7 +50,7 @@ app.use(cors({
     // Check against whitelist or Vercel preview URLs
     if (
       ALLOWED_ORIGINS.includes(origin) ||
-      origin.endsWith('.vercel.app')  // Allow Vercel preview deployments
+      /^https:\/\/rsvpizza.*\.vercel\.app$/.test(origin)  // Allow RSVPizza Vercel preview deployments only
     ) {
       return callback(null, true);
     }
