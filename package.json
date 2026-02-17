@@ -15,6 +15,7 @@
     "generate-og": "node scripts/generate-og-meta.js"
   },
   "dependencies": {
+    "dotenv": "^17.3.1",
     "pg": "^8.16.3"
   }
 }

@@ -1,8 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
+require('dotenv').config();
+
 const supabase = createClient(
-  'https://znpiwdvvsqaxuskpfleo.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODAyMDQ4NCwiZXhwIjoyMDgzNTk2NDg0fQ.KkAjyc8k6FbX4YxWPJEhOsInijffOcPtp6roESj4U9s'
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const TOPPINGS = ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'mushrooms', 'onions', 'bell-peppers', 'olives', 'spinach', 'jalapenos', 'tomatoes', 'extra-cheese', 'feta', 'pineapple'];

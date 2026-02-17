@@ -12,6 +12,8 @@ import { DonationStep } from './DonationStep';
 import { uuid } from '../lib/utils';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { NFT_CONTRACT_ADDRESS, getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
+import { useAccount } from 'wagmi';
+import { ConnectKitButton } from 'connectkit';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -58,33 +60,16 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     }
   };
 
-  // Wallet connection
-  const [walletConnecting, setWalletConnecting] = useState(false);
-  const [hasWallet, setHasWallet] = useState(false);
+  // Wallet connection via ConnectKit/wagmi
+  const { address: connectedAddress, isConnected: walletConnected } = useAccount();
 
-  // Detect browser wallet on mount
+  // Auto-fill wallet address when user connects via ConnectKit
   useEffect(() => {
-    setHasWallet(typeof window !== 'undefined' && !!(window as any).ethereum);
-  }, []);
-
-  const connectWallet = async () => {
-    const ethereum = (window as any).ethereum;
-    if (!ethereum) return;
-
-    setWalletConnecting(true);
-    try {
-      const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
-      if (accounts && accounts.length > 0) {
-        const address = accounts[0];
-        setEthereumAddress(address);
-        validateWalletAddress(address);
-      }
-    } catch (err) {
-      console.error('Wallet connection failed:', err);
-    } finally {
-      setWalletConnecting(false);
+    if (walletConnected && connectedAddress) {
+      setEthereumAddress(connectedAddress);
+      validateWalletAddress(connectedAddress);
     }
-  };
+  }, [walletConnected, connectedAddress]);
 
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -629,22 +614,28 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     <Check size={14} className="absolute left-[2.35rem] top-1/2 -translate-y-1/2 text-[#39d98a]" />
                   )}
                 </div>
-                {hasWallet && (
+                {ethereumAddress.trim() ? (
                   <button
                     type="button"
-                    onClick={ethereumAddress.trim() ? () => { setEthereumAddress(''); setWalletValidation('idle'); } : connectWallet}
-                    disabled={walletConnecting}
-                    className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+                    onClick={() => { setEthereumAddress(''); setWalletValidation('idle'); }}
+                    className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
                   >
-                    {walletConnecting ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : ethereumAddress.trim() ? (
-                      <X size={14} />
-                    ) : (
-                      <Wallet size={14} />
-                    )}
-                    <span className="hidden sm:inline">{walletConnecting ? 'Connecting...' : ethereumAddress.trim() ? 'Clear' : 'Connect'}</span>
+                    <X size={14} />
+                    <span className="hidden sm:inline">Clear</span>
                   </button>
+                ) : (
+                  <ConnectKitButton.Custom>
+                    {({ show }) => (
+                      <button
+                        type="button"
+                        onClick={show}
+                        className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
+                      >
+                        <Wallet size={14} />
+                        <span className="hidden sm:inline">Connect</span>
+                      </button>
+                    )}
+                  </ConnectKitButton.Custom>
                 )}
               </div>
               {walletValidation === 'invalid' && ethereumAddress.trim() && (
