@@ -145,8 +145,8 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    const totalPhotos = await prisma.photo.count({ where: { partyId } });
-    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true } });
+    const totalPhotos = await prisma.photo.count({ where: { partyId, status: 'approved' } });
+    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true, status: 'approved' } });
     const pendingPhotos = await prisma.photo.count({ where: { partyId, status: 'pending' } });
 
     // Get unique tags
