@@ -259,24 +259,30 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {selectedPizzerias.length > 0 && (
         <div className="space-y-2 mb-3">
           <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
-          {sortedSelectedPizzerias.map((pizzeria) => {
-            const isWinner = pizzeria.id === winnerId;
+          {sortedSelectedPizzerias.map((pizzeria, index) => {
             const scores = pizzeriaScores.get(pizzeria.id);
             const hasVotes = scores && scores.total > 0;
+            // Rank styling: gold (1st), silver (2nd), bronze (3rd) — only when there are votes
+            const rankStyles = [
+              { border: 'border-yellow-500/50', bg: 'bg-yellow-500/20', text: 'text-yellow-500', badgeBg: 'bg-yellow-500/10', label: '1st' },
+              { border: 'border-gray-400/50', bg: 'bg-gray-400/20', text: 'text-gray-400', badgeBg: 'bg-gray-400/10', label: '2nd' },
+              { border: 'border-amber-700/50', bg: 'bg-amber-700/20', text: 'text-amber-700', badgeBg: 'bg-amber-700/10', label: '3rd' },
+            ];
+            const rank = hasVotes ? rankStyles[index] || null : null;
 
             return (
               <div
                 key={pizzeria.id}
                 className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border ${
-                  isWinner ? 'border-yellow-500/50' : 'border-[#ff393a]/30'
+                  rank ? rank.border : 'border-[#ff393a]/30'
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    isWinner ? 'bg-yellow-500/20' : 'bg-[#ff393a]/20'
+                    rank ? rank.bg : 'bg-[#ff393a]/20'
                   }`}>
-                    {isWinner ? (
-                      <Trophy className="w-5 h-5 text-yellow-500" />
+                    {rank ? (
+                      <Trophy className={`w-5 h-5 ${rank.text}`} />
                     ) : (
                       <MapPin className="w-5 h-5 text-[#ff393a]" />
                     )}
@@ -290,10 +296,10 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                           {pizzeria.rating.toFixed(1)}
                         </span>
                       )}
-                      {isWinner && (
-                        <span className="flex items-center gap-1 text-xs text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded font-medium">
+                      {rank && (
+                        <span className={`flex items-center gap-1 text-xs ${rank.text} ${rank.badgeBg} px-1.5 py-0.5 rounded font-medium`}>
                           <Trophy size={10} />
-                          Winner
+                          {rank.label}
                         </span>
                       )}
                     </div>
