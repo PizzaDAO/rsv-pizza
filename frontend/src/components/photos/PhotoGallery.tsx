@@ -311,8 +311,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
       {/* Upload Modal */}
       {showUpload && (
-        <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50">
-          <div className="max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50 overflow-y-auto">
+          <div className="max-w-lg w-full pb-8" onClick={(e) => e.stopPropagation()}>
             <PhotoUpload
               partyId={partyId}
               uploaderName={uploaderName}
