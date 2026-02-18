@@ -447,7 +447,7 @@ model Photo {
   // Moderation
   status     String    @default("approved")
   reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
-  reviewedBy String?   @map("reviewed_by") @db.Uuid
+  reviewedBy String?   @map("reviewed_by")
 
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
