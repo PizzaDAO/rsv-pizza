@@ -193,20 +193,6 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     return scores;
   }, [guests]);
 
-  // Determine the winner (highest Borda score)
-  const winnerId = React.useMemo(() => {
-    let bestId: string | null = null;
-    let bestScore = 0;
-    for (const [id, data] of pizzeriaScores) {
-      if (data.total > bestScore) {
-        bestScore = data.total;
-        bestId = id;
-      }
-    }
-    // Only declare a winner if there are actual votes
-    return bestScore > 0 ? bestId : null;
-  }, [pizzeriaScores]);
-
   // Sort selected pizzerias by Borda score (highest first)
   const sortedSelectedPizzerias = React.useMemo(() => {
     return [...selectedPizzerias].sort((a, b) => {
