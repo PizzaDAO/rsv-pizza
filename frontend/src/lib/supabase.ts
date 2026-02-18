@@ -242,6 +242,7 @@ export interface DbParty {
   co_hosts: any[];
   share_to_unlock?: boolean;
   share_tweet_text?: string | null;
+  photo_moderation?: boolean;
   nft_enabled?: boolean;
   nft_chain?: string | null;
   created_at: string;
@@ -1013,6 +1014,7 @@ export async function updateParty(
     donation_eth_address?: string | null;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
+    photo_moderation?: boolean;
     nft_enabled?: boolean;
     nft_chain?: string | null;
   }
@@ -1047,6 +1049,7 @@ export async function updateParty(
         donationEthAddress: updates.donation_eth_address,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
+        photoModeration: updates.photo_moderation,
         nftEnabled: updates.nft_enabled,
         nftChain: updates.nft_chain,
       });

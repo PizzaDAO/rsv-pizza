@@ -9,6 +9,7 @@ interface PhotoUploadProps {
   uploaderName?: string;
   uploaderEmail?: string;
   guestId?: string;
+  photoModeration?: boolean;
   onUploadComplete?: (photo: Photo) => void;
   onClose?: () => void;
 }
@@ -27,6 +28,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   uploaderName,
   uploaderEmail,
   guestId,
+  photoModeration = false,
   onUploadComplete,
   onClose,
 }) => {
@@ -286,7 +288,19 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             <Check size={18} />
             {completeCount} photo{completeCount !== 1 ? 's' : ''} uploaded successfully
           </p>
+          {photoModeration && (
+            <p className="text-amber-400/80 text-sm mt-2">
+              Photos will appear after the host approves them.
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Moderation Notice */}
+      {photoModeration && files.length === 0 && (
+        <p className="mt-3 text-amber-400/70 text-xs text-center">
+          Photos are reviewed by the host before appearing in the gallery.
+        </p>
       )}
     </div>
   );

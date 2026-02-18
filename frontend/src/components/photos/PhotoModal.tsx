@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Photo } from '../../types';
 
 interface PhotoModalProps {
@@ -12,6 +12,8 @@ interface PhotoModalProps {
   onDelete?: (photoId: string) => void;
   onUpdateCaption?: (photoId: string, caption: string) => void;
   onUpdateTags?: (photoId: string, tags: string[]) => void;
+  onApprove?: (photoId: string) => void;
+  onReject?: (photoId: string) => void;
 }
 
 export const PhotoModal: React.FC<PhotoModalProps> = ({
@@ -24,6 +26,8 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   onDelete,
   onUpdateCaption,
   onUpdateTags,
+  onApprove,
+  onReject,
 }) => {
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionValue, setCaptionValue] = useState(photo.caption || '');
@@ -168,6 +172,52 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Status Badge + Approve/Reject */}
+          {photo.status === 'pending' && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-2">
+                <Clock size={16} className="text-amber-400" />
+                <span className="text-amber-400 text-sm font-medium">Pending Review</span>
+              </div>
+              {isHost && onApprove && onReject && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onApprove(photo.id)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 rounded-lg transition-colors"
+                  >
+                    <CheckCircle2 size={18} />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => onReject(photo.id)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 rounded-lg transition-colors"
+                  >
+                    <XCircle size={18} />
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {photo.status === 'rejected' && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <XCircle size={16} className="text-red-400" />
+                <span className="text-red-400 text-sm font-medium">Rejected</span>
+              </div>
+              {isHost && onApprove && (
+                <button
+                  onClick={() => onApprove(photo.id)}
+                  className="w-full mt-2 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 rounded-lg transition-colors"
+                >
+                  <CheckCircle2 size={18} />
+                  Approve
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Caption */}
           <div className="mb-4">

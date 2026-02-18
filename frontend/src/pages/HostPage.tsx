@@ -13,6 +13,8 @@ import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
+import { Checkbox } from '../components/Checkbox';
+import { updateParty } from '../lib/supabase';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -26,6 +28,7 @@ function HostPageContent() {
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
+  const [photoModerationEnabled, setPhotoModerationEnabled] = useState(false);
 
   // Check if current user can edit this party (only valid after auth and party have loaded)
   const canEdit = useMemo(() => {
@@ -43,6 +46,13 @@ function HostPageContent() {
     }
     return false;
   }, [party, user]);
+
+  // Sync photo moderation state from party
+  useEffect(() => {
+    if (party) {
+      setPhotoModerationEnabled(party.photoModeration || false);
+    }
+  }, [party]);
 
   // Redirect unauthorized users to RSVP page after auth and party have loaded
   useEffect(() => {
@@ -165,7 +175,7 @@ function HostPageContent() {
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-    // { id: 'photos' as TabType, label: 'Photos', icon: Camera }, // temporarily disabled
+    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
   ];
 
   return (
@@ -301,7 +311,34 @@ function HostPageContent() {
               <EventDetailsTab />
             )}
 
-            {/* Photos tab temporarily disabled */}
+            {activeTab === 'photos' && party && (
+              <div className="card p-6 space-y-4">
+                <Checkbox
+                  checked={photoModerationEnabled}
+                  onChange={async () => {
+                    const newValue = !photoModerationEnabled;
+                    setPhotoModerationEnabled(newValue);
+                    const success = await updateParty(party.id, { photo_moderation: newValue });
+                    if (!success) {
+                      setPhotoModerationEnabled(!newValue);
+                    }
+                  }}
+                  label="Require Photo Approval"
+                />
+                {photoModerationEnabled && (
+                  <p className="text-xs text-white/40 -mt-2 ml-8">
+                    Guest photos must be approved by a host before appearing in the gallery.
+                  </p>
+                )}
+                <PhotoGallery
+                  partyId={party.id}
+                  isHost={true}
+                  uploaderName={user?.name || undefined}
+                  uploaderEmail={user?.email}
+                  photoModeration={photoModerationEnabled}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
