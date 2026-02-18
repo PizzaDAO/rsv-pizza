@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { Pizzeria } from '../types';
+import { uuid } from '../lib/utils';
 
 interface PlaceAutocompleteProps {
   onPlaceSelected: (pizzeria: Partial<Pizzeria>) => void;
@@ -69,7 +70,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           const lng = place.geometry?.location?.lng() ?? 0;
 
           const pizzeria: Partial<Pizzeria> = {
-            id: `custom-${crypto.randomUUID()}`,
+            id: `custom-${uuid()}`,
             placeId: place.place_id || '',
             name: place.name || '',
             address: place.formatted_address || '',

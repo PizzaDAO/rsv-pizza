@@ -295,7 +295,7 @@ export const TableRow: React.FC<TableRowProps> = ({
       {/* Date - only for basic variant */}
       {variant === 'basic' && guest.submittedAt && (
         <span className="text-white/40 text-sm hidden sm:block flex-shrink-0">
-          {format(new Date(guest.submittedAt), 'MMM d, yyyy')}
+          {format(new Date(guest.submittedAt), 'MMM d, h:mm a')}
         </span>
       )}
 

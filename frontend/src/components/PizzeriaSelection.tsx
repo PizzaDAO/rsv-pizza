@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users } from 'lucide-react';
+import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
@@ -7,6 +7,7 @@ import { Pizzeria } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
+import { uuid } from '../lib/utils';
 
 interface PizzeriaSelectionProps {
   embedded?: boolean;
@@ -113,7 +114,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     if (selectedPizzerias.length >= 3) return;
 
     const pizzeria: Pizzeria = {
-      id: selectedPlace.id || `custom-${crypto.randomUUID()}`,
+      id: selectedPlace.id || `custom-${uuid()}`,
       placeId: selectedPlace.placeId || '',
       name: selectedPlace.name,
       address: selectedPlace.address || '',
@@ -138,7 +139,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     if (selectedPizzerias.length >= 3) return;
 
     const customPizzeria: Pizzeria = {
-      id: `custom-${crypto.randomUUID()}`,
+      id: `custom-${uuid()}`,
       placeId: '',
       name: customPizzeriaName.trim(),
       address: customPizzeriaAddress.trim() || '',
@@ -168,6 +169,38 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
   const savePizzerias = async (pizzeriasToSave: Pizzeria[]) => {
     await saveField('pizzerias', { selected_pizzerias: pizzeriasToSave });
   };
+
+  // Borda count scoring for pizzeria rankings
+  // 1st place = 3 pts, 2nd = 2 pts, 3rd = 1 pt
+  const pizzeriaScores = React.useMemo(() => {
+    const scores = new Map<string, { total: number; first: number; second: number; third: number }>();
+    if (!guests || guests.length === 0) return scores;
+
+    const pointsByRank = [3, 2, 1];
+
+    for (const guest of guests) {
+      if (!guest.pizzeriaRankings || guest.pizzeriaRankings.length === 0) continue;
+      for (let i = 0; i < guest.pizzeriaRankings.length && i < 3; i++) {
+        const pizzeriaId = guest.pizzeriaRankings[i];
+        const existing = scores.get(pizzeriaId) || { total: 0, first: 0, second: 0, third: 0 };
+        existing.total += pointsByRank[i];
+        if (i === 0) existing.first++;
+        else if (i === 1) existing.second++;
+        else if (i === 2) existing.third++;
+        scores.set(pizzeriaId, existing);
+      }
+    }
+    return scores;
+  }, [guests]);
+
+  // Sort selected pizzerias by Borda score (highest first)
+  const sortedSelectedPizzerias = React.useMemo(() => {
+    return [...selectedPizzerias].sort((a, b) => {
+      const scoreA = pizzeriaScores.get(a.id)?.total || 0;
+      const scoreB = pizzeriaScores.get(b.id)?.total || 0;
+      return scoreB - scoreA;
+    });
+  }, [selectedPizzerias, pizzeriaScores]);
 
   // Aggregate guest suggestions
   const guestSuggestions = React.useMemo(() => {
@@ -212,65 +245,103 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {selectedPizzerias.length > 0 && (
         <div className="space-y-2 mb-3">
           <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
-          {selectedPizzerias.map((pizzeria) => (
-            <div
-              key={pizzeria.id}
-              className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30"
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-[#ff393a]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-white font-medium truncate">{pizzeria.name}</p>
-                    {pizzeria.rating && (
-                      <span className="flex items-center gap-1 text-xs text-yellow-400">
-                        <Star size={12} className="fill-yellow-400" />
-                        {pizzeria.rating.toFixed(1)}
-                      </span>
+          {sortedSelectedPizzerias.map((pizzeria, index) => {
+            const scores = pizzeriaScores.get(pizzeria.id);
+            const hasVotes = scores && scores.total > 0;
+            // Rank styling: gold (1st), silver (2nd), bronze (3rd) — only when there are votes
+            const rankStyles = [
+              { border: 'border-yellow-500/50', bg: 'bg-yellow-500/20', text: 'text-yellow-500', badgeBg: 'bg-yellow-500/10', label: '1st' },
+              { border: 'border-gray-400/50', bg: 'bg-gray-400/20', text: 'text-gray-400', badgeBg: 'bg-gray-400/10', label: '2nd' },
+              { border: 'border-amber-700/50', bg: 'bg-amber-700/20', text: 'text-amber-700', badgeBg: 'bg-amber-700/10', label: '3rd' },
+            ];
+            const rank = hasVotes ? rankStyles[index] || null : null;
+
+            return (
+              <div
+                key={pizzeria.id}
+                className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border ${
+                  rank ? rank.border : 'border-[#ff393a]/30'
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    rank ? rank.bg : 'bg-[#ff393a]/20'
+                  }`}>
+                    {rank ? (
+                      <Trophy className={`w-5 h-5 ${rank.text}`} />
+                    ) : (
+                      <MapPin className="w-5 h-5 text-[#ff393a]" />
                     )}
                   </div>
-                  {pizzeria.address && (
-                    <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
-                  )}
-                  {(pizzeria.url || pizzeria.phone) && (
-                    <div className="flex items-center gap-2 mt-1">
-                      {pizzeria.url && (
-                        <a
-                          href={pizzeria.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <LinkIcon size={10} />
-                          Website
-                        </a>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                      {pizzeria.rating && (
+                        <span className="flex items-center gap-1 text-xs text-yellow-400">
+                          <Star size={12} className="fill-yellow-400" />
+                          {pizzeria.rating.toFixed(1)}
+                        </span>
                       )}
-                      {pizzeria.phone && (
-                        <a
-                          href={`tel:${pizzeria.phone}`}
-                          className="text-white/50 hover:text-white text-xs flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Phone size={10} />
-                          {pizzeria.phone}
-                        </a>
+                      {rank && (
+                        <span className={`flex items-center gap-1 text-xs ${rank.text} ${rank.badgeBg} px-1.5 py-0.5 rounded font-medium`}>
+                          <Trophy size={10} />
+                          {rank.label}
+                        </span>
                       )}
                     </div>
-                  )}
+                    {pizzeria.address && (
+                      <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                    )}
+                    {hasVotes && scores && (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-emerald-400 font-medium">{scores.total} pts</span>
+                        <span className="text-xs text-white/40">
+                          {scores.first > 0 && `${scores.first}\u00d7 1st`}
+                          {scores.first > 0 && scores.second > 0 && ' \u00b7 '}
+                          {scores.second > 0 && `${scores.second}\u00d7 2nd`}
+                          {(scores.first > 0 || scores.second > 0) && scores.third > 0 && ' \u00b7 '}
+                          {scores.third > 0 && `${scores.third}\u00d7 3rd`}
+                        </span>
+                      </div>
+                    )}
+                    {(pizzeria.url || pizzeria.phone) && (
+                      <div className="flex items-center gap-2 mt-1">
+                        {pizzeria.url && (
+                          <a
+                            href={pizzeria.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <LinkIcon size={10} />
+                            Website
+                          </a>
+                        )}
+                        {pizzeria.phone && (
+                          <a
+                            href={`tel:${pizzeria.phone}`}
+                            className="text-white/50 hover:text-white text-xs flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Phone size={10} />
+                            {pizzeria.phone}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => removePizzeria(pizzeria.id)}
+                  className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => removePizzeria(pizzeria.id)}
-                className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

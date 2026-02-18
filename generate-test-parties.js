@@ -1,8 +1,10 @@
 // Generate large test parties for RSVPizza
 const https = require('https');
 
-const SUPABASE_URL = 'znpiwdvvsqaxuskpfleo.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw';
+require('dotenv').config();
+
+const SUPABASE_URL = new URL(process.env.VITE_SUPABASE_URL).hostname;
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
 // Sample data
 const firstNames = ['Alex', 'Jordan', 'Taylor', 'Casey', 'Morgan', 'Riley', 'Quinn', 'Avery', 'Peyton', 'Cameron', 'Drew', 'Skyler', 'Reese', 'Parker', 'Hayden', 'Jamie', 'Dakota', 'Kendall', 'Blake', 'Charlie', 'Emery', 'Finley', 'Harper', 'Jesse', 'Kerry', 'Logan', 'Micah', 'Nico', 'Oakley', 'Phoenix', 'Remy', 'Sage', 'Tatum', 'Val', 'Winter', 'Zion', 'Addison', 'Bailey', 'Corey', 'Devon', 'Ellis', 'Flynn', 'Gray', 'Harley', 'Indigo', 'Jules', 'Kit', 'Lane', 'Marley', 'Noel'];

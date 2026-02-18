@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "nft:backfill": "tsx scripts/backfill-nft-mints.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
