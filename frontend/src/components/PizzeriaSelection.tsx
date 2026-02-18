@@ -170,6 +170,20 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     await saveField('pizzerias', { selected_pizzerias: pizzeriasToSave });
   };
 
+  // Count votes (rankings) per selected pizzeria
+  const pizzeriaVoteCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!guests || guests.length === 0) return counts;
+
+    for (const guest of guests) {
+      if (!guest.pizzeriaRankings || guest.pizzeriaRankings.length === 0) continue;
+      for (const pizzeriaId of guest.pizzeriaRankings) {
+        counts.set(pizzeriaId, (counts.get(pizzeriaId) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [guests]);
+
   // Aggregate guest suggestions
   const guestSuggestions = React.useMemo(() => {
     if (!guests || guests.length === 0) return [];
@@ -229,6 +243,12 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                       <span className="flex items-center gap-1 text-xs text-yellow-400">
                         <Star size={12} className="fill-yellow-400" />
                         {pizzeria.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {(pizzeriaVoteCounts.get(pizzeria.id) || 0) > 0 && (
+                      <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                        <Users size={10} />
+                        {pizzeriaVoteCounts.get(pizzeria.id)} {pizzeriaVoteCounts.get(pizzeria.id) === 1 ? 'vote' : 'votes'}
                       </span>
                     )}
                   </div>

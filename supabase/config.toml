@@ -1,0 +1,2 @@
+[functions.mint-nft]
+verify_jwt = false
