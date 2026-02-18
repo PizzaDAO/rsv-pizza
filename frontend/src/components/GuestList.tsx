@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX, Search, CheckCircle2 } from 'lucide-react';
+import { UserRoundX, Search, CheckCircle2, Download } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { checkInGuest } from '../lib/api';
 
@@ -32,6 +32,29 @@ export const GuestList: React.FC = () => {
   }
 
   const requireApproval = party?.requireApproval || false;
+
+  const exportCSV = () => {
+    const headers = ['Name', 'Email', 'RSVP Date', 'Dietary Restrictions', 'Liked Toppings', 'Disliked Toppings', 'Wallet Address'];
+    const rows = guests.map(g => [
+      g.name,
+      g.email || '',
+      g.submittedAt ? new Date(g.submittedAt).toLocaleDateString() : '',
+      g.dietaryRestrictions.join('; '),
+      g.toppings.join('; '),
+      g.dislikedToppings.join('; '),
+      g.ethereumAddress || '',
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${party?.name || 'guests'}-guests.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Count checked-in guests
   const checkedInCount = guests.filter(g => g.checkedInAt).length;
@@ -67,6 +90,13 @@ export const GuestList: React.FC = () => {
             </span>
           )}
         </div>
+        <button
+          onClick={exportCSV}
+          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
+        >
+          <Download size={14} />
+          Export CSV
+        </button>
       </div>
 
       <div className="mb-4">
