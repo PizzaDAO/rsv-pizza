@@ -6,6 +6,7 @@ import { LocationAutocomplete } from './LocationAutocomplete';
 import { TableRow } from './TableRow';
 import { GuestPreferencesList } from './GuestPreferencesList';
 import { Pizzeria, OrderingOption } from '../types';
+import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -25,7 +26,7 @@ export const PizzaOrderSummary: React.FC = () => {
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
   const [selectedPizzeria, setSelectedPizzeria] = useState<Pizzeria | null>(null);
   const [selectedOption, setSelectedOption] = useState<OrderingOption | null>(null);
-  const [orderComplete, setOrderComplete] = useState<{ orderId: string; checkoutUrl?: string } | null>(null);
+  const [orderComplete, setOrderComplete] = useState<{ orderId: string; checkoutUrl?: string; isAiCall?: boolean; pizzeriaName?: string } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Inline pizzeria search state
@@ -296,10 +297,23 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     setShowPizzeriaSearch(false);
   };
 
-  const handleOrderComplete = (orderId: string, checkoutUrl?: string) => {
-    setOrderComplete({ orderId, checkoutUrl });
+  const handleOrderComplete = (orderId: string, checkoutUrl?: string, meta?: { isAiCall?: boolean; pizzeriaName?: string; customerName?: string }) => {
+    setOrderComplete({ orderId, checkoutUrl, isAiCall: meta?.isAiCall, pizzeriaName: meta?.pizzeriaName });
     setSelectedPizzeria(null);
     setSelectedOption(null);
+
+    // Persist AI call to localStorage for host page history
+    if (meta?.isAiCall && party?.id) {
+      const storageKey = `ai-calls-${party.id}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      existing.push({
+        callId: orderId,
+        pizzeriaName: meta.pizzeriaName || 'Unknown',
+        customerName: meta.customerName || 'Unknown',
+        timestamp: new Date().toISOString(),
+      });
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+    }
   };
 
   const handleCloseCheckout = () => {
@@ -723,37 +737,65 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       {/* Order Complete Modal */}
       {orderComplete && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md text-center">
-            <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
-              <Check size={32} className="text-[#39d98a]" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Order Created!</h2>
-            <p className="text-white/60 mb-6">
-              Your order has been submitted successfully.
-            </p>
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
+            {orderComplete.isAiCall ? (
+              <>
+                <div className="text-center mb-4">
+                  <div className="w-16 h-16 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center mx-auto mb-4">
+                    <Phone size={32} className="text-[#8b5cf6]" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-1">AI Call Placed</h2>
+                  <p className="text-white/60 text-sm">
+                    {orderComplete.pizzeriaName ? `Calling ${orderComplete.pizzeriaName}` : 'Your order call is in progress'}
+                  </p>
+                </div>
 
-            {orderComplete.checkoutUrl ? (
-              <a
-                href={orderComplete.checkoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full btn-primary flex items-center justify-center gap-2 mb-3"
-              >
-                <ExternalLink size={18} />
-                Complete Payment
-              </a>
+                <CallRecordingPlayer
+                  callId={orderComplete.orderId}
+                  pizzeriaName={orderComplete.pizzeriaName}
+                />
+
+                <button
+                  onClick={() => setOrderComplete(null)}
+                  className="w-full btn-secondary mt-4"
+                >
+                  Close
+                </button>
+              </>
             ) : (
-              <p className="text-sm text-white/50 mb-4">
-                Order ID: {orderComplete.orderId}
-              </p>
-            )}
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
+                  <Check size={32} className="text-[#39d98a]" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Order Created!</h2>
+                <p className="text-white/60 mb-6">
+                  Your order has been submitted successfully.
+                </p>
 
-            <button
-              onClick={() => setOrderComplete(null)}
-              className="w-full btn-secondary"
-            >
-              Done
-            </button>
+                {orderComplete.checkoutUrl ? (
+                  <a
+                    href={orderComplete.checkoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full btn-primary flex items-center justify-center gap-2 mb-3"
+                  >
+                    <ExternalLink size={18} />
+                    Complete Payment
+                  </a>
+                ) : (
+                  <p className="text-sm text-white/50 mb-4">
+                    Order ID: {orderComplete.orderId}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => setOrderComplete(null)}
+                  className="w-full btn-secondary"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

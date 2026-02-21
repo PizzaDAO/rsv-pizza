@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy } from 'lucide-react';
+import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
-import { Pizzeria } from '../types';
+import { Pizzeria, OrderingOption } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
+import { OrderCheckout } from './OrderCheckout';
+import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
 
 interface PizzeriaSelectionProps {
@@ -14,7 +16,31 @@ interface PizzeriaSelectionProps {
 }
 
 export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
-  const { party, loadParty, guests } = usePizza();
+  const { party, loadParty, guests, recommendations } = usePizza();
+
+  // AI order state
+  const [orderPizzeria, setOrderPizzeria] = useState<Pizzeria | null>(null);
+  const [orderComplete, setOrderComplete] = useState<{ callId: string; pizzeriaName: string } | null>(null);
+
+  const aiOrderOption: OrderingOption = { provider: 'ai_phone', available: true };
+
+  const handleOrderComplete = (orderId: string, _checkoutUrl?: string, meta?: { isAiCall?: boolean; pizzeriaName?: string; customerName?: string }) => {
+    setOrderComplete({ callId: orderId, pizzeriaName: meta?.pizzeriaName || orderPizzeria?.name || 'Pizzeria' });
+    setOrderPizzeria(null);
+
+    // Persist to localStorage for host page history
+    if (meta?.isAiCall && party?.id) {
+      const storageKey = `ai-calls-${party.id}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      existing.push({
+        callId: orderId,
+        pizzeriaName: meta.pizzeriaName || 'Unknown',
+        customerName: meta.customerName || 'Unknown',
+        timestamp: new Date().toISOString(),
+      });
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+    }
+  };
 
   // Pizzeria selection state
   const [selectedPizzerias, setSelectedPizzerias] = useState<Pizzeria[]>([]);
@@ -332,13 +358,25 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                     )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removePizzeria(pizzeria.id)}
-                  className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {pizzeria.phone && recommendations.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrderPizzeria(pizzeria)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-[#8b5cf6] hover:bg-[#7c3aed] transition-colors"
+                    >
+                      <Bot size={14} />
+                      Order
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removePizzeria(pizzeria.id)}
+                    className="text-[#ff393a] hover:text-[#ff5a5b] p-1"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -614,6 +652,46 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* AI Order Checkout Modal */}
+      {orderPizzeria && (
+        <OrderCheckout
+          pizzeria={orderPizzeria}
+          orderingOption={aiOrderOption}
+          recommendations={recommendations}
+          onClose={() => setOrderPizzeria(null)}
+          onOrderComplete={handleOrderComplete}
+        />
+      )}
+
+      {/* AI Call Complete Modal */}
+      {orderComplete && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center mx-auto mb-4">
+                <Phone size={32} className="text-[#8b5cf6]" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-1">AI Call Placed</h2>
+              <p className="text-white/60 text-sm">
+                Calling {orderComplete.pizzeriaName}
+              </p>
+            </div>
+
+            <CallRecordingPlayer
+              callId={orderComplete.callId}
+              pizzeriaName={orderComplete.pizzeriaName}
+            />
+
+            <button
+              onClick={() => setOrderComplete(null)}
+              className="w-full btn-secondary mt-4"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

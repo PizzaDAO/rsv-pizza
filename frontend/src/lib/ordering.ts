@@ -188,6 +188,40 @@ export function generatePhoneOrderScript(
   return lines.join('\n');
 }
 
+// Call status response from ai-call-status edge function
+export interface CallStatus {
+  status: 'queued' | 'in-progress' | 'completed' | 'failed' | 'unknown';
+  recordingUrl: string | null;
+  transcript: string;
+  callLength: number | null;
+  answeredBy: 'human' | 'voicemail' | 'unknown';
+  endedReason: string | null;
+}
+
+// Get AI call status
+export async function getCallStatus(callId: string): Promise<CallStatus> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-call-status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ callId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get call status');
+  }
+
+  return response.json();
+}
+
+// Get the URL for the AI call recording audio proxy
+export function getCallRecordingUrl(callId: string): string {
+  return `${SUPABASE_URL}/functions/v1/ai-call-recording?callId=${encodeURIComponent(callId)}`;
+}
+
 // Format distance for display
 export function formatDistance(meters: number): string {
   if (meters < 1000) {

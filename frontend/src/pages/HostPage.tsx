@@ -11,6 +11,7 @@ import { BeverageSettings } from '../components/BeverageSettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
+import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
@@ -301,6 +302,8 @@ function HostPageContent() {
 
                 {/* Recommended Order - always shown, auto-generated (includes Guest Requests) */}
                 <PizzaOrderSummary />
+
+                <AiCallHistory partyId={party.id} />
 
                 <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                 <BeverageSettings />

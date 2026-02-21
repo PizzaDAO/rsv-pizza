@@ -43,7 +43,7 @@ interface OrderCheckoutProps {
   orderingOption: OrderingOption;
   recommendations: PizzaRecommendation[];
   onClose: () => void;
-  onOrderComplete: (orderId: string, checkoutUrl?: string) => void;
+  onOrderComplete: (orderId: string, checkoutUrl?: string, meta?: { isAiCall?: boolean; pizzeriaName?: string; customerName?: string }) => void;
 }
 
 type CheckoutStep = 'details' | 'payment' | 'confirm';
@@ -209,7 +209,11 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
       );
 
       if (result.success && result.callId) {
-        onOrderComplete(result.callId, undefined);
+        onOrderComplete(result.callId, undefined, {
+          isAiCall: true,
+          pizzeriaName: pizzeria.name,
+          customerName,
+        });
       } else {
         setError(result.error || 'Failed to initiate AI call');
       }
