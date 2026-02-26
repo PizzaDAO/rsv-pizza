@@ -16,7 +16,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canceling, setCanceling] = useState(false);
+  const [, setCanceling] = useState(false);
 
   const loadKit = async () => {
     setLoading(true);

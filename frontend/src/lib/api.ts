@@ -574,7 +574,9 @@ export async function batchReviewPhotos(
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
-
+    return null;
+  }
+}
 
 // Party Kit API functions
 export interface KitRequestData {

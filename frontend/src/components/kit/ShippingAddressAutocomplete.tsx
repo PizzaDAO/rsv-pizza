@@ -51,7 +51,7 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
   disabled = false,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
 
   // Use refs to avoid stale closures in the event listener
