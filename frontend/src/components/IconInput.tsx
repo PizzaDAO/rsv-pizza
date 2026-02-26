@@ -17,17 +17,6 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
       ? `${placeholder}*`
       : placeholder;
 
-
-type InputProps = BaseProps & React.InputHTMLAttributes<HTMLInputElement> & { multiline?: false };
-type TextareaProps = BaseProps & React.TextareaHTMLAttributes<HTMLTextAreaElement> & { multiline: true };
-
-type IconInputProps = InputProps | TextareaProps;
-
-export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
-  ({ icon: Icon, iconSize = 20, className = '', multiline, ...props }, ref) => {
-      ? `${placeholder} *`
-      : placeholder;
-
     return (
       <div className="relative">
         <Icon
