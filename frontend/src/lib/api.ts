@@ -1,5 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
-import { Pizzeria, Photo, PhotoStats, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -575,6 +574,10 @@ export async function batchReviewPhotos(
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
+    return null;
+  }
+}
+
 // ============================================
 // Display API functions
 // ============================================
@@ -689,6 +692,8 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
 // Create a new display
 export async function createDisplay(
   partyId: string,
