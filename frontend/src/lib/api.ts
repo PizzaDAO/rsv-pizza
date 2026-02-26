@@ -1,6 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
-import { Pizzeria, Photo, PhotoStats, VenueStatus } from '../types';
-import { Pizzeria, Photo, PhotoStats, VenueStatus, Venue } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, VenueStatus, Venue } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -676,6 +674,8 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
 // ============================================
 // Venue API functions
 // ============================================

@@ -14,7 +14,6 @@ import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, form
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { DonationSettings } from './DonationSettings';
 import { uuid } from '../lib/utils';
-import { getDateTimeInTimezone, parseDateTimeInTimezone } from '../utils/dateUtils';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
