@@ -4,10 +4,8 @@ import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, Chev
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
-import { Pizzeria, DonationPublicStats } from '../types';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
-import { Pizzeria } from '../types';
+import { Pizzeria, DonationPublicStats } from '../types';
 import { IconInput } from '../components/IconInput';
 import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';

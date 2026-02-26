@@ -220,6 +220,8 @@ export async function getCallStatus(callId: string): Promise<CallStatus> {
 // Get the URL for the AI call recording audio proxy
 export function getCallRecordingUrl(callId: string): string {
   return `${SUPABASE_URL}/functions/v1/ai-call-recording?callId=${encodeURIComponent(callId)}`;
+}
+
 // Calculate distance (Haversine, returns miles)
 export function calculateDistanceMiles(
   lat1: number, lng1: number, lat2: number, lng2: number
