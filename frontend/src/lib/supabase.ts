@@ -278,7 +278,6 @@ export interface DbGuest {
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checked_in_at?: string | null;
   checked_in_by?: string | null;
-  approved?: boolean | null; // null = pending, true = approved, false = declined (legacy)
   status?: DbGuestStatus;
   waitlist_position?: number | null;
   promoted_at?: string | null;
@@ -677,8 +676,6 @@ export async function addGuestToParty(
   inviteCode?: string,
   pizzeriaRankings?: string[],
   suggestedPizzerias?: any[]
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean } | null> {
-  pizzeriaRankings?: string[]
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');

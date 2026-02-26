@@ -1,7 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2 } from 'lucide-react';
-import { Trash2, Check, X, ArrowUpCircle } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';

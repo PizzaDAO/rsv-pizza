@@ -30,7 +30,6 @@ export interface Guest {
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checkedInAt?: string | null;
   checkedInBy?: string | null;
-  approved?: boolean | null; // null = pending, true = approved, false = declined (legacy)
   status?: GuestStatus;
   waitlistPosition?: number | null;
   promotedAt?: string | null;
