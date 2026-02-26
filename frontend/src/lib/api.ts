@@ -1,5 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
-import { Pizzeria, Photo, PhotoStats, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -575,54 +574,13 @@ export async function batchReviewPhotos(
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
-// GPP API functions
-// ============================================
-
-export interface CreateGPPEventData {
-  city: string;
-  hostName: string;
-  email: string;
-}
-
-export interface GPPEventResponse {
-  success: boolean;
-  event: {
-    id: string;
-    name: string;
-    inviteCode: string;
-    eventType: string;
-    eventTags: string[];
-  };
-  hostPageUrl: string;
-  eventPageUrl: string;
-  message: string;
-}
-
-export async function createGPPEvent(data: CreateGPPEventData): Promise<GPPEventResponse> {
-  return apiRequest<GPPEventResponse>('/api/gpp/events', {
-    method: 'POST',
-    body: data,
-    requireAuth: false,
-  });
-}
-
-// Budget API functions
-// ============================================
-
-// Get budget overview and items
-export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
-  try {
-    return await apiRequest<BudgetOverview>(`/api/parties/${partyId}/budget`, {
-      method: 'GET',
-      requireAuth: true,
-    });
-  } catch (error) {
-    console.error('Error fetching budget:', error);
     return null;
   }
 }
 
 // GPP API functions
+// ============================================
+
 export interface CreateGPPEventData {
   city: string;
   hostName: string;
@@ -696,6 +654,24 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
+// Budget API functions
+// ============================================
+
+// Get budget overview and items
+export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
+  try {
+    return await apiRequest<BudgetOverview>(`/api/parties/${partyId}/budget`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching budget:', error);
+    return null;
+  }
+}
+
 // Update budget settings
 export async function updateBudgetSettings(
   partyId: string,
