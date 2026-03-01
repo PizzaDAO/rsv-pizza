@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus, Monitor, Gift } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus, Monitor, Gift, Wallet } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -24,11 +24,12 @@ import { ReportWidget } from '../components/report';
 import { StaffingWidget } from '../components/staffing';
 import { DisplaysWidget } from '../components/displays';
 import { RaffleWidget } from '../components/raffle';
+import { BudgetTab } from '../components/budget';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'apps';
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'apps';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -64,7 +65,7 @@ function HostPageContent() {
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff' || tab === 'displays' || tab === 'raffle') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff' || tab === 'displays' || tab === 'raffle' || tab === 'budget') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -176,6 +177,7 @@ function HostPageContent() {
     { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
     { id: 'displays' as TabType, label: 'Displays', icon: Monitor },
     { id: 'raffle' as TabType, label: 'Raffle', icon: Gift },
+    { id: 'budget' as TabType, label: 'Budget', icon: Wallet },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
   ];
 
@@ -369,6 +371,10 @@ function HostPageContent() {
 
               {activeTab === 'raffle' && party && (
                 <RaffleWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'budget' && party && (
+                <BudgetTab partyId={party.id} />
               )}
             </div>
           </div>
