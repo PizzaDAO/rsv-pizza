@@ -1,10 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-<<<<<<< HEAD
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart } from 'lucide-react';
-=======
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, FileBarChart } from 'lucide-react';
->>>>>>> origin/mozzarella-66712-report-widget
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -20,24 +16,17 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
-<<<<<<< HEAD
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
 import { MusicWidget } from '../components/music';
 import { ReportWidget } from '../components/report';
-=======
-import { ReportWidget } from '../components/report';
->>>>>>> origin/mozzarella-66712-report-widget
+import { StaffingWidget } from '../components/staffing';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-<<<<<<< HEAD
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'apps';
-=======
-type TabType = 'details' | 'pizza' | 'guests' | 'photos' | 'report';
->>>>>>> origin/mozzarella-66712-report-widget
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'apps';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -48,14 +37,10 @@ function HostPageContent() {
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
   const [photoModerationEnabled, setPhotoModerationEnabled] = useState(false);
 
-  // Check if current user can edit this party (only valid after auth and party have loaded)
   const canEdit = useMemo(() => {
     if (!party || !user) return false;
-    // Super admin can edit any party
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
-    // Party owner can edit
     if (party.userId === user.id) return true;
-    // Co-host with editor permission can edit
     if (party.coHosts && Array.isArray(party.coHosts)) {
       const isEditor = party.coHosts.some(
         (h: any) => h.email?.toLowerCase() === user.email.toLowerCase() && h.canEdit === true
@@ -65,26 +50,19 @@ function HostPageContent() {
     return false;
   }, [party, user]);
 
-  // Sync photo moderation state from party
   useEffect(() => {
     if (party) {
       setPhotoModerationEnabled(party.photoModeration || false);
     }
   }, [party]);
 
-  // Redirect unauthorized users to RSVP page after auth and party have loaded
   useEffect(() => {
     if (!authLoading && !partyLoading && party && !canEdit) {
       navigate(`/rsvp/${inviteCode}`, { replace: true });
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  // Derive active tab from URL
-<<<<<<< HEAD
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report') ? tab : 'details';
-=======
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'report') ? tab : 'details';
->>>>>>> origin/mozzarella-66712-report-widget
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -108,7 +86,6 @@ function HostPageContent() {
     load();
   }, [inviteCode, loadParty, loadedCode]);
 
-  // Count guests with requests for slider marks
   const guestsWithRequests = useMemo(() => {
     return guests.filter(g =>
       g.toppings.length > 0 ||
@@ -119,19 +96,15 @@ function HostPageContent() {
     ).length;
   }, [guests]);
 
-  // Track previous values for auto-regeneration
   const prevExpectedGuests = useRef<number | null>(null);
   const prevGuestsWithRequests = useRef<number>(0);
   const hasInitialized = useRef(false);
 
-  // Auto-generate recommendations when expected guests or requests change
   useEffect(() => {
-    // Skip if party hasn't loaded yet or no guests
     if (!party || guests.length === 0) return;
 
     const currentExpected = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
 
-    // On first load, generate recommendations
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       prevExpectedGuests.current = currentExpected;
@@ -140,21 +113,18 @@ function HostPageContent() {
       return;
     }
 
-    // Regenerate if expected guests changed
     if (prevExpectedGuests.current !== currentExpected) {
       prevExpectedGuests.current = currentExpected;
       generateRecommendations();
       return;
     }
 
-    // Regenerate if new requests came in
     if (prevGuestsWithRequests.current !== guestsWithRequests) {
       prevGuestsWithRequests.current = guestsWithRequests;
       generateRecommendations();
     }
   }, [party, guests.length, orderExpectedGuests, guestsWithRequests, generateRecommendations]);
 
-  // Wait for both auth and party to finish loading
   if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
@@ -182,7 +152,6 @@ function HostPageContent() {
     );
   }
 
-  // Show loading while redirect is pending for unauthorized users
   if (!canEdit) {
     return (
       <Layout>
@@ -199,14 +168,11 @@ function HostPageContent() {
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
-<<<<<<< HEAD
     { id: 'music' as TabType, label: 'Music', icon: Music },
     { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
+    { id: 'staff' as TabType, label: 'Staff', icon: UserPlus },
     { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
-=======
-    { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
->>>>>>> origin/mozzarella-66712-report-widget
   ];
 
   return (
@@ -214,7 +180,6 @@ function HostPageContent() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
 
-        {/* Tab Navigation */}
         <div className="border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -237,7 +202,6 @@ function HostPageContent() {
           })}
         </div>
 
-        {/* Tab Content */}
         {activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} />
         ) : activeTab !== 'apps' && (
@@ -252,7 +216,6 @@ function HostPageContent() {
 
               {activeTab === 'pizza' && (
                 <>
-                  {/* Expected Guests Slider - at top */}
                   <div className="card p-4 bg-[#1a1a2e] border-white/10">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -271,7 +234,6 @@ function HostPageContent() {
                       />
                     </div>
 
-                    {/* Slider with marks */}
                     {(() => {
                       const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
                       const minValue = 0;
@@ -329,9 +291,7 @@ function HostPageContent() {
                   </div>
 
                   <PizzaOrderSummary />
-
                   <AiCallHistory partyId={party.id} />
-
                   <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                   <BeverageSettings />
                 </>
@@ -387,58 +347,18 @@ function HostPageContent() {
                 </div>
               )}
 
-<<<<<<< HEAD
               {activeTab === 'sponsors' && party && (
                 <SponsorCRM partyId={party.id} />
+              )}
+
+              {activeTab === 'staff' && party && (
+                <StaffingWidget partyId={party.id} />
               )}
 
               {activeTab === 'report' && party && (
                 <ReportWidget partyId={party.id} />
               )}
             </div>
-=======
-                <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
-                <BeverageSettings />
-              </>
-            )}
-
-            {activeTab === 'details' && (
-              <EventDetailsTab />
-            )}
-
-            {activeTab === 'photos' && party && (
-              <div className="card p-6 space-y-4">
-                <Checkbox
-                  checked={photoModerationEnabled}
-                  onChange={async () => {
-                    const newValue = !photoModerationEnabled;
-                    setPhotoModerationEnabled(newValue);
-                    const success = await updateParty(party.id, { photo_moderation: newValue });
-                    if (!success) {
-                      setPhotoModerationEnabled(!newValue);
-                    }
-                  }}
-                  label="Require Photo Approval"
-                />
-                {photoModerationEnabled && (
-                  <p className="text-xs text-white/40 -mt-2 ml-8">
-                    Guest photos must be approved by a host before appearing in the gallery.
-                  </p>
-                )}
-                <PhotoGallery
-                  partyId={party.id}
-                  isHost={true}
-                  uploaderName={user?.name || undefined}
-                  uploaderEmail={user?.email}
-                  photoModeration={photoModerationEnabled}
-                />
-              </div>
-            )}
-
-            {activeTab === 'report' && party && (
-              <ReportWidget partyId={party.id} />
-            )}
->>>>>>> origin/mozzarella-66712-report-widget
           </div>
         )}
       </div>

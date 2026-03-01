@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1245,5 +1245,128 @@ export async function getPublicReport(slug: string): Promise<{ report: EventRepo
   } catch (error) {
     console.error('Error fetching public report:', error);
     return null;
+  }
+}
+
+// ============================================
+// Staff API functions (host only)
+// ============================================
+
+export interface StaffListResponse {
+  staff: Staff[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface StaffFilters {
+  status?: StaffStatus;
+  role?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateStaffData {
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  status?: StaffStatus;
+  notes?: string;
+}
+
+export interface UpdateStaffData {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string;
+  status?: StaffStatus;
+  notes?: string | null;
+}
+
+// Get all staff for a party
+export async function getPartyStaff(
+  partyId: string,
+  filters: StaffFilters = {}
+): Promise<StaffListResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.role) params.append('role', filters.role);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/staff${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<StaffListResponse>(url, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    return null;
+  }
+}
+
+// Get staff statistics
+export async function getStaffStats(partyId: string): Promise<StaffStats | null> {
+  try {
+    return await apiRequest<StaffStats>(`/api/parties/${partyId}/staff/stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching staff stats:', error);
+    return null;
+  }
+}
+
+// Add a new staff member
+export async function createStaff(
+  partyId: string,
+  data: CreateStaffData
+): Promise<{ staff: Staff } | null> {
+  try {
+    return await apiRequest<{ staff: Staff }>(`/api/parties/${partyId}/staff`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating staff:', error);
+    return null;
+  }
+}
+
+// Update a staff member
+export async function updateStaff(
+  partyId: string,
+  staffId: string,
+  data: UpdateStaffData
+): Promise<{ staff: Staff } | null> {
+  try {
+    return await apiRequest<{ staff: Staff }>(`/api/parties/${partyId}/staff/${staffId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating staff:', error);
+    return null;
+  }
+}
+
+// Delete a staff member
+export async function deleteStaff(partyId: string, staffId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/staff/${staffId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting staff:', error);
+    return false;
   }
 }
