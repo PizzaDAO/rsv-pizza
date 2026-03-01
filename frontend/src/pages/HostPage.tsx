@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus, Monitor } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -22,11 +22,12 @@ import { VenueWidget } from '../components/venue';
 import { MusicWidget } from '../components/music';
 import { ReportWidget } from '../components/report';
 import { StaffingWidget } from '../components/staffing';
+import { DisplaysWidget } from '../components/displays';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'apps';
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'apps';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -62,7 +63,7 @@ function HostPageContent() {
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff' || tab === 'displays') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -172,6 +173,7 @@ function HostPageContent() {
     { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
     { id: 'staff' as TabType, label: 'Staff', icon: UserPlus },
     { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
+    { id: 'displays' as TabType, label: 'Displays', icon: Monitor },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
   ];
 
@@ -357,6 +359,10 @@ function HostPageContent() {
 
               {activeTab === 'report' && party && (
                 <ReportWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'displays' && party && (
+                <DisplaysWidget partyId={party.id} />
               )}
             </div>
           </div>

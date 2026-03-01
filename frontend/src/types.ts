@@ -567,3 +567,88 @@ export interface StaffStats {
   };
   uniqueRoles: string[];
 }
+
+// Display Widget types
+export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom';
+
+export interface SlideContent {
+  type: 'image' | 'text' | 'qr';
+  url?: string;
+  content?: string;
+  caption?: string;
+}
+
+export interface SlideshowConfig {
+  googleSlidesUrl?: string;
+  slides?: SlideContent[];
+  transition?: 'fade' | 'slide' | 'none';
+  shuffle?: boolean;
+}
+
+export interface QRCodeConfig {
+  size?: 'small' | 'medium' | 'large';
+  message?: string;
+  showEventInfo?: boolean;
+  showGuestCount?: boolean;
+}
+
+export interface PhotosConfig {
+  filter?: 'all' | 'starred';
+  layout?: 'grid' | 'slideshow';
+  autoRefresh?: number;
+  columns?: number;
+  limit?: number;
+}
+
+export interface EventInfoConfig {
+  showCountdown?: boolean;
+  showGuestCount?: boolean;
+  showLocation?: boolean;
+  showDescription?: boolean;
+}
+
+export interface UploadConfig {
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+}
+
+export interface CustomConfig {
+  html?: string;
+  refreshInterval?: number;
+}
+
+export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | UploadConfig | CustomConfig;
+
+export interface Display {
+  id: string;
+  partyId: string;
+  name: string;
+  slug: string;
+  contentType: DisplayContentType;
+  contentConfig: DisplayContentConfig;
+  rotationInterval: number;
+  backgroundColor: string;
+  showClock: boolean;
+  showEventName: boolean;
+  isActive: boolean;
+  password?: string | null;
+  lastViewedAt?: string | null;
+  viewCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DisplayViewerData {
+  display: Display;
+  party: {
+    id: string;
+    name: string;
+    date: string | null;
+    address: string | null;
+    venueName: string | null;
+    eventImageUrl: string | null;
+    inviteCode: string;
+    customUrl: string | null;
+  };
+  photos?: Photo[];
+}

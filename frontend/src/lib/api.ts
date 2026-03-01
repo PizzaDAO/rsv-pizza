@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1368,5 +1368,146 @@ export async function deleteStaff(partyId: string, staffId: string): Promise<boo
   } catch (error) {
     console.error('Error deleting staff:', error);
     return false;
+  }
+}
+
+// ============================================
+// Display API functions
+// ============================================
+
+export interface CreateDisplayData {
+  name: string;
+  contentType?: DisplayContentType;
+  contentConfig?: DisplayContentConfig;
+  rotationInterval?: number;
+  backgroundColor?: string;
+  showClock?: boolean;
+  showEventName?: boolean;
+  password?: string;
+}
+
+export interface UpdateDisplayData {
+  name?: string;
+  contentType?: DisplayContentType;
+  contentConfig?: DisplayContentConfig;
+  rotationInterval?: number;
+  backgroundColor?: string;
+  showClock?: boolean;
+  showEventName?: boolean;
+  isActive?: boolean;
+  password?: string | null;
+}
+
+// List displays for a party
+export async function getPartyDisplays(partyId: string): Promise<{ displays: Display[] } | null> {
+  try {
+    return await apiRequest<{ displays: Display[] }>(`/api/parties/${partyId}/displays`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching displays:', error);
+    return null;
+  }
+}
+
+// Create a new display
+export async function createDisplay(
+  partyId: string,
+  data: CreateDisplayData
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating display:', error);
+    return null;
+  }
+}
+
+// Get display details
+export async function getDisplay(
+  partyId: string,
+  displayId: string
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching display:', error);
+    return null;
+  }
+}
+
+// Update display
+export async function updateDisplay(
+  partyId: string,
+  displayId: string,
+  data: UpdateDisplayData
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating display:', error);
+    return null;
+  }
+}
+
+// Delete display
+export async function deleteDisplay(partyId: string, displayId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting display:', error);
+    return false;
+  }
+}
+
+// Get display for public viewer (no auth)
+export async function getDisplayForViewer(
+  partyId: string,
+  slug: string,
+  password?: string
+): Promise<DisplayViewerData | null> {
+  try {
+    const params = password ? `?password=${encodeURIComponent(password)}` : '';
+    return await apiRequest<DisplayViewerData>(`/api/display/view/${partyId}/${slug}${params}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching display for viewer:', error);
+    return null;
+  }
+}
+
+// Get photos for display (for live refresh)
+export async function getDisplayPhotos(
+  partyId: string,
+  slug: string,
+  since?: string
+): Promise<{ photos: Photo[] } | null> {
+  try {
+    const params = since ? `?since=${encodeURIComponent(since)}` : '';
+    return await apiRequest<{ photos: Photo[] }>(`/api/display/view/${partyId}/${slug}/photos${params}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching display photos:', error);
+    return null;
   }
 }
