@@ -81,6 +81,10 @@ model Party {
   kitEnabled  Boolean   @default(false) @map("kit_enabled")
   kitDeadline DateTime? @map("kit_deadline") @db.Date
 
+  // Party Kit settings
+  kitEnabled  Boolean   @default(false) @map("kit_enabled")
+  kitDeadline DateTime? @map("kit_deadline") @db.Date
+
   // Event type and tagging (for GPP and other special events)
   eventType  String?  @map("event_type")  // 'standard', 'gpp', 'private', etc.
   eventTags  String[] @default([]) @map("event_tags")  // Tags for filtering/grouping

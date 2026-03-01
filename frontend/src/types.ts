@@ -756,3 +756,61 @@ export interface RaffleWinner {
     name: string;
   };
 }
+
+// Party Kit types
+export type KitTier = 'basic' | 'large' | 'deluxe';
+export type KitStatus = 'pending' | 'approved' | 'shipped' | 'delivered' | 'declined';
+
+export interface PartyKit {
+  id: string;
+  partyId: string;
+  requestedTier: KitTier;
+  allocatedTier: KitTier | null;
+  recipientName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+  status: KitStatus;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  notes: string | null;
+  adminNotes: string | null;
+  requestedAt: string;
+  approvedAt: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KitTierInfo {
+  id: KitTier;
+  name: string;
+  description: string;
+  contents: string[];
+}
+
+export const KIT_TIERS: KitTierInfo[] = [
+  {
+    id: 'basic',
+    name: 'Basic Kit',
+    description: 'Essential party supplies',
+    contents: ['Stickers', 'Tablecloth', 'Flyers'],
+  },
+  {
+    id: 'large',
+    name: 'Large Kit',
+    description: 'Everything in Basic plus more',
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents'],
+  },
+  {
+    id: 'deluxe',
+    name: 'Deluxe Kit',
+    description: 'The complete party package',
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Pins', 'Extras'],
+  },
+];
