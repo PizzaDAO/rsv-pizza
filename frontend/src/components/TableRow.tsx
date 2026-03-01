@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -38,6 +38,10 @@ interface TableRowProps {
   // For requests variant - lookup functions
   toppingNameById?: (id: string) => string;
   beverageNameById?: (id: string) => string;
+  // Edit functionality
+  editable?: boolean;
+  onQuantityChange?: (id: string, newQuantity: number) => void;
+  onRemovePizza?: (id: string) => void;
 }
 
 export const TableRow: React.FC<TableRowProps> = ({
@@ -55,6 +59,9 @@ export const TableRow: React.FC<TableRowProps> = ({
   onPromote,
   toppingNameById = (id) => id,
   beverageNameById = (id) => id,
+  editable = false,
+  onQuantityChange,
+  onRemovePizza,
 }) => {
   // Pizza variant
   if (variant === 'pizza' && pizzaRec) {
@@ -92,20 +99,55 @@ export const TableRow: React.FC<TableRowProps> = ({
             </div>
           </div>
 
-          {/* Guest count */}
-          <span className="text-white/50 text-xs flex-shrink-0">
-            {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
-          </span>
+          {/* Guest names */}
+          <div className="flex flex-wrap gap-1 flex-shrink-0 max-w-[200px] justify-end">
+            {pizzaRec.guests && pizzaRec.guests.length > 0 ? (
+              <>
+                {pizzaRec.guests.slice(0, 4).map((g, i) => (
+                  <span key={g.id || i} className="px-1.5 py-0.5 bg-white/10 text-white/70 text-[10px] rounded">
+                    {g.name.split(' ')[0]}
+                  </span>
+                ))}
+                {pizzaRec.guests.length > 4 && (
+                  <span className="text-white/50 text-[10px]">+{pizzaRec.guests.length - 4}</span>
+                )}
+              </>
+            ) : (
+              <span className="text-white/50 text-xs">
+                {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
+              </span>
+            )}
+          </div>
         </div>
       );
     }
 
     return (
       <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
-        {/* Quantity */}
-        <span className={`font-bold text-sm flex-shrink-0 w-8 text-center ${pizzaRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-[#ff393a]'}`}>
-          {quantity}x
-        </span>
+        {/* Quantity - with edit controls if editable */}
+        {editable && onQuantityChange ? (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => onQuantityChange(pizzaRec.id, Math.max(0, quantity - 1))}
+              className="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+            >
+              <Minus size={12} />
+            </button>
+            <span className={`font-bold text-sm w-6 text-center ${pizzaRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-[#ff393a]'}`}>
+              {quantity}
+            </span>
+            <button
+              onClick={() => onQuantityChange(pizzaRec.id, quantity + 1)}
+              className="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+        ) : (
+          <span className={`font-bold text-sm flex-shrink-0 w-8 text-center ${pizzaRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-[#ff393a]'}`}>
+            {quantity}x
+          </span>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -132,10 +174,36 @@ export const TableRow: React.FC<TableRowProps> = ({
           </div>
         </div>
 
-        {/* Guest count */}
-        <span className="text-white/50 text-xs flex-shrink-0">
-          {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
-        </span>
+        {/* Guest names */}
+        <div className="flex flex-wrap gap-1 flex-shrink-0 max-w-[200px] justify-end">
+          {pizzaRec.guests && pizzaRec.guests.length > 0 ? (
+            <>
+              {pizzaRec.guests.slice(0, 4).map((g, i) => (
+                <span key={g.id || i} className="px-1.5 py-0.5 bg-white/10 text-white/70 text-[10px] rounded">
+                  {g.name.split(' ')[0]}
+                </span>
+              ))}
+              {pizzaRec.guests.length > 4 && (
+                <span className="text-white/50 text-[10px]">+{pizzaRec.guests.length - 4}</span>
+              )}
+            </>
+          ) : (
+            <span className="text-white/50 text-xs">
+              {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
+            </span>
+          )}
+        </div>
+
+        {/* Remove button if editable */}
+        {editable && onRemovePizza && (
+          <button
+            onClick={() => onRemovePizza(pizzaRec.id)}
+            className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+            aria-label="Remove pizza"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     );
   }

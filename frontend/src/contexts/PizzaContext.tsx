@@ -344,6 +344,42 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setBeverageRecommendations(waves[0]?.beverages || []);
   };
 
+  // Update pizza quantity in recommendations
+  const updatePizzaQuantity = (pizzaId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      // Remove the pizza if quantity is 0 or less
+      removePizza(pizzaId);
+      return;
+    }
+
+    setRecommendations(prev =>
+      prev.map(p => p.id === pizzaId ? { ...p, quantity: newQuantity } : p)
+    );
+
+    // Also update wave recommendations
+    setWaveRecommendations(prev =>
+      prev.map(wave => ({
+        ...wave,
+        pizzas: wave.pizzas.map(p => p.id === pizzaId ? { ...p, quantity: newQuantity } : p),
+        totalPizzas: wave.pizzas.reduce((sum, p) => sum + (p.id === pizzaId ? newQuantity : (p.quantity || 1)), 0),
+      }))
+    );
+  };
+
+  // Remove pizza from recommendations
+  const removePizza = (pizzaId: string) => {
+    setRecommendations(prev => prev.filter(p => p.id !== pizzaId));
+
+    // Also update wave recommendations
+    setWaveRecommendations(prev =>
+      prev.map(wave => ({
+        ...wave,
+        pizzas: wave.pizzas.filter(p => p.id !== pizzaId),
+        totalPizzas: wave.pizzas.filter(p => p.id !== pizzaId).reduce((sum, p) => sum + (p.quantity || 1), 0),
+      }))
+    );
+  };
+
   return (
     <PizzaContext.Provider value={{
       party,
@@ -363,6 +399,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       promoteGuest,
       recommendations,
       generateRecommendations,
+      updatePizzaQuantity,
+      removePizza,
       beverageRecommendations,
       waveRecommendations,
       orderExpectedGuests,

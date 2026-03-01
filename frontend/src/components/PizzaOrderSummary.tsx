@@ -7,7 +7,7 @@ import { TableRow } from './TableRow';
 import { GuestPreferencesList } from './GuestPreferencesList';
 import { Pizzeria, OrderingOption } from '../types';
 import { CallRecordingPlayer } from './CallRecordingPlayer';
-import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer } from 'lucide-react';
+import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   searchPizzerias,
@@ -20,7 +20,7 @@ import {
 } from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
-  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations } = usePizza();
+  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations, updatePizzaQuantity, removePizza } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
@@ -28,6 +28,7 @@ export const PizzaOrderSummary: React.FC = () => {
   const [selectedOption, setSelectedOption] = useState<OrderingOption | null>(null);
   const [orderComplete, setOrderComplete] = useState<{ orderId: string; checkoutUrl?: string; isAiCall?: boolean; pizzeriaName?: string } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Inline pizzeria search state
   const [pizzerias, setPizzerias] = useState<Pizzeria[]>([]);
@@ -36,6 +37,11 @@ export const PizzaOrderSummary: React.FC = () => {
   const [searchAddress, setSearchAddress] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [autoSearched, setAutoSearched] = useState(false);
+
+  // Test mode state
+  const [showTestMode, setShowTestMode] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testPizzeriaName, setTestPizzeriaName] = useState('Test Pizzeria');
 
   // Auto-search if party address is provided
   useEffect(() => {
@@ -115,6 +121,31 @@ export const PizzaOrderSummary: React.FC = () => {
   const handleInlineSelectPizzeria = (pizzeria: Pizzeria, option: OrderingOption) => {
     setSelectedPizzeria(pizzeria);
     setSelectedOption(option);
+  };
+
+  // Handle test mode - create a fake pizzeria with AI phone option
+  const handleTestAICall = () => {
+    if (!testPhone.trim()) return;
+
+    const testPizzeria: Pizzeria = {
+      id: 'test-pizzeria',
+      placeId: 'test-place-id',
+      name: testPizzeriaName || 'Test Pizzeria',
+      address: '123 Test Street',
+      phone: testPhone,
+      rating: 5.0,
+      reviewCount: 100,
+      isOpen: true,
+      distance: 0,
+      location: { lat: 0, lng: 0 },
+      orderingOptions: [
+        { provider: 'ai_phone' as any, available: true },
+        { provider: 'phone', available: true },
+      ],
+    };
+
+    setSelectedPizzeria(testPizzeria);
+    setSelectedOption({ provider: 'ai_phone' as any, available: true });
   };
 
   // Generate call script for phone ordering
@@ -359,8 +390,191 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
         {isExpanded && recommendations.length > 0 && (
           <>
-            <div className="mt-4 mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
-              <h3 className="font-medium text-[#ffb347] mb-2">Order Summary</h3>
+            {/* Pizzeria Selection - MOVED TO TOP */}
+            <div className="mt-4 mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+              {!hasSearched || pizzerias.length === 0 ? (
+                // Show search form if no results yet
+                <div className="space-y-3">
+                  <h3 className="font-medium text-white text-sm mb-3">1. Select a Pizzeria</h3>
+
+                  <button
+                    onClick={handleUseCurrentLocation}
+                    disabled={pizzeriaLoading}
+                    className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2"
+                  >
+                    {pizzeriaLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Navigation size={16} />
+                    )}
+                    Use My Location
+                  </button>
+
+                  <div className="flex items-center gap-2 text-white/40">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-xs">or</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+
+                  <form onSubmit={handleAddressSearch} className="flex gap-2">
+                    <div className="flex-1">
+                      <LocationAutocomplete
+                        value={searchAddress}
+                        onChange={setSearchAddress}
+                        placeholder="Enter delivery address..."
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={pizzeriaLoading || !searchAddress.trim()}
+                      className="btn-secondary px-3"
+                    >
+                      {pizzeriaLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                    </button>
+                  </form>
+
+                  {pizzeriaError && (
+                    <p className="text-xs text-[#ff393a]">{pizzeriaError}</p>
+                  )}
+                </div>
+              ) : (
+                // Show top pizzerias
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-white text-sm">1. Select a Pizzeria</h3>
+                    <button
+                      onClick={() => setShowPizzeriaSearch(true)}
+                      className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                    >
+                      View all
+                    </button>
+                  </div>
+
+                  {pizzerias.slice(0, 5).map((pizzeria) => {
+                    const directOption = pizzeria.orderingOptions.find(o => supportsDirectOrdering(o.provider) && o.available);
+                    const phoneOption = pizzeria.orderingOptions.find(o => o.provider === 'phone');
+                    const primaryOption = directOption || phoneOption || pizzeria.orderingOptions[0];
+
+                    return (
+                      <div
+                        key={pizzeria.id}
+                        className="p-3 bg-white/5 border border-white/10 rounded-lg hover:border-[#ff393a]/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-white text-sm truncate">{pizzeria.name}</h4>
+                              <div className="flex items-center gap-1">
+                                {renderStars(pizzeria.rating)}
+                                {pizzeria.reviewCount !== undefined && (
+                                  <span className="text-xs text-white/50">({pizzeria.reviewCount})</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-white/50">
+                              {pizzeria.distance && (
+                                <span>{formatDistance(pizzeria.distance)}</span>
+                              )}
+                              {pizzeria.isOpen !== undefined && (
+                                <span className={pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}>
+                                  {pizzeria.isOpen ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {primaryOption && (
+                            primaryOption.provider === 'phone' && pizzeria.phone ? (
+                              <a
+                                href={`tel:${pizzeria.phone}`}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                              >
+                                <Phone size={12} className="md:hidden" />
+                                <span className="md:hidden">Call</span>
+                                <span className="hidden md:inline">{pizzeria.phone}</span>
+                              </a>
+                            ) : supportsDirectOrdering(primaryOption.provider) ? (
+                              <button
+                                onClick={() => handleInlineSelectPizzeria(pizzeria, primaryOption)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white"
+                                style={{ backgroundColor: getProviderColor(primaryOption.provider) }}
+                              >
+                                <ShoppingCart size={12} />
+                                Order
+                              </button>
+                            ) : primaryOption.deepLink ? (
+                              <a
+                                href={primaryOption.deepLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                              >
+                                <ExternalLink size={12} />
+                                Order
+                              </a>
+                            ) : null
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Test Mode Section */}
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <button
+                      onClick={() => setShowTestMode(!showTestMode)}
+                      className="flex items-center gap-2 text-xs text-white/50 hover:text-white/70"
+                    >
+                      <Phone size={12} />
+                      Test AI Call with Custom Number
+                      {showTestMode ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+
+                    {showTestMode && (
+                      <div className="mt-3 space-y-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <p className="text-xs text-purple-300">Enter any phone number to test the AI calling feature:</p>
+                        <input
+                          type="text"
+                          value={testPizzeriaName}
+                          onChange={(e) => setTestPizzeriaName(e.target.value)}
+                          placeholder="Pizzeria name (optional)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <input
+                          type="tel"
+                          value={testPhone}
+                          onChange={(e) => setTestPhone(e.target.value)}
+                          placeholder="Phone number (e.g., +1-555-123-4567)"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                        />
+                        <button
+                          onClick={handleTestAICall}
+                          disabled={!testPhone.trim()}
+                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        >
+                          Start Test AI Call
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Order Summary */}
+            <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-[#ffb347]">2. Review Your Order</h3>
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    isEditMode ? 'bg-[#ff393a] text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                  }`}
+                >
+                  <Pencil size={12} />
+                  {isEditMode ? 'Done Editing' : 'Edit Order'}
+                </button>
+              </div>
               <div className="space-y-2 text-sm">
                 <p className="text-white/80">
                   <span className="text-white/60">Total pizzas:</span>{' '}
@@ -430,7 +644,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       {waveRec.pizzas
                         .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                         .map((pizza, pizzaIndex) => (
-                          <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={pizzaIndex} variant="pizza" />
+                          <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={pizzaIndex} variant="pizza" editable={isEditMode} onQuantityChange={updatePizzaQuantity} onRemovePizza={removePizza} />
                         ))}
                     </div>
                   </div>
@@ -475,7 +689,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   {[...recommendations]
                     .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                     .map((pizza, index) => (
-                      <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={index} variant="pizza" />
+                      <TableRow key={pizza.id} pizzaRec={pizza} pizzaIndex={index} variant="pizza" editable={isEditMode} onQuantityChange={updatePizzaQuantity} onRemovePizza={removePizza} />
                     ))}
                 </div>
 
@@ -559,138 +773,6 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               </div>
             )}
 
-            {/* Inline Pizzeria Search/Results */}
-            <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
-              {!hasSearched || pizzerias.length === 0 ? (
-                // Show search form if no results yet
-                <div className="space-y-3">
-                  <h3 className="font-medium text-white text-sm mb-3">Find a Pizzeria</h3>
-
-                  <button
-                    onClick={handleUseCurrentLocation}
-                    disabled={pizzeriaLoading}
-                    className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2"
-                  >
-                    {pizzeriaLoading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Navigation size={16} />
-                    )}
-                    Use My Location
-                  </button>
-
-                  <div className="flex items-center gap-2 text-white/40">
-                    <div className="flex-1 h-px bg-white/10" />
-                    <span className="text-xs">or</span>
-                    <div className="flex-1 h-px bg-white/10" />
-                  </div>
-
-                  <form onSubmit={handleAddressSearch} className="flex gap-2">
-                    <div className="flex-1">
-                      <LocationAutocomplete
-                        value={searchAddress}
-                        onChange={setSearchAddress}
-                        placeholder="Enter delivery address..."
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={pizzeriaLoading || !searchAddress.trim()}
-                      className="btn-secondary px-3"
-                    >
-                      {pizzeriaLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                    </button>
-                  </form>
-
-                  {pizzeriaError && (
-                    <p className="text-xs text-[#ff393a]">{pizzeriaError}</p>
-                  )}
-                </div>
-              ) : (
-                // Show top 3 pizzerias
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white text-sm">Top Pizzerias Nearby</h3>
-                    <button
-                      onClick={() => setShowPizzeriaSearch(true)}
-                      className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
-                    >
-                      View all
-                    </button>
-                  </div>
-
-                  {pizzerias.slice(0, 3).map((pizzeria) => {
-                    const directOption = pizzeria.orderingOptions.find(o => supportsDirectOrdering(o.provider) && o.available);
-                    const phoneOption = pizzeria.orderingOptions.find(o => o.provider === 'phone');
-                    const primaryOption = directOption || phoneOption || pizzeria.orderingOptions[0];
-
-                    return (
-                      <div
-                        key={pizzeria.id}
-                        className="p-3 bg-white/5 border border-white/10 rounded-lg"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-white text-sm truncate">{pizzeria.name}</h4>
-                              <div className="flex items-center gap-1">
-                                {renderStars(pizzeria.rating)}
-                                {pizzeria.reviewCount !== undefined && (
-                                  <span className="text-xs text-white/50">({pizzeria.reviewCount})</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-white/50">
-                              {pizzeria.distance && (
-                                <span>{formatDistance(pizzeria.distance)}</span>
-                              )}
-                              {pizzeria.isOpen !== undefined && (
-                                <span className={pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}>
-                                  {pizzeria.isOpen ? 'Open' : 'Closed'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {primaryOption && (
-                            primaryOption.provider === 'phone' && pizzeria.phone ? (
-                              <a
-                                href={`tel:${pizzeria.phone}`}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
-                              >
-                                <Phone size={12} className="md:hidden" />
-                                <span className="md:hidden">Call</span>
-                                <span className="hidden md:inline">{pizzeria.phone}</span>
-                              </a>
-                            ) : supportsDirectOrdering(primaryOption.provider) ? (
-                              <button
-                                onClick={() => handleInlineSelectPizzeria(pizzeria, primaryOption)}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white"
-                                style={{ backgroundColor: getProviderColor(primaryOption.provider) }}
-                              >
-                                <ShoppingCart size={12} />
-                                Order
-                              </button>
-                            ) : primaryOption.deepLink ? (
-                              <a
-                                href={primaryOption.deepLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
-                              >
-                                <ExternalLink size={12} />
-                                Order
-                              </a>
-                            ) : null
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
             {/* Guest Requests - embedded */}
             <div className="mt-4 pt-4 border-t border-white/10">
               <GuestPreferencesList embedded />
@@ -729,6 +811,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
           pizzeria={selectedPizzeria}
           orderingOption={selectedOption}
           recommendations={recommendations}
+          partyId={party?.id}
           onClose={handleCloseCheckout}
           onOrderComplete={handleOrderComplete}
         />
