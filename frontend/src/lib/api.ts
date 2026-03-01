@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -118,6 +118,7 @@ export interface UpdatePartyData {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  fundraisingGoal?: number | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -182,6 +183,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       photoModeration: data.photoModeration,
       nftEnabled: data.nftEnabled,
       nftChain: data.nftChain,
+      fundraisingGoal: data.fundraisingGoal,
     },
   });
 }
@@ -584,6 +586,61 @@ export async function batchReviewPhotos(
   }
 }
 
+// ============================================
+// Sponsor CRM API functions
+// ============================================
+
+export interface CreateSponsorData {
+  name: string;
+  website?: string;
+  brandTwitter?: string;
+  pointPerson?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactTwitter?: string;
+  telegram?: string;
+  status?: SponsorStatus;
+  amount?: number | null;
+  sponsorshipType?: SponsorshipType | null;
+  productService?: string;
+  logoUrl?: string;
+  notes?: string;
+  lastContactedAt?: string | null;
+}
+
+export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
+
+export interface SponsorFilters {
+  status?: SponsorStatus;
+  sortBy?: 'createdAt' | 'name' | 'amount' | 'lastContactedAt' | 'status';
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Get all sponsors for a party
+export async function getSponsors(
+  partyId: string,
+  filters: SponsorFilters = {}
+): Promise<{ sponsors: Sponsor[] } | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/sponsors${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<{ sponsors: Sponsor[] }>(url, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsors:', error);
+    return null;
+  }
+}
+
 // GPP API functions
 export interface CreateGPPEventData {
   city: string;
@@ -658,4 +715,99 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
+// Get sponsor pipeline statistics
+export async function getSponsorStats(partyId: string): Promise<SponsorStats | null> {
+  try {
+    return await apiRequest<SponsorStats>(`/api/parties/${partyId}/sponsors/stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsor stats:', error);
+    return null;
+  }
+}
+
+// Create a new sponsor
+export async function createSponsor(
+  partyId: string,
+  data: CreateSponsorData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating sponsor:', error);
+    throw error;
+  }
+}
+
+// Get single sponsor details
+export async function getSponsor(
+  partyId: string,
+  sponsorId: string
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsor:', error);
+    return null;
+  }
+}
+
+// Update a sponsor
+export async function updateSponsor(
+  partyId: string,
+  sponsorId: string,
+  data: UpdateSponsorData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating sponsor:', error);
+    throw error;
+  }
+}
+
+// Delete a sponsor
+export async function deleteSponsor(partyId: string, sponsorId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting sponsor:', error);
+    return false;
+  }
+}
+
+// Update fundraising goal for a party
+export async function updateFundraisingGoal(
+  partyId: string,
+  fundraisingGoal: number | null
+): Promise<{ party: any } | null> {
+  try {
+    return await apiRequest<{ party: any }>(`/api/parties/${partyId}`, {
+      method: 'PATCH',
+      body: { fundraisingGoal },
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating fundraising goal:', error);
+    throw error;
+  }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -17,11 +17,12 @@ import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
 import { AppsHub } from '../components/AppsHub';
+import { SponsorCRM } from '../components/sponsors';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'pizza' | 'guests' | 'photos' | 'apps';
+type TabType = 'details' | 'pizza' | 'guests' | 'photos' | 'apps' | 'sponsors';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -64,7 +65,7 @@ function HostPageContent() {
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -178,6 +179,7 @@ function HostPageContent() {
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
   ];
 
@@ -346,6 +348,10 @@ function HostPageContent() {
                     photoModeration={photoModerationEnabled}
                   />
                 </div>
+              )}
+
+              {activeTab === 'sponsors' && party && (
+                <SponsorCRM partyId={party.id} />
               )}
             </div>
           </div>

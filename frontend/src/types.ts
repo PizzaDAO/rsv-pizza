@@ -158,6 +158,7 @@ export interface Party {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  fundraisingGoal?: number | null;
   createdAt: string;
   guests: Guest[];
   // Donation settings
@@ -318,4 +319,38 @@ export interface PhotoStats {
   uniqueTags: string[];
   uniqueUploadersCount: number;
   photosEnabled: boolean;
+}
+
+// Sponsor CRM types
+export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
+export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
+
+export interface Sponsor {
+  id: string;
+  partyId: string;
+  name: string;
+  website: string | null;
+  brandTwitter: string | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  contactTwitter: string | null;
+  telegram: string | null;
+  status: SponsorStatus;
+  amount: number | null;
+  sponsorshipType: SponsorshipType | null;
+  productService: string | null;
+  logoUrl: string | null;
+  notes: string | null;
+  lastContactedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SponsorStats {
+  fundraisingGoal: number | null;
+  totalConfirmed: number;
+  totalSponsors: number;
+  statusCounts: Record<SponsorStatus, number>;
 }
