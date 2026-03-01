@@ -4,7 +4,7 @@ import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, Chev
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { Pizzeria, DonationPublicStats } from '../types';
 import { IconInput } from '../components/IconInput';
 import { DonationForm } from '../components/DonationForm';
@@ -59,6 +59,7 @@ export function RSVPPage() {
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // Load saved preferences when user is logged in or when email matches a saved profile
   useEffect(() => {
@@ -157,6 +158,9 @@ export function RSVPPage() {
       // If host has selected specific pizzerias, use those
       if (party?.selectedPizzerias && party.selectedPizzerias.length > 0) {
         setNearbyPizzerias(party.selectedPizzerias);
+        if (party?.address) {
+          geocodeAddress(party.address).then(loc => { if (loc) setVenueLocation(loc); });
+        }
         return;
       }
 
@@ -166,6 +170,7 @@ export function RSVPPage() {
       setLoadingPizzerias(true);
       try {
         const location = await geocodeAddress(party.address);
+        if (location) setVenueLocation(location);
         if (location) {
           const results = await searchPizzerias(location.lat, location.lng);
           // Take only top 3
@@ -751,6 +756,11 @@ export function RSVPPage() {
                               <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
                                 <Star size={10} className="fill-yellow-400" />
                                 {pizzeria.rating.toFixed(1)}
+                              </span>
+                            )}
+                            {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
+                              <span className="text-xs text-white/40">
+                                {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                               </span>
                             )}
                           </div>
