@@ -69,7 +69,6 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     submittedAt: dbGuest.submitted_at,
     checkedInAt: dbGuest.checked_in_at ?? null,
     approved: dbGuest.approved ?? null,
-    checkedInAt: dbGuest.checked_in_at ?? null,
     checkedInBy: dbGuest.checked_in_by ?? null,
     status: dbGuest.status || 'CONFIRMED',
     waitlistPosition: dbGuest.waitlist_position || null,
