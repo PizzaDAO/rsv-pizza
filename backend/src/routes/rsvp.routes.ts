@@ -346,20 +346,6 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     // Send appropriate email if email provided
     if (email?.trim()) {
       try {
-<<<<<<< HEAD
-        await sendRSVPConfirmationEmail({
-          guestEmail: email.trim(),
-          guestName: name.trim(),
-          guestId: guest.id,
-          partyName: party.name,
-          partyDate: party.date,
-          partyTimezone: party.timezone,
-          partyAddress: party.address,
-          inviteCode,
-          customUrl: party.customUrl,
-          requireApproval: party.requireApproval,
-        });
-=======
         if (isAtCapacity) {
           await sendWaitlistConfirmationEmail({
             guestEmail: email.trim(),
@@ -377,13 +363,13 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             guestId: guest.id,
             partyName: party.name,
             partyDate: party.date,
+            partyTimezone: party.timezone,
             partyAddress: party.address,
             inviteCode,
             customUrl: party.customUrl,
             requireApproval: party.requireApproval,
           });
         }
->>>>>>> a6aab27 (sausage-63975: Add waitlist feature for events at capacity)
       } catch (emailError) {
         console.error('Failed to send confirmation email:', emailError);
         // Don't fail the RSVP if email fails
