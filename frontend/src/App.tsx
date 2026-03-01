@@ -14,6 +14,7 @@ import { AccountPage } from './pages/AccountPage';
 import { GPPLandingPage } from './pages/GPPLandingPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { DJPage } from './pages/DJPage';
+import { PublicReportPage } from './pages/PublicReportPage';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
+            <Route path="/report/:slug" element={<PublicReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />

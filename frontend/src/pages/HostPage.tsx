@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music } from 'lucide-react';
+<<<<<<< HEAD
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart } from 'lucide-react';
+=======
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, FileBarChart } from 'lucide-react';
+>>>>>>> origin/mozzarella-66712-report-widget
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -16,15 +20,24 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
+<<<<<<< HEAD
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
 import { MusicWidget } from '../components/music';
+import { ReportWidget } from '../components/report';
+=======
+import { ReportWidget } from '../components/report';
+>>>>>>> origin/mozzarella-66712-report-widget
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'apps';
+<<<<<<< HEAD
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'apps';
+=======
+type TabType = 'details' | 'pizza' | 'guests' | 'photos' | 'report';
+>>>>>>> origin/mozzarella-66712-report-widget
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -67,7 +80,11 @@ function HostPageContent() {
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music') ? tab : 'details';
+<<<<<<< HEAD
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report') ? tab : 'details';
+=======
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'report') ? tab : 'details';
+>>>>>>> origin/mozzarella-66712-report-widget
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -182,9 +199,14 @@ function HostPageContent() {
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+<<<<<<< HEAD
     { id: 'music' as TabType, label: 'Music', icon: Music },
     { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
+    { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
+=======
+    { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
+>>>>>>> origin/mozzarella-66712-report-widget
   ];
 
   return (
@@ -365,10 +387,58 @@ function HostPageContent() {
                 </div>
               )}
 
+<<<<<<< HEAD
               {activeTab === 'sponsors' && party && (
                 <SponsorCRM partyId={party.id} />
               )}
+
+              {activeTab === 'report' && party && (
+                <ReportWidget partyId={party.id} />
+              )}
             </div>
+=======
+                <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
+                <BeverageSettings />
+              </>
+            )}
+
+            {activeTab === 'details' && (
+              <EventDetailsTab />
+            )}
+
+            {activeTab === 'photos' && party && (
+              <div className="card p-6 space-y-4">
+                <Checkbox
+                  checked={photoModerationEnabled}
+                  onChange={async () => {
+                    const newValue = !photoModerationEnabled;
+                    setPhotoModerationEnabled(newValue);
+                    const success = await updateParty(party.id, { photo_moderation: newValue });
+                    if (!success) {
+                      setPhotoModerationEnabled(!newValue);
+                    }
+                  }}
+                  label="Require Photo Approval"
+                />
+                {photoModerationEnabled && (
+                  <p className="text-xs text-white/40 -mt-2 ml-8">
+                    Guest photos must be approved by a host before appearing in the gallery.
+                  </p>
+                )}
+                <PhotoGallery
+                  partyId={party.id}
+                  isHost={true}
+                  uploaderName={user?.name || undefined}
+                  uploaderEmail={user?.email}
+                  photoModeration={photoModerationEnabled}
+                />
+              </div>
+            )}
+
+            {activeTab === 'report' && party && (
+              <ReportWidget partyId={party.id} />
+            )}
+>>>>>>> origin/mozzarella-66712-report-widget
           </div>
         )}
       </div>

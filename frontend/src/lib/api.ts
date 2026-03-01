@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1075,5 +1075,175 @@ export async function reorderPerformers(
   } catch (error) {
     console.error('Error reordering performers:', error);
     throw error;
+  }
+}
+
+// =====================
+// Report API functions
+// =====================
+
+// Get full report data (host only)
+export async function getReport(partyId: string): Promise<{ report: EventReport } | null> {
+  try {
+    return await apiRequest<{ report: EventReport }>(`/api/parties/${partyId}/report`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching report:', error);
+    return null;
+  }
+}
+
+// Update report fields (host only)
+export interface UpdateReportData {
+  reportRecap?: string | null;
+  reportVideoUrl?: string | null;
+  reportPhotosUrl?: string | null;
+  flyerArtist?: string | null;
+  xPostUrl?: string | null;
+  xPostViews?: number | null;
+  farcasterPostUrl?: string | null;
+  farcasterViews?: number | null;
+  lumaUrl?: string | null;
+  lumaViews?: number | null;
+  poapEventId?: string | null;
+  poapMints?: number | null;
+  poapMoments?: number | null;
+}
+
+export async function updateReport(
+  partyId: string,
+  data: UpdateReportData
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/report`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating report:', error);
+    return false;
+  }
+}
+
+// Publish report
+export async function publishReport(
+  partyId: string
+): Promise<{ reportPublicSlug: string; publicUrl: string } | null> {
+  try {
+    return await apiRequest<{ success: boolean; reportPublicSlug: string; publicUrl: string }>(
+      `/api/parties/${partyId}/report/publish`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error publishing report:', error);
+    return null;
+  }
+}
+
+// Unpublish report
+export async function unpublishReport(partyId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/report/publish`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error unpublishing report:', error);
+    return false;
+  }
+}
+
+// Add social post
+export async function addSocialPost(
+  partyId: string,
+  data: { platform: string; url: string; authorHandle?: string }
+): Promise<{ socialPost: SocialPost } | null> {
+  try {
+    return await apiRequest<{ socialPost: SocialPost }>(
+      `/api/parties/${partyId}/report/social-posts`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error adding social post:', error);
+    return null;
+  }
+}
+
+// Delete social post
+export async function deleteSocialPost(partyId: string, postId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/report/social-posts/${postId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting social post:', error);
+    return false;
+  }
+}
+
+// Add notable attendee
+export async function addNotableAttendee(
+  partyId: string,
+  data: { name: string; link?: string }
+): Promise<{ notableAttendee: NotableAttendee } | null> {
+  try {
+    return await apiRequest<{ notableAttendee: NotableAttendee }>(
+      `/api/parties/${partyId}/report/notable-attendees`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error adding notable attendee:', error);
+    return null;
+  }
+}
+
+// Delete notable attendee
+export async function deleteNotableAttendee(partyId: string, attendeeId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/report/notable-attendees/${attendeeId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting notable attendee:', error);
+    return false;
+  }
+}
+
+// Get public report by slug (no auth)
+export async function getPublicReport(slug: string): Promise<{ report: EventReport } | null> {
+  try {
+    return await apiRequest<{ report: EventReport }>(`/api/reports/public/${slug}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching public report:', error);
+    return null;
   }
 }
