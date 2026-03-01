@@ -311,6 +311,7 @@ export interface DbGuest {
   suggested_pizzerias?: any[];
   submitted_at: string;
   submitted_via: string;
+  checked_in_at?: string | null;
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checked_in_at?: string | null;
   checked_in_by?: string | null;

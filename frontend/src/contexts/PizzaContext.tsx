@@ -67,6 +67,7 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
     suggestedPizzerias: dbGuest.suggested_pizzerias || [],
     submittedAt: dbGuest.submitted_at,
+    checkedInAt: dbGuest.checked_in_at ?? null,
     approved: dbGuest.approved ?? null,
     checkedInAt: dbGuest.checked_in_at ?? null,
     checkedInBy: dbGuest.checked_in_by ?? null,
