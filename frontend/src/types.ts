@@ -125,6 +125,44 @@ export interface PizzaSettings {
   style: PizzaStyle;
 }
 
+// Venue status tracking
+export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full' | 'declined';
+
+// Venue model (for venue picker)
+export interface Venue {
+  id: string;
+  partyId: string;
+  name: string;
+  address: string | null;
+  website: string | null;
+  capacity: number | null;
+  cost: number | null;
+  organization: string | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  status: VenueStatus;
+  isSelected: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Legacy VenueInfo interface (for backwards compatibility with Party fields)
+export interface VenueInfo {
+  status: VenueStatus | null;
+  capacity: number | null;
+  cost: number | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  organization: string | null;
+  website: string | null;
+  notes: string | null;
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -148,6 +186,17 @@ export interface Party {
   description: string | null;
   address: string | null;
   venueName: string | null;
+  // Venue tracking fields
+  venueStatus: VenueStatus | null;
+  venueCapacity: number | null;
+  venueCost: number | null;
+  venuePointPerson: string | null;
+  venueContactName: string | null;
+  venueContactEmail: string | null;
+  venueContactPhone: string | null;
+  venueOrganization: string | null;
+  venueWebsite: string | null;
+  venueNotes: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
