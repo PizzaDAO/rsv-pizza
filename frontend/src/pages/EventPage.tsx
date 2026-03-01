@@ -18,6 +18,7 @@ import { DonationStep } from '../components/DonationStep';
 import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
+import { MusicWidget } from '../components/music';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
@@ -939,6 +940,11 @@ export function EventPage() {
                     size="lg"
                     showTitle={true}
                   />
+                </div>
+
+                {/* Music Lineup Section */}
+                <div className="border-t border-white/10 pt-6 mt-6">
+                  <MusicWidget isHost={false} partyId={event.id} />
                 </div>
 
                 {/* Photo Gallery Section */}

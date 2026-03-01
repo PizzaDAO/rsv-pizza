@@ -403,3 +403,64 @@ export interface SponsorStats {
   totalSponsors: number;
   statusCounts: Record<SponsorStatus, number>;
 }
+
+// Music/DJ Lineup types
+export type PerformerType = 'dj' | 'live_band' | 'solo' | 'playlist';
+export type PerformerStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Performer {
+  id: string;
+  partyId: string;
+  name: string;
+  type: PerformerType;
+  genre: string | null;
+  setTime: string | null;
+  setDuration: number | null;
+  sortOrder: number;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  instagram: string | null;
+  soundcloud: string | null;
+  status: PerformerStatus;
+  equipmentProvided: boolean;
+  equipmentNotes: string | null;
+  fee: number | null;
+  feePaid: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerformersResponse {
+  performers: Performer[];
+  musicEnabled: boolean;
+  musicNotes: string | null;
+}
+
+// Song type for music widget
+export type MusicPlatform = 'spotify' | 'apple_music' | 'youtube' | 'soundcloud' | 'other';
+
+export interface Song {
+  id: string;
+  partyId: string;
+  title: string;
+  artist: string;
+  platform: MusicPlatform;
+  url: string | null;
+  fileUrl: string | null;
+  addedBy: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface Playlist {
+  id: string;
+  partyId: string;
+  name: string;
+  platform: MusicPlatform;
+  url: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+}

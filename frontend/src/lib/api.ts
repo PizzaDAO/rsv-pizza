@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -130,6 +130,8 @@ export interface UpdatePartyData {
   nftEnabled?: boolean;
   nftChain?: string | null;
   fundraisingGoal?: number | null;
+  musicEnabled?: boolean;
+  musicNotes?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -206,6 +208,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       nftEnabled: data.nftEnabled,
       nftChain: data.nftChain,
       fundraisingGoal: data.fundraisingGoal,
+      musicEnabled: data.musicEnabled,
+      musicNotes: data.musicNotes,
     },
   });
 }
@@ -663,6 +667,61 @@ export async function getSponsors(
   }
 }
 
+// ============================================
+// Performer/Music API functions
+// ============================================
+
+export interface CreatePerformerData {
+  name: string;
+  type?: 'dj' | 'live_band' | 'solo' | 'playlist';
+  genre?: string;
+  setTime?: string;
+  setDuration?: number;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  instagram?: string;
+  soundcloud?: string;
+  status?: 'pending' | 'confirmed' | 'cancelled';
+  equipmentProvided?: boolean;
+  equipmentNotes?: string;
+  fee?: number;
+  feePaid?: boolean;
+  notes?: string;
+}
+
+export interface UpdatePerformerData {
+  name?: string;
+  type?: 'dj' | 'live_band' | 'solo' | 'playlist';
+  genre?: string | null;
+  setTime?: string | null;
+  setDuration?: number | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  instagram?: string | null;
+  soundcloud?: string | null;
+  status?: 'pending' | 'confirmed' | 'cancelled';
+  equipmentProvided?: boolean;
+  equipmentNotes?: string | null;
+  fee?: number | null;
+  feePaid?: boolean;
+  notes?: string | null;
+}
+
+// Get performers for a party (public endpoint)
+export async function getPerformers(partyId: string): Promise<PerformersResponse | null> {
+  try {
+    return await apiRequest<PerformersResponse>(`/api/parties/${partyId}/performers`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching performers:', error);
+    return null;
+  }
+}
+
 // GPP API functions
 export interface CreateGPPEventData {
   city: string;
@@ -937,6 +996,84 @@ export async function deselectVenue(partyId: string, venueId: string): Promise<V
     return response.venue;
   } catch (error) {
     console.error('Error deselecting venue:', error);
+    throw error;
+  }
+}
+
+// Add a performer (host only)
+export async function addPerformer(
+  partyId: string,
+  data: CreatePerformerData
+): Promise<{ performer: Performer } | null> {
+  try {
+    return await apiRequest<{ performer: Performer }>(`/api/parties/${partyId}/performers`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error adding performer:', error);
+    throw error;
+  }
+}
+
+// Update a performer (host only)
+export async function updatePerformer(
+  partyId: string,
+  performerId: string,
+  data: UpdatePerformerData
+): Promise<{ performer: Performer } | null> {
+  try {
+    return await apiRequest<{ performer: Performer }>(
+      `/api/parties/${partyId}/performers/${performerId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating performer:', error);
+    throw error;
+  }
+}
+
+// Delete a performer (host only)
+export async function deletePerformer(
+  partyId: string,
+  performerId: string
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/performers/${performerId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting performer:', error);
+    return false;
+  }
+}
+
+// Reorder performers (host only)
+export async function reorderPerformers(
+  partyId: string,
+  performerIds: string[]
+): Promise<{ performers: Performer[] } | null> {
+  try {
+    return await apiRequest<{ performers: Performer[] }>(
+      `/api/parties/${partyId}/performers/reorder`,
+      {
+        method: 'PATCH',
+        body: { performerIds },
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error reordering performers:', error);
     throw error;
   }
 }

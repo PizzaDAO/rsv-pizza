@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -19,11 +19,12 @@ import { updateParty } from '../lib/supabase';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
+import { MusicWidget } from '../components/music';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'apps';
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'apps';
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -66,7 +67,7 @@ function HostPageContent() {
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
   // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue') ? tab : 'details';
+  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music') ? tab : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -181,6 +182,7 @@ function HostPageContent() {
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    { id: 'music' as TabType, label: 'Music', icon: Music },
     { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
     { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
   ];
@@ -251,8 +253,6 @@ function HostPageContent() {
                     {(() => {
                       const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
                       const minValue = 0;
-                      // Scale max dynamically based on data - use smaller max for low guest counts
-                      // Cap at 5x the number of RSVPs
                       const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
                       const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
                       const maxCap = guests.length > 0 ? guests.length * 5 : 100;
@@ -262,7 +262,6 @@ function HostPageContent() {
 
                       return (
                         <div className="relative pt-6 pb-2">
-                          {/* Marks */}
                           {guestsWithRequests > 0 && (
                             <div
                               className="absolute top-0 flex flex-col items-center"
@@ -286,7 +285,6 @@ function HostPageContent() {
                             </div>
                           )}
 
-                          {/* Slider track */}
                           <input
                             type="range"
                             min={minValue}
@@ -299,7 +297,6 @@ function HostPageContent() {
                             }}
                           />
 
-                          {/* Min/Max labels */}
                           <div className="flex justify-between mt-1">
                             <span className="text-[10px] text-white/40">{minValue}</span>
                             <span className="text-[10px] text-white/40">{maxValue}</span>
@@ -309,7 +306,6 @@ function HostPageContent() {
                     })()}
                   </div>
 
-                  {/* Recommended Order - always shown, auto-generated (includes Guest Requests) */}
                   <PizzaOrderSummary />
 
                   <AiCallHistory partyId={party.id} />
@@ -328,13 +324,16 @@ function HostPageContent() {
                   <VenueWidget
                     partyId={party.id}
                     onVenueSelect={() => {
-                      // Refresh party data when a venue is selected
                       if (party?.inviteCode) {
                         loadParty(party.inviteCode);
                       }
                     }}
                   />
                 </div>
+              )}
+
+              {activeTab === 'music' && (
+                <MusicWidget isHost={true} />
               )}
 
               {activeTab === 'photos' && party && (

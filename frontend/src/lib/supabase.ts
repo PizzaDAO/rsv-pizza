@@ -1095,6 +1095,8 @@ export async function updateParty(
     photo_moderation?: boolean;
     nft_enabled?: boolean;
     nft_chain?: string | null;
+    music_enabled?: boolean;
+    music_notes?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1141,6 +1143,8 @@ export async function updateParty(
         photoModeration: updates.photo_moderation,
         nftEnabled: updates.nft_enabled,
         nftChain: updates.nft_chain,
+        musicEnabled: updates.music_enabled,
+        musicNotes: updates.music_notes,
       });
       return true;
     } catch (error) {
