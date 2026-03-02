@@ -132,6 +132,7 @@ export interface UpdatePartyData {
   fundraisingGoal?: number | null;
   musicEnabled?: boolean;
   musicNotes?: string | null;
+  pinnedApps?: string[];
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -210,6 +211,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       fundraisingGoal: data.fundraisingGoal,
       musicEnabled: data.musicEnabled,
       musicNotes: data.musicNotes,
+      pinnedApps: data.pinnedApps,
     },
   });
 }

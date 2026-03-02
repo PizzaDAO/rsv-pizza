@@ -116,6 +116,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationRecipient: dbParty.donation_recipient || null,
     donationRecipientUrl: dbParty.donation_recipient_url || null,
     donationEthAddress: dbParty.donation_eth_address || null,
+    pinnedApps: (dbParty.pinned_apps as string[]) ?? [],
     guests,
   };
 }

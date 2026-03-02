@@ -257,7 +257,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes, photoModeration,
-      nftEnabled, nftChain
+      nftEnabled, nftChain,
+      pinnedApps
     } = req.body;
 
     // Verify ownership or super admin
@@ -313,6 +314,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(photoModeration !== undefined && { photoModeration }),
         ...(nftEnabled !== undefined && { nftEnabled }),
         ...(nftChain !== undefined && { nftChain: nftChain || null }),
+        ...(pinnedApps !== undefined && { pinnedApps }),
       },
       include: {
         user: { select: { name: true } },

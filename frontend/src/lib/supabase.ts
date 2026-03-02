@@ -290,6 +290,7 @@ export interface DbParty {
   donation_recipient?: string | null;
   donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
+  pinned_apps?: string[];
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -336,7 +337,8 @@ const SAFE_PARTY_COLUMNS = `
   fundraising_goal, report_recap, report_video_url, report_photos_url,
   flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
   luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
-  report_published, report_public_slug
+  report_published, report_public_slug,
+  pinned_apps
 `;
 
 // Party operations
@@ -1098,6 +1100,7 @@ export async function updateParty(
     nft_chain?: string | null;
     music_enabled?: boolean;
     music_notes?: string | null;
+    pinned_apps?: string[];
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1146,6 +1149,7 @@ export async function updateParty(
         nftChain: updates.nft_chain,
         musicEnabled: updates.music_enabled,
         musicNotes: updates.music_notes,
+        pinnedApps: updates.pinned_apps,
       });
       return true;
     } catch (error) {

@@ -218,6 +218,7 @@ export interface Party {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  pinnedApps?: string[];
 }
 
 export interface Donation {

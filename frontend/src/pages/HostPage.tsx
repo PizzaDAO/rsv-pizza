@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, DollarSign, MapPin, Music, FileBarChart, UserPlus, Monitor, Gift, Wallet, Package, Megaphone } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -27,11 +27,14 @@ import { RaffleWidget } from '../components/raffle';
 import { BudgetTab } from '../components/budget';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
+import { PINNABLE_APPS } from '../lib/appDefinitions';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
 type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'gpp' | 'promo' | 'apps';
+
+const ALL_VALID_TABS: TabType[] = ['details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -67,7 +70,7 @@ function HostPageContent() {
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos' || tab === 'apps' || tab === 'sponsors' || tab === 'venue' || tab === 'music' || tab === 'report' || tab === 'staff' || tab === 'displays' || tab === 'raffle' || tab === 'budget' || tab === 'gpp' || tab === 'promo') ? tab : 'details';
+  const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -167,23 +170,21 @@ function HostPageContent() {
     );
   }
 
-  const tabs = [
+  const coreTabs = [
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
-    { id: 'venue' as TabType, label: 'Venue', icon: MapPin },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
-    { id: 'music' as TabType, label: 'Music', icon: Music },
-    { id: 'sponsors' as TabType, label: 'Sponsors', icon: DollarSign },
-    { id: 'staff' as TabType, label: 'Staff', icon: UserPlus },
-    { id: 'report' as TabType, label: 'Report', icon: FileBarChart },
-    { id: 'displays' as TabType, label: 'Displays', icon: Monitor },
-    { id: 'raffle' as TabType, label: 'Raffle', icon: Gift },
-    { id: 'budget' as TabType, label: 'Budget', icon: Wallet },
-    { id: 'gpp' as TabType, label: 'GPP', icon: Package },
-    { id: 'promo' as TabType, label: 'Promo', icon: Megaphone },
-    { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid },
   ];
+
+  // Build pinned tabs from party.pinnedApps
+  const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
+    const appDef = PINNABLE_APPS.find(a => a.id === appId);
+    if (!appDef) return null;
+    return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
+  }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
+
+  const tabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
 
   return (
     <Layout>
@@ -213,7 +214,7 @@ function HostPageContent() {
         </div>
 
         {activeTab === 'apps' && party ? (
-          <AppsHub inviteCode={party.inviteCode} />
+          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
         ) : activeTab !== 'apps' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">

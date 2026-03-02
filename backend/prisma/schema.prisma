@@ -138,6 +138,9 @@ model Party {
   reportPublished    Boolean   @default(false) @map("report_published")
   reportPublicSlug   String?   @unique @map("report_public_slug")
 
+  // Pinned apps (for Apps Hub tab bar)
+  pinnedApps  Json?   @default("[]") @map("pinned_apps")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

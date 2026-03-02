@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Beer,
@@ -25,7 +25,12 @@ import {
   Gift,
   TicketCheck,
   ExternalLink,
+  Pin,
+  PinOff,
 } from 'lucide-react';
+import { updateParty } from '../lib/supabase';
+import { usePizza } from '../contexts/PizzaContext';
+import { PINNABLE_APPS } from '../lib/appDefinitions';
 
 type AppStatus = 'live' | 'preview' | 'coming-soon';
 
@@ -224,6 +229,11 @@ const apps: AppItem[] = [
   },
 ];
 
+// Check if an app is pinnable (has its own dedicated tab, not a core tab)
+function isPinnable(appId: string): boolean {
+  return PINNABLE_APPS.some(a => a.id === appId);
+}
+
 function StatusBadge({ status }: { status: AppStatus }) {
   const styles = {
     live: 'bg-[#39d98a]/20 text-[#39d98a]',
@@ -248,12 +258,17 @@ function AppCard({
   app,
   inviteCode,
   navigate,
+  isPinned,
+  onTogglePin,
 }: {
   app: AppItem;
   inviteCode: string;
   navigate: ReturnType<typeof useNavigate>;
+  isPinned: boolean;
+  onTogglePin?: (appId: string, pin: boolean) => void;
 }) {
   const isClickable = app.status !== 'coming-soon';
+  const canPin = isPinnable(app.id) && app.status === 'live';
 
   const iconBg = {
     live: 'bg-[#39d98a]/15',
@@ -285,16 +300,36 @@ function AppCard({
     }
   };
 
+  const handlePinClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onTogglePin) {
+      onTogglePin(app.id, !isPinned);
+    }
+  };
+
   return (
     <button
       onClick={handleClick}
       disabled={!isClickable}
-      className={`card p-5 text-left transition-colors w-full ${
+      className={`card p-5 text-left transition-colors w-full relative group ${
         isClickable
           ? 'hover:bg-white/5 cursor-pointer'
           : 'cursor-not-allowed opacity-50'
       }`}
     >
+      {canPin && (
+        <div
+          onClick={handlePinClick}
+          className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all cursor-pointer ${
+            isPinned
+              ? 'bg-[#ff393a]/20 text-[#ff393a] opacity-100'
+              : 'bg-white/5 text-white/30 opacity-0 group-hover:opacity-100 hover:text-white/60 hover:bg-white/10'
+          }`}
+          title={isPinned ? 'Unpin from tab bar' : 'Pin to tab bar'}
+        >
+          {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+        </div>
+      )}
       <div className="flex items-start gap-3">
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg[app.status]}`}
@@ -304,6 +339,11 @@ function AppCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-white truncate">{app.name}</span>
+            {isPinned && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#ff393a]/15 text-[#ff393a]">
+                Pinned
+              </span>
+            )}
             {app.status === 'preview' && (
               <ExternalLink size={12} className="text-[#5c7cfa] flex-shrink-0" />
             )}
@@ -323,11 +363,15 @@ function AppSection({
   apps: sectionApps,
   inviteCode,
   navigate,
+  pinnedApps,
+  onTogglePin,
 }: {
   title: string;
   apps: AppItem[];
   inviteCode: string;
   navigate: ReturnType<typeof useNavigate>;
+  pinnedApps: string[];
+  onTogglePin: (appId: string, pin: boolean) => void;
 }) {
   return (
     <div>
@@ -336,15 +380,50 @@ function AppSection({
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {sectionApps.map((app) => (
-          <AppCard key={app.id} app={app} inviteCode={inviteCode} navigate={navigate} />
+          <AppCard
+            key={app.id}
+            app={app}
+            inviteCode={inviteCode}
+            navigate={navigate}
+            isPinned={pinnedApps.includes(app.id)}
+            onTogglePin={onTogglePin}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-export function AppsHub({ inviteCode }: { inviteCode: string }) {
+export function AppsHub({
+  inviteCode,
+  pinnedApps: initialPinnedApps,
+  partyId,
+}: {
+  inviteCode: string;
+  pinnedApps: string[];
+  partyId: string;
+}) {
   const navigate = useNavigate();
+  const { loadParty } = usePizza();
+  const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
+
+  const handleTogglePin = async (appId: string, pin: boolean) => {
+    // Optimistic update
+    const previousPinned = pinnedApps;
+    const newPinned = pin
+      ? [...pinnedApps, appId]
+      : pinnedApps.filter(id => id !== appId);
+    setPinnedApps(newPinned);
+
+    const success = await updateParty(partyId, { pinned_apps: newPinned });
+    if (!success) {
+      // Revert on failure
+      setPinnedApps(previousPinned);
+    } else {
+      // Reload party to sync the tab bar in HostPage
+      loadParty(inviteCode);
+    }
+  };
 
   const liveApps = apps.filter((a) => a.status === 'live');
   const previewApps = apps.filter((a) => a.status === 'preview');
@@ -352,9 +431,43 @@ export function AppsHub({ inviteCode }: { inviteCode: string }) {
 
   return (
     <div className="space-y-8">
-      <AppSection title="Live" apps={liveApps} inviteCode={inviteCode} navigate={navigate} />
-      <AppSection title="Preview" apps={previewApps} inviteCode={inviteCode} navigate={navigate} />
-      <AppSection title="Coming Soon" apps={comingSoonApps} inviteCode={inviteCode} navigate={navigate} />
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-white/40 mt-1">
+            Click an app to open it. Hover and click the pin icon to add it to your tab bar.
+          </p>
+        </div>
+      </div>
+      {liveApps.length > 0 && (
+        <AppSection
+          title="Live"
+          apps={liveApps}
+          inviteCode={inviteCode}
+          navigate={navigate}
+          pinnedApps={pinnedApps}
+          onTogglePin={handleTogglePin}
+        />
+      )}
+      {previewApps.length > 0 && (
+        <AppSection
+          title="Preview"
+          apps={previewApps}
+          inviteCode={inviteCode}
+          navigate={navigate}
+          pinnedApps={pinnedApps}
+          onTogglePin={handleTogglePin}
+        />
+      )}
+      {comingSoonApps.length > 0 && (
+        <AppSection
+          title="Coming Soon"
+          apps={comingSoonApps}
+          inviteCode={inviteCode}
+          navigate={navigate}
+          pinnedApps={pinnedApps}
+          onTogglePin={handleTogglePin}
+        />
+      )}
     </div>
   );
 }
