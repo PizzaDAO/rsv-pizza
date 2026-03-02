@@ -1,14 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users,
-  Pizza,
   Beer,
-  Camera,
   Store,
   Bot,
-  DollarSign,
-  ScanLine,
   Coins,
   Handshake,
   MapPin,
@@ -48,36 +43,12 @@ interface AppItem {
 const apps: AppItem[] = [
   // Live features
   {
-    id: 'guest-list',
-    name: 'Guest List',
-    description: 'Manage RSVPs, approvals, and check-ins',
-    icon: Users,
-    status: 'live',
-    tab: 'guests',
-  },
-  {
-    id: 'pizza-recommendations',
-    name: 'Pizza Recommendations',
-    description: 'AI-powered pizza ordering based on guest preferences',
-    icon: Pizza,
-    status: 'live',
-    tab: 'pizza',
-  },
-  {
     id: 'beverages',
     name: 'Beverages',
     description: 'Track beverage preferences and recommendations',
     icon: Beer,
     status: 'live',
     tab: 'pizza',
-  },
-  {
-    id: 'photos',
-    name: 'Photos',
-    description: 'Photo uploads and moderation',
-    icon: Camera,
-    status: 'live',
-    tab: 'photos',
   },
   {
     id: 'pizzeria-selection',
@@ -94,22 +65,6 @@ const apps: AppItem[] = [
     icon: Bot,
     status: 'live',
     tab: 'pizza',
-  },
-  {
-    id: 'donations',
-    name: 'Donations',
-    description: 'Accept donations for the event',
-    icon: DollarSign,
-    status: 'live',
-    tab: 'details',
-  },
-  {
-    id: 'check-in',
-    name: 'Check-in',
-    description: 'QR code check-in for guests',
-    icon: ScanLine,
-    status: 'live',
-    tab: 'guests',
   },
   {
     id: 'nft-minting',
