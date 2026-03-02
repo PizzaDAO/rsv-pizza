@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, ExternalLink, Loader2, Search, RefreshCw, ClipboardList } from 'lucide-react';
 import { SocialPost } from '../../types';
 import { TweetEmbed } from './TweetEmbed';
+import { TwitterFeed } from './TwitterFeed';
 import { IconInput } from '../IconInput';
 
 // Platform icons/colors
@@ -111,46 +112,51 @@ export function SocialPostsList({ posts, onAdd, onDelete, onBulkAdd, onRefreshEm
 
   // Read-only display
   if (!editable) {
-    if (posts.length === 0) return null;
+    if (posts.length === 0 && !eventSlug) return null;
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-white">Attendee Social Posts</h3>
-        <div className="space-y-3">
-          {posts.map((post) => {
-            if (post.platform === 'twitter' && post.embedHtml) {
-              return (
-                <TweetEmbed
-                  key={post.id}
-                  embedHtml={post.embedHtml}
-                  url={post.url}
-                  authorHandle={post.authorHandle}
-                />
-              );
-            }
-            const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
-            return (
-              <a
-                key={post.id}
-                href={post.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors"
-              >
-                <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                  {platform.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  {post.authorHandle && (
-                    <span className="text-sm text-white font-medium">@{post.authorHandle}</span>
-                  )}
-                  <p className="text-xs text-white/40 truncate">{post.url}</p>
-                </div>
-                <ExternalLink size={16} className="text-white/40" />
-              </a>
-            );
-          })}
-        </div>
+        {posts.length > 0 && (
+          <>
+            <h3 className="text-lg font-semibold text-white">Attendee Social Posts</h3>
+            <div className="space-y-3">
+              {posts.map((post) => {
+                if (post.platform === 'twitter' && post.embedHtml) {
+                  return (
+                    <TweetEmbed
+                      key={post.id}
+                      embedHtml={post.embedHtml}
+                      url={post.url}
+                      authorHandle={post.authorHandle}
+                    />
+                  );
+                }
+                const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
+                return (
+                  <a
+                    key={post.id}
+                    href={post.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors"
+                  >
+                    <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
+                      {platform.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {post.authorHandle && (
+                        <span className="text-sm text-white font-medium">@{post.authorHandle}</span>
+                      )}
+                      <p className="text-xs text-white/40 truncate">{post.url}</p>
+                    </div>
+                    <ExternalLink size={16} className="text-white/40" />
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        )}
+        {eventSlug && <TwitterFeed eventSlug={eventSlug} />}
       </div>
     );
   }
@@ -390,6 +396,9 @@ export function SocialPostsList({ posts, onAdd, onDelete, onBulkAdd, onRefreshEm
           </div>
         )
       )}
+
+      {/* Live Twitter Feed */}
+      {eventSlug && <TwitterFeed eventSlug={eventSlug} />}
     </div>
   );
 }

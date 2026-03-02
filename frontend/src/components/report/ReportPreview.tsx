@@ -3,13 +3,15 @@ import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink,
 import { EventReport } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { TweetEmbed } from './TweetEmbed';
+import { TwitterFeed } from './TwitterFeed';
 
 interface ReportPreviewProps {
   report: EventReport;
   onClose?: () => void;
+  eventSlug?: string | null;
 }
 
-export function ReportPreview({ report, onClose }: ReportPreviewProps) {
+export function ReportPreview({ report, onClose, eventSlug }: ReportPreviewProps) {
   const hasKPIs = report.xPostViews || report.farcasterViews || report.lumaViews ||
     report.poapMints || report.poapMoments || report.stats.totalRsvps > 0;
 
@@ -284,6 +286,13 @@ export function ReportPreview({ report, onClose }: ReportPreviewProps) {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Live Twitter Feed */}
+      {eventSlug && (
+        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+          <TwitterFeed eventSlug={eventSlug} />
         </div>
       )}
     </div>

@@ -16,7 +16,7 @@ declare global {
 let twitterScriptLoaded = false;
 let twitterScriptLoading = false;
 
-function loadTwitterWidgets(): Promise<void> {
+export function loadTwitterWidgets(): Promise<void> {
   if (twitterScriptLoaded) return Promise.resolve();
   if (twitterScriptLoading) {
     // Wait for existing load

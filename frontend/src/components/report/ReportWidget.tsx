@@ -364,7 +364,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             Back to Editor
           </button>
         </div>
-        <ReportPreview report={report} />
+        <ReportPreview report={report} eventSlug={party?.customUrl || party?.inviteCode || null} />
       </div>
     );
   }
