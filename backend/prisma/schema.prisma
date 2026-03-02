@@ -215,6 +215,7 @@ model SocialPost {
   platform     String   // "twitter", "farcaster", "instagram"
   url          String   // Full URL to the post
   authorHandle String?  @map("author_handle")
+  embedHtml    String?  @map("embed_html")
 
   sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz

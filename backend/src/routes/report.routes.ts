@@ -400,6 +400,29 @@ router.get('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest
   }
 });
 
+// Helper: fetch Twitter oEmbed data for a URL
+async function fetchTwitterOembed(tweetUrl: string): Promise<{ html: string; authorName: string } | null> {
+  try {
+    // Normalize x.com to twitter.com for oEmbed API
+    const normalizedUrl = tweetUrl.replace('https://x.com/', 'https://twitter.com/');
+    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(normalizedUrl)}&theme=dark&dnt=true`;
+    const response = await fetch(oembedUrl);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return { html: data.html || null, authorName: data.author_name || '' };
+  } catch {
+    return null;
+  }
+}
+
+// Helper: detect platform from URL
+function detectPlatformFromUrl(url: string): string {
+  if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
+  if (url.includes('warpcast.com') || url.includes('farcaster')) return 'farcaster';
+  if (url.includes('instagram.com')) return 'instagram';
+  return 'twitter'; // default
+}
+
 // POST /api/parties/:partyId/report/social-posts - Add social post
 router.post('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -422,17 +445,133 @@ router.post('/:partyId/report/social-posts', requireAuth, async (req: AuthReques
       _max: { sortOrder: true },
     });
 
+    // Fetch oEmbed data for Twitter posts
+    let embedHtml: string | null = null;
+    let resolvedAuthorHandle = authorHandle || null;
+
+    if (platform === 'twitter') {
+      const oembedData = await fetchTwitterOembed(url);
+      if (oembedData) {
+        embedHtml = oembedData.html;
+        if (!resolvedAuthorHandle && oembedData.authorName) {
+          resolvedAuthorHandle = oembedData.authorName;
+        }
+      }
+    }
+
     const socialPost = await prisma.socialPost.create({
       data: {
         partyId,
         platform,
         url,
-        authorHandle: authorHandle || null,
+        authorHandle: resolvedAuthorHandle,
+        embedHtml,
         sortOrder: (maxOrder._max.sortOrder || 0) + 1,
       },
     });
 
     res.status(201).json({ socialPost });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/report/social-posts/bulk - Bulk add social posts
+router.post('/:partyId/report/social-posts/bulk', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { urls } = req.body;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      throw new AppError('URLs array is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Limit to 50 URLs at a time
+    const urlList = urls.slice(0, 50).map((u: string) => u.trim()).filter(Boolean);
+
+    // Get max sort order
+    const maxOrder = await prisma.socialPost.aggregate({
+      where: { partyId },
+      _max: { sortOrder: true },
+    });
+    let nextOrder = (maxOrder._max.sortOrder || 0) + 1;
+
+    const createdPosts = [];
+
+    for (const url of urlList) {
+      const platform = detectPlatformFromUrl(url);
+
+      let embedHtml: string | null = null;
+      let authorHandle: string | null = null;
+
+      if (platform === 'twitter') {
+        const oembedData = await fetchTwitterOembed(url);
+        if (oembedData) {
+          embedHtml = oembedData.html;
+          authorHandle = oembedData.authorName || null;
+        }
+      }
+
+      const socialPost = await prisma.socialPost.create({
+        data: {
+          partyId,
+          platform,
+          url,
+          authorHandle,
+          embedHtml,
+          sortOrder: nextOrder++,
+        },
+      });
+      createdPosts.push(socialPost);
+    }
+
+    res.status(201).json({ socialPosts: createdPosts, count: createdPosts.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/report/social-posts/:id/refresh-embed - Refresh oEmbed for a post
+router.post('/:partyId/report/social-posts/:id/refresh-embed', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, id } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Find the post
+    const existingPost = await prisma.socialPost.findFirst({
+      where: { id, partyId },
+    });
+
+    if (!existingPost) {
+      throw new AppError('Social post not found', 404, 'NOT_FOUND');
+    }
+
+    if (existingPost.platform !== 'twitter') {
+      throw new AppError('oEmbed refresh is only supported for Twitter posts', 400, 'UNSUPPORTED_PLATFORM');
+    }
+
+    const oembedData = await fetchTwitterOembed(existingPost.url);
+
+    const socialPost = await prisma.socialPost.update({
+      where: { id },
+      data: {
+        embedHtml: oembedData?.html || null,
+        ...(oembedData?.authorName && !existingPost.authorHandle ? { authorHandle: oembedData.authorName } : {}),
+      },
+    });
+
+    res.json({ socialPost });
   } catch (error) {
     next(error);
   }

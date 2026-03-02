@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X } from 'lucide-react';
 import { EventReport } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
+import { TweetEmbed } from './TweetEmbed';
 
 interface ReportPreviewProps {
   report: EventReport;
@@ -246,8 +247,20 @@ export function ReportPreview({ report, onClose }: ReportPreviewProps) {
       {report.socialPosts.length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
           <h2 className="text-lg font-semibold text-white mb-3">Attendee Social Posts</h2>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {report.socialPosts.map((post) => {
+              // Render tweet embed for Twitter posts
+              if (post.platform === 'twitter' && post.embedHtml) {
+                return (
+                  <TweetEmbed
+                    key={post.id}
+                    embedHtml={post.embedHtml}
+                    url={post.url}
+                    authorHandle={post.authorHandle}
+                  />
+                );
+              }
+
               const platformInfo = PLATFORM_INFO[post.platform] || PLATFORM_INFO.twitter;
               return (
                 <a

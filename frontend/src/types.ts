@@ -473,6 +473,7 @@ export interface SocialPost {
   platform: 'twitter' | 'farcaster' | 'instagram';
   url: string;
   authorHandle: string | null;
+  embedHtml: string | null;
   sortOrder: number;
   createdAt: string;
 }

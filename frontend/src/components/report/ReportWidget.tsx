@@ -14,6 +14,8 @@ import {
   unpublishReport,
   addSocialPost,
   deleteSocialPost,
+  bulkAddSocialPosts,
+  refreshSocialPostEmbed,
   addNotableAttendee,
   deleteNotableAttendee,
 } from '../../lib/api';
@@ -208,6 +210,32 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       } : null);
     } else {
       throw new Error('Failed to delete social post');
+    }
+  };
+
+  // Handle bulk adding social posts
+  const handleBulkAddSocialPosts = async (urls: string[]) => {
+    const result = await bulkAddSocialPosts(partyId, urls);
+    if (result?.socialPosts) {
+      setReport(prev => prev ? {
+        ...prev,
+        socialPosts: [...prev.socialPosts, ...result.socialPosts],
+      } : null);
+    } else {
+      throw new Error('Failed to bulk add social posts');
+    }
+  };
+
+  // Handle refreshing social post embed
+  const handleRefreshSocialPostEmbed = async (id: string) => {
+    const result = await refreshSocialPostEmbed(partyId, id);
+    if (result?.socialPost) {
+      setReport(prev => prev ? {
+        ...prev,
+        socialPosts: prev.socialPosts.map(p => p.id === id ? result.socialPost : p),
+      } : null);
+    } else {
+      throw new Error('Failed to refresh embed');
     }
   };
 
@@ -510,7 +538,10 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           posts={report.socialPosts}
           onAdd={handleAddSocialPost}
           onDelete={handleDeleteSocialPost}
+          onBulkAdd={handleBulkAddSocialPosts}
+          onRefreshEmbed={handleRefreshSocialPostEmbed}
           editable={true}
+          eventSlug={party?.customUrl || party?.inviteCode || null}
         />
       </div>
 

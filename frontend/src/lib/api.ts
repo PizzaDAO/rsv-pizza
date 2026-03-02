@@ -1183,6 +1183,45 @@ export async function addSocialPost(
   }
 }
 
+// Bulk add social posts
+export async function bulkAddSocialPosts(
+  partyId: string,
+  urls: string[]
+): Promise<{ socialPosts: SocialPost[]; count: number } | null> {
+  try {
+    return await apiRequest<{ socialPosts: SocialPost[]; count: number }>(
+      `/api/parties/${partyId}/report/social-posts/bulk`,
+      {
+        method: 'POST',
+        body: { urls },
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error bulk adding social posts:', error);
+    return null;
+  }
+}
+
+// Refresh oEmbed for a social post
+export async function refreshSocialPostEmbed(
+  partyId: string,
+  postId: string
+): Promise<{ socialPost: SocialPost } | null> {
+  try {
+    return await apiRequest<{ socialPost: SocialPost }>(
+      `/api/parties/${partyId}/report/social-posts/${postId}/refresh-embed`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error refreshing social post embed:', error);
+    return null;
+  }
+}
+
 // Delete social post
 export async function deleteSocialPost(partyId: string, postId: string): Promise<boolean> {
   try {
