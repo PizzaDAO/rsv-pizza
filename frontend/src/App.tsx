@@ -16,6 +16,7 @@ import { CheckInPage } from './pages/CheckInPage';
 import { DJPage } from './pages/DJPage';
 import { PublicReportPage } from './pages/PublicReportPage';
 import { DisplayPage } from './pages/DisplayPage';
+import { UnderbossDashboard } from './pages/UnderbossDashboard';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
             <Route path="/dj/:inviteCode" element={<DJPage />} />
             <Route path="/display/:partyId/:slug" element={<DisplayPage />} />
+            <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

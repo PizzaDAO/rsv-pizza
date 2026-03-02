@@ -219,6 +219,7 @@ export interface Party {
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
   pinnedApps?: string[];
+  region?: string | null;
 }
 
 export interface Donation {
@@ -815,3 +816,69 @@ export const KIT_TIERS: KitTierInfo[] = [
     contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Pins', 'Extras'],
   },
 ];
+
+// ============================================
+// Underboss Dashboard types
+// ============================================
+
+export type GPPRegion = 'latam' | 'europe' | 'india' | 'usa-canada' | 'africa' | 'apac';
+
+export const GPP_REGIONS: { id: GPPRegion; label: string }[] = [
+  { id: 'latam', label: 'LATAM' },
+  { id: 'europe', label: 'Europe' },
+  { id: 'india', label: 'India' },
+  { id: 'usa-canada', label: 'USA + Canada' },
+  { id: 'africa', label: 'Africa' },
+  { id: 'apac', label: 'APAC' },
+];
+
+export interface UnderbossEventProgress {
+  hasVenue: boolean;
+  hasBudget: boolean;
+  hasPartyKit: boolean;
+  hasEventImage: boolean;
+  hasDate: boolean;
+  hasAddress: boolean;
+}
+
+export interface UnderbossEvent {
+  id: string;
+  name: string;
+  customUrl: string | null;
+  date: string | null;
+  address: string | null;
+  venueName: string | null;
+  host: { name: string | null; email: string | null };
+  coHosts: any[];
+  progress: UnderbossEventProgress;
+  guestCount: number;
+  approvedCount: number;
+  checkedInCount: number;
+  photoCount: number;
+  kitStatus: string | null;
+  fundraisingGoal: number | null;
+  totalSponsored: number;
+  createdAt: string;
+}
+
+export interface UnderbossStats {
+  totalEvents: number;
+  totalRsvps: number;
+  totalApproved: number;
+  eventsWithVenue: number;
+  eventsWithBudget: number;
+  eventsWithKit: number;
+  completionRate: {
+    venue: number;
+    budget: number;
+    partyKit: number;
+  };
+  avgRsvpsPerEvent: number;
+}
+
+export interface UnderbossDashboardData {
+  region: string;
+  underboss: { name: string; email: string };
+  stats: UnderbossStats;
+  events: UnderbossEvent[];
+}

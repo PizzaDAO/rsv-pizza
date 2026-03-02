@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, UnderbossDashboardData, GPPRegion } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -133,6 +133,7 @@ export interface UpdatePartyData {
   musicEnabled?: boolean;
   musicNotes?: string | null;
   pinnedApps?: string[];
+  region?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -212,6 +213,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       musicEnabled: data.musicEnabled,
       musicNotes: data.musicNotes,
       pinnedApps: data.pinnedApps,
+      region: data.region,
     },
   });
 }
@@ -1895,4 +1897,26 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
     console.error('Error canceling kit request:', error);
     return false;
   }
+}
+
+// ============================================
+// Underboss Dashboard API
+// ============================================
+
+// Fetch underboss dashboard data (token-based, no JWT auth)
+export async function fetchUnderbossDashboard(
+  region: GPPRegion,
+  token: string
+): Promise<UnderbossDashboardData> {
+  const response = await fetch(
+    `${API_URL}/api/underboss/${region}?token=${encodeURIComponent(token)}`,
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.error?.message || error.message || `API error: ${response.status}`);
+  }
+
+  return response.json();
 }
