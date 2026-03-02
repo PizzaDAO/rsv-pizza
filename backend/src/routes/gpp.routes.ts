@@ -179,6 +179,8 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         photosPublic: GPP_DEFAULTS.photosPublic,
         customUrl: customUrl,
         date: defaultDate,
+        availableBeverages: [],
+        availableToppings: [],
         coHosts: [
           {
             id: crypto.randomUUID(),
