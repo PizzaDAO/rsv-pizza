@@ -155,6 +155,7 @@ model Party {
   socialPosts      SocialPost[]
   notableAttendees NotableAttendee[]
   aiPhoneCalls     AIPhoneCall[]
+  pageViews        PageView[]
 
   @@map("parties")
 }
@@ -866,4 +867,25 @@ model AIPhoneCall {
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
+}
+
+// ============================================
+// Page View Tracking
+// ============================================
+
+model PageView {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  visitorHash String?  @map("visitor_hash")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  referrer    String?
+  country     String?
+  viewedAt    DateTime @default(now()) @map("viewed_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([partyId, viewedAt])
+  @@index([partyId, visitorHash])
+  @@map("page_views")
 }

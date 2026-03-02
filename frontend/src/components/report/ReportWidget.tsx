@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { EventReport, Guest } from '../../types';
+import { EventReport, Guest, PageViewStats as PageViewStatsType } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
 import { NotableAttendeesList } from './NotableAttendeesList';
 import { ReportPreview } from './ReportPreview';
+import { PageViewStats } from './PageViewStats';
 import {
   getReport,
   updateReport,
@@ -16,6 +17,7 @@ import {
   deleteSocialPost,
   addNotableAttendee,
   deleteNotableAttendee,
+  getPageViewStats,
 } from '../../lib/api';
 
 interface ReportWidgetProps {
@@ -82,6 +84,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   const [publishingState, setPublishingState] = useState<'idle' | 'publishing' | 'unpublishing'>('idle');
   const [copiedLink, setCopiedLink] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [viewStats, setViewStats] = useState<PageViewStatsType | null>(null);
 
   // Track pending changes for debounced save
   const pendingChanges = useRef<Record<string, any>>({});
@@ -123,7 +126,11 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   // Only load once on mount (or if partyId changes)
   useEffect(() => {
     loadReport();
-  }, [loadReport]);
+    // Load page view stats in parallel (non-blocking)
+    getPageViewStats(partyId).then(stats => {
+      if (stats) setViewStats(stats);
+    });
+  }, [loadReport, partyId]);
 
   // Debounced save: accumulates changes and saves after 1.5s of inactivity
   const debouncedSave = useCallback(async () => {
@@ -336,7 +343,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             Back to Editor
           </button>
         </div>
-        <ReportPreview report={report} />
+        <ReportPreview report={report} pageViewStats={viewStats} />
       </div>
     );
   }
@@ -465,8 +472,16 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           report={report}
           onChange={handleChange}
           editable={true}
+          pageViewStats={viewStats}
         />
       </div>
+
+      {/* Page View Stats */}
+      {viewStats && (
+        <div className="card p-6">
+          <PageViewStats stats={viewStats} />
+        </div>
+      )}
 
       {/* Notable Attendees */}
       <div className="card p-6">

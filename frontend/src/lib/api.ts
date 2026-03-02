@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, PageViewStats } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1246,6 +1246,19 @@ export async function getPublicReport(slug: string): Promise<{ report: EventRepo
     });
   } catch (error) {
     console.error('Error fetching public report:', error);
+    return null;
+  }
+}
+
+// Get page view stats (host only)
+export async function getPageViewStats(partyId: string): Promise<PageViewStats | null> {
+  try {
+    return await apiRequest<PageViewStats>(`/api/parties/${partyId}/report/views`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching page view stats:', error);
     return null;
   }
 }
