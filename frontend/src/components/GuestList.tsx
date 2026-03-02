@@ -1,14 +1,81 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
 import { UserRoundX, Users, Clock, Search, CheckCircle2, Download } from 'lucide-react';
 import { IconInput } from './IconInput';
-import { checkInGuest } from '../lib/api';
+import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
   const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
+  const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
+
+  // Fetch notable guest IDs on mount and when party changes
+  const fetchNotableIds = useCallback(async () => {
+    if (!party?.id) return;
+    try {
+      const ids = await getNotableGuestIds(party.id);
+      setNotableGuestIds(new Set(ids));
+    } catch {
+      // Silently fail - non-critical feature
+    }
+  }, [party?.id]);
+
+  useEffect(() => {
+    fetchNotableIds();
+  }, [fetchNotableIds]);
+
+  const handleToggleNotable = async (guestId: string) => {
+    if (!party?.id || togglingNotableId) return;
+
+    const isCurrentlyNotable = notableGuestIds.has(guestId);
+    setTogglingNotableId(guestId);
+
+    // Optimistic update
+    setNotableGuestIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyNotable) {
+        next.delete(guestId);
+      } else {
+        next.add(guestId);
+      }
+      return next;
+    });
+
+    try {
+      if (isCurrentlyNotable) {
+        const success = await deleteNotableAttendeeByGuestId(party.id, guestId);
+        if (!success) {
+          // Revert
+          setNotableGuestIds(prev => { const next = new Set(prev); next.add(guestId); return next; });
+        }
+      } else {
+        const guest = guests.find(g => g.id === guestId);
+        if (guest) {
+          const result = await addNotableAttendee(party.id, { name: guest.name, guestId });
+          if (!result) {
+            // Revert
+            setNotableGuestIds(prev => { const next = new Set(prev); next.delete(guestId); return next; });
+          }
+        }
+      }
+    } catch {
+      // Revert on error
+      setNotableGuestIds(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyNotable) {
+          next.add(guestId);
+        } else {
+          next.delete(guestId);
+        }
+        return next;
+      });
+    } finally {
+      setTogglingNotableId(null);
+    }
+  };
 
   const filteredGuests = useMemo(() => {
     if (!searchQuery.trim()) return guests;
@@ -146,6 +213,9 @@ export const GuestList: React.FC = () => {
                 onRemove={removeGuest}
                 onCheckIn={handleCheckIn}
                 isCheckingIn={checkingInId === guest.id}
+                isNotable={guest.id ? notableGuestIds.has(guest.id) : false}
+                onToggleNotable={handleToggleNotable}
+                isTogglingNotable={togglingNotableId === guest.id}
               />
             ))}
           </div>

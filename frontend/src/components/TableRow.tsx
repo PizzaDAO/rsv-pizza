@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -42,6 +42,10 @@ interface TableRowProps {
   editable?: boolean;
   onQuantityChange?: (id: string, newQuantity: number) => void;
   onRemovePizza?: (id: string) => void;
+  // Notable attendee star toggle
+  isNotable?: boolean;
+  onToggleNotable?: (id: string) => void;
+  isTogglingNotable?: boolean;
 }
 
 export const TableRow: React.FC<TableRowProps> = ({
@@ -62,6 +66,9 @@ export const TableRow: React.FC<TableRowProps> = ({
   editable = false,
   onQuantityChange,
   onRemovePizza,
+  isNotable = false,
+  onToggleNotable,
+  isTogglingNotable = false,
 }) => {
   // Pizza variant
   if (variant === 'pizza' && pizzaRec) {
@@ -380,6 +387,26 @@ export const TableRow: React.FC<TableRowProps> = ({
       )}
       {requireApproval && guest.approved === false && (
         <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+      )}
+
+      {/* Notable attendee star toggle */}
+      {variant === 'basic' && onToggleNotable && guest.id && (
+        <button
+          onClick={() => onToggleNotable(guest.id!)}
+          disabled={isTogglingNotable}
+          className={`p-1.5 rounded transition-colors flex-shrink-0 ${
+            isNotable
+              ? 'text-yellow-400 hover:bg-yellow-400/10'
+              : 'text-white/0 group-hover:text-white/30 hover:!text-yellow-400 hover:!bg-yellow-400/10'
+          }`}
+          title={isNotable ? 'Remove from notable attendees' : 'Mark as notable attendee'}
+        >
+          {isTogglingNotable ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Star size={14} fill={isNotable ? 'currentColor' : 'none'} />
+          )}
+        </button>
       )}
 
       {/* Check-in status badge or button */}

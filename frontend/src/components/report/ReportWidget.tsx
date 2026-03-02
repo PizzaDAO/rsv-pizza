@@ -212,7 +212,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   };
 
   // Handle adding notable attendees
-  const handleAddNotableAttendee = async (data: { name: string; link?: string }) => {
+  const handleAddNotableAttendee = async (data: { name: string; link?: string; guestId?: string }) => {
     const result = await addNotableAttendee(partyId, data);
     if (result?.notableAttendee) {
       setReport(prev => prev ? {
@@ -223,6 +223,21 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       throw new Error('Failed to add notable attendee');
     }
   };
+
+  // Refresh notable attendees from API (used when Browse All modal makes changes)
+  const refreshNotableAttendees = useCallback(async () => {
+    try {
+      const result = await getReport(partyId);
+      if (result?.report) {
+        setReport(prev => prev ? {
+          ...prev,
+          notableAttendees: result.report.notableAttendees,
+        } : null);
+      }
+    } catch (err) {
+      console.error('Error refreshing notable attendees:', err);
+    }
+  }, [partyId]);
 
   // Handle deleting notable attendees
   const handleDeleteNotableAttendee = async (id: string) => {
@@ -473,8 +488,10 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         <NotableAttendeesList
           attendees={report.notableAttendees}
           guests={guests}
+          partyId={partyId}
           onAdd={handleAddNotableAttendee}
           onDelete={handleDeleteNotableAttendee}
+          onRefresh={refreshNotableAttendees}
           editable={true}
         />
       </div>

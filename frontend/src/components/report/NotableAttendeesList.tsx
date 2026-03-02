@@ -1,33 +1,25 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, ExternalLink, Loader2, Star, Search, UserPlus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, ExternalLink, Loader2, Star, Users } from 'lucide-react';
 import { NotableAttendee, Guest } from '../../types';
+import { BrowseGuestsModal } from './BrowseGuestsModal';
 
 interface NotableAttendeesListProps {
   attendees: NotableAttendee[];
   guests?: Guest[];
-  onAdd: (data: { name: string; link?: string }) => Promise<void>;
+  partyId?: string;
+  onAdd: (data: { name: string; link?: string; guestId?: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRefresh?: () => void;
   editable?: boolean;
 }
 
-export function NotableAttendeesList({ attendees, guests = [], onAdd, onDelete, editable = true }: NotableAttendeesListProps) {
+export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, onDelete, onRefresh, editable = true }: NotableAttendeesListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newLink, setNewLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [guestSearch, setGuestSearch] = useState('');
-  const [showGuestSearch, setShowGuestSearch] = useState(false);
-
-  // Filter guests by search query, excluding already-added attendees
-  const filteredGuests = useMemo(() => {
-    if (!guestSearch.trim()) return [];
-    const q = guestSearch.toLowerCase();
-    const existingNames = new Set(attendees.map(a => a.name.toLowerCase()));
-    return guests
-      .filter(g => g.name.toLowerCase().includes(q) && !existingNames.has(g.name.toLowerCase()))
-      .slice(0, 8);
-  }, [guestSearch, guests, attendees]);
+  const [showBrowseModal, setShowBrowseModal] = useState(false);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -41,20 +33,6 @@ export function NotableAttendeesList({ attendees, guests = [], onAdd, onDelete, 
       setNewName('');
       setNewLink('');
       setIsAdding(false);
-    } catch (error) {
-      console.error('Failed to add notable attendee:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddFromGuest = async (guest: Guest) => {
-    setLoading(true);
-    try {
-      await onAdd({
-        name: guest.name,
-      });
-      setGuestSearch('');
     } catch (error) {
       console.error('Failed to add notable attendee:', error);
     } finally {
@@ -108,15 +86,15 @@ export function NotableAttendeesList({ attendees, guests = [], onAdd, onDelete, 
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Notable Attendees</h3>
         <div className="flex items-center gap-2">
-          {!isAdding && !showGuestSearch && (
+          {!isAdding && (
             <>
-              {guests.length > 0 && (
+              {guests.length > 0 && partyId && (
                 <button
-                  onClick={() => setShowGuestSearch(true)}
+                  onClick={() => setShowBrowseModal(true)}
                   className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors"
                 >
-                  <Search size={16} />
-                  Search Guests
+                  <Users size={16} />
+                  Browse All
                 </button>
               )}
               <button
@@ -131,48 +109,15 @@ export function NotableAttendeesList({ attendees, guests = [], onAdd, onDelete, 
         </div>
       </div>
 
-      {/* Search existing guests */}
-      {showGuestSearch && (
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
-          <input
-            type="text"
-            value={guestSearch}
-            onChange={(e) => setGuestSearch(e.target.value)}
-            placeholder="Search guests by name..."
-            autoFocus
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-          />
-          {filteredGuests.length > 0 && (
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {filteredGuests.map((guest) => (
-                <button
-                  key={guest.id}
-                  onClick={() => handleAddFromGuest(guest)}
-                  disabled={loading}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left"
-                >
-                  <UserPlus size={14} className="text-white/40 shrink-0" />
-                  <span className="text-sm text-white truncate">{guest.name}</span>
-                  {guest.email && (
-                    <span className="text-xs text-white/30 truncate ml-auto">{guest.email}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          {guestSearch.trim() && filteredGuests.length === 0 && (
-            <p className="text-xs text-white/30">No matching guests found</p>
-          )}
-          <button
-            onClick={() => {
-              setShowGuestSearch(false);
-              setGuestSearch('');
-            }}
-            className="btn-secondary text-sm py-2 w-full"
-          >
-            Cancel
-          </button>
-        </div>
+      {/* Browse All Guests Modal */}
+      {partyId && (
+        <BrowseGuestsModal
+          isOpen={showBrowseModal}
+          onClose={() => setShowBrowseModal(false)}
+          guests={guests}
+          partyId={partyId}
+          onChanged={() => onRefresh?.()}
+        />
       )}
 
       {/* Add new attendee form (manual) */}
@@ -252,7 +197,7 @@ export function NotableAttendeesList({ attendees, guests = [], onAdd, onDelete, 
           ))}
         </div>
       ) : (
-        !isAdding && !showGuestSearch && (
+        !isAdding && (
           <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
             <p className="text-white/40 text-sm">No notable attendees added yet</p>
             <p className="text-white/30 text-xs mt-1">Add VIPs, notable companies, or influencers who attended</p>

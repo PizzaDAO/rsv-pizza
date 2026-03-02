@@ -1203,7 +1203,7 @@ export async function deleteSocialPost(partyId: string, postId: string): Promise
 // Add notable attendee
 export async function addNotableAttendee(
   partyId: string,
-  data: { name: string; link?: string }
+  data: { name: string; link?: string; guestId?: string }
 ): Promise<{ notableAttendee: NotableAttendee } | null> {
   try {
     return await apiRequest<{ notableAttendee: NotableAttendee }>(
@@ -1234,6 +1234,40 @@ export async function deleteNotableAttendee(partyId: string, attendeeId: string)
   } catch (error) {
     console.error('Error deleting notable attendee:', error);
     return false;
+  }
+}
+
+// Delete notable attendee by guest ID
+export async function deleteNotableAttendeeByGuestId(partyId: string, guestId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/report/notable-attendees/by-guest/${guestId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting notable attendee by guest ID:', error);
+    return false;
+  }
+}
+
+// Get notable guest IDs for a party
+export async function getNotableGuestIds(partyId: string): Promise<string[]> {
+  try {
+    const result = await apiRequest<{ guestIds: string[] }>(
+      `/api/parties/${partyId}/report/notable-attendees/guest-ids`,
+      {
+        method: 'GET',
+        requireAuth: true,
+      }
+    );
+    return result.guestIds;
+  } catch (error) {
+    console.error('Error fetching notable guest IDs:', error);
+    return [];
   }
 }
 

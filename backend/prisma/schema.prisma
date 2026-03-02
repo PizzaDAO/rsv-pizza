@@ -197,11 +197,12 @@ model Guest {
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  pizzaMappings GuestPizzaMapping[]
-  photos        Photo[]
-  donations     Donation[]
-  raffleEntries RaffleEntry[]
-  raffleWins    RaffleWinner[]
+  pizzaMappings    GuestPizzaMapping[]
+  photos           Photo[]
+  donations        Donation[]
+  raffleEntries    RaffleEntry[]
+  raffleWins       RaffleWinner[]
+  notableAttendees NotableAttendee[]
 
   @@map("guests")
 }
@@ -231,6 +232,8 @@ model NotableAttendee {
 
   name      String   // Person or company name
   link      String?  // Optional link to profile/website
+  guestId   String?  @map("guest_id") @db.Uuid
+  guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
