@@ -729,6 +729,10 @@ export interface CreateGPPEventData {
   city: string;
   hostName: string;
   email: string;
+  country?: string;
+  countryCode?: string;
+  cityLat?: number;
+  cityLng?: number;
 }
 
 export interface GPPEventResponse {
