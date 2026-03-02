@@ -7,14 +7,12 @@ const router = Router();
 
 // GPP Default values
 const GPP_DEFAULTS = {
-  description: `Join us for Global Pizza Party - a worldwide celebration of pizza!
-
-This event is part of PizzaDAO's Global Pizza Party, where communities around the world come together to share pizza and good vibes.
+  description: `Join us for the Global Pizza Party, a worldwide celebration of pizza and bitcoin, where communities around the world come together to share pizza and good vibes.
 
 What to expect:
-- Free pizza for all attendees
-- Meet fellow pizza lovers
-- Celebrate the universal language of pizza
+- Free pizza
+- Crypto enthusiasts
+- Good conversations
 
 RSVP to secure your slice!`,
   eventType: 'gpp',
