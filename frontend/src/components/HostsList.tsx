@@ -55,7 +55,8 @@ export const HostsList: React.FC<HostsListProps> = ({
   showTitle = true,
   showSocialLinks = true,
 }) => {
-  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false) || [];
+  const displayHost = hostProfile?.name || hostName;
+  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false && h.name !== displayHost) || [];
 
   // Size configurations
   const sizeConfig = {
@@ -238,12 +239,10 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
   coHosts,
   maxVisible = 6,
 }) => {
-  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false) || [];
+  const displayHostName = hostProfile?.name || hostName;
+  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false && h.name !== displayHostName) || [];
   const displayCoHosts = visibleCoHosts.slice(0, maxVisible);
   const remainingCount = visibleCoHosts.length > maxVisible ? visibleCoHosts.length - maxVisible : 0;
-
-  // Use hostProfile name if available, otherwise fall back to hostName
-  const displayHostName = hostProfile?.name || hostName;
 
   return (
     <div className="flex items-center gap-3">
