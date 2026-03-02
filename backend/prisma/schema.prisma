@@ -185,6 +185,11 @@ model Guest {
   // Guest-suggested pizzerias
   suggestedPizzerias Json @default("[]") @map("suggested_pizzerias")
 
+  // Waitlist fields
+  status            String   @default("CONFIRMED")
+  waitlistPosition  Int?     @map("waitlist_position")
+  promotedAt        DateTime? @map("promoted_at") @db.Timestamptz
+
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy String?   @map("checked_in_by")
