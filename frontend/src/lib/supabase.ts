@@ -6,6 +6,7 @@ import {
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
+  promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
 
@@ -94,6 +95,42 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading image:', error);
+    return null;
+  }
+}
+
+/**
+ * Upload a sponsor logo to Supabase Storage and return the public URL
+ * @param file The image file to upload
+ * @returns The public URL of the uploaded logo, or null if upload failed
+ */
+export async function uploadSponsorLogo(file: File): Promise<string | null> {
+  try {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `sponsor-logos/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    // Upload to Supabase Storage (using event-images bucket for now)
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading sponsor logo:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading sponsor logo:', error);
     return null;
   }
 }
@@ -253,7 +290,10 @@ export interface DbParty {
   donation_recipient?: string | null;
   donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
+  pinned_apps?: string[];
 }
+
+export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
 
 export interface DbGuest {
   id: string;
@@ -272,9 +312,13 @@ export interface DbGuest {
   suggested_pizzerias?: any[];
   submitted_at: string;
   submitted_via: string;
+  checked_in_at?: string | null;
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checked_in_at?: string | null;
   checked_in_by?: string | null;
+  status?: DbGuestStatus;
+  waitlist_position?: number | null;
+  promoted_at?: string | null;
 }
 
 // Safe column list for parties table — excludes password
@@ -293,7 +337,8 @@ const SAFE_PARTY_COLUMNS = `
   fundraising_goal, report_recap, report_video_url, report_photos_url,
   flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
   luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
-  report_published, report_public_slug
+  report_published, report_public_slug,
+  pinned_apps
 `;
 
 // Party operations
@@ -670,7 +715,7 @@ export async function addGuestToParty(
   inviteCode?: string,
   pizzeriaRankings?: string[],
   suggestedPizzerias?: any[]
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean } | null> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     return null;
@@ -704,7 +749,7 @@ export async function addGuestToParty(
 
     const data = await response.json();
 
-    // Return a minimal DbGuest object (backend only returns id and name)
+    // Return a minimal DbGuest object (backend returns id, name, status, waitlistPosition)
     const guest = {
       id: data.guest.id,
       party_id: partyId,
@@ -722,9 +767,18 @@ export async function addGuestToParty(
       suggested_pizzerias: suggestedPizzerias || [],
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
+      status: data.guest.status || 'CONFIRMED',
+      waitlist_position: data.guest.waitlistPosition || null,
     } as DbGuest;
 
-    return { guest, alreadyRegistered: data.alreadyRegistered || false, requireApproval: data.requireApproval || false, updated: data.updated || false };
+    return {
+      guest,
+      alreadyRegistered: data.alreadyRegistered || false,
+      requireApproval: data.requireApproval || false,
+      updated: data.updated || false,
+      waitlisted: data.waitlisted || false,
+      waitlistPosition: data.waitlistPosition || null,
+    };
   } catch (error) {
     console.error('Error adding guest:', error);
     return null;
@@ -903,6 +957,22 @@ export async function updateGuestApproval(guestId: string, approved: boolean, pa
   return true;
 }
 
+export async function promoteGuest(guestId: string, partyId: string): Promise<boolean> {
+  // Use API if authenticated (secure path)
+  if (isAuthenticated()) {
+    try {
+      await promoteGuestApi(partyId, guestId);
+      return true;
+    } catch (error) {
+      console.error('Error promoting guest via API:', error);
+      return false;
+    }
+  }
+
+  console.error('Must be authenticated to promote guest');
+  return false;
+}
+
 export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
   const { data, error } = await supabase
     .from('guests')
@@ -993,6 +1063,17 @@ export async function updateParty(
     duration?: number | null;
     address?: string | null;
     venue_name?: string | null;
+    // Venue tracking fields
+    venueStatus?: string | null;
+    venueCapacity?: number | null;
+    venueCost?: number | null;
+    venuePointPerson?: string | null;
+    venueContactName?: string | null;
+    venueContactEmail?: string | null;
+    venueContactPhone?: string | null;
+    venueOrganization?: string | null;
+    venueWebsite?: string | null;
+    venueNotes?: string | null;
     description?: string | null;
     password?: string | null;
     custom_url?: string | null;
@@ -1017,6 +1098,9 @@ export async function updateParty(
     photo_moderation?: boolean;
     nft_enabled?: boolean;
     nft_chain?: string | null;
+    music_enabled?: boolean;
+    music_notes?: string | null;
+    pinned_apps?: string[];
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1029,6 +1113,17 @@ export async function updateParty(
         timezone: updates.timezone,
         address: updates.address,
         venueName: updates.venue_name,
+        // Venue tracking fields
+        venueStatus: updates.venueStatus as any,
+        venueCapacity: updates.venueCapacity,
+        venueCost: updates.venueCost,
+        venuePointPerson: updates.venuePointPerson,
+        venueContactName: updates.venueContactName,
+        venueContactEmail: updates.venueContactEmail,
+        venueContactPhone: updates.venueContactPhone,
+        venueOrganization: updates.venueOrganization,
+        venueWebsite: updates.venueWebsite,
+        venueNotes: updates.venueNotes,
         maxGuests: updates.max_guests,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
@@ -1052,6 +1147,9 @@ export async function updateParty(
         photoModeration: updates.photo_moderation,
         nftEnabled: updates.nft_enabled,
         nftChain: updates.nft_chain,
+        musicEnabled: updates.music_enabled,
+        musicNotes: updates.music_notes,
+        pinnedApps: updates.pinned_apps,
       });
       return true;
     } catch (error) {

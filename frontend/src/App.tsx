@@ -13,6 +13,9 @@ import { NewEventPage } from './pages/NewEventPage';
 import { AccountPage } from './pages/AccountPage';
 import { GPPLandingPage } from './pages/GPPLandingPage';
 import { CheckInPage } from './pages/CheckInPage';
+import { DJPage } from './pages/DJPage';
+import { PublicReportPage } from './pages/PublicReportPage';
+import { DisplayPage } from './pages/DisplayPage';
 
 function App() {
   return (
@@ -27,10 +30,13 @@ function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
+            <Route path="/report/:slug" element={<PublicReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
+            <Route path="/dj/:inviteCode" element={<DJPage />} />
+            <Route path="/display/:partyId/:slug" element={<DisplayPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

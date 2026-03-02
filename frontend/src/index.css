@@ -81,6 +81,7 @@ input[type="number"],
 input[type="password"],
 input[type="url"],
 input[type="tel"],
+input[type="time"],
 input[type="date"],
 input[type="datetime-local"],
 input[type="tel"],
@@ -120,6 +121,20 @@ input[type="time"],
 input[type="search"],
 textarea {
   text-align: left !important;
+}
+
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
 }
 
 /* Textarea specific */
@@ -280,4 +295,23 @@ body.modal-open {
 /* Hide the Google logo in autocomplete */
 .pac-logo:after {
   display: none !important;
+}
+
+/* Confetti animation for winner picker */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(200px) rotate(720deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  animation: confetti-fall ease-out forwards;
 }

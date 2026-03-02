@@ -23,6 +23,7 @@ interface PizzaContextType {
   removeGuest: (id: string) => Promise<void>;
   approveGuest: (id: string) => Promise<void>;
   declineGuest: (id: string) => Promise<void>;
+  promoteGuest: (id: string) => Promise<void>;
   // Recommendations
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
@@ -40,7 +41,7 @@ interface PizzaContextType {
   updatePizzaSettings: (settings: PizzaSettings) => void;
 }
 
-const PizzaContext = createContext<PizzaContextType | undefined>(undefined);
+export const PizzaContext = createContext<PizzaContextType | undefined>(undefined);
 
 // Re-export from constants for backward compatibility
 export const availableToppings = TOPPINGS;
@@ -66,9 +67,12 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     pizzeriaRankings: dbGuest.pizzeria_rankings || [],
     suggestedPizzerias: dbGuest.suggested_pizzerias || [],
     submittedAt: dbGuest.submitted_at,
-    approved: dbGuest.approved ?? null,
     checkedInAt: dbGuest.checked_in_at ?? null,
+    approved: dbGuest.approved ?? null,
     checkedInBy: dbGuest.checked_in_by ?? null,
+    status: dbGuest.status || 'CONFIRMED',
+    waitlistPosition: dbGuest.waitlist_position || null,
+    promotedAt: dbGuest.promoted_at || null,
   };
 }
 
@@ -112,6 +116,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationRecipient: dbParty.donation_recipient || null,
     donationRecipientUrl: dbParty.donation_recipient_url || null,
     donationEthAddress: dbParty.donation_eth_address || null,
+    pinnedApps: (dbParty.pinned_apps as string[]) ?? [],
     guests,
   };
 }
@@ -267,6 +272,30 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const promoteGuest = async (id: string) => {
+    if (!party) return;
+    const success = await db.promoteGuest(id, party.id);
+    if (success) {
+      setGuests(prev => prev.map(g =>
+        g.id === id
+          ? { ...g, status: 'CONFIRMED', waitlistPosition: null, promotedAt: new Date().toISOString() }
+          : g.status === 'WAITLISTED' && g.waitlistPosition && g.waitlistPosition > (prev.find(p => p.id === id)?.waitlistPosition || 0)
+            ? { ...g, waitlistPosition: g.waitlistPosition - 1 }
+            : g
+      ));
+      setParty(prev => prev ? {
+        ...prev,
+        guests: prev.guests.map(g =>
+          g.id === id
+            ? { ...g, status: 'CONFIRMED', waitlistPosition: null, promotedAt: new Date().toISOString() }
+            : g.status === 'WAITLISTED' && g.waitlistPosition && g.waitlistPosition > (prev.guests.find(p => p.id === id)?.waitlistPosition || 0)
+              ? { ...g, waitlistPosition: g.waitlistPosition - 1 }
+              : g
+        )
+      } : null);
+    }
+  };
+
   const updatePizzaSettings = (settings: PizzaSettings) => {
     setPizzaSettings(settings);
   };
@@ -316,6 +345,42 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setBeverageRecommendations(waves[0]?.beverages || []);
   };
 
+  // Update pizza quantity in recommendations
+  const updatePizzaQuantity = (pizzaId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      // Remove the pizza if quantity is 0 or less
+      removePizza(pizzaId);
+      return;
+    }
+
+    setRecommendations(prev =>
+      prev.map(p => p.id === pizzaId ? { ...p, quantity: newQuantity } : p)
+    );
+
+    // Also update wave recommendations
+    setWaveRecommendations(prev =>
+      prev.map(wave => ({
+        ...wave,
+        pizzas: wave.pizzas.map(p => p.id === pizzaId ? { ...p, quantity: newQuantity } : p),
+        totalPizzas: wave.pizzas.reduce((sum, p) => sum + (p.id === pizzaId ? newQuantity : (p.quantity || 1)), 0),
+      }))
+    );
+  };
+
+  // Remove pizza from recommendations
+  const removePizza = (pizzaId: string) => {
+    setRecommendations(prev => prev.filter(p => p.id !== pizzaId));
+
+    // Also update wave recommendations
+    setWaveRecommendations(prev =>
+      prev.map(wave => ({
+        ...wave,
+        pizzas: wave.pizzas.filter(p => p.id !== pizzaId),
+        totalPizzas: wave.pizzas.filter(p => p.id !== pizzaId).reduce((sum, p) => sum + (p.quantity || 1), 0),
+      }))
+    );
+  };
+
   return (
     <PizzaContext.Provider value={{
       party,
@@ -332,8 +397,11 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       removeGuest,
       approveGuest,
       declineGuest,
+      promoteGuest,
       recommendations,
       generateRecommendations,
+      updatePizzaQuantity,
+      removePizza,
       beverageRecommendations,
       waveRecommendations,
       orderExpectedGuests,

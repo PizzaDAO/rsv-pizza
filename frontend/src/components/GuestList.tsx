@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX, Search, CheckCircle2, Download } from 'lucide-react';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { checkInGuest } from '../lib/api';
 
 export const GuestList: React.FC = () => {
-  const { guests, removeGuest, approveGuest, declineGuest, party, loadParty } = usePizza();
+  const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
@@ -75,66 +75,107 @@ export const GuestList: React.FC = () => {
     }
   };
 
+  // Separate guests by status
+  const confirmedGuests = filteredGuests.filter(g => g.status !== 'WAITLISTED');
+  const waitlistedGuests = filteredGuests.filter(g => g.status === 'WAITLISTED')
+    .sort((a, b) => (a.waitlistPosition || 0) - (b.waitlistPosition || 0));
+
   return (
-    <div className="card p-6">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-white">Guests</h2>
-          <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
-            {guests.length}
-          </span>
-          {checkedInCount > 0 && (
-            <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
-              <CheckCircle2 size={14} />
-              {checkedInCount} checked in
+    <div className="space-y-6">
+      {/* Confirmed Guests Section */}
+      <div className="card p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <Users size={20} className="text-white/60" />
+            <h2 className="text-xl font-bold text-white">Guests</h2>
+            <span className="bg-[#39d98a]/20 text-[#39d98a] text-sm font-medium px-3 py-1 rounded-full border border-[#39d98a]/30">
+              {confirmedGuests.length}
+              {party?.maxGuests && ` / ${party.maxGuests}`}
             </span>
-          )}
+            {checkedInCount > 0 && (
+              <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
+                <CheckCircle2 size={14} />
+                {checkedInCount} checked in
+              </span>
+            )}
+          </div>
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
         </div>
-        <button
-          onClick={exportCSV}
-          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
-        >
-          <Download size={14} />
-          Export CSV
-        </button>
+
+        <div className="mb-4">
+          <IconInput
+            icon={Search}
+            type="text"
+            placeholder="Search guests by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {searchQuery.trim() && (
+          <p className="text-sm text-white/50 mb-3">
+            Showing {filteredGuests.length} of {guests.length} guests
+          </p>
+        )}
+
+        {confirmedGuests.length === 0 ? (
+          searchQuery.trim() ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Search size={36} className="text-white/20 mb-3" />
+              <p className="text-white/50">No guests match "{searchQuery}"</p>
+            </div>
+          ) : (
+            <p className="text-white/50 text-sm py-4">No confirmed guests yet.</p>
+          )
+        ) : (
+          <div className="divide-y divide-white/10">
+            {confirmedGuests.map(guest => (
+              <TableRow
+                key={guest.id}
+                guest={guest}
+                variant="basic"
+                requireApproval={requireApproval}
+                onApprove={approveGuest}
+                onDecline={declineGuest}
+                onRemove={removeGuest}
+                onCheckIn={handleCheckIn}
+                isCheckingIn={checkingInId === guest.id}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="mb-4">
-        <IconInput
-          icon={Search}
-          type="text"
-          placeholder="Search guests by name or email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
+      {/* Waitlist Section */}
+      {waitlistedGuests.length > 0 && (
+        <div className="card p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-3">
+              <Clock size={20} className="text-white/60" />
+              <h2 className="text-xl font-bold text-white">Waitlist</h2>
+              <span className="bg-[#ffc107]/20 text-[#ffc107] text-sm font-medium px-3 py-1 rounded-full border border-[#ffc107]/30">
+                {waitlistedGuests.length}
+              </span>
+            </div>
+          </div>
 
-      {searchQuery.trim() && (
-        <p className="text-sm text-white/50 mb-3">
-          Showing {filteredGuests.length} of {guests.length} guests
-        </p>
-      )}
-
-      {filteredGuests.length === 0 && searchQuery.trim() ? (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Search size={36} className="text-white/20 mb-3" />
-          <p className="text-white/50">No guests match "{searchQuery}"</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-white/10">
-          {filteredGuests.map(guest => (
-            <TableRow
-              key={guest.id}
-              guest={guest}
-              variant="basic"
-              requireApproval={requireApproval}
-              onApprove={approveGuest}
-              onDecline={declineGuest}
-              onRemove={removeGuest}
-              onCheckIn={handleCheckIn}
-              isCheckingIn={checkingInId === guest.id}
-            />
-          ))}
+          <div className="divide-y divide-white/10">
+            {waitlistedGuests.map(guest => (
+              <TableRow
+                key={guest.id}
+                guest={guest}
+                variant="waitlist"
+                onPromote={promoteGuest}
+                onRemove={removeGuest}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

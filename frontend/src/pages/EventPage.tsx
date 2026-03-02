@@ -18,6 +18,7 @@ import { DonationStep } from '../components/DonationStep';
 import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
+import { MusicWidget } from '../components/music';
 import { PhotoStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
@@ -598,8 +599,16 @@ export function EventPage() {
                       <Users className="w-4 h-4" />
                       <span>
                         {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                        {event.maxGuests && ` / ${event.maxGuests}`}
                       </span>
+                      {event.maxGuests && event.guestCount >= event.maxGuests && (
+                        <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                      )}
+                      {event.maxGuests && event.guestCount < event.maxGuests && (
+                        <span className="text-white/40 text-xs">
+                          ({event.maxGuests - event.guestCount} spots left)
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -807,8 +816,16 @@ export function EventPage() {
                       <Users className="w-4 h-4" />
                       <span>
                         {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
-                        {event.maxGuests && ` • ${event.maxGuests} expected`}
+                        {event.maxGuests && ` / ${event.maxGuests}`}
                       </span>
+                      {event.maxGuests && event.guestCount >= event.maxGuests && (
+                        <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                      )}
+                      {event.maxGuests && event.guestCount < event.maxGuests && (
+                        <span className="text-white/40 text-xs">
+                          ({event.maxGuests - event.guestCount} spots left)
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -923,6 +940,11 @@ export function EventPage() {
                     size="lg"
                     showTitle={true}
                   />
+                </div>
+
+                {/* Music Lineup Section */}
+                <div className="border-t border-white/10 pt-6 mt-6">
+                  <MusicWidget isHost={false} partyId={event.id} />
                 </div>
 
                 {/* Photo Gallery Section */}

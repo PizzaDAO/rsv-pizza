@@ -152,6 +152,16 @@ export async function createAIPhoneOrder(
     }),
   });
 
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      return { success: false, error: data.error || data.message || `Request failed with status ${response.status}` };
+    } catch {
+      return { success: false, error: `Request failed with status ${response.status}` };
+    }
+  }
+
   return response.json();
 }
 
@@ -222,6 +232,22 @@ export function getCallRecordingUrl(callId: string): string {
   return `${SUPABASE_URL}/functions/v1/ai-call-recording?callId=${encodeURIComponent(callId)}`;
 }
 
+// Calculate distance (Haversine, returns miles)
+export function calculateDistanceMiles(
+  lat1: number, lng1: number, lat2: number, lng2: number
+): number {
+  const R = 3958.8;
+  const dLat = ((lat2-lat1)*Math.PI)/180;
+  const dLng = ((lng2-lng1)*Math.PI)/180;
+  const a = Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+export function formatDistanceMiles(miles: number): string {
+  if (miles<0.1) return "<0.1 mi";
+  return miles.toFixed(1)+" mi";
+}
+
 // Format distance for display
 export function formatDistance(meters: number): string {
   if (meters < 1000) {
@@ -270,4 +296,142 @@ export function getProviderColor(provider: OrderingProvider): string {
 // Check if provider supports direct API ordering
 export function supportsDirectOrdering(provider: OrderingProvider): boolean {
   return ['square', 'toast', 'chownow', 'ai_phone'].includes(provider);
+}
+
+// --- Backend API AI Phone Call Functions ---
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3006';
+
+// Initiate AI phone call via backend API
+export async function initiateAIPhoneCall(
+  partyId: string,
+  pizzeriaName: string,
+  pizzeriaPhone: string,
+  items: OrderItem[],
+  customerName: string,
+  customerPhone: string,
+  fulfillmentType: 'pickup' | 'delivery',
+  deliveryAddress?: string,
+  partySize?: number,
+  estimatedTotal?: number
+): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
+  const token = localStorage.getItem('authToken');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/initiate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      partyId,
+      pizzeriaName,
+      pizzeriaPhone,
+      items,
+      customerName,
+      customerPhone,
+      fulfillmentType,
+      deliveryAddress,
+      partySize,
+      estimatedTotal,
+    }),
+  });
+
+  // Handle non-JSON responses (e.g., HTML 404 from backend not yet deployed)
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return {
+      success: false,
+      error: `Backend API returned non-JSON response (status ${response.status}). The ai-phone endpoint may not be deployed yet.`,
+    };
+  }
+
+  const data = await response.json();
+
+  // Normalize error response - backend may return {message, code} or {error}
+  if (!response.ok || data.message || data.error) {
+    return {
+      success: false,
+      error: data.message || data.error || 'Failed to initiate AI call',
+    };
+  }
+
+  return data;
+}
+
+// Retry a failed AI phone call
+export async function retryAIPhoneCall(
+  aiPhoneCallId: string
+): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
+  const token = localStorage.getItem('authToken');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/retry`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return {
+      success: false,
+      error: `Backend API returned non-JSON response (status ${response.status}).`,
+    };
+  }
+
+  if (!response.ok) {
+    const data = await response.json();
+    return {
+      success: false,
+      error: data.message || data.error || 'Failed to retry call',
+    };
+  }
+
+  return response.json();
+}
+
+// Get AI phone call status
+export async function getAIPhoneCallStatus(aiPhoneCallId: string) {
+  const token = localStorage.getItem('authToken');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/status`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Backend API returned non-JSON response (status ${response.status})`);
+  }
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch call status');
+  }
+
+  return response.json();
+}
+
+// Get AI phone call transcript
+export async function getAIPhoneCallTranscript(aiPhoneCallId: string) {
+  const token = localStorage.getItem('authToken');
+
+  const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/transcript`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Backend API returned non-JSON response (status ${response.status})`);
+  }
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch transcript');
+  }
+
+  return response.json();
 }

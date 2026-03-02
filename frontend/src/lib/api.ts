@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -95,6 +95,17 @@ export interface UpdatePartyData {
   timezone?: string | null;
   address?: string | null;
   venueName?: string | null;
+  // Venue tracking fields
+  venueStatus?: VenueStatus | null;
+  venueCapacity?: number | null;
+  venueCost?: number | null;
+  venuePointPerson?: string | null;
+  venueContactName?: string | null;
+  venueContactEmail?: string | null;
+  venueContactPhone?: string | null;
+  venueOrganization?: string | null;
+  venueWebsite?: string | null;
+  venueNotes?: string | null;
   maxGuests?: number | null;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -118,6 +129,10 @@ export interface UpdatePartyData {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  fundraisingGoal?: number | null;
+  musicEnabled?: boolean;
+  musicNotes?: string | null;
+  pinnedApps?: string[];
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -159,6 +174,17 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       timezone: data.timezone,
       address: data.address,
       venueName: data.venueName,
+      // Venue tracking fields
+      venueStatus: data.venueStatus,
+      venueCapacity: data.venueCapacity,
+      venueCost: data.venueCost,
+      venuePointPerson: data.venuePointPerson,
+      venueContactName: data.venueContactName,
+      venueContactEmail: data.venueContactEmail,
+      venueContactPhone: data.venueContactPhone,
+      venueOrganization: data.venueOrganization,
+      venueWebsite: data.venueWebsite,
+      venueNotes: data.venueNotes,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -182,6 +208,10 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       photoModeration: data.photoModeration,
       nftEnabled: data.nftEnabled,
       nftChain: data.nftChain,
+      fundraisingGoal: data.fundraisingGoal,
+      musicEnabled: data.musicEnabled,
+      musicNotes: data.musicNotes,
+      pinnedApps: data.pinnedApps,
     },
   });
 }
@@ -221,6 +251,12 @@ export async function updateGuestApprovalApi(partyId: string, guestId: string, a
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',
     body: { approved },
+  });
+}
+
+export async function promoteGuestApi(partyId: string, guestId: string) {
+  return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/promote`, {
+    method: 'POST',
   });
 }
 
@@ -578,6 +614,116 @@ export async function batchReviewPhotos(
   }
 }
 
+// ============================================
+// Sponsor CRM API functions
+// ============================================
+
+export interface CreateSponsorData {
+  name: string;
+  website?: string;
+  brandTwitter?: string;
+  pointPerson?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactTwitter?: string;
+  telegram?: string;
+  status?: SponsorStatus;
+  amount?: number | null;
+  sponsorshipType?: SponsorshipType | null;
+  productService?: string;
+  logoUrl?: string;
+  notes?: string;
+  lastContactedAt?: string | null;
+}
+
+export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
+
+export interface SponsorFilters {
+  status?: SponsorStatus;
+  sortBy?: 'createdAt' | 'name' | 'amount' | 'lastContactedAt' | 'status';
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Get all sponsors for a party
+export async function getSponsors(
+  partyId: string,
+  filters: SponsorFilters = {}
+): Promise<{ sponsors: Sponsor[] } | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/sponsors${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<{ sponsors: Sponsor[] }>(url, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsors:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Performer/Music API functions
+// ============================================
+
+export interface CreatePerformerData {
+  name: string;
+  type?: 'dj' | 'live_band' | 'solo' | 'playlist';
+  genre?: string;
+  setTime?: string;
+  setDuration?: number;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  instagram?: string;
+  soundcloud?: string;
+  status?: 'pending' | 'confirmed' | 'cancelled';
+  equipmentProvided?: boolean;
+  equipmentNotes?: string;
+  fee?: number;
+  feePaid?: boolean;
+  notes?: string;
+}
+
+export interface UpdatePerformerData {
+  name?: string;
+  type?: 'dj' | 'live_band' | 'solo' | 'playlist';
+  genre?: string | null;
+  setTime?: string | null;
+  setDuration?: number | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  instagram?: string | null;
+  soundcloud?: string | null;
+  status?: 'pending' | 'confirmed' | 'cancelled';
+  equipmentProvided?: boolean;
+  equipmentNotes?: string | null;
+  fee?: number | null;
+  feePaid?: boolean;
+  notes?: string | null;
+}
+
+// Get performers for a party (public endpoint)
+export async function getPerformers(partyId: string): Promise<PerformersResponse | null> {
+  try {
+    return await apiRequest<PerformersResponse>(`/api/parties/${partyId}/performers`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching performers:', error);
+    return null;
+  }
+}
+
 // GPP API functions
 export interface CreateGPPEventData {
   city: string;
@@ -652,4 +798,1101 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
     method: 'GET',
     requireAuth: true,
   });
+}
+
+// Get sponsor pipeline statistics
+export async function getSponsorStats(partyId: string): Promise<SponsorStats | null> {
+  try {
+    return await apiRequest<SponsorStats>(`/api/parties/${partyId}/sponsors/stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsor stats:', error);
+    return null;
+  }
+}
+
+// Create a new sponsor
+export async function createSponsor(
+  partyId: string,
+  data: CreateSponsorData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating sponsor:', error);
+    throw error;
+  }
+}
+
+// Get single sponsor details
+export async function getSponsor(
+  partyId: string,
+  sponsorId: string
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching sponsor:', error);
+    return null;
+  }
+}
+
+// Update a sponsor
+export async function updateSponsor(
+  partyId: string,
+  sponsorId: string,
+  data: UpdateSponsorData
+): Promise<{ sponsor: Sponsor } | null> {
+  try {
+    return await apiRequest<{ sponsor: Sponsor }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating sponsor:', error);
+    throw error;
+  }
+}
+
+// Delete a sponsor
+export async function deleteSponsor(partyId: string, sponsorId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/sponsors/${sponsorId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting sponsor:', error);
+    return false;
+  }
+}
+
+// Update fundraising goal for a party
+export async function updateFundraisingGoal(
+  partyId: string,
+  fundraisingGoal: number | null
+): Promise<{ party: any } | null> {
+  try {
+    return await apiRequest<{ party: any }>(`/api/parties/${partyId}`, {
+      method: 'PATCH',
+      body: { fundraisingGoal },
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating fundraising goal:', error);
+    throw error;
+  }
+}
+
+// ============================================
+// Venue API functions
+// ============================================
+
+export interface VenueCreateData {
+  name: string;
+  address?: string;
+  website?: string;
+  capacity?: number;
+  cost?: number;
+  organization?: string;
+  pointPerson?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  status?: VenueStatus;
+  notes?: string;
+}
+
+export interface VenueUpdateData extends Partial<VenueCreateData> {}
+
+// Get all venues for a party
+export async function getVenues(partyId: string): Promise<Venue[]> {
+  try {
+    const response = await apiRequest<{ venues: Venue[] }>(`/api/parties/${partyId}/venues`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return response.venues;
+  } catch (error) {
+    console.error('Error fetching venues:', error);
+    return [];
+  }
+}
+
+// Create a new venue
+export async function createVenue(partyId: string, data: VenueCreateData): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error creating venue:', error);
+    throw error;
+  }
+}
+
+// Update a venue
+export async function updateVenue(partyId: string, venueId: string, data: VenueUpdateData): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues/${venueId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error updating venue:', error);
+    throw error;
+  }
+}
+
+// Delete a venue
+export async function deleteVenue(partyId: string, venueId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/venues/${venueId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting venue:', error);
+    return false;
+  }
+}
+
+// Select a venue as the event location
+export async function selectVenue(partyId: string, venueId: string): Promise<{ venue: Venue; party: any } | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue; party: any }>(`/api/parties/${partyId}/venues/${venueId}/select`, {
+      method: 'PATCH',
+      requireAuth: true,
+    });
+    return response;
+  } catch (error) {
+    console.error('Error selecting venue:', error);
+    throw error;
+  }
+}
+
+// Deselect a venue
+export async function deselectVenue(partyId: string, venueId: string): Promise<Venue | null> {
+  try {
+    const response = await apiRequest<{ venue: Venue }>(`/api/parties/${partyId}/venues/${venueId}/deselect`, {
+      method: 'PATCH',
+      requireAuth: true,
+    });
+    return response.venue;
+  } catch (error) {
+    console.error('Error deselecting venue:', error);
+    throw error;
+  }
+}
+
+// Add a performer (host only)
+export async function addPerformer(
+  partyId: string,
+  data: CreatePerformerData
+): Promise<{ performer: Performer } | null> {
+  try {
+    return await apiRequest<{ performer: Performer }>(`/api/parties/${partyId}/performers`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error adding performer:', error);
+    throw error;
+  }
+}
+
+// Update a performer (host only)
+export async function updatePerformer(
+  partyId: string,
+  performerId: string,
+  data: UpdatePerformerData
+): Promise<{ performer: Performer } | null> {
+  try {
+    return await apiRequest<{ performer: Performer }>(
+      `/api/parties/${partyId}/performers/${performerId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating performer:', error);
+    throw error;
+  }
+}
+
+// Delete a performer (host only)
+export async function deletePerformer(
+  partyId: string,
+  performerId: string
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/performers/${performerId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting performer:', error);
+    return false;
+  }
+}
+
+// Reorder performers (host only)
+export async function reorderPerformers(
+  partyId: string,
+  performerIds: string[]
+): Promise<{ performers: Performer[] } | null> {
+  try {
+    return await apiRequest<{ performers: Performer[] }>(
+      `/api/parties/${partyId}/performers/reorder`,
+      {
+        method: 'PATCH',
+        body: { performerIds },
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error reordering performers:', error);
+    throw error;
+  }
+}
+
+// =====================
+// Report API functions
+// =====================
+
+// Get full report data (host only)
+export async function getReport(partyId: string): Promise<{ report: EventReport } | null> {
+  try {
+    return await apiRequest<{ report: EventReport }>(`/api/parties/${partyId}/report`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching report:', error);
+    return null;
+  }
+}
+
+// Update report fields (host only)
+export interface UpdateReportData {
+  reportRecap?: string | null;
+  reportVideoUrl?: string | null;
+  reportPhotosUrl?: string | null;
+  flyerArtist?: string | null;
+  xPostUrl?: string | null;
+  xPostViews?: number | null;
+  farcasterPostUrl?: string | null;
+  farcasterViews?: number | null;
+  lumaUrl?: string | null;
+  lumaViews?: number | null;
+  poapEventId?: string | null;
+  poapMints?: number | null;
+  poapMoments?: number | null;
+}
+
+export async function updateReport(
+  partyId: string,
+  data: UpdateReportData
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/report`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating report:', error);
+    return false;
+  }
+}
+
+// Publish report
+export async function publishReport(
+  partyId: string
+): Promise<{ reportPublicSlug: string; publicUrl: string } | null> {
+  try {
+    return await apiRequest<{ success: boolean; reportPublicSlug: string; publicUrl: string }>(
+      `/api/parties/${partyId}/report/publish`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error publishing report:', error);
+    return null;
+  }
+}
+
+// Unpublish report
+export async function unpublishReport(partyId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/report/publish`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error unpublishing report:', error);
+    return false;
+  }
+}
+
+// Add social post
+export async function addSocialPost(
+  partyId: string,
+  data: { platform: string; url: string; authorHandle?: string }
+): Promise<{ socialPost: SocialPost } | null> {
+  try {
+    return await apiRequest<{ socialPost: SocialPost }>(
+      `/api/parties/${partyId}/report/social-posts`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error adding social post:', error);
+    return null;
+  }
+}
+
+// Delete social post
+export async function deleteSocialPost(partyId: string, postId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/report/social-posts/${postId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting social post:', error);
+    return false;
+  }
+}
+
+// Add notable attendee
+export async function addNotableAttendee(
+  partyId: string,
+  data: { name: string; link?: string }
+): Promise<{ notableAttendee: NotableAttendee } | null> {
+  try {
+    return await apiRequest<{ notableAttendee: NotableAttendee }>(
+      `/api/parties/${partyId}/report/notable-attendees`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error adding notable attendee:', error);
+    return null;
+  }
+}
+
+// Delete notable attendee
+export async function deleteNotableAttendee(partyId: string, attendeeId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/report/notable-attendees/${attendeeId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting notable attendee:', error);
+    return false;
+  }
+}
+
+// Get public report by slug (no auth)
+export async function getPublicReport(slug: string): Promise<{ report: EventReport } | null> {
+  try {
+    return await apiRequest<{ report: EventReport }>(`/api/reports/public/${slug}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching public report:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Staff API functions (host only)
+// ============================================
+
+export interface StaffListResponse {
+  staff: Staff[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface StaffFilters {
+  status?: StaffStatus;
+  role?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateStaffData {
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  status?: StaffStatus;
+  notes?: string;
+}
+
+export interface UpdateStaffData {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string;
+  status?: StaffStatus;
+  notes?: string | null;
+}
+
+// Get all staff for a party
+export async function getPartyStaff(
+  partyId: string,
+  filters: StaffFilters = {}
+): Promise<StaffListResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.role) params.append('role', filters.role);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = `/api/parties/${partyId}/staff${queryString ? `?${queryString}` : ''}`;
+
+    return await apiRequest<StaffListResponse>(url, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    return null;
+  }
+}
+
+// Get staff statistics
+export async function getStaffStats(partyId: string): Promise<StaffStats | null> {
+  try {
+    return await apiRequest<StaffStats>(`/api/parties/${partyId}/staff/stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching staff stats:', error);
+    return null;
+  }
+}
+
+// Add a new staff member
+export async function createStaff(
+  partyId: string,
+  data: CreateStaffData
+): Promise<{ staff: Staff } | null> {
+  try {
+    return await apiRequest<{ staff: Staff }>(`/api/parties/${partyId}/staff`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating staff:', error);
+    return null;
+  }
+}
+
+// Update a staff member
+export async function updateStaff(
+  partyId: string,
+  staffId: string,
+  data: UpdateStaffData
+): Promise<{ staff: Staff } | null> {
+  try {
+    return await apiRequest<{ staff: Staff }>(`/api/parties/${partyId}/staff/${staffId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating staff:', error);
+    return null;
+  }
+}
+
+// Delete a staff member
+export async function deleteStaff(partyId: string, staffId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/staff/${staffId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting staff:', error);
+    return false;
+  }
+}
+
+// ============================================
+// Display API functions
+// ============================================
+
+export interface CreateDisplayData {
+  name: string;
+  contentType?: DisplayContentType;
+  contentConfig?: DisplayContentConfig;
+  rotationInterval?: number;
+  backgroundColor?: string;
+  showClock?: boolean;
+  showEventName?: boolean;
+  password?: string;
+}
+
+export interface UpdateDisplayData {
+  name?: string;
+  contentType?: DisplayContentType;
+  contentConfig?: DisplayContentConfig;
+  rotationInterval?: number;
+  backgroundColor?: string;
+  showClock?: boolean;
+  showEventName?: boolean;
+  isActive?: boolean;
+  password?: string | null;
+}
+
+// List displays for a party
+export async function getPartyDisplays(partyId: string): Promise<{ displays: Display[] } | null> {
+  try {
+    return await apiRequest<{ displays: Display[] }>(`/api/parties/${partyId}/displays`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching displays:', error);
+    return null;
+  }
+}
+
+// Create a new display
+export async function createDisplay(
+  partyId: string,
+  data: CreateDisplayData
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating display:', error);
+    return null;
+  }
+}
+
+// Get display details
+export async function getDisplay(
+  partyId: string,
+  displayId: string
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching display:', error);
+    return null;
+  }
+}
+
+// Update display
+export async function updateDisplay(
+  partyId: string,
+  displayId: string,
+  data: UpdateDisplayData
+): Promise<{ display: Display } | null> {
+  try {
+    return await apiRequest<{ display: Display }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating display:', error);
+    return null;
+  }
+}
+
+// Delete display
+export async function deleteDisplay(partyId: string, displayId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/displays/${displayId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting display:', error);
+    return false;
+  }
+}
+
+// Get display for public viewer (no auth)
+export async function getDisplayForViewer(
+  partyId: string,
+  slug: string,
+  password?: string
+): Promise<DisplayViewerData | null> {
+  try {
+    const params = password ? `?password=${encodeURIComponent(password)}` : '';
+    return await apiRequest<DisplayViewerData>(`/api/display/view/${partyId}/${slug}${params}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching display for viewer:', error);
+    return null;
+  }
+}
+
+// Get photos for display (for live refresh)
+export async function getDisplayPhotos(
+  partyId: string,
+  slug: string,
+  since?: string
+): Promise<{ photos: Photo[] } | null> {
+  try {
+    const params = since ? `?since=${encodeURIComponent(since)}` : '';
+    return await apiRequest<{ photos: Photo[] }>(`/api/display/view/${partyId}/${slug}/photos${params}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching display photos:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Raffle API Functions
+// ============================================
+
+export async function getRaffles(partyId: string): Promise<{ raffles: Raffle[] } | null> {
+  try {
+    return await apiRequest<{ raffles: Raffle[] }>(`/api/parties/${partyId}/raffles`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching raffles:', error);
+    return null;
+  }
+}
+
+export async function getRaffle(partyId: string, raffleId: string): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching raffle:', error);
+    return null;
+  }
+}
+
+export async function createRaffle(
+  partyId: string,
+  data: { name: string; description?: string; entriesPerGuest?: number }
+): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating raffle:', error);
+    return null;
+  }
+}
+
+export async function updateRaffle(
+  partyId: string,
+  raffleId: string,
+  data: { name?: string; description?: string; status?: string; entriesPerGuest?: number }
+): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating raffle:', error);
+    return null;
+  }
+}
+
+export async function deleteRaffle(partyId: string, raffleId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/raffles/${raffleId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting raffle:', error);
+    return false;
+  }
+}
+
+export async function addRafflePrize(
+  partyId: string,
+  raffleId: string,
+  data: { name: string; description?: string; imageUrl?: string; quantity?: number }
+): Promise<{ prize: RafflePrize } | null> {
+  try {
+    return await apiRequest<{ prize: RafflePrize }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error adding prize:', error);
+    return null;
+  }
+}
+
+export async function updateRafflePrize(
+  partyId: string,
+  raffleId: string,
+  prizeId: string,
+  data: { name?: string; description?: string; imageUrl?: string; quantity?: number }
+): Promise<{ prize: RafflePrize } | null> {
+  try {
+    return await apiRequest<{ prize: RafflePrize }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes/${prizeId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating prize:', error);
+    return null;
+  }
+}
+
+export async function deleteRafflePrize(partyId: string, raffleId: string, prizeId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/raffles/${raffleId}/prizes/${prizeId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting prize:', error);
+    return false;
+  }
+}
+
+export async function enterRaffle(
+  partyId: string,
+  raffleId: string,
+  guestId: string
+): Promise<{ entry: RaffleEntry } | null> {
+  try {
+    return await apiRequest<{ entry: RaffleEntry }>(`/api/parties/${partyId}/raffles/${raffleId}/enter`, {
+      method: 'POST',
+      body: { guestId },
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error entering raffle:', error);
+    throw error;
+  }
+}
+
+export async function drawRaffleWinners(partyId: string, raffleId: string): Promise<{ raffle: Raffle } | null> {
+  try {
+    return await apiRequest<{ raffle: Raffle }>(`/api/parties/${partyId}/raffles/${raffleId}/draw`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error drawing winners:', error);
+    throw error;
+  }
+}
+
+export async function claimRafflePrize(
+  partyId: string,
+  raffleId: string,
+  winnerId: string
+): Promise<{ winner: RaffleWinner } | null> {
+  try {
+    return await apiRequest<{ winner: RaffleWinner }>(`/api/parties/${partyId}/raffles/${raffleId}/winners/${winnerId}/claim`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error claiming prize:', error);
+    return null;
+  }
+}
+
+export async function unclaimRafflePrize(
+  partyId: string,
+  raffleId: string,
+  winnerId: string
+): Promise<{ winner: RaffleWinner } | null> {
+  try {
+    return await apiRequest<{ winner: RaffleWinner }>(`/api/parties/${partyId}/raffles/${raffleId}/winners/${winnerId}/claim`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error unclaiming prize:', error);
+    return null;
+  }
+}
+
+// Budget API functions
+// ============================================
+
+// Get budget overview and items
+export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
+  try {
+    return await apiRequest<BudgetOverview>(`/api/parties/${partyId}/budget`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching budget:', error);
+    return null;
+  }
+}
+
+// Update budget settings
+export async function updateBudgetSettings(
+  partyId: string,
+  data: { budgetEnabled?: boolean; budgetTotal?: number | null }
+): Promise<{ budgetEnabled: boolean; budgetTotal: number | null } | null> {
+  try {
+    return await apiRequest<{ budgetEnabled: boolean; budgetTotal: number | null }>(
+      `/api/parties/${partyId}/budget/settings`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating budget settings:', error);
+    return null;
+  }
+}
+
+// Create budget item
+export interface CreateBudgetItemData {
+  name: string;
+  category: BudgetCategory;
+  cost: number;
+  status?: BudgetStatus;
+  pointPerson?: string;
+  notes?: string;
+  receiptUrl?: string;
+}
+
+export async function createBudgetItem(
+  partyId: string,
+  data: CreateBudgetItemData
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(`/api/parties/${partyId}/budget/items`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating budget item:', error);
+    return null;
+  }
+}
+
+// Update budget item
+export async function updateBudgetItem(
+  partyId: string,
+  itemId: string,
+  data: Partial<CreateBudgetItemData>
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(
+      `/api/parties/${partyId}/budget/items/${itemId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating budget item:', error);
+    return null;
+  }
+}
+
+// Delete budget item
+export async function deleteBudgetItem(partyId: string, itemId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/budget/items/${itemId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting budget item:', error);
+    return false;
+  }
+}
+
+// Toggle budget item status
+export async function toggleBudgetItemStatus(
+  partyId: string,
+  itemId: string
+): Promise<{ item: BudgetItem } | null> {
+  try {
+    return await apiRequest<{ item: BudgetItem }>(
+      `/api/parties/${partyId}/budget/items/${itemId}/toggle-status`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling budget item status:', error);
+    return null;
+  }
+}
+
+// Party Kit API functions
+// ============================================
+
+export interface KitRequestData {
+  requestedTier?: KitTier;
+  recipientName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface KitResponse {
+  kitEnabled: boolean;
+  kitDeadline: string | null;
+  kit: PartyKit | null;
+}
+
+// Get kit request for a party
+export async function getPartyKit(partyId: string): Promise<KitResponse | null> {
+  try {
+    return await apiRequest<KitResponse>(`/api/parties/${partyId}/kit`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching kit:', error);
+    return null;
+  }
+}
+
+// Submit a kit request
+export async function submitKitRequest(
+  partyId: string,
+  data: KitRequestData
+): Promise<{ kit: PartyKit } | null> {
+  try {
+    return await apiRequest<{ kit: PartyKit }>(`/api/parties/${partyId}/kit`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error submitting kit request:', error);
+    throw error;
+  }
+}
+
+// Update a kit request
+export async function updateKitRequest(
+  partyId: string,
+  data: Partial<KitRequestData>
+): Promise<{ kit: PartyKit } | null> {
+  try {
+    return await apiRequest<{ kit: PartyKit }>(`/api/parties/${partyId}/kit`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating kit request:', error);
+    throw error;
+  }
+}
+
+// Cancel a kit request
+export async function cancelKitRequest(partyId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/kit`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error canceling kit request:', error);
+    return false;
+  }
 }

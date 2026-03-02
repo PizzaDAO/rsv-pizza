@@ -10,6 +10,8 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
+export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+
 export interface Guest {
   id?: string;
   name: string;
@@ -28,6 +30,9 @@ export interface Guest {
   approved?: boolean | null; // null = pending, true = approved, false = declined
   checkedInAt?: string | null;
   checkedInBy?: string | null;
+  status?: GuestStatus;
+  waitlistPosition?: number | null;
+  promotedAt?: string | null;
 }
 
 export interface PizzaStyle {
@@ -120,6 +125,44 @@ export interface PizzaSettings {
   style: PizzaStyle;
 }
 
+// Venue status tracking
+export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full' | 'declined';
+
+// Venue model (for venue picker)
+export interface Venue {
+  id: string;
+  partyId: string;
+  name: string;
+  address: string | null;
+  website: string | null;
+  capacity: number | null;
+  cost: number | null;
+  organization: string | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  status: VenueStatus;
+  isSelected: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Legacy VenueInfo interface (for backwards compatibility with Party fields)
+export interface VenueInfo {
+  status: VenueStatus | null;
+  capacity: number | null;
+  cost: number | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  organization: string | null;
+  website: string | null;
+  notes: string | null;
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -143,6 +186,17 @@ export interface Party {
   description: string | null;
   address: string | null;
   venueName: string | null;
+  // Venue tracking fields
+  venueStatus: VenueStatus | null;
+  venueCapacity: number | null;
+  venueCost: number | null;
+  venuePointPerson: string | null;
+  venueContactName: string | null;
+  venueContactEmail: string | null;
+  venueContactPhone: string | null;
+  venueOrganization: string | null;
+  venueWebsite: string | null;
+  venueNotes: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];
@@ -153,6 +207,7 @@ export interface Party {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  fundraisingGoal?: number | null;
   createdAt: string;
   guests: Guest[];
   // Donation settings
@@ -163,6 +218,7 @@ export interface Party {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  pinnedApps?: string[];
 }
 
 export interface Donation {
@@ -314,3 +370,448 @@ export interface PhotoStats {
   uniqueUploadersCount: number;
   photosEnabled: boolean;
 }
+
+// Sponsor CRM types
+export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
+export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
+
+export interface Sponsor {
+  id: string;
+  partyId: string;
+  name: string;
+  website: string | null;
+  brandTwitter: string | null;
+  pointPerson: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  contactTwitter: string | null;
+  telegram: string | null;
+  status: SponsorStatus;
+  amount: number | null;
+  sponsorshipType: SponsorshipType | null;
+  productService: string | null;
+  logoUrl: string | null;
+  notes: string | null;
+  lastContactedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SponsorStats {
+  fundraisingGoal: number | null;
+  totalConfirmed: number;
+  totalSponsors: number;
+  statusCounts: Record<SponsorStatus, number>;
+}
+
+// Music/DJ Lineup types
+export type PerformerType = 'dj' | 'live_band' | 'solo' | 'playlist';
+export type PerformerStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Performer {
+  id: string;
+  partyId: string;
+  name: string;
+  type: PerformerType;
+  genre: string | null;
+  setTime: string | null;
+  setDuration: number | null;
+  sortOrder: number;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  instagram: string | null;
+  soundcloud: string | null;
+  status: PerformerStatus;
+  equipmentProvided: boolean;
+  equipmentNotes: string | null;
+  fee: number | null;
+  feePaid: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerformersResponse {
+  performers: Performer[];
+  musicEnabled: boolean;
+  musicNotes: string | null;
+}
+
+// Song type for music widget
+export type MusicPlatform = 'spotify' | 'apple_music' | 'youtube' | 'soundcloud' | 'other';
+
+export interface Song {
+  id: string;
+  partyId: string;
+  title: string;
+  artist: string;
+  platform: MusicPlatform;
+  url: string | null;
+  fileUrl: string | null;
+  addedBy: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface Playlist {
+  id: string;
+  partyId: string;
+  name: string;
+  platform: MusicPlatform;
+  url: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+// Report Widget types
+export interface SocialPost {
+  id: string;
+  partyId: string;
+  platform: 'twitter' | 'farcaster' | 'instagram';
+  url: string;
+  authorHandle: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface NotableAttendee {
+  id: string;
+  partyId: string;
+  name: string;
+  link: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ReportStats {
+  totalRsvps: number;
+  approvedGuests: number;
+  mailingListSignups: number;
+  walletAddresses: number;
+  roleBreakdown: Record<string, number>;
+}
+
+export interface EventReport {
+  // Event details
+  id: string;
+  name: string;
+  date: string | null;
+  timezone: string | null;
+  venueName: string | null;
+  address: string | null;
+  eventImageUrl: string | null;
+  description: string | null;
+  coHosts: CoHost[];
+  host: {
+    name: string | null;
+    profilePictureUrl: string | null;
+  } | null;
+
+  // Report-specific fields
+  reportRecap: string | null;
+  reportVideoUrl: string | null;
+  reportPhotosUrl: string | null;
+  flyerArtist: string | null;
+
+  // KPIs
+  xPostUrl: string | null;
+  xPostViews: number | null;
+  farcasterPostUrl: string | null;
+  farcasterViews: number | null;
+  lumaUrl: string | null;
+  lumaViews: number | null;
+  poapEventId: string | null;
+  poapMints: number | null;
+  poapMoments: number | null;
+
+  // Report settings
+  reportPublished?: boolean;
+  reportPublicSlug?: string | null;
+
+  // Related data
+  socialPosts: SocialPost[];
+  notableAttendees: NotableAttendee[];
+  featuredPhotos: Photo[];
+
+  // Calculated stats
+  stats: ReportStats;
+}
+
+// Staffing types
+export type StaffStatus = 'invited' | 'confirmed' | 'declined' | 'checked_in';
+
+export interface Staff {
+  id: string;
+  partyId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  status: StaffStatus;
+  confirmedAt: string | null;
+  checkedInAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StaffStats {
+  totalStaff: number;
+  byStatus: {
+    invited: number;
+    confirmed: number;
+    declined: number;
+    checked_in: number;
+  };
+  uniqueRoles: string[];
+}
+
+// Display Widget types
+export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom';
+
+export interface SlideContent {
+  type: 'image' | 'text' | 'qr';
+  url?: string;
+  content?: string;
+  caption?: string;
+}
+
+export interface SlideshowConfig {
+  googleSlidesUrl?: string;
+  slides?: SlideContent[];
+  transition?: 'fade' | 'slide' | 'none';
+  shuffle?: boolean;
+}
+
+export interface QRCodeConfig {
+  size?: 'small' | 'medium' | 'large';
+  message?: string;
+  showEventInfo?: boolean;
+  showGuestCount?: boolean;
+}
+
+export interface PhotosConfig {
+  filter?: 'all' | 'starred';
+  layout?: 'grid' | 'slideshow';
+  autoRefresh?: number;
+  columns?: number;
+  limit?: number;
+}
+
+export interface EventInfoConfig {
+  showCountdown?: boolean;
+  showGuestCount?: boolean;
+  showLocation?: boolean;
+  showDescription?: boolean;
+}
+
+export interface UploadConfig {
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+}
+
+export interface CustomConfig {
+  html?: string;
+  refreshInterval?: number;
+}
+
+export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | UploadConfig | CustomConfig;
+
+export interface Display {
+  id: string;
+  partyId: string;
+  name: string;
+  slug: string;
+  contentType: DisplayContentType;
+  contentConfig: DisplayContentConfig;
+  rotationInterval: number;
+  backgroundColor: string;
+  showClock: boolean;
+  showEventName: boolean;
+  isActive: boolean;
+  password?: string | null;
+  lastViewedAt?: string | null;
+  viewCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DisplayViewerData {
+  display: Display;
+  party: {
+    id: string;
+    name: string;
+    date: string | null;
+    address: string | null;
+    venueName: string | null;
+    eventImageUrl: string | null;
+    inviteCode: string;
+    customUrl: string | null;
+  };
+  photos?: Photo[];
+}
+
+// Budget Widget types
+export type BudgetCategory = 'pizza' | 'drinks' | 'venue' | 'supplies' | 'entertainment' | 'tips' | 'other';
+export type BudgetStatus = 'pending' | 'paid';
+
+export const BUDGET_CATEGORIES: { id: BudgetCategory; label: string; icon: string }[] = [
+  { id: 'pizza', label: 'Pizza', icon: 'Pizza' },
+  { id: 'drinks', label: 'Drinks', icon: 'Wine' },
+  { id: 'venue', label: 'Venue', icon: 'Home' },
+  { id: 'supplies', label: 'Supplies', icon: 'Package' },
+  { id: 'entertainment', label: 'Entertainment', icon: 'Music' },
+  { id: 'tips', label: 'Tips', icon: 'Heart' },
+  { id: 'other', label: 'Other', icon: 'MoreHorizontal' },
+];
+
+export interface BudgetItem {
+  id: string;
+  partyId: string;
+  name: string;
+  category: BudgetCategory;
+  cost: number;
+  status: BudgetStatus;
+  pointPerson: string | null;
+  notes: string | null;
+  receiptUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategoryTotal {
+  total: number;
+  paid: number;
+  pending: number;
+  count: number;
+}
+
+export interface BudgetOverview {
+  budgetEnabled: boolean;
+  budgetTotal: number | null;
+  totalSpent: number;
+  totalPaid: number;
+  totalPending: number;
+  remaining: number | null;
+  categoryTotals: Record<BudgetCategory, BudgetCategoryTotal>;
+  items: BudgetItem[];
+}
+
+// Raffle Widget types
+export type RaffleStatus = 'draft' | 'open' | 'closed' | 'drawn';
+
+export interface Raffle {
+  id: string;
+  partyId: string;
+  name: string;
+  description: string | null;
+  status: RaffleStatus;
+  entriesPerGuest: number;
+  createdAt: string;
+  updatedAt: string;
+  prizes: RafflePrize[];
+  entries: RaffleEntry[];
+  winners: RaffleWinner[];
+  _count?: {
+    entries: number;
+  };
+}
+
+export interface RafflePrize {
+  id: string;
+  raffleId: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  createdAt: string;
+}
+
+export interface RaffleEntry {
+  id: string;
+  raffleId: string;
+  guestId: string;
+  createdAt: string;
+  guest?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface RaffleWinner {
+  id: string;
+  raffleId: string;
+  prizeId: string;
+  guestId: string;
+  claimedAt: string | null;
+  createdAt: string;
+  guest?: {
+    id: string;
+    name: string;
+  };
+  prize?: {
+    id: string;
+    name: string;
+  };
+}
+
+// Party Kit types
+export type KitTier = 'basic' | 'large' | 'deluxe';
+export type KitStatus = 'pending' | 'approved' | 'shipped' | 'delivered' | 'declined';
+
+export interface PartyKit {
+  id: string;
+  partyId: string;
+  requestedTier: KitTier;
+  allocatedTier: KitTier | null;
+  recipientName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+  status: KitStatus;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  notes: string | null;
+  adminNotes: string | null;
+  requestedAt: string;
+  approvedAt: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KitTierInfo {
+  id: KitTier;
+  name: string;
+  description: string;
+  contents: string[];
+}
+
+export const KIT_TIERS: KitTierInfo[] = [
+  {
+    id: 'basic',
+    name: 'Basic Kit',
+    description: 'Essential party supplies',
+    contents: ['Stickers', 'Tablecloth', 'Flyers'],
+  },
+  {
+    id: 'large',
+    name: 'Large Kit',
+    description: 'Everything in Basic plus more',
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents'],
+  },
+  {
+    id: 'deluxe',
+    name: 'Deluxe Kit',
+    description: 'The complete party package',
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Pins', 'Extras'],
+  },
+];

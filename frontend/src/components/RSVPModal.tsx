@@ -3,7 +3,7 @@ import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRig
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { IconInput } from './IconInput';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -32,6 +32,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
   const [wasUpdated, setWasUpdated] = useState(false);
+  const [waitlisted, setWaitlisted] = useState(false);
+  const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [step, setStep] = useState(1);
   const [showDonation, setShowDonation] = useState(false);
   const [donationComplete, setDonationComplete] = useState(false);
@@ -86,6 +88,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // NFT minting state
   const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
@@ -104,6 +107,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setAlreadyRegistered(false);
       setPendingApproval(false);
       setWasUpdated(false);
+      setWaitlisted(false);
+      setWaitlistPosition(null);
       setStep(1);
       setError(null);
       setMintStatus('idle');
@@ -124,6 +129,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setLikedBeverages(existingGuest.likedBeverages);
         setDislikedBeverages(existingGuest.dislikedBeverages);
         setPizzeriaRankings(existingGuest.pizzeriaRankings);
+        setSuggestedPizzerias(existingGuest.suggestedPizzerias || []);
         setPreferencesLoaded(true); // Mark as loaded so we don't override with profile preferences
       }
 
@@ -184,6 +190,19 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     }
   }, [user, isOpen]);
 
+  // Merge existing suggested pizzerias into nearby list when editing
+  useEffect(() => {
+    if (isOpen && isEditing && existingGuest?.suggestedPizzerias) {
+      const sug = (existingGuest.suggestedPizzerias as any[]).filter((s: any) => s && s.name);
+      if (sug.length > 0) {
+        setNearbyPizzerias(prev => {
+          const newOnes = sug.filter((s: any) => !prev.some(p => p.id === s.id));
+          return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+        });
+      }
+    }
+  }, [isOpen, isEditing, existingGuest]);
+
   // Use host-selected pizzerias if available, otherwise fetch nearby pizzerias
   useEffect(() => {
     async function fetchPizzerias() {
@@ -192,6 +211,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       // If host has selected specific pizzerias, use those
       if (event.selectedPizzerias && event.selectedPizzerias.length > 0) {
         setNearbyPizzerias(event.selectedPizzerias);
+        // Geocode venue for distance calculation
+        if (event.address) {
+          geocodeAddress(event.address).then(loc => { if (loc) setVenueLocation(loc); });
+        }
         return;
       }
 
@@ -201,6 +224,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       setLoadingPizzerias(true);
       try {
         const location = await geocodeAddress(event.address);
+        if (location) setVenueLocation(location);
         if (location) {
           const results = await searchPizzerias(location.lat, location.lng);
           setNearbyPizzerias(results.slice(0, 3));
@@ -302,6 +326,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setPendingApproval(result.requireApproval);
         // Check if this was an update (either we were editing or backend says it was updated)
         setWasUpdated(isEditing || result.updated);
+        setWaitlisted(result.waitlisted);
+        setWaitlistPosition(result.waitlistPosition);
         setSubmitted(true);
         // Notify parent to refresh data
         onRSVPSuccess?.();
@@ -414,6 +440,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   if (submitted) {
     const getSuccessIcon = () => {
       if (alreadyRegistered && !wasUpdated) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
+      if (waitlisted) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       if (pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       return 'bg-[#39d98a]/20 border-[#39d98a]/30';
     };
@@ -421,8 +448,22 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     const getSuccessTitle = () => {
       if (wasUpdated) return "RSVP Updated!";
       if (alreadyRegistered) return "You're already registered!";
+      if (waitlisted) return "You're on the Waitlist!";
       if (pendingApproval) return "RSVP Submitted!";
       return `See you at ${event.name}!`;
+    };
+
+    const getSuccessIconComponent = () => {
+      if (alreadyRegistered && !wasUpdated) {
+        return <AlertCircle className="w-8 h-8 text-[#ff393a]" />;
+      }
+      if (waitlisted) {
+        return <span className="text-2xl font-bold text-[#ffc107]">#{waitlistPosition}</span>;
+      }
+      if (pendingApproval) {
+        return <Loader2 className="w-8 h-8 text-[#ffc107]" />;
+      }
+      return <Check className="w-8 h-8 text-[#39d98a]" />;
     };
 
     return (
@@ -435,13 +476,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
-            {alreadyRegistered && !wasUpdated ? (
-              <AlertCircle className="w-8 h-8 text-[#ff393a]" />
-            ) : pendingApproval ? (
-              <Loader2 className="w-8 h-8 text-[#ffc107]" />
-            ) : (
-              <Check className="w-8 h-8 text-[#39d98a]" />
-            )}
+            {getSuccessIconComponent()}
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
             {getSuccessTitle()}
@@ -456,7 +491,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               Your preferences have been saved.
             </p>
           )}
-          {pendingApproval && !alreadyRegistered && (
+          {waitlisted && !wasUpdated && (
+            <p className="text-white/60 mb-4">
+              This event is currently at capacity, but you're #{waitlistPosition} on the waitlist!
+              We'll notify you if a spot opens up.
+            </p>
+          )}
+          {pendingApproval && !alreadyRegistered && !waitlisted && (
             <p className="text-white/60 mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
@@ -884,6 +925,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                               <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
                                 <Star size={10} className="fill-yellow-400" />
                                 {pizzeria.rating.toFixed(1)}
+                              </span>
+                            )}
+                            {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
+                              <span className="text-xs text-white/40">
+                                {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                               </span>
                             )}
                           </div>

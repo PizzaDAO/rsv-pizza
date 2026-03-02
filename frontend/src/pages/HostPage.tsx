@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -16,11 +16,25 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
+import { AppsHub } from '../components/AppsHub';
+import { SponsorCRM } from '../components/sponsors';
+import { VenueWidget } from '../components/venue';
+import { MusicWidget } from '../components/music';
+import { ReportWidget } from '../components/report';
+import { StaffingWidget } from '../components/staffing';
+import { DisplaysWidget } from '../components/displays';
+import { RaffleWidget } from '../components/raffle';
+import { BudgetTab } from '../components/budget';
+import { PartyKitWidget } from '../components/kit';
+import { PromoWidget } from '../components/promo';
+import { PINNABLE_APPS } from '../lib/appDefinitions';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'pizza' | 'guests' | 'photos';
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'gpp' | 'promo' | 'apps';
+
+const ALL_VALID_TABS: TabType[] = ['details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -31,14 +45,10 @@ function HostPageContent() {
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
   const [photoModerationEnabled, setPhotoModerationEnabled] = useState(false);
 
-  // Check if current user can edit this party (only valid after auth and party have loaded)
   const canEdit = useMemo(() => {
     if (!party || !user) return false;
-    // Super admin can edit any party
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
-    // Party owner can edit
     if (party.userId === user.id) return true;
-    // Co-host with editor permission can edit
     if (party.coHosts && Array.isArray(party.coHosts)) {
       const isEditor = party.coHosts.some(
         (h: any) => h.email?.toLowerCase() === user.email.toLowerCase() && h.canEdit === true
@@ -48,22 +58,19 @@ function HostPageContent() {
     return false;
   }, [party, user]);
 
-  // Sync photo moderation state from party
   useEffect(() => {
     if (party) {
       setPhotoModerationEnabled(party.photoModeration || false);
     }
   }, [party]);
 
-  // Redirect unauthorized users to RSVP page after auth and party have loaded
   useEffect(() => {
     if (!authLoading && !partyLoading && party && !canEdit) {
       navigate(`/rsvp/${inviteCode}`, { replace: true });
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  // Derive active tab from URL
-  const activeTab: TabType = (tab === 'guests' || tab === 'pizza' || tab === 'photos') ? tab : 'details';
+  const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : 'details';
 
   const setActiveTab = (newTab: TabType) => {
     if (newTab === 'details') {
@@ -87,7 +94,6 @@ function HostPageContent() {
     load();
   }, [inviteCode, loadParty, loadedCode]);
 
-  // Count guests with requests for slider marks
   const guestsWithRequests = useMemo(() => {
     return guests.filter(g =>
       g.toppings.length > 0 ||
@@ -98,19 +104,15 @@ function HostPageContent() {
     ).length;
   }, [guests]);
 
-  // Track previous values for auto-regeneration
   const prevExpectedGuests = useRef<number | null>(null);
   const prevGuestsWithRequests = useRef<number>(0);
   const hasInitialized = useRef(false);
 
-  // Auto-generate recommendations when expected guests or requests change
   useEffect(() => {
-    // Skip if party hasn't loaded yet or no guests
     if (!party || guests.length === 0) return;
 
     const currentExpected = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
 
-    // On first load, generate recommendations
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       prevExpectedGuests.current = currentExpected;
@@ -119,21 +121,18 @@ function HostPageContent() {
       return;
     }
 
-    // Regenerate if expected guests changed
     if (prevExpectedGuests.current !== currentExpected) {
       prevExpectedGuests.current = currentExpected;
       generateRecommendations();
       return;
     }
 
-    // Regenerate if new requests came in
     if (prevGuestsWithRequests.current !== guestsWithRequests) {
       prevGuestsWithRequests.current = guestsWithRequests;
       generateRecommendations();
     }
   }, [party, guests.length, orderExpectedGuests, guestsWithRequests, generateRecommendations]);
 
-  // Wait for both auth and party to finish loading
   if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
@@ -161,7 +160,6 @@ function HostPageContent() {
     );
   }
 
-  // Show loading while redirect is pending for unauthorized users
   if (!canEdit) {
     return (
       <Layout>
@@ -172,19 +170,27 @@ function HostPageContent() {
     );
   }
 
-  const tabs = [
+  const coreTabs = [
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
     { id: 'photos' as TabType, label: 'Photos', icon: Camera },
   ];
 
+  // Build pinned tabs from party.pinnedApps
+  const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
+    const appDef = PINNABLE_APPS.find(a => a.id === appId);
+    if (!appDef) return null;
+    return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
+  }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
+
+  const tabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
 
-        {/* Tab Navigation */}
         <div className="border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -207,143 +213,193 @@ function HostPageContent() {
           })}
         </div>
 
-        {/* Tab Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 space-y-3">
-            {activeTab === 'guests' && (
-              <>
-                <GuestList />
-                <DonationSummary />
-              </>
-            )}
+        {activeTab === 'apps' && party ? (
+          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
+        ) : activeTab !== 'apps' && (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2 space-y-3">
+              {activeTab === 'guests' && (
+                <>
+                  <GuestList />
+                  <DonationSummary />
+                </>
+              )}
 
-            {activeTab === 'pizza' && (
-              <>
-                {/* Expected Guests Slider - at top */}
-                <div className="card p-4 bg-[#1a1a2e] border-white/10">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className="text-sm font-medium text-white">Expected Guests</span>
-                      <p className="text-xs text-white/50 mt-0.5">Adjust for non-respondents</p>
+              {activeTab === 'pizza' && (
+                <>
+                  <div className="card p-4 bg-[#1a1a2e] border-white/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <span className="text-sm font-medium text-white">Expected Guests</span>
+                        <p className="text-xs text-white/50 mt-0.5">Adjust for non-respondents</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={orderExpectedGuests ?? party?.maxGuests ?? guests.length}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value, 10) : null;
+                          setOrderExpectedGuests(value);
+                        }}
+                        className="w-20 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                      />
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      value={orderExpectedGuests ?? party?.maxGuests ?? guests.length}
-                      onChange={(e) => {
-                        const value = e.target.value ? parseInt(e.target.value, 10) : null;
-                        setOrderExpectedGuests(value);
-                      }}
-                      className="w-20 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-                    />
+
+                    {(() => {
+                      const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
+                      const minValue = 0;
+                      const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
+                      const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
+                      const maxCap = guests.length > 0 ? guests.length * 5 : 100;
+                      const maxValue = Math.min(dynamicMax, maxCap);
+                      const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
+                      const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;
+
+                      return (
+                        <div className="relative pt-6 pb-2">
+                          {guestsWithRequests > 0 && (
+                            <div
+                              className="absolute top-0 flex flex-col items-center"
+                              style={{ left: `${requestsPercent}%`, transform: 'translateX(-50%)' }}
+                            >
+                              <span className="text-[10px] text-[#ff393a] font-medium whitespace-nowrap">
+                                {guestsWithRequests} requests
+                              </span>
+                              <div className="w-0.5 h-2 bg-[#ff393a]/50 mt-0.5" />
+                            </div>
+                          )}
+                          {guests.length > 0 && guests.length !== guestsWithRequests && (
+                            <div
+                              className="absolute top-0 flex flex-col items-center"
+                              style={{ left: `${rsvpsPercent}%`, transform: 'translateX(-50%)' }}
+                            >
+                              <span className="text-[10px] text-white/60 font-medium whitespace-nowrap">
+                                {guests.length} RSVPs
+                              </span>
+                              <div className="w-0.5 h-2 bg-white/30 mt-0.5" />
+                            </div>
+                          )}
+
+                          <input
+                            type="range"
+                            min={minValue}
+                            max={maxValue}
+                            value={currentValue}
+                            onChange={(e) => setOrderExpectedGuests(parseInt(e.target.value, 10))}
+                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#ff393a]"
+                            style={{
+                              background: `linear-gradient(to right, #ff393a 0%, #ff393a ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) 100%)`
+                            }}
+                          />
+
+                          <div className="flex justify-between mt-1">
+                            <span className="text-[10px] text-white/40">{minValue}</span>
+                            <span className="text-[10px] text-white/40">{maxValue}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* Slider with marks */}
-                  {(() => {
-                    const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
-                    const minValue = 0;
-                    // Scale max dynamically based on data - use smaller max for low guest counts
-                    // Cap at 5x the number of RSVPs
-                    const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
-                    const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
-                    const maxCap = guests.length > 0 ? guests.length * 5 : 100;
-                    const maxValue = Math.min(dynamicMax, maxCap);
-                    const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
-                    const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;
+                  <PizzaOrderSummary />
+                  <AiCallHistory partyId={party.id} />
+                  <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
+                  <BeverageSettings />
+                </>
+              )}
 
-                    return (
-                      <div className="relative pt-6 pb-2">
-                        {/* Marks */}
-                        {guestsWithRequests > 0 && (
-                          <div
-                            className="absolute top-0 flex flex-col items-center"
-                            style={{ left: `${requestsPercent}%`, transform: 'translateX(-50%)' }}
-                          >
-                            <span className="text-[10px] text-[#ff393a] font-medium whitespace-nowrap">
-                              {guestsWithRequests} requests
-                            </span>
-                            <div className="w-0.5 h-2 bg-[#ff393a]/50 mt-0.5" />
-                          </div>
-                        )}
-                        {guests.length > 0 && guests.length !== guestsWithRequests && (
-                          <div
-                            className="absolute top-0 flex flex-col items-center"
-                            style={{ left: `${rsvpsPercent}%`, transform: 'translateX(-50%)' }}
-                          >
-                            <span className="text-[10px] text-white/60 font-medium whitespace-nowrap">
-                              {guests.length} RSVPs
-                            </span>
-                            <div className="w-0.5 h-2 bg-white/30 mt-0.5" />
-                          </div>
-                        )}
+              {activeTab === 'details' && (
+                <EventDetailsTab />
+              )}
 
-                        {/* Slider track */}
-                        <input
-                          type="range"
-                          min={minValue}
-                          max={maxValue}
-                          value={currentValue}
-                          onChange={(e) => setOrderExpectedGuests(parseInt(e.target.value, 10))}
-                          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#ff393a]"
-                          style={{
-                            background: `linear-gradient(to right, #ff393a 0%, #ff393a ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) 100%)`
-                          }}
-                        />
-
-                        {/* Min/Max labels */}
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[10px] text-white/40">{minValue}</span>
-                          <span className="text-[10px] text-white/40">{maxValue}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
+              {activeTab === 'venue' && party && (
+                <div className="card p-6">
+                  <VenueWidget
+                    partyId={party.id}
+                    onVenueSelect={() => {
+                      if (party?.inviteCode) {
+                        loadParty(party.inviteCode);
+                      }
+                    }}
+                  />
                 </div>
+              )}
 
-                {/* Recommended Order - always shown, auto-generated (includes Guest Requests) */}
-                <PizzaOrderSummary />
+              {activeTab === 'music' && (
+                <MusicWidget isHost={true} />
+              )}
 
-                <AiCallHistory partyId={party.id} />
+              {activeTab === 'photos' && party && (
+                <div className="card p-6 space-y-4">
+                  <Checkbox
+                    checked={photoModerationEnabled}
+                    onChange={async () => {
+                      const newValue = !photoModerationEnabled;
+                      setPhotoModerationEnabled(newValue);
+                      const success = await updateParty(party.id, { photo_moderation: newValue });
+                      if (!success) {
+                        setPhotoModerationEnabled(!newValue);
+                      }
+                    }}
+                    label="Require Photo Approval"
+                  />
+                  {photoModerationEnabled && (
+                    <p className="text-xs text-white/40 -mt-2 ml-8">
+                      Guest photos must be approved by a host before appearing in the gallery.
+                    </p>
+                  )}
+                  <PhotoGallery
+                    partyId={party.id}
+                    isHost={true}
+                    uploaderName={user?.name || undefined}
+                    uploaderEmail={user?.email}
+                    photoModeration={photoModerationEnabled}
+                  />
+                </div>
+              )}
 
-                <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
-                <BeverageSettings />
-              </>
-            )}
+              {activeTab === 'sponsors' && party && (
+                <SponsorCRM partyId={party.id} />
+              )}
 
-            {activeTab === 'details' && (
-              <EventDetailsTab />
-            )}
+              {activeTab === 'staff' && party && (
+                <StaffingWidget partyId={party.id} />
+              )}
 
-            {activeTab === 'photos' && party && (
-              <div className="card p-6 space-y-4">
-                <Checkbox
-                  checked={photoModerationEnabled}
-                  onChange={async () => {
-                    const newValue = !photoModerationEnabled;
-                    setPhotoModerationEnabled(newValue);
-                    const success = await updateParty(party.id, { photo_moderation: newValue });
-                    if (!success) {
-                      setPhotoModerationEnabled(!newValue);
-                    }
-                  }}
-                  label="Require Photo Approval"
-                />
-                {photoModerationEnabled && (
-                  <p className="text-xs text-white/40 -mt-2 ml-8">
-                    Guest photos must be approved by a host before appearing in the gallery.
-                  </p>
-                )}
-                <PhotoGallery
-                  partyId={party.id}
-                  isHost={true}
-                  uploaderName={user?.name || undefined}
-                  uploaderEmail={user?.email}
-                  photoModeration={photoModerationEnabled}
-                />
-              </div>
-            )}
+              {activeTab === 'report' && party && (
+                <ReportWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'displays' && party && (
+                <DisplaysWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'raffle' && party && (
+                <RaffleWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'budget' && party && (
+                <BudgetTab partyId={party.id} />
+              )}
+
+              {activeTab === 'promo' && (
+                <PromoWidget />
+              )}
+
+              {activeTab === 'gpp' && party && (
+                <div className="space-y-4">
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-white">Global Pizza Party</h2>
+                    <p className="text-white/60 text-sm mt-1">
+                      Request party kits and access GPP-specific features for your event.
+                    </p>
+                  </div>
+                  <PartyKitWidget partyId={party.id} />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Layout>
   );
