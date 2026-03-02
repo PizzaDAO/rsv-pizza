@@ -152,6 +152,7 @@ model Party {
   venues           Venue[]
   sponsors         Sponsor[]
   budgetItems      BudgetItem[]
+  checklistItems   ChecklistItem[]
   socialPosts      SocialPost[]
   notableAttendees NotableAttendee[]
   aiPhoneCalls     AIPhoneCall[]
@@ -821,6 +822,30 @@ model BudgetItem {
 
   @@index([partyId, category])
   @@map("budget_items")
+}
+
+// ============================================
+// Checklist Models
+// ============================================
+
+model ChecklistItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  name        String
+  dueDate     DateTime? @map("due_date") @db.Date
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  isAuto      Boolean   @default(false) @map("is_auto")
+  autoRule    String?   @map("auto_rule")
+  linkTab     String?   @map("link_tab")
+  sortOrder   Int       @default(0) @map("sort_order")
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId, sortOrder])
+  @@map("checklist_items")
 }
 
 model AIPhoneCall {
