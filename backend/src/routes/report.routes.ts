@@ -378,6 +378,81 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
 });
 
 // =====================
+// Page View Stats
+// =====================
+
+// GET /api/parties/:partyId/report/views - Get page view stats (host only)
+router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Total views
+    const totalViews = await prisma.pageView.count({
+      where: { partyId },
+    });
+
+    // Unique views (distinct visitor_hash)
+    const uniqueResult = await prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(DISTINCT visitor_hash) as count
+      FROM page_views
+      WHERE party_id = ${partyId}::uuid
+        AND visitor_hash IS NOT NULL
+    `;
+    const uniqueViews = Number(uniqueResult[0]?.count || 0);
+
+    // Daily views for last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dailyResult = await prisma.$queryRaw<{ date: string; total: bigint; unique: bigint }[]>`
+      SELECT
+        TO_CHAR(viewed_at::date, 'YYYY-MM-DD') as date,
+        COUNT(*) as total,
+        COUNT(DISTINCT visitor_hash) as unique
+      FROM page_views
+      WHERE party_id = ${partyId}::uuid
+        AND viewed_at >= ${thirtyDaysAgo}
+      GROUP BY viewed_at::date
+      ORDER BY viewed_at::date ASC
+    `;
+    const dailyViews = dailyResult.map(row => ({
+      date: row.date,
+      total: Number(row.total),
+      unique: Number(row.unique),
+    }));
+
+    // Top referrers (top 10, excluding null/empty)
+    const referrerResult = await prisma.$queryRaw<{ referrer: string; count: bigint }[]>`
+      SELECT referrer, COUNT(*) as count
+      FROM page_views
+      WHERE party_id = ${partyId}::uuid
+        AND referrer IS NOT NULL
+        AND referrer != ''
+      GROUP BY referrer
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+    const topReferrers = referrerResult.map(row => ({
+      referrer: row.referrer,
+      count: Number(row.count),
+    }));
+
+    res.json({
+      totalViews,
+      uniqueViews,
+      dailyViews,
+      topReferrers,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================
 // Social Posts CRUD
 // =====================
 
