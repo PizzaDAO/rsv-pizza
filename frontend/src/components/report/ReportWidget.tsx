@@ -29,8 +29,10 @@ function buildFallbackReport(party: any, guests: Guest[]): EventReport {
   const walletAddresses = guests.filter(g => g.ethereumAddress).length;
   const roleBreakdown: Record<string, number> = {};
   guests.forEach(g => {
-    const role = (g.roles && g.roles.length > 0) ? g.roles[0] : 'Other';
-    roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+    const guestRoles = g.roles && g.roles.length > 0 ? g.roles : ['Other'];
+    guestRoles.forEach(role => {
+      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+    });
   });
 
   return {
@@ -482,7 +484,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       {/* Role Chart */}
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
         <div className="card p-6">
-          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} />
+          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
         </div>
       )}
 

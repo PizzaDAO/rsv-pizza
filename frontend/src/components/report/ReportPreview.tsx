@@ -221,7 +221,7 @@ export function ReportPreview({ report, onClose }: ReportPreviewProps) {
       {/* Role Breakdown */}
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} />
+          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
         </div>
       )}
 

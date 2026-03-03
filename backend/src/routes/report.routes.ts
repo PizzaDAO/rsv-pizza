@@ -78,12 +78,13 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
     const mailingListSignups = party.guests.filter(g => g.mailingListOptIn).length;
     const walletAddresses = party.guests.filter(g => g.ethereumAddress).length;
 
-    // Calculate role breakdown
+    // Calculate role breakdown — count ALL roles per guest (guests can have multiple)
     const roleBreakdown: Record<string, number> = {};
     party.guests.forEach(guest => {
-      // Use single role field if available, otherwise use first role from roles array
-      const role = guest.role || (guest.roles && guest.roles.length > 0 ? guest.roles[0] : 'Other');
-      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+      const guestRoles = guest.roles && guest.roles.length > 0 ? guest.roles : [guest.role || 'Other'];
+      guestRoles.forEach(role => {
+        roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+      });
     });
 
     res.json({
@@ -316,11 +317,13 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
     const mailingListSignups = party.guests.filter(g => g.mailingListOptIn).length;
     const walletAddresses = party.guests.filter(g => g.ethereumAddress).length;
 
-    // Calculate role breakdown
+    // Calculate role breakdown — count ALL roles per guest (guests can have multiple)
     const roleBreakdown: Record<string, number> = {};
     party.guests.forEach(guest => {
-      const role = guest.role || (guest.roles && guest.roles.length > 0 ? guest.roles[0] : 'Other');
-      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+      const guestRoles = guest.roles && guest.roles.length > 0 ? guest.roles : [guest.role || 'Other'];
+      guestRoles.forEach(role => {
+        roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+      });
     });
 
     res.json({
