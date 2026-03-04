@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -15,7 +16,7 @@ interface UnderbossRequest extends AuthRequest {
   };
 }
 
-// Token validation middleware
+// Token validation middleware — also allows JWT-authenticated admins
 async function requireUnderbossToken(
   req: UnderbossRequest,
   res: Response,
@@ -23,27 +24,55 @@ async function requireUnderbossToken(
 ) {
   try {
     const token = (req.query.token as string) || req.headers['x-underboss-token'] as string;
+
+    // Try token-based auth first
+    if (token) {
+      const underboss = await prisma.underboss.findUnique({
+        where: { accessToken: token },
+      });
+
+      if (underboss && underboss.isActive) {
+        req.underboss = {
+          id: underboss.id,
+          name: underboss.name,
+          email: underboss.email,
+          region: underboss.region,
+          isActive: underboss.isActive,
+        };
+        return next();
+      }
+    }
+
+    // Try JWT admin auth as fallback
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const jwtToken = authHeader.split(' ')[1];
+      const secret = process.env.JWT_SECRET;
+      if (secret) {
+        try {
+          const decoded = jwt.verify(jwtToken, secret) as { userId: string; email: string };
+          if (await isAdmin(decoded.email)) {
+            // Admin user — create a synthetic underboss entry so downstream code works
+            req.underboss = {
+              id: 'admin',
+              name: 'Admin',
+              email: decoded.email,
+              region: '__admin__', // Special marker — admin can view any region
+              isActive: true,
+            };
+            return next();
+          }
+        } catch {
+          // Invalid JWT, fall through to error
+        }
+      }
+    }
+
+    // Neither token nor admin auth worked
     if (!token) {
       throw new AppError('Access token required', 401, 'UNAUTHORIZED');
     }
-
-    const underboss = await prisma.underboss.findUnique({
-      where: { accessToken: token },
-    });
-
-    if (!underboss || !underboss.isActive) {
-      throw new AppError('Invalid or inactive token', 403, 'FORBIDDEN');
-    }
-
-    req.underboss = {
-      id: underboss.id,
-      name: underboss.name,
-      email: underboss.email,
-      region: underboss.region,
-      isActive: underboss.isActive,
-    };
-
-    next();
+    throw new AppError('Invalid or inactive token', 403, 'FORBIDDEN');
   } catch (error) {
     next(error);
   }
@@ -149,8 +178,8 @@ router.get('/:region', requireUnderbossToken, async (req: UnderbossRequest, res:
   try {
     const { region } = req.params;
 
-    // Verify the underboss is assigned to this region
-    if (req.underboss!.region !== region) {
+    // Verify the underboss is assigned to this region (admins can view any region)
+    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -193,7 +222,7 @@ router.get('/:region/events', requireUnderbossToken, async (req: UnderbossReques
     const limit = parseInt(req.query.limit as string) || 50;
     const skip = (page - 1) * limit;
 
-    if (req.underboss!.region !== region) {
+    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -235,7 +264,7 @@ router.get('/:region/events/:partyId', requireUnderbossToken, async (req: Underb
   try {
     const { region, partyId } = req.params;
 
-    if (req.underboss!.region !== region) {
+    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -287,7 +316,7 @@ router.get('/:region/stats', requireUnderbossToken, async (req: UnderbossRequest
   try {
     const { region } = req.params;
 
-    if (req.underboss!.region !== region) {
+    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -472,7 +501,7 @@ router.patch('/admin/assign-region/:partyId', requireAuth, async (req: AuthReque
     const { partyId } = req.params;
     const { region } = req.body;
 
-    const validRegions = ['latam', 'europe', 'india', 'usa-canada', 'africa', 'apac'];
+    const validRegions = ['usa', 'canada', 'central-america', 'south-america', 'western-europe', 'eastern-europe', 'africa', 'india', 'china', 'middle-east', 'asia', 'oceania'];
     if (region && !validRegions.includes(region)) {
       throw new AppError(`Invalid region. Must be one of: ${validRegions.join(', ')}`, 400, 'VALIDATION_ERROR');
     }

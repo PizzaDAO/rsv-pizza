@@ -1993,3 +1993,10 @@ export async function fetchUnderbossDashboard(
 
   return response.json();
 }
+
+// Fetch underboss dashboard as admin (JWT auth, no token needed)
+export async function fetchUnderbossDashboardAsAdmin(
+  region: GPPRegion
+): Promise<UnderbossDashboardData> {
+  return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
+}

@@ -828,15 +828,21 @@ export const KIT_TIERS: KitTierInfo[] = [
 // Underboss Dashboard types
 // ============================================
 
-export type GPPRegion = 'latam' | 'europe' | 'india' | 'usa-canada' | 'africa' | 'apac';
+export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
 
 export const GPP_REGIONS: { id: GPPRegion; label: string }[] = [
-  { id: 'latam', label: 'LATAM' },
-  { id: 'europe', label: 'Europe' },
-  { id: 'india', label: 'India' },
-  { id: 'usa-canada', label: 'USA + Canada' },
+  { id: 'usa', label: 'USA' },
+  { id: 'canada', label: 'Canada' },
+  { id: 'central-america', label: 'Central America' },
+  { id: 'south-america', label: 'South America' },
+  { id: 'western-europe', label: 'Western Europe' },
+  { id: 'eastern-europe', label: 'Eastern Europe' },
   { id: 'africa', label: 'Africa' },
-  { id: 'apac', label: 'APAC' },
+  { id: 'india', label: 'India' },
+  { id: 'china', label: 'China' },
+  { id: 'middle-east', label: 'Middle East' },
+  { id: 'asia', label: 'Asia' },
+  { id: 'oceania', label: 'Oceania' },
 ];
 
 export interface UnderbossEventProgress {
