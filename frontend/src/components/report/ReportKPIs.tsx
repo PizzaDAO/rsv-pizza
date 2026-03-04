@@ -7,9 +7,10 @@ interface ReportKPIsProps {
   onChange: (field: string, value: string | number | null) => void;
   editable?: boolean;
   pageViewStats?: PageViewStats | null;
+  socialPostViews?: number;
 }
 
-export function ReportKPIs({ report, onChange, editable = true, pageViewStats }: ReportKPIsProps) {
+export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews }: ReportKPIsProps) {
   const kpiItems = [
     {
       label: 'X Post Views',
@@ -71,6 +72,12 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats }:
         color: 'text-[#ff393a]',
       },
     ] : []),
+    ...(socialPostViews ? [{
+      label: 'Social Post Views',
+      value: socialPostViews,
+      icon: Eye,
+      color: 'text-blue-400',
+    }] : []),
     {
       label: 'Total RSVPs',
       value: report.stats.totalRsvps,
