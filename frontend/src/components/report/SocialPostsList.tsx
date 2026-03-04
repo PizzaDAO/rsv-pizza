@@ -31,10 +31,30 @@ function getTweetId(url: string): string | null {
 // Twitter/X embed component
 function TwitterEmbed({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const tweetId = getTweetId(url);
 
   useEffect(() => {
     if (!tweetId || !containerRef.current) return;
+
+    const embedTweet = () => {
+      if (!(window as any).twttr?.widgets || !containerRef.current) return;
+      // Clear any previous content
+      containerRef.current.innerHTML = '';
+      (window as any).twttr.widgets.createTweet(tweetId, containerRef.current, {
+        theme: 'dark',
+        align: 'center',
+        conversation: 'none',
+      }).then(() => {
+        // After tweet renders, measure and collapse the wrapper
+        requestAnimationFrame(() => {
+          if (containerRef.current && wrapperRef.current) {
+            const contentHeight = containerRef.current.scrollHeight;
+            wrapperRef.current.style.height = `${contentHeight * 0.7}px`;
+          }
+        });
+      });
+    };
 
     // Load Twitter widget script if not already loaded
     const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
@@ -44,28 +64,26 @@ function TwitterEmbed({ url }: { url: string }) {
       script.async = true;
       script.charset = 'utf-8';
       document.head.appendChild(script);
-      script.onload = () => {
+      script.onload = embedTweet;
+    } else {
+      // Script loaded but twttr may not be ready yet
+      const checkReady = () => {
         if ((window as any).twttr?.widgets) {
-          (window as any).twttr.widgets.createTweet(tweetId, containerRef.current!, {
-            theme: 'dark',
-            align: 'center',
-            conversation: 'none',
-          });
+          embedTweet();
+        } else {
+          setTimeout(checkReady, 100);
         }
       };
-    } else if ((window as any).twttr?.widgets) {
-      (window as any).twttr.widgets.createTweet(tweetId, containerRef.current!, {
-        theme: 'dark',
-        align: 'center',
-        conversation: 'none',
-      });
+      checkReady();
     }
   }, [tweetId]);
 
   if (!tweetId) return null;
 
   return (
-    <div ref={containerRef} className="mt-2 mx-auto origin-top-left" style={{ transform: 'scale(0.7)', width: '143%' }} />
+    <div ref={wrapperRef} className="mt-2 overflow-hidden">
+      <div ref={containerRef} className="origin-top-left" style={{ transform: 'scale(0.7)', width: '143%' }} />
+    </div>
   );
 }
 
