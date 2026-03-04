@@ -22,9 +22,12 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
+import pageviewRoutes from './routes/pageview.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
+import underbossRoutes from './routes/underboss.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -84,6 +87,8 @@ const rsvpLimiter = rateLimit({
 app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
+app.use('/api/admin', adminRoutes);          // Admin management routes
+app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
@@ -100,6 +105,7 @@ app.use('/api/parties', reportRoutes); // Report routes (includes public report 
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);

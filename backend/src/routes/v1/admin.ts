@@ -1,17 +1,21 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin, SUPER_ADMIN_EMAIL } from '../../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error.js';
 import { generateApiKey, SCOPES, Scope } from '../../middleware/apiKey.js';
 
 const router = Router();
 
 // Middleware to require super admin access
-const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!isSuperAdmin(req.userEmail)) {
-    throw new AppError(`Admin access required (${SUPER_ADMIN_EMAIL})`, 403, 'FORBIDDEN');
+const requireSuperAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 };
 
 /**

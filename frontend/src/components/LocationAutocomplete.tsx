@@ -1,12 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 
+export interface CityData {
+  cityName: string;      // "New York"
+  country: string;       // "United States"
+  countryCode: string;   // "US"
+  state?: string;        // "NY"
+  lat: number;
+  lng: number;
+  formattedName: string; // "New York, NY, USA"
+}
+
 interface LocationAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onVenueNameChange?: (venueName: string | null) => void;
   onTimezoneChange?: (timezone: string) => void;
   onPlaceSelected?: (address: string, venueName: string | null) => void;
+  onCitySelected?: (cityData: CityData) => void;
+  types?: string[];
+  fields?: string[];
+  disabled?: boolean;
   placeholder?: string;
   className?: string;
 }
@@ -17,6 +31,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   onVenueNameChange,
   onTimezoneChange,
   onPlaceSelected,
+  onCitySelected,
+  types,
+  fields,
+  disabled,
   placeholder = 'Add Event Location',
   className = ''
 }) => {
@@ -29,13 +47,15 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const onVenueNameChangeRef = useRef(onVenueNameChange);
   const onTimezoneChangeRef = useRef(onTimezoneChange);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+  const onCitySelectedRef = useRef(onCitySelected);
 
   useEffect(() => {
     onChangeRef.current = onChange;
     onVenueNameChangeRef.current = onVenueNameChange;
     onTimezoneChangeRef.current = onTimezoneChange;
     onPlaceSelectedRef.current = onPlaceSelected;
-  }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected]);
+    onCitySelectedRef.current = onCitySelected;
+  }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected, onCitySelected]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -115,11 +135,19 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
 
     const initAutocomplete = () => {
       if (inputRef.current && window.google?.maps?.places) {
+        // Build fields list: use prop if provided, otherwise default
+        const defaultFields = ['formatted_address', 'name', 'place_id', 'geometry'];
+        let autocompleteFields = fields || defaultFields;
+        // If onCitySelected is provided, ensure address_components is in fields
+        if (onCitySelectedRef.current && !autocompleteFields.includes('address_components')) {
+          autocompleteFields = [...autocompleteFields, 'address_components'];
+        }
+
         const autocompleteInstance = new window.google.maps.places.Autocomplete(
           inputRef.current,
           {
-            types: ['geocode', 'establishment'],
-            fields: ['formatted_address', 'name', 'place_id', 'geometry']
+            types: types || ['geocode', 'establishment'],
+            fields: autocompleteFields
           }
         );
 
@@ -148,6 +176,29 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           // Call onPlaceSelected callback for auto-save
           if (onPlaceSelectedRef.current && selectedAddress) {
             onPlaceSelectedRef.current(selectedAddress, selectedVenueName);
+          }
+
+          // Parse city data from address_components when onCitySelected is provided
+          if (onCitySelectedRef.current && place.address_components && place.geometry?.location) {
+            const components = place.address_components;
+            const getComponent = (type: string) =>
+              components.find(c => c.types.includes(type));
+
+            const cityComponent = getComponent('locality') || getComponent('sublocality') || getComponent('administrative_area_level_1');
+            const countryComponent = getComponent('country');
+            const stateComponent = getComponent('administrative_area_level_1');
+
+            if (cityComponent) {
+              onCitySelectedRef.current({
+                cityName: cityComponent.long_name,
+                country: countryComponent?.long_name || '',
+                countryCode: countryComponent?.short_name || '',
+                state: stateComponent?.short_name,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+                formattedName: selectedAddress,
+              });
+            }
           }
 
           // Fetch timezone based on location coordinates
@@ -181,6 +232,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        disabled={disabled}
         className={`w-full !pl-11 text-left ${className}`}
       />
     </div>

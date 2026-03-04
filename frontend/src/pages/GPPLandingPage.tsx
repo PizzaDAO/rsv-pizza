@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Globe, Pizza, Users, Camera, CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
+import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
 
 export function GPPLandingPage() {
@@ -15,6 +16,13 @@ export function GPPLandingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
+  const cityDataRef = useRef<CityData | null>(null);
+
+  const handleCitySelected = (data: CityData) => {
+    cityDataRef.current = data;
+    // Use just the city name (not full formatted address) as the city value
+    setCity(data.cityName);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,10 +30,17 @@ export function GPPLandingPage() {
     setIsSubmitting(true);
 
     try {
+      const cd = cityDataRef.current;
       const response = await createGPPEvent({
         city: city.trim(),
         hostName: hostName.trim(),
         email: email.trim(),
+        ...(cd && {
+          country: cd.country,
+          countryCode: cd.countryCode,
+          cityLat: cd.lat,
+          cityLng: cd.lng,
+        }),
       });
 
       if (response.success) {
@@ -173,14 +188,16 @@ export function GPPLandingPage() {
                   <label htmlFor="city" className="block text-sm font-medium text-white/80 mb-2">
                     What city are you hosting in?
                   </label>
-                  <input
-                    id="city"
-                    type="text"
+                  <LocationAutocomplete
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={(val) => {
+                      setCity(val);
+                      // Clear structured data if user edits manually
+                      cityDataRef.current = null;
+                    }}
+                    onCitySelected={handleCitySelected}
+                    types={['(cities)']}
                     placeholder="e.g., New York, London, Tokyo"
-                    className="w-full"
-                    required
                     disabled={isSubmitting}
                   />
                 </div>

@@ -1,14 +1,15 @@
 import React from 'react';
-import { Eye, Users, Mail, Wallet, Award, Video } from 'lucide-react';
-import { EventReport } from '../../types';
+import { Eye, Users, Mail, Wallet, Award, Video, MousePointerClick } from 'lucide-react';
+import { EventReport, PageViewStats } from '../../types';
 
 interface ReportKPIsProps {
   report: EventReport;
   onChange: (field: string, value: string | number | null) => void;
   editable?: boolean;
+  pageViewStats?: PageViewStats | null;
 }
 
-export function ReportKPIs({ report, onChange, editable = true }: ReportKPIsProps) {
+export function ReportKPIs({ report, onChange, editable = true, pageViewStats }: ReportKPIsProps) {
   const kpiItems = [
     {
       label: 'X Post Views',
@@ -55,7 +56,21 @@ export function ReportKPIs({ report, onChange, editable = true }: ReportKPIsProp
     },
   ];
 
-  const autoCalculatedItems = [
+  const autoCalculatedItems: { label: string; value: number | null | undefined; icon: React.ElementType; color: string }[] = [
+    ...(pageViewStats ? [
+      {
+        label: 'Page Views',
+        value: pageViewStats.totalViews,
+        icon: MousePointerClick,
+        color: 'text-[#ff393a]',
+      },
+      {
+        label: 'Unique Visitors',
+        value: pageViewStats.uniqueViews,
+        icon: Eye,
+        color: 'text-[#ff393a]',
+      },
+    ] : []),
     {
       label: 'Total RSVPs',
       value: report.stats.totalRsvps,
@@ -224,6 +239,7 @@ export function ReportKPIs({ report, onChange, editable = true }: ReportKPIsProp
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {autoCalculatedItems.map((item) => {
             const Icon = item.icon;
+            if (item.value === null || item.value === undefined) return null;
             return (
               <div key={item.label} className="bg-white/5 rounded-xl p-4 border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
