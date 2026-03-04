@@ -107,7 +107,11 @@
       "Bash(gh pr create:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh pr view:*)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(cd /c/Users/samgo/OneDrive/Documents/PizzaDAO/Code/rsvpizza && NODE_TLS_REJECT_UNAUTHORIZED=0 node -e \"\nconst { Client } = require\\('pg'\\);\nconst client = new Client\\({\n  connectionString: 'postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres',\n  ssl: true\n}\\);\nasync function run\\(\\) {\n  await client.connect\\(\\);\n  console.log\\('Connection via pooler port 6543 works!'\\);\n  await client.end\\(\\);\n}\nrun\\(\\).catch\\(e => { console.error\\('Failed:', e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/samgo/OneDrive/Documents/PizzaDAO/Code/rsvpizza && NODE_TLS_REJECT_UNAUTHORIZED=0 node -e \"\nconst { Client } = require\\('pg'\\);\nconst client = new Client\\({\n  connectionString: 'postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:5432/postgres',\n  ssl: true\n}\\);\nasync function run\\(\\) {\n  await client.connect\\(\\);\n  await client.query\\(\\\\`\n    ALTER TABLE budget_items ADD COLUMN IF NOT EXISTS receipt_url TEXT;\n    ALTER TABLE budget_items DROP COLUMN IF EXISTS contact;\n    ALTER TABLE budget_items DROP COLUMN IF EXISTS link;\n  \\\\`\\);\n  console.log\\('Fixed! Added receipt_url, dropped contact + link'\\);\n  const res = await client.query\\(\\\\\"SELECT column_name FROM information_schema.columns WHERE table_name = 'budget_items' ORDER BY column_name\\\\\"\\);\n  console.log\\('Columns:', res.rows.map\\(r => r.column_name\\)\\);\n  await client.end\\(\\);\n}\nrun\\(\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1)",
+      "Bash(gh pr:*)"
     ]
   }
 }

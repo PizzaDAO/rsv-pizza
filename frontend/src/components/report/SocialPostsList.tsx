@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, ExternalLink, Loader2, Eye, Link, Type } from 'lucide-react';
 import { SocialPost } from '../../types';
+import { IconInput } from '../IconInput';
 
 // Platform icons/colors
 const PLATFORMS = {
@@ -11,15 +12,88 @@ const PLATFORMS = {
 
 interface SocialPostsListProps {
   posts: SocialPost[];
-  onAdd: (post: { platform: string; url: string }) => Promise<void>;
+  onAdd: (post: { platform: string; url: string; title?: string; views?: number | null }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   editable?: boolean;
+}
+
+// Helper: detect if URL is a Twitter/X post
+function isTwitterUrl(url: string): boolean {
+  return /^https?:\/\/(twitter\.com|x\.com)\//i.test(url);
+}
+
+// Helper: extract tweet ID from URL
+function getTweetId(url: string): string | null {
+  const match = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+  return match ? match[1] : null;
+}
+
+// Twitter/X embed component
+function TwitterEmbed({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tweetId = getTweetId(url);
+
+  useEffect(() => {
+    if (!tweetId || !containerRef.current) return;
+
+    // Load Twitter widget script if not already loaded
+    const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+      script.charset = 'utf-8';
+      document.head.appendChild(script);
+      script.onload = () => {
+        if ((window as any).twttr?.widgets) {
+          (window as any).twttr.widgets.createTweet(tweetId, containerRef.current!, {
+            theme: 'dark',
+            align: 'center',
+            conversation: 'none',
+          });
+        }
+      };
+    } else if ((window as any).twttr?.widgets) {
+      (window as any).twttr.widgets.createTweet(tweetId, containerRef.current!, {
+        theme: 'dark',
+        align: 'center',
+        conversation: 'none',
+      });
+    }
+  }, [tweetId]);
+
+  if (!tweetId) return null;
+
+  return (
+    <div ref={containerRef} className="mt-2 max-w-lg mx-auto" />
+  );
+}
+
+// Generic link preview for non-Twitter URLs
+function LinkPreview({ url, platform }: { url: string; platform: string }) {
+  const platformInfo = PLATFORMS[platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors text-sm text-white/60 hover:text-white/80"
+    >
+      <div className={`w-5 h-5 ${platformInfo.color} rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
+        {platformInfo.icon}
+      </div>
+      <span className="truncate">{url}</span>
+      <ExternalLink size={14} className="flex-shrink-0" />
+    </a>
+  );
 }
 
 export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: SocialPostsListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newPlatform, setNewPlatform] = useState<string>('twitter');
   const [newUrl, setNewUrl] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newViews, setNewViews] = useState('');
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -31,8 +105,12 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
       await onAdd({
         platform: newPlatform,
         url: newUrl.trim(),
+        title: newTitle.trim() || undefined,
+        views: newViews ? parseInt(newViews, 10) : null,
       });
       setNewUrl('');
+      setNewTitle('');
+      setNewViews('');
       setIsAdding(false);
     } catch (error) {
       console.error('Failed to add social post:', error);
@@ -63,35 +141,67 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     }
   };
 
+  // Calculate total views across all posts
+  const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
+
   // Read-only display
   if (!editable) {
     if (posts.length === 0) return null;
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-white">Attendee Social Posts</h3>
-        <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">Social Posts</h3>
+          {totalViews > 0 && (
+            <div className="flex items-center gap-1.5 text-white/60 text-sm">
+              <Eye size={14} />
+              <span>{totalViews.toLocaleString()} total views</span>
+            </div>
+          )}
+        </div>
+        <div className="space-y-3">
           {posts.map((post) => {
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
-              <a
-                key={post.id}
-                href={post.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors"
-              >
-                <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                  {platform.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  {post.authorHandle && (
-                    <span className="text-sm text-white font-medium">@{post.authorHandle}</span>
+              <div key={post.id} className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                <div className="flex items-center gap-3 p-3">
+                  <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                    {platform.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {post.title && (
+                      <p className="text-sm text-white font-medium">{post.title}</p>
+                    )}
+                    {post.authorHandle && (
+                      <span className="text-xs text-white/60">@{post.authorHandle}</span>
+                    )}
+                    {!post.title && !post.authorHandle && (
+                      <p className="text-xs text-white/40 truncate">{post.url}</p>
+                    )}
+                  </div>
+                  {post.views != null && (
+                    <div className="flex items-center gap-1 text-white/60 text-xs flex-shrink-0">
+                      <Eye size={12} />
+                      <span>{post.views.toLocaleString()}</span>
+                    </div>
                   )}
-                  <p className="text-xs text-white/40 truncate">{post.url}</p>
+                  <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                    <ExternalLink size={16} className="text-white/40 hover:text-white/60" />
+                  </a>
                 </div>
-                <ExternalLink size={16} className="text-white/40" />
-              </a>
+                {/* Embed for Twitter/X posts */}
+                {isTwitterUrl(post.url) && (
+                  <div className="px-3 pb-3">
+                    <TwitterEmbed url={post.url} />
+                  </div>
+                )}
+                {/* Link preview for non-Twitter posts */}
+                {!isTwitterUrl(post.url) && (
+                  <div className="px-3 pb-3">
+                    <LinkPreview url={post.url} platform={post.platform} />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -102,7 +212,14 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Attendee Social Posts</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Social Posts</h3>
+          {totalViews > 0 && (
+            <p className="text-xs text-white/40 mt-0.5">
+              {totalViews.toLocaleString()} total views across {posts.length} post{posts.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
         {!isAdding && (
           <button
             onClick={() => setIsAdding(true)}
@@ -132,15 +249,29 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               </button>
             ))}
           </div>
-          <input
+          <IconInput
+            icon={Link}
             type="url"
             value={newUrl}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setNewUrl(e.target.value);
               detectPlatform(e.target.value);
             }}
             placeholder="Post URL"
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+          />
+          <IconInput
+            icon={Type}
+            type="text"
+            value={newTitle}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTitle(e.target.value)}
+            placeholder="Title (what the post is about)"
+          />
+          <IconInput
+            icon={Eye}
+            type="number"
+            value={newViews}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewViews(e.target.value)}
+            placeholder="Views (optional)"
           />
           <div className="flex gap-2">
             <button
@@ -155,6 +286,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               onClick={() => {
                 setIsAdding(false);
                 setNewUrl('');
+                setNewTitle('');
+                setNewViews('');
               }}
               className="btn-secondary text-sm py-2"
             >
@@ -166,41 +299,65 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
 
       {/* List of posts */}
       {posts.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {posts.map((post) => {
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
               <div
                 key={post.id}
-                className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10"
+                className="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
               >
-                <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                  {platform.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  {post.authorHandle && (
-                    <span className="text-sm text-white font-medium">@{post.authorHandle}</span>
+                {/* Post header row */}
+                <div className="flex items-center gap-3 p-3">
+                  <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                    {platform.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {post.title && (
+                      <p className="text-sm text-white font-medium">{post.title}</p>
+                    )}
+                    {post.authorHandle && (
+                      <span className="text-xs text-white/60">@{post.authorHandle}</span>
+                    )}
+                    <a
+                      href={post.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-white/40 hover:text-white/60 truncate block"
+                    >
+                      {post.url}
+                    </a>
+                  </div>
+                  {post.views != null && (
+                    <div className="flex items-center gap-1 text-white/50 text-xs flex-shrink-0 bg-white/5 px-2 py-1 rounded-md">
+                      <Eye size={12} />
+                      <span>{post.views.toLocaleString()}</span>
+                    </div>
                   )}
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-white/40 hover:text-white/60 truncate block"
+                  <button
+                    onClick={() => handleDelete(post.id)}
+                    disabled={deletingId === post.id}
+                    className="p-2 text-white/40 hover:text-red-400 transition-colors flex-shrink-0"
                   >
-                    {post.url}
-                  </a>
+                    {deletingId === post.id ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={16} />
+                    )}
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleDelete(post.id)}
-                  disabled={deletingId === post.id}
-                  className="p-2 text-white/40 hover:text-red-400 transition-colors"
-                >
-                  {deletingId === post.id ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={16} />
-                  )}
-                </button>
+                {/* Embed for Twitter/X posts */}
+                {isTwitterUrl(post.url) && (
+                  <div className="px-3 pb-3">
+                    <TwitterEmbed url={post.url} />
+                  </div>
+                )}
+                {/* Link preview for non-Twitter posts */}
+                {!isTwitterUrl(post.url) && (
+                  <div className="px-3 pb-3">
+                    <LinkPreview url={post.url} platform={post.platform} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -209,7 +366,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
         !isAdding && (
           <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
             <p className="text-white/40 text-sm">No social posts added yet</p>
-            <p className="text-white/30 text-xs mt-1">Add links to attendee posts about your event</p>
+            <p className="text-white/30 text-xs mt-1">Add links to posts about your event</p>
           </div>
         )
       )}

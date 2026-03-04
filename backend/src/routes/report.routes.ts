@@ -482,7 +482,7 @@ router.get('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest
 router.post('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { platform, url, authorHandle } = req.body;
+    const { platform, url, authorHandle, title, views } = req.body;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -506,6 +506,8 @@ router.post('/:partyId/report/social-posts', requireAuth, async (req: AuthReques
         platform,
         url,
         authorHandle: authorHandle || null,
+        title: title || null,
+        views: views != null && views !== '' ? (typeof views === 'string' ? parseInt(views, 10) : views) : null,
         sortOrder: (maxOrder._max.sortOrder || 0) + 1,
       },
     });

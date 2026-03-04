@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
+import { SocialPostsList } from './SocialPostsList';
 
 interface ReportPreviewProps {
   report: EventReport;
@@ -263,32 +264,12 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {/* Social Posts */}
       {report.socialPosts.length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-3">Attendee Social Posts</h2>
-          <div className="space-y-2">
-            {report.socialPosts.map((post) => {
-              const platformInfo = PLATFORM_INFO[post.platform] || PLATFORM_INFO.twitter;
-              return (
-                <a
-                  key={post.id}
-                  href={post.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors"
-                >
-                  <div className={`w-8 h-8 ${platformInfo.color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                    {platformInfo.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {post.authorHandle && (
-                      <span className="text-sm text-white font-medium">@{post.authorHandle}</span>
-                    )}
-                    <p className="text-xs text-white/40 truncate">{post.url}</p>
-                  </div>
-                  <ExternalLink size={16} className="text-white/40" />
-                </a>
-              );
-            })}
-          </div>
+          <SocialPostsList
+            posts={report.socialPosts}
+            onAdd={async () => {}}
+            onDelete={async () => {}}
+            editable={false}
+          />
         </div>
       )}
     </div>
@@ -296,12 +277,6 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 }
 
 // Helper components
-const PLATFORM_INFO: Record<string, { name: string; color: string; icon: string }> = {
-  twitter: { name: 'X (Twitter)', color: 'bg-blue-500', icon: 'X' },
-  farcaster: { name: 'Farcaster', color: 'bg-purple-500', icon: 'F' },
-  instagram: { name: 'Instagram', color: 'bg-pink-500', icon: 'IG' },
-};
-
 interface KPICardProps {
   label: string;
   value: number;

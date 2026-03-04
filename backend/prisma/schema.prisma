@@ -216,6 +216,8 @@ model SocialPost {
   platform     String   // "twitter", "farcaster", "instagram"
   url          String   // Full URL to the post
   authorHandle String?  @map("author_handle")
+  title        String?  // Title/description of what the post is about
+  views        Int?     // Number of views the post received
 
   sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz

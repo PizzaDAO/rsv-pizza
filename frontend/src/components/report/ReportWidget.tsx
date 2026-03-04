@@ -195,7 +195,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   }, []);
 
   // Handle adding social posts (authorHandle extracted by backend from URL)
-  const handleAddSocialPost = async (post: { platform: string; url: string }) => {
+  const handleAddSocialPost = async (post: { platform: string; url: string; title?: string; views?: number | null }) => {
     const result = await addSocialPost(partyId, post);
     if (result?.socialPost) {
       setReport(prev => prev ? {
@@ -468,7 +468,17 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* Social Posts (moved here from below) */}
+      <div className="card p-6">
+        <SocialPostsList
+          posts={report.socialPosts}
+          onAdd={handleAddSocialPost}
+          onDelete={handleDeleteSocialPost}
+          editable={true}
+        />
+      </div>
+
+      {/* KPIs (auto-calculated stats only) */}
       <div className="card p-6">
         <ReportKPIs
           report={report}
@@ -520,16 +530,6 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           </div>
         </div>
       )}
-
-      {/* Social Posts */}
-      <div className="card p-6">
-        <SocialPostsList
-          posts={report.socialPosts}
-          onAdd={handleAddSocialPost}
-          onDelete={handleDeleteSocialPost}
-          editable={true}
-        />
-      </div>
 
       {/* Publish Section */}
       <div className="card p-6">

@@ -1170,7 +1170,7 @@ export async function unpublishReport(partyId: string): Promise<boolean> {
 // Add social post
 export async function addSocialPost(
   partyId: string,
-  data: { platform: string; url: string; authorHandle?: string }
+  data: { platform: string; url: string; authorHandle?: string; title?: string; views?: number | null }
 ): Promise<{ socialPost: SocialPost } | null> {
   try {
     return await apiRequest<{ socialPost: SocialPost }>(
