@@ -65,7 +65,7 @@ function TwitterEmbed({ url }: { url: string }) {
   if (!tweetId) return null;
 
   return (
-    <div ref={containerRef} className="mt-2 max-w-lg mx-auto" />
+    <div ref={containerRef} className="mt-2 mx-auto origin-top-left" style={{ transform: 'scale(0.7)', width: '143%' }} />
   );
 }
 
