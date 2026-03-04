@@ -3,7 +3,6 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -16,63 +15,48 @@ interface UnderbossRequest extends AuthRequest {
   };
 }
 
-// Token validation middleware — also allows JWT-authenticated admins
-async function requireUnderbossToken(
+// Login-based underboss middleware — requires JWT auth, then looks up underboss by email
+async function requireUnderbossAuth(
   req: UnderbossRequest,
   res: Response,
   next: NextFunction
 ) {
   try {
-    const token = (req.query.token as string) || req.headers['x-underboss-token'] as string;
-
-    // Try token-based auth first
-    if (token) {
-      const underboss = await prisma.underboss.findUnique({
-        where: { accessToken: token },
-      });
-
-      if (underboss && underboss.isActive) {
-        req.underboss = {
-          id: underboss.id,
-          name: underboss.name,
-          email: underboss.email,
-          region: underboss.region,
-          isActive: underboss.isActive,
-        };
-        return next();
-      }
+    const email = req.userEmail;
+    if (!email) {
+      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
     }
 
-    // Try JWT admin auth as fallback
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const jwtToken = authHeader.split(' ')[1];
-      const secret = process.env.JWT_SECRET;
-      if (secret) {
-        try {
-          const decoded = jwt.verify(jwtToken, secret) as { userId: string; email: string };
-          if (await isAdmin(decoded.email)) {
-            // Admin user — create a synthetic underboss entry so downstream code works
-            req.underboss = {
-              id: 'admin',
-              name: 'Admin',
-              email: decoded.email,
-              region: '__admin__', // Special marker — admin can view any region
-              isActive: true,
-            };
-            return next();
-          }
-        } catch {
-          // Invalid JWT, fall through to error
-        }
-      }
+    // Check if user is an admin first
+    if (await isAdmin(email)) {
+      req.underboss = {
+        id: 'admin',
+        name: 'Admin',
+        email,
+        region: '__admin__', // Special marker — admin can view any region
+        isActive: true,
+      };
+      return next();
     }
 
-    // Neither token nor admin auth worked
-    if (!token) {
-      throw new AppError('Access token required', 401, 'UNAUTHORIZED');
+    // Look up underboss by email
+    const underboss = await prisma.underboss.findFirst({
+      where: { email: email.toLowerCase(), isActive: true },
+    });
+
+    if (underboss) {
+      req.underboss = {
+        id: underboss.id,
+        name: underboss.name,
+        email: underboss.email,
+        region: underboss.region,
+        isActive: underboss.isActive,
+      };
+      return next();
     }
-    throw new AppError('Invalid or inactive token', 403, 'FORBIDDEN');
+
+    // Neither underboss nor admin
+    throw new AppError('Not authorized as underboss', 403, 'FORBIDDEN');
   } catch (error) {
     next(error);
   }
@@ -170,11 +154,59 @@ function formatEvent(party: any) {
 const router = Router();
 
 // ============================================
-// Dashboard routes (token-based auth)
+// Dashboard routes (login-based auth)
 // ============================================
 
+// GET /api/underboss/me - Returns the current user's underboss record or admin status
+router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const email = req.userEmail;
+    if (!email) {
+      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+    }
+
+    // Check admin first
+    const adminStatus = await isAdmin(email);
+    if (adminStatus) {
+      return res.json({
+        isAdmin: true,
+        isUnderboss: false,
+        region: null,
+        name: 'Admin',
+        email,
+      });
+    }
+
+    // Look up underboss by email
+    const underboss = await prisma.underboss.findFirst({
+      where: { email: email.toLowerCase(), isActive: true },
+    });
+
+    if (underboss) {
+      return res.json({
+        isAdmin: false,
+        isUnderboss: true,
+        region: underboss.region,
+        name: underboss.name,
+        email: underboss.email,
+      });
+    }
+
+    // Neither
+    return res.json({
+      isAdmin: false,
+      isUnderboss: false,
+      region: null,
+      name: null,
+      email,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/underboss/:region - Main dashboard data
-router.get('/:region', requireUnderbossToken, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region } = req.params;
 
@@ -215,7 +247,7 @@ router.get('/:region', requireUnderbossToken, async (req: UnderbossRequest, res:
 });
 
 // GET /api/underboss/:region/events - Paginated event list
-router.get('/:region/events', requireUnderbossToken, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region } = req.params;
     const page = parseInt(req.query.page as string) || 1;
@@ -260,7 +292,7 @@ router.get('/:region/events', requireUnderbossToken, async (req: UnderbossReques
 });
 
 // GET /api/underboss/:region/events/:partyId - Single event detail
-router.get('/:region/events/:partyId', requireUnderbossToken, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region, partyId } = req.params;
 
@@ -312,7 +344,7 @@ router.get('/:region/events/:partyId', requireUnderbossToken, async (req: Underb
 });
 
 // GET /api/underboss/:region/stats - Aggregate stats
-router.get('/:region/stats', requireUnderbossToken, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region } = req.params;
 
@@ -343,7 +375,7 @@ router.get('/:region/stats', requireUnderbossToken, async (req: UnderbossRequest
 // Admin routes (JWT auth + super admin check)
 // ============================================
 
-// POST /api/underboss/admin/create - Create underboss + generate token
+// POST /api/underboss/admin/create - Create underboss
 router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!(await isAdmin(req.userEmail))) {
@@ -356,15 +388,15 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       throw new AppError('Name, email, and region are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Generate a secure random token
-    const accessToken = `ub_${crypto.randomBytes(32).toString('hex')}`;
+    // Generate a placeholder token for the DB column (required by schema) but it's no longer used for auth
+    const placeholderToken = `unused_${crypto.randomBytes(32).toString('hex')}`;
 
     const underboss = await prisma.underboss.create({
       data: {
         name,
-        email,
+        email: email.toLowerCase(),
         region,
-        accessToken,
+        accessToken: placeholderToken,
         notes: notes || null,
       },
     });
@@ -379,7 +411,6 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
         notes: underboss.notes,
         createdAt: underboss.createdAt,
       },
-      accessToken, // Only returned on creation
     });
   } catch (error) {
     next(error);
@@ -445,27 +476,6 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
     });
 
     res.json({ underboss });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/underboss/admin/:id/rotate-token - Rotate access token
-router.post('/admin/:id/rotate-token', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
-    }
-
-    const { id } = req.params;
-    const newToken = `ub_${crypto.randomBytes(32).toString('hex')}`;
-
-    await prisma.underboss.update({
-      where: { id },
-      data: { accessToken: newToken },
-    });
-
-    res.json({ accessToken: newToken });
   } catch (error) {
     next(error);
   }

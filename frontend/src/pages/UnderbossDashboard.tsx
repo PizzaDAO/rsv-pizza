@@ -1,25 +1,29 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { LoginModal } from '../components/LoginModal';
 import { RegionStats, EventTable } from '../components/underboss';
-import { fetchUnderbossDashboard, fetchUnderbossDashboardAsAdmin } from '../lib/api';
+import { fetchUnderbossDashboard, fetchUnderbossMe } from '../lib/api';
+import type { UnderbossMeResponse } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { GPP_REGIONS } from '../types';
 import type { UnderbossDashboardData, GPPRegion } from '../types';
 
 export function UnderbossDashboard() {
   const { region } = useParams<{ region: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token') || '';
+  const { user, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<UnderbossDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
 
   const regionLabel = GPP_REGIONS.find((r) => r.id === region)?.label || region || 'Unknown';
 
@@ -35,79 +39,98 @@ export function UnderbossDashboard() {
     }
 
     try {
-      if (token) {
-        // Token-based auth
-        const result = await fetchUnderbossDashboard(targetRegion as GPPRegion, token);
-        setData(result);
-        setIsAdmin(false);
-      } else {
-        // Try JWT admin auth
-        const result = await fetchUnderbossDashboardAsAdmin(targetRegion as GPPRegion);
-        setData(result);
-        setIsAdmin(true);
-      }
+      const result = await fetchUnderbossDashboard(targetRegion as GPPRegion);
+      setData(result);
     } catch (err: any) {
-      if (!token) {
-        setError('Access denied. Please use the link provided to you, or sign in as an admin.');
-      } else {
-        setError(err.message || 'Failed to load dashboard');
-      }
+      setError(err.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
+  // On mount / user change: determine access via /me endpoint
   useEffect(() => {
-    if (!region) {
-      setError('Missing region');
+    if (authLoading) return;
+
+    if (!user) {
       setLoading(false);
+      setError(null);
       return;
     }
 
-    if (!token && !localStorage.getItem('authToken')) {
-      setError('Missing access token');
-      setLoading(false);
-      return;
+    async function checkAccess() {
+      try {
+        const me = await fetchUnderbossMe();
+        setMeData(me);
+
+        if (me.isAdmin) {
+          setIsAdmin(true);
+          // Admin with no region param: default to first region
+          const targetRegion = region || GPP_REGIONS[0].id;
+          if (!region) {
+            navigate(`/underboss/${targetRegion}`, { replace: true });
+          }
+          loadDashboard(targetRegion);
+        } else if (me.isUnderboss && me.region) {
+          setIsAdmin(false);
+          // Underboss: auto-redirect to their region
+          if (!region || region !== me.region) {
+            navigate(`/underboss/${me.region}`, { replace: true });
+          }
+          loadDashboard(me.region);
+        } else {
+          // Not authorized
+          setLoading(false);
+          setError('You are not authorized to access the underboss dashboard.');
+        }
+      } catch (err: any) {
+        setLoading(false);
+        setError(err.message || 'Failed to check access');
+      }
     }
 
-    loadDashboard(region);
-  }, [region, token, loadDashboard]);
+    checkAccess();
+  }, [user, authLoading, region, navigate, loadDashboard]);
 
   // Handle region switch for admins
   const handleRegionSwitch = (newRegion: GPPRegion) => {
     setRegionDropdownOpen(false);
-    if (token) {
-      navigate(`/underboss/${newRegion}?token=${encodeURIComponent(token)}`);
-    } else {
-      navigate(`/underboss/${newRegion}`);
-    }
+    navigate(`/underboss/${newRegion}`);
   };
 
-  // Error state - no auth at all
-  if (!token && !localStorage.getItem('authToken')) {
+  // Not logged in
+  if (!authLoading && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-          <Shield size={48} className="mx-auto mb-4 text-red-400/60" />
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-white/50">
-            This dashboard requires an access token or admin login. Please use the link provided to you.
+          <Shield size={48} className="mx-auto mb-4 text-orange-400/60" />
+          <h1 className="text-2xl font-bold text-white mb-2">Underboss Dashboard</h1>
+          <p className="text-white/50 mb-6">
+            Please log in to access the underboss dashboard.
           </p>
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+          >
+            <LogIn size={18} />
+            Log In
+          </button>
         </div>
         <Footer />
+        <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
       </div>
     );
   }
 
   // Loading state
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-white/40 mb-4" />
-          <p className="text-white/40 text-sm">Loading {regionLabel} dashboard...</p>
+          <p className="text-white/40 text-sm">Loading dashboard...</p>
         </div>
         <Footer />
       </div>

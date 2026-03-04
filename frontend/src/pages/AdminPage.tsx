@@ -4,11 +4,11 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Key, Globe,
+  Mail, User, Globe,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
-  fetchUnderbossList, createUnderboss, rotateUnderbossToken, deactivateUnderboss,
+  fetchUnderbossList, createUnderboss, deactivateUnderboss,
 } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin } from '../types';
@@ -34,7 +34,6 @@ export function AdminPage() {
   const [ubRegion, setUbRegion] = useState('');
   const [addingUb, setAddingUb] = useState(false);
   const [ubMessage, setUbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [newToken, setNewToken] = useState<string | null>(null);
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -121,11 +120,10 @@ export function AdminPage() {
         region: ubRegion,
       });
       setUnderbosses((prev) => [...prev, result.underboss]);
-      setNewToken(result.accessToken);
       setUbName('');
       setUbEmail('');
       setUbRegion('');
-      setUbMessage({ type: 'success', text: `Created underboss ${result.underboss.name}. Token shown below.` });
+      setUbMessage({ type: 'success', text: `Created underboss ${result.underboss.name}. They can now log in at /underboss.` });
     } catch (err: any) {
       setUbMessage({ type: 'error', text: err.message || 'Failed to create underboss' });
     } finally {
@@ -133,19 +131,8 @@ export function AdminPage() {
     }
   }
 
-  async function handleRotateToken(id: string, name: string) {
-    if (!confirm(`Rotate access token for ${name}? The old token will stop working.`)) return;
-    try {
-      const token = await rotateUnderbossToken(id);
-      setNewToken(token);
-      setUbMessage({ type: 'success', text: `New token generated for ${name}. Copy it now!` });
-    } catch (err: any) {
-      setUbMessage({ type: 'error', text: err.message || 'Failed to rotate token' });
-    }
-  }
-
   async function handleDeactivate(id: string, name: string) {
-    if (!confirm(`Deactivate ${name}? Their access token will stop working.`)) return;
+    if (!confirm(`Deactivate ${name}? They will lose access to the underboss dashboard.`)) return;
     try {
       await deactivateUnderboss(id);
       setUnderbosses((prev) =>
@@ -328,24 +315,6 @@ export function AdminPage() {
               </div>
             )}
 
-            {newToken && (
-              <div className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-                <p className="text-yellow-300 text-sm font-medium mb-2">Access Token (copy now, shown only once):</p>
-                <code className="block bg-black/50 rounded-lg p-3 text-xs text-yellow-200 break-all select-all">
-                  {newToken}
-                </code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(newToken);
-                    setNewToken(null);
-                  }}
-                  className="mt-2 text-xs text-yellow-400 hover:text-yellow-300 transition-colors"
-                >
-                  Copy & dismiss
-                </button>
-              </div>
-            )}
-
             <form onSubmit={handleAddUnderboss} className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
@@ -422,13 +391,6 @@ export function AdminPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleRotateToken(ub.id, ub.name)}
-                            className="text-white/40 hover:text-yellow-400 transition-colors p-1"
-                            title="Rotate token"
-                          >
-                            <Key size={16} />
-                          </button>
                           {ub.isActive && (
                             <button
                               onClick={() => handleDeactivate(ub.id, ub.name)}

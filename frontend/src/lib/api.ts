@@ -1954,18 +1954,11 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; region: string; notes?: string }): Promise<{ underboss: UnderbossAdmin; accessToken: string }> {
+export async function createUnderboss(data: { name: string; email: string; region: string; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
   });
-}
-
-export async function rotateUnderbossToken(id: string): Promise<string> {
-  const result = await apiRequest<{ accessToken: string }>(`/api/underboss/admin/${id}/rotate-token`, {
-    method: 'POST',
-  });
-  return result.accessToken;
 }
 
 export async function deactivateUnderboss(id: string): Promise<void> {
@@ -1976,26 +1969,21 @@ export async function deactivateUnderboss(id: string): Promise<void> {
 // Underboss Dashboard API
 // ============================================
 
-// Fetch underboss dashboard data (token-based, no JWT auth)
-export async function fetchUnderbossDashboard(
-  region: GPPRegion,
-  token: string
-): Promise<UnderbossDashboardData> {
-  const response = await fetch(
-    `${API_URL}/api/underboss/${region}?token=${encodeURIComponent(token)}`,
-    { headers: { 'Content-Type': 'application/json' } }
-  );
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.error?.message || error.message || `API error: ${response.status}`);
-  }
-
-  return response.json();
+// Fetch current user's underboss status
+export interface UnderbossMeResponse {
+  isAdmin: boolean;
+  isUnderboss: boolean;
+  region: string | null;
+  name: string | null;
+  email: string;
 }
 
-// Fetch underboss dashboard as admin (JWT auth, no token needed)
-export async function fetchUnderbossDashboardAsAdmin(
+export async function fetchUnderbossMe(): Promise<UnderbossMeResponse> {
+  return apiRequest<UnderbossMeResponse>('/api/underboss/me');
+}
+
+// Fetch underboss dashboard data (JWT auth)
+export async function fetchUnderbossDashboard(
   region: GPPRegion
 ): Promise<UnderbossDashboardData> {
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);

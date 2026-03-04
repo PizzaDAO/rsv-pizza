@@ -39,6 +39,7 @@ function App() {
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
             <Route path="/dj/:inviteCode" element={<DJPage />} />
             <Route path="/display/:partyId/:slug" element={<DisplayPage />} />
+            <Route path="/underboss" element={<UnderbossDashboard />} />
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
             {/* Catch-all route for custom URLs - must be last */}
