@@ -889,3 +889,19 @@ model Underboss {
   @@index([region])
   @@map("underbosses")
 }
+
+// ============================================
+// Admin Management Models
+// ============================================
+
+model Admin {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  role      String   @default("admin")
+  name      String?
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("admins")
+}

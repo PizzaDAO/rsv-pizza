@@ -882,3 +882,26 @@ export interface UnderbossDashboardData {
   stats: UnderbossStats;
   events: UnderbossEvent[];
 }
+
+// ============================================
+// Admin Management types
+// ============================================
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: 'super_admin' | 'admin';
+  name: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface UnderbossAdmin {
+  id: string;
+  name: string;
+  email: string;
+  region: string;
+  isActive: boolean;
+  notes: string | null;
+  createdAt: string;
+}

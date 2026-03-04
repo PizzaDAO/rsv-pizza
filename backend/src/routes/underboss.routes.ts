@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 
@@ -317,8 +317,8 @@ router.get('/:region/stats', requireUnderbossToken, async (req: UnderbossRequest
 // POST /api/underboss/admin/create - Create underboss + generate token
 router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { name, email, region, notes } = req.body;
@@ -360,8 +360,8 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
 // GET /api/underboss/admin/list - List all underbosses
 router.get('/admin/list', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const underbosses = await prisma.underboss.findMany({
@@ -387,8 +387,8 @@ router.get('/admin/list', requireAuth, async (req: AuthRequest, res: Response, n
 // PATCH /api/underboss/admin/:id - Update underboss
 router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -424,8 +424,8 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
 // POST /api/underboss/admin/:id/rotate-token - Rotate access token
 router.post('/admin/:id/rotate-token', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -445,8 +445,8 @@ router.post('/admin/:id/rotate-token', requireAuth, async (req: AuthRequest, res
 // DELETE /api/underboss/admin/:id - Deactivate underboss
 router.delete('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -465,8 +465,8 @@ router.delete('/admin/:id', requireAuth, async (req: AuthRequest, res: Response,
 // PATCH /api/underboss/admin/assign-region/:partyId - Set region on a GPP event
 router.patch('/admin/assign-region/:partyId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!isSuperAdmin(req.userEmail)) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { partyId } = req.params;
