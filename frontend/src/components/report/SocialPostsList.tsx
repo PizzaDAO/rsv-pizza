@@ -50,7 +50,7 @@ function TwitterEmbed({ url }: { url: string }) {
         requestAnimationFrame(() => {
           if (containerRef.current && wrapperRef.current) {
             const contentHeight = containerRef.current.scrollHeight;
-            wrapperRef.current.style.height = `${contentHeight * 0.7}px`;
+            wrapperRef.current.style.height = `${contentHeight * 0.55}px`;
           }
         });
       });
@@ -81,8 +81,8 @@ function TwitterEmbed({ url }: { url: string }) {
   if (!tweetId) return null;
 
   return (
-    <div ref={wrapperRef} className="mt-2 overflow-hidden">
-      <div ref={containerRef} className="origin-top-left" style={{ transform: 'scale(0.7)', width: '143%' }} />
+    <div ref={wrapperRef} className="overflow-hidden">
+      <div ref={containerRef} className="origin-top-left" style={{ transform: 'scale(0.55)', width: '182%' }} />
     </div>
   );
 }
@@ -177,45 +177,45 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
             </div>
           )}
         </div>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {posts.map((post) => {
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
               <div key={post.id} className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
-                <div className="flex items-center gap-3 p-3">
-                  <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                <div className="flex items-center gap-2 p-2">
+                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
                     {platform.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     {post.title && (
-                      <p className="text-sm text-white font-medium">{post.title}</p>
+                      <p className="text-xs text-white font-medium truncate">{post.title}</p>
                     )}
                     {post.authorHandle && (
-                      <span className="text-xs text-white/60">@{post.authorHandle}</span>
+                      <span className="text-[10px] text-white/60">@{post.authorHandle}</span>
                     )}
                     {!post.title && !post.authorHandle && (
-                      <p className="text-xs text-white/40 truncate">{post.url}</p>
+                      <p className="text-[10px] text-white/40 truncate">{post.url}</p>
                     )}
                   </div>
                   {post.views != null && (
-                    <div className="flex items-center gap-1 text-white/60 text-xs flex-shrink-0">
-                      <Eye size={12} />
+                    <div className="flex items-center gap-1 text-white/60 text-[10px] flex-shrink-0">
+                      <Eye size={10} />
                       <span>{post.views.toLocaleString()}</span>
                     </div>
                   )}
                   <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                    <ExternalLink size={16} className="text-white/40 hover:text-white/60" />
+                    <ExternalLink size={12} className="text-white/40 hover:text-white/60" />
                   </a>
                 </div>
                 {/* Embed for Twitter/X posts */}
                 {isTwitterUrl(post.url) && (
-                  <div className="px-3 pb-3">
+                  <div className="px-2 pb-2">
                     <TwitterEmbed url={post.url} />
                   </div>
                 )}
                 {/* Link preview for non-Twitter posts */}
                 {!isTwitterUrl(post.url) && (
-                  <div className="px-3 pb-3">
+                  <div className="px-2 pb-2">
                     <LinkPreview url={post.url} platform={post.platform} />
                   </div>
                 )}
@@ -317,7 +317,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
 
       {/* List of posts */}
       {posts.length > 0 ? (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {posts.map((post) => {
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
@@ -326,53 +326,53 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
                 className="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
               >
                 {/* Post header row */}
-                <div className="flex items-center gap-3 p-3">
-                  <div className={`w-8 h-8 ${platform.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                <div className="flex items-center gap-2 p-2">
+                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
                     {platform.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     {post.title && (
-                      <p className="text-sm text-white font-medium">{post.title}</p>
+                      <p className="text-xs text-white font-medium truncate">{post.title}</p>
                     )}
                     {post.authorHandle && (
-                      <span className="text-xs text-white/60">@{post.authorHandle}</span>
+                      <span className="text-[10px] text-white/60">@{post.authorHandle}</span>
                     )}
                     <a
                       href={post.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-white/40 hover:text-white/60 truncate block"
+                      className="text-[10px] text-white/40 hover:text-white/60 truncate block"
                     >
                       {post.url}
                     </a>
                   </div>
                   {post.views != null && (
-                    <div className="flex items-center gap-1 text-white/50 text-xs flex-shrink-0 bg-white/5 px-2 py-1 rounded-md">
-                      <Eye size={12} />
+                    <div className="flex items-center gap-1 text-white/50 text-[10px] flex-shrink-0 bg-white/5 px-1.5 py-0.5 rounded">
+                      <Eye size={10} />
                       <span>{post.views.toLocaleString()}</span>
                     </div>
                   )}
                   <button
                     onClick={() => handleDelete(post.id)}
                     disabled={deletingId === post.id}
-                    className="p-2 text-white/40 hover:text-red-400 transition-colors flex-shrink-0"
+                    className="p-1 text-white/40 hover:text-red-400 transition-colors flex-shrink-0"
                   >
                     {deletingId === post.id ? (
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     )}
                   </button>
                 </div>
                 {/* Embed for Twitter/X posts */}
                 {isTwitterUrl(post.url) && (
-                  <div className="px-3 pb-3">
+                  <div className="px-2 pb-2">
                     <TwitterEmbed url={post.url} />
                   </div>
                 )}
                 {/* Link preview for non-Twitter posts */}
                 {!isTwitterUrl(post.url) && (
-                  <div className="px-3 pb-3">
+                  <div className="px-2 pb-2">
                     <LinkPreview url={post.url} platform={post.platform} />
                   </div>
                 )}
