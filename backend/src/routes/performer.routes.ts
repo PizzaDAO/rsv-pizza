@@ -6,7 +6,7 @@ import { AppError } from '../middleware/error.js';
 // Helper function to check if user can edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can edit any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 

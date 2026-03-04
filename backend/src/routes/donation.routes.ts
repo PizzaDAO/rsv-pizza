@@ -8,7 +8,7 @@ const router = Router();
 // Helper function to check if user can access party donations
 async function canUserAccessDonations(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can access any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 

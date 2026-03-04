@@ -8,7 +8,7 @@ const router = Router();
 // Helper function to check if user can check in guests for a party (host or co-host)
 async function canUserCheckIn(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can check in for any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 

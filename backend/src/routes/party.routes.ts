@@ -8,7 +8,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can edit any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 
@@ -59,7 +59,7 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
   }
 
   // Super admin can access any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return party;
   }
 
