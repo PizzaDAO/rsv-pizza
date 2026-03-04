@@ -20,13 +20,17 @@ function isItemCompleted(item: ChecklistItem, autoStates: AutoCompleteStates): b
 
 function formatDueDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
-  const date = new Date(dateStr + 'T00:00:00');
+  // Handle both "2026-03-08" and "2026-03-08T00:00:00.000Z" formats
+  const dateOnly = dateStr.split('T')[0];
+  const date = new Date(dateOnly + 'T00:00:00');
+  if (isNaN(date.getTime())) return null;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function isOverdue(dateStr: string | null, completed: boolean): boolean {
   if (!dateStr || completed) return false;
-  const due = new Date(dateStr + 'T23:59:59');
+  const dateOnly = dateStr.split('T')[0];
+  const due = new Date(dateOnly + 'T23:59:59');
   return due < new Date();
 }
 
