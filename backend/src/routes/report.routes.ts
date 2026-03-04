@@ -122,6 +122,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         reportPublished: party.reportPublished,
         reportPublicSlug: party.reportPublicSlug,
         reportPassword: party.reportPassword || null,
+        reportStatsConfig: party.reportStatsConfig || null,
 
         // Related data
         socialPosts: party.socialPosts,
@@ -161,6 +162,7 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
       poapEventId,
       poapMints,
       poapMoments,
+      reportStatsConfig,
     } = req.body;
 
     // Verify ownership or super admin
@@ -192,6 +194,7 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
         ...(poapEventId !== undefined && { poapEventId }),
         ...(poapMints !== undefined && { poapMints: toIntOrNull(poapMints) }),
         ...(poapMoments !== undefined && { poapMoments: toIntOrNull(poapMoments) }),
+        ...(reportStatsConfig !== undefined && { reportStatsConfig }),
       },
     });
 
@@ -393,6 +396,9 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         poapMints: party.poapMints,
         poapMoments: party.poapMoments,
 
+        // Report settings
+        reportStatsConfig: party.reportStatsConfig || null,
+
         // Related data
         socialPosts: party.socialPosts,
         notableAttendees: party.notableAttendees,
@@ -402,7 +408,7 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         stats: {
           totalRsvps,
           approvedGuests,
-          mailingListSignups, // Might want to hide this
+          mailingListSignups,
           walletAddresses,
           roleBreakdown,
         },

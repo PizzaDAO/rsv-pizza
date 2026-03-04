@@ -11,11 +11,32 @@ interface ReportPreviewProps {
 }
 
 export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewProps) {
+  const config = report.reportStatsConfig || {};
   const socialPostViews = report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0);
   const socialPostCount = report.socialPosts.length;
-  const hasKPIs = socialPostViews > 0 || socialPostCount > 0 ||
-    report.poapMints || report.poapMoments || report.stats.totalRsvps > 0 ||
-    (pageViewStats && pageViewStats.totalViews > 0);
+
+  // Build stats list with config-aware values
+  const statsDefs: { key: string; label: string; autoValue: number | null | undefined; icon: React.ElementType; color: string; url?: string }[] = [
+    ...(pageViewStats ? [
+      { key: 'pageViews', label: 'Page Views', autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
+      { key: 'uniqueVisitors', label: 'Unique Visitors', autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
+    ] : []),
+    { key: 'socialPostViews', label: 'Social Post Views', autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
+    { key: 'socialPosts', label: 'Social Posts', autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
+    { key: 'totalRsvps', label: 'Total RSVPs', autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
+    { key: 'attendees', label: 'Attendees', autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
+    { key: 'newsletterSignups', label: 'Newsletter Sign-ups', autoValue: report.stats.mailingListSignups, icon: Mail, color: 'text-orange-400' },
+    { key: 'walletAddresses', label: 'Wallet Addresses', autoValue: report.stats.walletAddresses, icon: Wallet, color: 'text-cyan-400' },
+    { key: 'poapMints', label: 'POAP Mints', autoValue: report.poapMints, icon: Award, color: 'text-yellow-400', url: report.poapEventId ? `https://poap.gallery/event/${report.poapEventId}` : undefined },
+    { key: 'poapMoments', label: 'POAP Moments', autoValue: report.poapMoments, icon: Video, color: 'text-yellow-400' },
+  ];
+
+  const visibleStats = statsDefs
+    .filter(s => config[s.key]?.hidden !== true)
+    .map(s => ({ ...s, value: config[s.key]?.override != null ? config[s.key]!.override! : (s.autoValue ?? null) }))
+    .filter(s => s.value != null);
+
+  const hasKPIs = visibleStats.length > 0;
 
   return (
     <div className="space-y-6">
@@ -120,84 +141,21 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
         </div>
       )}
 
-      {/* KPIs */}
+      {/* Stats */}
       {hasKPIs && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-4">Key Metrics</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Stats</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {pageViewStats && pageViewStats.totalViews > 0 && (
+            {visibleStats.map((stat) => (
               <KPICard
-                label="Page Views"
-                value={pageViewStats.totalViews}
-                icon={MousePointerClick}
-                color="text-[#ff393a]"
+                key={stat.key}
+                label={stat.label}
+                value={stat.value!}
+                icon={stat.icon}
+                color={stat.color}
+                url={stat.url}
               />
-            )}
-            {pageViewStats && pageViewStats.uniqueViews > 0 && (
-              <KPICard
-                label="Unique Visitors"
-                value={pageViewStats.uniqueViews}
-                icon={Eye}
-                color="text-[#ff393a]"
-              />
-            )}
-            {socialPostViews > 0 && (
-              <KPICard
-                label="Social Post Views"
-                value={socialPostViews}
-                icon={Eye}
-                color="text-blue-400"
-              />
-            )}
-            {socialPostCount > 0 && (
-              <KPICard
-                label="Social Posts"
-                value={socialPostCount}
-                icon={FileText}
-                color="text-blue-400"
-              />
-            )}
-            {report.poapMints != null && (
-              <KPICard
-                label="POAP Mints"
-                value={report.poapMints}
-                icon={Award}
-                color="text-yellow-400"
-                url={report.poapEventId ? `https://poap.gallery/event/${report.poapEventId}` : undefined}
-              />
-            )}
-            {report.poapMoments != null && (
-              <KPICard
-                label="POAP Moments"
-                value={report.poapMoments}
-                icon={Video}
-                color="text-yellow-400"
-              />
-            )}
-            <KPICard
-              label="Total RSVPs"
-              value={report.stats.totalRsvps}
-              icon={Users}
-              color="text-green-400"
-            />
-            <KPICard
-              label="Attendees"
-              value={report.stats.approvedGuests}
-              icon={Users}
-              color="text-emerald-400"
-            />
-            <KPICard
-              label="Newsletter Sign-ups"
-              value={report.stats.mailingListSignups}
-              icon={Mail}
-              color="text-orange-400"
-            />
-            <KPICard
-              label="Wallet Addresses"
-              value={report.stats.walletAddresses}
-              icon={Wallet}
-              color="text-cyan-400"
-            />
+            ))}
           </div>
         </div>
       )}

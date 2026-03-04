@@ -541,6 +541,7 @@ export interface EventReport {
   reportPublished?: boolean;
   reportPublicSlug?: string | null;
   reportPassword?: string | null;
+  reportStatsConfig?: Record<string, { override?: number | null; hidden?: boolean }> | null;
 
   // Related data
   socialPosts: SocialPost[];

@@ -134,6 +134,7 @@ model Party {
   reportPublished    Boolean   @default(false) @map("report_published")
   reportPublicSlug   String?   @unique @map("report_public_slug")
   reportPassword     String?   @map("report_password")
+  reportStatsConfig  Json?     @map("report_stats_config")
 
   // Pinned apps (for Apps Hub tab bar)
   pinnedApps  Json?   @default("[]") @map("pinned_apps")
