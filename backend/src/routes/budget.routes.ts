@@ -6,7 +6,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 // Helper function to check if user can edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, PageViewStats } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -133,6 +133,7 @@ export interface UpdatePartyData {
   musicEnabled?: boolean;
   musicNotes?: string | null;
   pinnedApps?: string[];
+  region?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -212,6 +213,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       musicEnabled: data.musicEnabled,
       musicNotes: data.musicNotes,
       pinnedApps: data.pinnedApps,
+      region: data.region,
     },
   });
 }
@@ -1912,4 +1914,77 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
     console.error('Error canceling kit request:', error);
     return false;
   }
+}
+
+// ============================================
+// Underboss Dashboard API
+// ============================================
+
+// ============================================
+// Admin Management API
+// ============================================
+
+export async function fetchAdminMe(): Promise<{ isAdmin: boolean; role?: string; email?: string; name?: string; id?: string }> {
+  return apiRequest('/api/admin/me');
+}
+
+export async function fetchAdminList(): Promise<AdminUser[]> {
+  const result = await apiRequest<{ admins: AdminUser[] }>('/api/admin/list');
+  return result.admins;
+}
+
+export async function addAdmin(data: { email: string; name?: string; role?: string }): Promise<AdminUser> {
+  const result = await apiRequest<{ admin: AdminUser }>('/api/admin/add', {
+    method: 'POST',
+    body: data,
+  });
+  return result.admin;
+}
+
+export async function removeAdmin(id: string): Promise<void> {
+  await apiRequest(`/api/admin/${id}`, { method: 'DELETE' });
+}
+
+// ============================================
+// Underboss Admin API (management)
+// ============================================
+
+export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
+  const result = await apiRequest<{ underbosses: UnderbossAdmin[] }>('/api/underboss/admin/list');
+  return result.underbosses;
+}
+
+export async function createUnderboss(data: { name: string; email: string; region: string; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+  return apiRequest('/api/underboss/admin/create', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export async function deactivateUnderboss(id: string): Promise<void> {
+  await apiRequest(`/api/underboss/admin/${id}`, { method: 'DELETE' });
+}
+
+// ============================================
+// Underboss Dashboard API
+// ============================================
+
+// Fetch current user's underboss status
+export interface UnderbossMeResponse {
+  isAdmin: boolean;
+  isUnderboss: boolean;
+  region: string | null;
+  name: string | null;
+  email: string;
+}
+
+export async function fetchUnderbossMe(): Promise<UnderbossMeResponse> {
+  return apiRequest<UnderbossMeResponse>('/api/underboss/me');
+}
+
+// Fetch underboss dashboard data (JWT auth)
+export async function fetchUnderbossDashboard(
+  region: GPPRegion
+): Promise<UnderbossDashboardData> {
+  return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
 }

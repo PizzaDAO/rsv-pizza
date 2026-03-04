@@ -137,6 +137,9 @@ model Party {
   // Pinned apps (for Apps Hub tab bar)
   pinnedApps  Json?   @default("[]") @map("pinned_apps")
 
+  // Region (for underboss dashboard)
+  region  String?
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -890,4 +893,39 @@ model PageView {
   @@index([partyId, viewedAt])
   @@index([partyId, visitorHash])
   @@map("page_views")
+}
+
+// ============================================
+// Underboss Dashboard Models
+// ============================================
+
+model Underboss {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  email       String
+  region      String
+  accessToken String   @unique @map("access_token")
+  isActive    Boolean  @default(true) @map("is_active")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([region])
+  @@map("underbosses")
+}
+
+// ============================================
+// Admin Management Models
+// ============================================
+
+model Admin {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  role      String   @default("admin")
+  name      String?
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("admins")
 }

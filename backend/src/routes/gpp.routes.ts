@@ -5,6 +5,57 @@ import { AppError } from '../middleware/error.js';
 
 const router = Router();
 
+// Map ISO country codes to underboss regions
+function countryCodeToRegion(countryCode: string): string | null {
+  const cc = countryCode.toUpperCase();
+
+  // USA
+  if (cc === 'US') return 'usa';
+
+  // Canada
+  if (cc === 'CA') return 'canada';
+
+  // Central America
+  const centralAmerica = ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'JM', 'HT', 'DO', 'PR', 'TT', 'BB', 'BS', 'AG', 'DM', 'GD', 'KN', 'LC', 'VC'];
+  if (centralAmerica.includes(cc)) return 'central-america';
+
+  // South America
+  const southAmerica = ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'];
+  if (southAmerica.includes(cc)) return 'south-america';
+
+  // Western Europe
+  const westernEurope = ['GB', 'FR', 'DE', 'IT', 'ES', 'PT', 'NL', 'BE', 'LU', 'IE', 'AT', 'CH', 'DK', 'NO', 'SE', 'FI', 'IS', 'MT', 'MC', 'AD', 'LI', 'SM', 'VA'];
+  if (westernEurope.includes(cc)) return 'western-europe';
+
+  // Eastern Europe
+  const easternEurope = ['PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'BA', 'ME', 'MK', 'AL', 'XK', 'UA', 'BY', 'MD', 'LT', 'LV', 'EE', 'GE', 'AM', 'AZ', 'GR', 'CY', 'TR'];
+  if (easternEurope.includes(cc)) return 'eastern-europe';
+
+  // India
+  if (cc === 'IN') return 'india';
+
+  // China
+  if (cc === 'CN' || cc === 'HK' || cc === 'MO' || cc === 'TW') return 'china';
+
+  // Middle East
+  const middleEast = ['SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'IQ', 'IR', 'SY', 'JO', 'LB', 'IL', 'PS', 'EG'];
+  if (middleEast.includes(cc)) return 'middle-east';
+
+  // Africa (excluding Egypt which is in Middle East)
+  const africa = ['ZA', 'NG', 'KE', 'GH', 'ET', 'TZ', 'UG', 'RW', 'SN', 'CI', 'CM', 'AO', 'MZ', 'MG', 'ZW', 'ZM', 'BW', 'NA', 'MW', 'ML', 'BF', 'NE', 'TD', 'GN', 'BJ', 'TG', 'SL', 'LR', 'MR', 'GA', 'CG', 'CD', 'DJ', 'ER', 'SO', 'SD', 'SS', 'CF', 'GQ', 'ST', 'KM', 'SC', 'MU', 'CV', 'GM', 'GW', 'LS', 'SZ', 'TN', 'DZ', 'MA', 'LY'];
+  if (africa.includes(cc)) return 'africa';
+
+  // Oceania
+  const oceania = ['AU', 'NZ', 'FJ', 'PG', 'WS', 'TO', 'VU', 'SB', 'KI', 'FM', 'MH', 'PW', 'TV', 'NR', 'GU', 'NC', 'PF'];
+  if (oceania.includes(cc)) return 'oceania';
+
+  // Asia (catch-all for remaining Asian countries)
+  const asia = ['JP', 'KR', 'TH', 'VN', 'PH', 'MY', 'SG', 'ID', 'MM', 'KH', 'LA', 'BN', 'TL', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'PK', 'BD', 'LK', 'NP', 'BT'];
+  if (asia.includes(cc)) return 'asia';
+
+  return null; // Unknown country
+}
+
 // GPP Default values
 const GPP_DEFAULTS = {
   description: `Join us for the Global Pizza Party, a worldwide celebration of pizza and bitcoin, where communities around the world come together to share pizza and good vibes.
@@ -164,6 +215,9 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     }
     const defaultDate = new Date(defaultYear, 4, 22, 18, 0, 0); // May 22 at 6 PM
 
+    // Auto-infer region from country code
+    const inferredRegion = countryCode ? countryCodeToRegion(countryCode) : null;
+
     // Create the party with GPP defaults
     const party = await prisma.party.create({
       data: {
@@ -177,6 +231,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         photosPublic: GPP_DEFAULTS.photosPublic,
         customUrl: customUrl,
         date: defaultDate,
+        region: inferredRegion,
         availableBeverages: [],
         availableToppings: [],
         coHosts: [

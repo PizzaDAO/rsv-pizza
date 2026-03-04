@@ -7,7 +7,7 @@ import crypto from 'crypto';
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can edit any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 

@@ -8,7 +8,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can edit any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 
@@ -59,7 +59,7 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
   }
 
   // Super admin can access any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return party;
   }
 
@@ -258,7 +258,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes, photoModeration,
       nftEnabled, nftChain,
-      pinnedApps
+      pinnedApps,
+      region
     } = req.body;
 
     // Verify ownership or super admin
@@ -315,6 +316,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(nftEnabled !== undefined && { nftEnabled }),
         ...(nftChain !== undefined && { nftChain: nftChain || null }),
         ...(pinnedApps !== undefined && { pinnedApps }),
+        ...(region !== undefined && { region: region || null }),
       },
       include: {
         user: { select: { name: true } },

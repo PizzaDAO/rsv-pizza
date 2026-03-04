@@ -6,7 +6,7 @@ import { AppError } from '../middleware/error.js';
 // Helper function to check if user can access/edit a party
 async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can edit any party
-  if (isSuperAdmin(userEmail)) {
+  if (await isSuperAdmin(userEmail)) {
     return true;
   }
 
@@ -195,7 +195,7 @@ router.patch('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Respons
     }
 
     // Check permissions
-    const isAdmin = isSuperAdmin(req.userEmail);
+    const isAdmin = await isSuperAdmin(req.userEmail);
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
 
     if (!canEdit && !isAdmin) {
@@ -290,7 +290,7 @@ router.delete('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Respon
     const { partyId } = req.params;
 
     // Verify ownership or super admin
-    const isAdmin = isSuperAdmin(req.userEmail);
+    const isAdmin = await isSuperAdmin(req.userEmail);
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
 
     if (!canEdit && !isAdmin) {

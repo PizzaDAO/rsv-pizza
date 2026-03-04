@@ -1,18 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './error.js';
-
-// Super admin email that can edit any party
-export const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
+import { prisma } from '../config/database.js';
 
 export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
 }
 
-// Check if the user is the super admin
-export function isSuperAdmin(email?: string): boolean {
-  return email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+// Check if the user is any kind of admin (DB-backed)
+export async function isAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
+  return !!admin;
+}
+
+// Check if the user is a super admin (DB-backed)
+export async function isSuperAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
+  return admin?.role === 'super_admin';
 }
 
 // Optional auth: tries to parse the JWT but doesn't error if missing/invalid
