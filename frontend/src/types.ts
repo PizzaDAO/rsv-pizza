@@ -540,6 +540,7 @@ export interface EventReport {
   // Report settings
   reportPublished?: boolean;
   reportPublicSlug?: string | null;
+  reportPassword?: string | null;
 
   // Related data
   socialPosts: SocialPost[];

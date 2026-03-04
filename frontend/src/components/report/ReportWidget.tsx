@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon } from 'lucide-react';
+import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon, Lock } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { EventReport, Guest, PageViewStats as PageViewStatsType } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
@@ -7,6 +7,7 @@ import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
 import { NotableAttendeesList } from './NotableAttendeesList';
 import { ReportPreview } from './ReportPreview';
+import { IconInput } from '../IconInput';
 import { PageViewStats } from './PageViewStats';
 import {
   getReport,
@@ -86,6 +87,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   const [publishingState, setPublishingState] = useState<'idle' | 'publishing' | 'unpublishing'>('idle');
   const [copiedLink, setCopiedLink] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [reportPassword, setReportPassword] = useState('');
   const [viewStats, setViewStats] = useState<PageViewStatsType | null>(null);
 
   // Track pending changes for debounced save
@@ -105,6 +107,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       const result = await getReport(partyId);
       if (result?.report) {
         setReport(result.report);
+        setReportPassword(result.report.reportPassword || '');
       } else if (partyRef.current) {
         // Fallback: Build report from party data if API returns nothing
         setReport(buildFallbackReport(partyRef.current, guestsRef.current));
@@ -255,12 +258,13 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
     setPublishingState('publishing');
     try {
-      const result = await publishReport(partyId);
+      const result = await publishReport(partyId, reportPassword || undefined);
       if (result) {
         setReport(prev => prev ? {
           ...prev,
           reportPublished: true,
           reportPublicSlug: result.reportPublicSlug,
+          reportPassword: reportPassword || null,
         } : null);
       } else {
         setError('Failed to publish report');
@@ -541,6 +545,12 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               <div className="flex items-center gap-2 text-green-400">
                 <Eye size={16} />
                 <span className="text-sm font-medium">Report is published</span>
+                {report.reportPassword && (
+                  <span className="flex items-center gap-1 text-xs text-white/40 bg-white/5 px-2 py-0.5 rounded">
+                    <Lock size={10} />
+                    Password protected
+                  </span>
+                )}
               </div>
               {report.reportPublicSlug && (
                 <div className="flex items-center gap-2">
@@ -565,6 +575,24 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                   </button>
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <IconInput
+                  icon={Lock}
+                  type="text"
+                  value={reportPassword}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
+                  placeholder="Password (optional)"
+                />
+                <button
+                  onClick={async () => {
+                    await publishReport(partyId, reportPassword || undefined);
+                    setReport(prev => prev ? { ...prev, reportPassword: reportPassword || null } : null);
+                  }}
+                  className="btn-secondary text-sm py-2 px-3 whitespace-nowrap"
+                >
+                  Update
+                </button>
+              </div>
               <button
                 onClick={handleUnpublish}
                 disabled={publishingState === 'unpublishing'}
@@ -581,8 +609,15 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           ) : (
             <div className="space-y-3">
               <p className="text-white/60 text-sm">
-                Publish your report to share it with a public link. Anyone with the link can view the compiled report.
+                Publish your report to share it with a public link.
               </p>
+              <IconInput
+                icon={Lock}
+                type="text"
+                value={reportPassword}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
+                placeholder="Password (optional — leave empty for public access)"
+              />
               <button
                 onClick={handlePublish}
                 disabled={publishingState === 'publishing'}

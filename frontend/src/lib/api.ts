@@ -1139,13 +1139,15 @@ export async function updateReport(
 
 // Publish report
 export async function publishReport(
-  partyId: string
+  partyId: string,
+  password?: string
 ): Promise<{ reportPublicSlug: string; publicUrl: string } | null> {
   try {
     return await apiRequest<{ success: boolean; reportPublicSlug: string; publicUrl: string }>(
       `/api/parties/${partyId}/report/publish`,
       {
         method: 'POST',
+        body: password ? { password } : undefined,
         requireAuth: true,
       }
     );
@@ -1153,6 +1155,32 @@ export async function publishReport(
     console.error('Error publishing report:', error);
     return null;
   }
+}
+
+// Check if published report requires password
+export async function checkReportPassword(
+  publicSlug: string
+): Promise<{ requiresPassword: boolean; name: string } | null> {
+  try {
+    return await apiRequest<{ requiresPassword: boolean; name: string }>(
+      `/api/reports/public/${publicSlug}/check`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch {
+    return null;
+  }
+}
+
+// Fetch published report (public, with optional password)
+export async function fetchPublicReport(
+  publicSlug: string,
+  password?: string
+): Promise<any> {
+  const params = password ? `?password=${encodeURIComponent(password)}` : '';
+  return apiRequest(`/api/reports/public/${publicSlug}${params}`, {
+    method: 'GET',
+    requireAuth: false,
+  });
 }
 
 // Unpublish report

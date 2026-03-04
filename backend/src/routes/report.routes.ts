@@ -121,6 +121,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         // Report settings
         reportPublished: party.reportPublished,
         reportPublicSlug: party.reportPublicSlug,
+        reportPassword: party.reportPassword || null,
 
         // Related data
         socialPosts: party.socialPosts,
@@ -221,6 +222,9 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Accept optional password
+    const { password } = req.body || {};
+
     // Generate slug if not already set
     let slug = existingParty.reportPublicSlug;
     if (!slug) {
@@ -232,6 +236,7 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
       data: {
         reportPublished: true,
         reportPublicSlug: slug,
+        reportPassword: password || null,
       },
     });
 
@@ -239,6 +244,7 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
       success: true,
       reportPublicSlug: party.reportPublicSlug,
       publicUrl: `/report/${party.reportPublicSlug}`,
+      hasPassword: !!party.reportPassword,
     });
   } catch (error) {
     next(error);
@@ -269,10 +275,40 @@ router.delete('/:partyId/report/publish', requireAuth, async (req: AuthRequest, 
   }
 });
 
+// GET /api/reports/:publicSlug/check - Check if report requires password (public)
+router.get('/public/:publicSlug/check', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { publicSlug } = req.params;
+    const party = await prisma.party.findUnique({
+      where: { reportPublicSlug: publicSlug },
+      select: { reportPublished: true, reportPassword: true, name: true },
+    });
+
+    if (!party || !party.reportPublished) {
+      throw new AppError('Report not found', 404, 'NOT_FOUND');
+    }
+
+    res.json({ requiresPassword: !!party.reportPassword, name: party.name });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/reports/:publicSlug - View published report (public)
 router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
+    const password = req.query.password as string | undefined;
+
+    // Quick password check before loading full data
+    const check = await prisma.party.findUnique({
+      where: { reportPublicSlug: publicSlug },
+      select: { reportPassword: true, reportPublished: true },
+    });
+
+    if (check?.reportPassword && check.reportPassword !== password) {
+      throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
+    }
 
     const party = await prisma.party.findUnique({
       where: { reportPublicSlug: publicSlug },
