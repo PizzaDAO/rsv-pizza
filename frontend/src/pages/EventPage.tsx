@@ -99,6 +99,15 @@ export function EventPage() {
             setIsAuthenticated(true);
           }
 
+          // Fire-and-forget page view tracking
+          const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+          fetch(`${apiUrl}/api/events/${slug}/view`, {
+            method: 'POST',
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referrer: document.referrer || null }),
+          }).catch(() => {});
+
           // Load photo stats to see if photos are enabled and have content
           const stats = await getPhotoStats(foundEvent.id);
           if (stats) {

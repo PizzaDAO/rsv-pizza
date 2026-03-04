@@ -495,6 +495,13 @@ export interface ReportStats {
   roleBreakdown: Record<string, number>;
 }
 
+export interface PageViewStats {
+  totalViews: number;
+  uniqueViews: number;
+  dailyViews: { date: string; total: number; unique: number }[];
+  topReferrers: { referrer: string; count: number }[];
+}
+
 export interface EventReport {
   // Event details
   id: string;

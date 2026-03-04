@@ -1,16 +1,18 @@
 import React from 'react';
-import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X } from 'lucide-react';
-import { EventReport } from '../../types';
+import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick } from 'lucide-react';
+import { EventReport, PageViewStats } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 
 interface ReportPreviewProps {
   report: EventReport;
   onClose?: () => void;
+  pageViewStats?: PageViewStats | null;
 }
 
-export function ReportPreview({ report, onClose }: ReportPreviewProps) {
+export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewProps) {
   const hasKPIs = report.xPostViews || report.farcasterViews || report.lumaViews ||
-    report.poapMints || report.poapMoments || report.stats.totalRsvps > 0;
+    report.poapMints || report.poapMoments || report.stats.totalRsvps > 0 ||
+    (pageViewStats && pageViewStats.totalViews > 0);
 
   return (
     <div className="space-y-6">
@@ -120,6 +122,22 @@ export function ReportPreview({ report, onClose }: ReportPreviewProps) {
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
           <h2 className="text-lg font-semibold text-white mb-4">Key Metrics</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {pageViewStats && pageViewStats.totalViews > 0 && (
+              <KPICard
+                label="Page Views"
+                value={pageViewStats.totalViews}
+                icon={MousePointerClick}
+                color="text-[#ff393a]"
+              />
+            )}
+            {pageViewStats && pageViewStats.uniqueViews > 0 && (
+              <KPICard
+                label="Unique Visitors"
+                value={pageViewStats.uniqueViews}
+                icon={Eye}
+                color="text-[#ff393a]"
+              />
+            )}
             {report.xPostViews != null && (
               <KPICard
                 label="X Post Views"
@@ -221,7 +239,7 @@ export function ReportPreview({ report, onClose }: ReportPreviewProps) {
       {/* Role Breakdown */}
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} />
+          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
         </div>
       )}
 
