@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Users, Mail, Wallet, Award, Video, MousePointerClick } from 'lucide-react';
+import { Eye, Users, Mail, Wallet, Award, Video, MousePointerClick, FileText } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 
 interface ReportKPIsProps {
@@ -8,37 +8,11 @@ interface ReportKPIsProps {
   editable?: boolean;
   pageViewStats?: PageViewStats | null;
   socialPostViews?: number;
+  socialPostCount?: number;
 }
 
-export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews }: ReportKPIsProps) {
+export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount }: ReportKPIsProps) {
   const kpiItems = [
-    {
-      label: 'X Post Views',
-      field: 'xPostViews',
-      urlField: 'xPostUrl',
-      value: report.xPostViews,
-      url: report.xPostUrl,
-      icon: Eye,
-      color: 'text-blue-400',
-    },
-    {
-      label: 'Farcaster Views',
-      field: 'farcasterViews',
-      urlField: 'farcasterPostUrl',
-      value: report.farcasterViews,
-      url: report.farcasterPostUrl,
-      icon: Eye,
-      color: 'text-purple-400',
-    },
-    {
-      label: 'Luma Views',
-      field: 'lumaViews',
-      urlField: 'lumaUrl',
-      value: report.lumaViews,
-      url: report.lumaUrl,
-      icon: Eye,
-      color: 'text-pink-400',
-    },
     {
       label: 'POAP Mints',
       field: 'poapMints',
@@ -76,6 +50,12 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
       label: 'Social Post Views',
       value: socialPostViews,
       icon: Eye,
+      color: 'text-blue-400',
+    }] : []),
+    ...(socialPostCount ? [{
+      label: 'Social Posts',
+      value: socialPostCount,
+      icon: FileText,
       color: 'text-blue-400',
     }] : []),
     {

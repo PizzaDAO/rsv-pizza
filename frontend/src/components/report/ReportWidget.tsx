@@ -490,6 +490,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           editable={true}
           pageViewStats={viewStats}
           socialPostViews={report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0)}
+          socialPostCount={report.socialPosts.length}
         />
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick } from 'lucide-react';
+import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick, FileText } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
@@ -11,7 +11,9 @@ interface ReportPreviewProps {
 }
 
 export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewProps) {
-  const hasKPIs = report.xPostViews || report.farcasterViews || report.lumaViews ||
+  const socialPostViews = report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0);
+  const socialPostCount = report.socialPosts.length;
+  const hasKPIs = socialPostViews > 0 || socialPostCount > 0 ||
     report.poapMints || report.poapMoments || report.stats.totalRsvps > 0 ||
     (pageViewStats && pageViewStats.totalViews > 0);
 
@@ -139,31 +141,20 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
                 color="text-[#ff393a]"
               />
             )}
-            {report.xPostViews != null && (
+            {socialPostViews > 0 && (
               <KPICard
-                label="X Post Views"
-                value={report.xPostViews}
+                label="Social Post Views"
+                value={socialPostViews}
                 icon={Eye}
                 color="text-blue-400"
-                url={report.xPostUrl}
               />
             )}
-            {report.farcasterViews != null && (
+            {socialPostCount > 0 && (
               <KPICard
-                label="Farcaster Views"
-                value={report.farcasterViews}
-                icon={Eye}
-                color="text-purple-400"
-                url={report.farcasterPostUrl}
-              />
-            )}
-            {report.lumaViews != null && (
-              <KPICard
-                label="Luma Views"
-                value={report.lumaViews}
-                icon={Eye}
-                color="text-pink-400"
-                url={report.lumaUrl}
+                label="Social Posts"
+                value={socialPostCount}
+                icon={FileText}
+                color="text-blue-400"
               />
             )}
             {report.poapMints != null && (
