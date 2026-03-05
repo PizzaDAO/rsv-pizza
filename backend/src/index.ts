@@ -20,6 +20,7 @@ import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import v1Routes from './routes/v1/index.js';
@@ -99,6 +100,7 @@ app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);

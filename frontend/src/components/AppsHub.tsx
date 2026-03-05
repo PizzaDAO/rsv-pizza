@@ -170,14 +170,16 @@ const apps: AppItem[] = [
     tab: 'guests',
   },
 
-  // Coming Soon features
   {
     id: 'checklist',
     name: 'Checklist',
     description: 'Event planning checklist',
     icon: ListChecks,
-    status: 'coming-soon',
+    status: 'live',
+    tab: 'checklist',
   },
+
+  // Coming Soon features
   {
     id: 'print-nametags',
     name: 'Print / Nametags',

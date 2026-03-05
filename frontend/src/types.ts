@@ -828,6 +828,35 @@ export const KIT_TIERS: KitTierInfo[] = [
   },
 ];
 
+// Checklist Widget types
+export interface ChecklistItem {
+  id: string;
+  partyId: string;
+  name: string;
+  dueDate: string | null;
+  completed: boolean;
+  completedAt: string | null;
+  isAuto: boolean;
+  autoRule: string | null;
+  linkTab: string | null;
+  sortOrder: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutoCompleteStates {
+  party_kit_submitted: boolean;
+  venue_added: boolean;
+  budget_submitted: boolean;
+}
+
+export interface ChecklistData {
+  items: ChecklistItem[];
+  autoCompleteStates: AutoCompleteStates;
+  seeded: boolean;
+}
+
 // ============================================
 // Underboss Dashboard types
 // ============================================

@@ -7,6 +7,7 @@ import {
   Monitor,
   Ticket,
   Calculator,
+  ListChecks,
   Package,
   Megaphone,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'displays', name: 'Displays', tab: 'displays', icon: Monitor },
   { id: 'raffle', name: 'Raffle', tab: 'raffle', icon: Ticket },
   { id: 'budget', name: 'Budget', tab: 'budget', icon: Calculator },
+  { id: 'checklist', name: 'Checklist', tab: 'checklist', icon: ListChecks },
   { id: 'party-kit', name: 'Party Kit', tab: 'gpp', icon: Package },
   { id: 'marketing-promo', name: 'Promo', tab: 'promo', icon: Megaphone },
 ];

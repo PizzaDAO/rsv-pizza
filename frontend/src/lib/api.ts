@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1941,6 +1941,107 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
   } catch (error) {
     console.error('Error canceling kit request:', error);
     return false;
+  }
+}
+
+// ============================================
+// Checklist API functions
+// ============================================
+
+// Get checklist items + auto-complete states
+export async function getChecklist(partyId: string): Promise<ChecklistData | null> {
+  try {
+    return await apiRequest<ChecklistData>(`/api/parties/${partyId}/checklist`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching checklist:', error);
+    return null;
+  }
+}
+
+// Seed default GPP checklist items (idempotent)
+export async function seedChecklist(partyId: string): Promise<{ items: ChecklistItem[]; seeded: boolean } | null> {
+  try {
+    return await apiRequest<{ items: ChecklistItem[]; seeded: boolean }>(`/api/parties/${partyId}/checklist/seed`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error seeding checklist:', error);
+    return null;
+  }
+}
+
+// Create a custom checklist item
+export async function createChecklistItem(
+  partyId: string,
+  data: { name: string; dueDate?: string | null }
+): Promise<{ item: ChecklistItem } | null> {
+  try {
+    return await apiRequest<{ item: ChecklistItem }>(`/api/parties/${partyId}/checklist/items`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating checklist item:', error);
+    return null;
+  }
+}
+
+// Update a checklist item
+export async function updateChecklistItem(
+  partyId: string,
+  itemId: string,
+  data: { name?: string; dueDate?: string | null; sortOrder?: number }
+): Promise<{ item: ChecklistItem } | null> {
+  try {
+    return await apiRequest<{ item: ChecklistItem }>(
+      `/api/parties/${partyId}/checklist/items/${itemId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error updating checklist item:', error);
+    return null;
+  }
+}
+
+// Delete a custom checklist item
+export async function deleteChecklistItem(partyId: string, itemId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/checklist/items/${itemId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting checklist item:', error);
+    return false;
+  }
+}
+
+// Toggle manual completion of a checklist item
+export async function toggleChecklistItem(
+  partyId: string,
+  itemId: string
+): Promise<{ item: ChecklistItem } | null> {
+  try {
+    return await apiRequest<{ item: ChecklistItem }>(
+      `/api/parties/${partyId}/checklist/items/${itemId}/toggle`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling checklist item:', error);
+    return null;
   }
 }
 
