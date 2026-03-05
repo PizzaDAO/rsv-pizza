@@ -106,6 +106,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         reportVideoUrl: party.reportVideoUrl,
         reportPhotosUrl: party.reportPhotosUrl,
         flyerArtist: party.flyerArtist,
+        flyerArtistUrl: party.flyerArtistUrl,
 
         // KPIs
         xPostUrl: party.xPostUrl,
@@ -153,6 +154,7 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
       reportVideoUrl,
       reportPhotosUrl,
       flyerArtist,
+      flyerArtistUrl,
       xPostUrl,
       xPostViews,
       farcasterPostUrl,
@@ -185,6 +187,7 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
         ...(reportVideoUrl !== undefined && { reportVideoUrl }),
         ...(reportPhotosUrl !== undefined && { reportPhotosUrl }),
         ...(flyerArtist !== undefined && { flyerArtist }),
+        ...(flyerArtistUrl !== undefined && { flyerArtistUrl }),
         ...(xPostUrl !== undefined && { xPostUrl }),
         ...(xPostViews !== undefined && { xPostViews: toIntOrNull(xPostViews) }),
         ...(farcasterPostUrl !== undefined && { farcasterPostUrl }),
@@ -384,6 +387,7 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         reportVideoUrl: party.reportVideoUrl,
         reportPhotosUrl: party.reportPhotosUrl,
         flyerArtist: party.flyerArtist,
+        flyerArtistUrl: party.flyerArtistUrl,
 
         // KPIs
         xPostUrl: party.xPostUrl,

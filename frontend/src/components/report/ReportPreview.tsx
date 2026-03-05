@@ -90,11 +90,41 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
             )}
 
             {report.flyerArtist && (
-              <p className="text-white/40 text-xs mt-2">Flyer by {report.flyerArtist}</p>
+              <p className="text-white/40 text-xs mt-2">
+                Flyer by{' '}
+                {report.flyerArtistUrl ? (
+                  <a href={report.flyerArtistUrl} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white underline">
+                    {report.flyerArtist}
+                  </a>
+                ) : (
+                  report.flyerArtist
+                )}
+              </p>
             )}
 
-            {report.host && report.host.name && (
-              <p className="text-white/40 text-xs mt-1">Hosted by {report.host.name}</p>
+            {(report.host?.name || (report.coHosts && report.coHosts.length > 0)) && (
+              <p className="text-white/40 text-xs mt-1">
+                Hosted by{' '}
+                {[
+                  ...(report.host?.name ? [{ name: report.host.name }] : []),
+                  ...(report.coHosts || []).filter(c => c.showOnEvent !== false),
+                ].map((person, i, arr) => {
+                  const coHost = 'website' in person ? person as { name: string; website?: string; twitter?: string } : null;
+                  const link = coHost?.website || (coHost?.twitter ? `https://x.com/${coHost.twitter.replace(/^@/, '')}` : null);
+                  return (
+                    <span key={i}>
+                      {link ? (
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white underline">
+                          {person.name}
+                        </a>
+                      ) : (
+                        <span className="text-white/60">{person.name}</span>
+                      )}
+                      {i < arr.length - 1 ? ', ' : ''}
+                    </span>
+                  );
+                })}
+              </p>
             )}
           </div>
         </div>
@@ -108,36 +138,34 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
         </div>
       )}
 
-      {/* Media links */}
-      {(report.reportVideoUrl || report.reportPhotosUrl) && (
+      {/* Media */}
+      {(report.reportPhotosUrl || report.featuredPhotos.length > 0) && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-3">Media</h2>
-          <div className="flex flex-wrap gap-3">
-            {report.reportVideoUrl && (
-              <a
-                href={report.reportVideoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-sm"
-              >
-                <Video size={16} />
-                Party Video
-                <ExternalLink size={14} className="text-white/40" />
-              </a>
-            )}
-            {report.reportPhotosUrl && (
-              <a
-                href={report.reportPhotosUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-sm"
-              >
-                <Eye size={16} />
-                Raw Photos / Video
-                <ExternalLink size={14} className="text-white/40" />
-              </a>
-            )}
-          </div>
+          <h2 className="text-lg font-semibold text-white mb-4">Media</h2>
+          {report.featuredPhotos.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
+              {report.featuredPhotos.map((photo) => (
+                <img
+                  key={photo.id}
+                  src={photo.thumbnailUrl || photo.url}
+                  alt={photo.caption || 'Event photo'}
+                  className="w-full aspect-square object-cover rounded-lg"
+                />
+              ))}
+            </div>
+          )}
+          {report.reportPhotosUrl && (
+            <a
+              href={report.reportPhotosUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-sm"
+            >
+              <Eye size={16} />
+              Raw Photos / Video
+              <ExternalLink size={14} className="text-white/40" />
+            </a>
+          )}
         </div>
       )}
 
@@ -190,23 +218,6 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
           <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
-        </div>
-      )}
-
-      {/* Featured Photos */}
-      {report.featuredPhotos.length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-4">Event Photos</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {report.featuredPhotos.map((photo) => (
-              <img
-                key={photo.id}
-                src={photo.thumbnailUrl || photo.url}
-                alt={photo.caption || 'Event photo'}
-                className="w-full aspect-square object-cover rounded-lg"
-              />
-            ))}
-          </div>
         </div>
       )}
 

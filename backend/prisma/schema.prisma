@@ -118,6 +118,7 @@ model Party {
   reportVideoUrl     String?   @map("report_video_url")   // Link to party video
   reportPhotosUrl    String?   @map("report_photos_url")  // Link to raw photos/video
   flyerArtist        String?   @map("flyer_artist")       // Flyer artist credit
+  flyerArtistUrl     String?   @map("flyer_artist_url")   // Flyer artist link
 
   // KPI tracking
   xPostUrl           String?   @map("x_post_url")         // Main X/Twitter post

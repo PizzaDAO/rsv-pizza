@@ -53,6 +53,7 @@ function buildFallbackReport(party: any, guests: Guest[]): EventReport {
     reportVideoUrl: null,
     reportPhotosUrl: null,
     flyerArtist: null,
+    flyerArtistUrl: null,
     xPostUrl: null,
     xPostViews: null,
     farcasterPostUrl: null,
@@ -467,9 +468,9 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             <div>
               <input
                 type="url"
-                value={report.reportVideoUrl || ''}
-                onChange={(e) => handleChange('reportVideoUrl', e.target.value || null)}
-                placeholder="Party video URL"
+                value={report.flyerArtistUrl || ''}
+                onChange={(e) => handleChange('flyerArtistUrl', e.target.value || null)}
+                placeholder="Flyer artist link"
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
               />
             </div>

@@ -526,6 +526,7 @@ export interface EventReport {
   reportVideoUrl: string | null;
   reportPhotosUrl: string | null;
   flyerArtist: string | null;
+  flyerArtistUrl: string | null;
 
   // KPIs
   xPostUrl: string | null;
