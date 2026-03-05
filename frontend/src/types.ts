@@ -485,6 +485,7 @@ export interface NotableAttendee {
   partyId: string;
   name: string;
   link: string | null;
+  guestId: string | null;
   sortOrder: number;
   createdAt: string;
 }

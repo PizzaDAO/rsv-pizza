@@ -620,7 +620,7 @@ router.get('/:partyId/report/notable-attendees', requireAuth, async (req: AuthRe
 router.post('/:partyId/report/notable-attendees', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { name, link } = req.body;
+    const { name, link, guestId } = req.body;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -630,6 +630,16 @@ router.post('/:partyId/report/notable-attendees', requireAuth, async (req: AuthR
 
     if (!name) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // If guestId provided, check for duplicates
+    if (guestId) {
+      const existing = await prisma.notableAttendee.findFirst({
+        where: { partyId, guestId },
+      });
+      if (existing) {
+        return res.status(200).json({ notableAttendee: existing });
+      }
     }
 
     // Get max sort order
@@ -643,6 +653,7 @@ router.post('/:partyId/report/notable-attendees', requireAuth, async (req: AuthR
         partyId,
         name,
         link: link || null,
+        guestId: guestId || null,
         sortOrder: (maxOrder._max.sortOrder || 0) + 1,
       },
     });
@@ -678,6 +689,62 @@ router.delete('/:partyId/report/notable-attendees/:id', requireAuth, async (req:
     });
 
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/parties/:partyId/report/notable-attendees/by-guest/:guestId - Remove notable attendee by guest ID
+router.delete('/:partyId/report/notable-attendees/by-guest/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, guestId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Find the notable attendee by guest ID
+    const notableAttendee = await prisma.notableAttendee.findFirst({
+      where: { partyId, guestId },
+    });
+
+    if (!notableAttendee) {
+      throw new AppError('Notable attendee not found for this guest', 404, 'NOT_FOUND');
+    }
+
+    await prisma.notableAttendee.delete({
+      where: { id: notableAttendee.id },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:partyId/report/notable-attendees/guest-ids - Get notable guest IDs
+router.get('/:partyId/report/notable-attendees/guest-ids', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    const notableAttendees = await prisma.notableAttendee.findMany({
+      where: { partyId, guestId: { not: null } },
+      select: { guestId: true },
+    });
+
+    const guestIds = notableAttendees
+      .map(a => a.guestId)
+      .filter((id): id is string => id !== null);
+
+    res.json({ guestIds });
   } catch (error) {
     next(error);
   }
