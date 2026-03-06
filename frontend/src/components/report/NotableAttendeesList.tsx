@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Loader2, Users, Building2 } from 'lucide-react';
 import { NotableAttendee, Guest } from '../../types';
 import { BrowseGuestsModal } from './BrowseGuestsModal';
@@ -76,11 +76,13 @@ function DomainLogo({ domain, size = 20 }: { domain: string; size?: number }) {
 
 function OrgCard({
   group,
+  totalRsvps,
   editable,
   deletingId,
   onDelete,
 }: {
   group: OrgGroup;
+  totalRsvps: number;
   editable: boolean;
   deletingId: string | null;
   onDelete: (id: string) => void;
@@ -100,8 +102,8 @@ function OrgCard({
           >
             {domain}
           </a>
-          {attendees.length > 1 && (
-            <span className="text-xs text-white/40">({attendees.length})</span>
+          {totalRsvps > 1 && (
+            <span className="text-xs text-white/40">({totalRsvps})</span>
           )}
         </>
       ) : (
@@ -112,13 +114,13 @@ function OrgCard({
           ))}
         </>
       )}
-      {editable && attendees.length === 1 && (
+      {editable && (
         <button
-          onClick={() => onDelete(attendees[0].id)}
-          disabled={deletingId === attendees[0].id}
+          onClick={() => attendees.forEach(a => onDelete(a.id))}
+          disabled={attendees.some(a => deletingId === a.id)}
           className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
         >
-          {deletingId === attendees[0].id ? (
+          {attendees.some(a => deletingId === a.id) ? (
             <Loader2 size={12} className="animate-spin" />
           ) : (
             <Trash2 size={12} />
@@ -138,6 +140,16 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
   const [showBrowseModal, setShowBrowseModal] = useState(false);
 
   const orgGroups = groupByOrg(attendees);
+
+  // Count total RSVPs per domain from the full guest list
+  const domainRsvpCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const g of guests) {
+      const domain = g.email ? extractEmailDomain(g.email, true) : null;
+      if (domain) counts.set(domain, (counts.get(domain) || 0) + 1);
+    }
+    return counts;
+  }, [guests]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -181,6 +193,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
             <OrgCard
               key={group.domain || '_independent'}
               group={group}
+              totalRsvps={group.domain ? (domainRsvpCounts.get(group.domain) || group.attendees.length) : group.attendees.length}
               editable={false}
               deletingId={null}
               onDelete={() => {}}
@@ -277,6 +290,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
             <OrgCard
               key={group.domain || '_independent'}
               group={group}
+              totalRsvps={group.domain ? (domainRsvpCounts.get(group.domain) || group.attendees.length) : group.attendees.length}
               editable={true}
               deletingId={deletingId}
               onDelete={handleDelete}
