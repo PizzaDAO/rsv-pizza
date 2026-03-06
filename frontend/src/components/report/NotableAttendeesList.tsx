@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ExternalLink, Loader2, Users, Building2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Users, Building2 } from 'lucide-react';
 import { NotableAttendee, Guest } from '../../types';
 import { BrowseGuestsModal } from './BrowseGuestsModal';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
@@ -36,7 +36,7 @@ function groupByOrg(attendees: NotableAttendee[]): OrgGroup[] {
 
   // Sort orgs by member count descending
   const groups: OrgGroup[] = [...map.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
     .map(([domain, members]) => ({ domain, attendees: members }));
 
   if (independent.length > 0) {
@@ -88,65 +88,43 @@ function OrgCard({
   const { domain, attendees } = group;
 
   return (
-    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-2">
-      {/* Org header */}
-      <div className="flex items-center gap-2">
-        {domain ? (
-          <>
-            <DomainLogo domain={domain} size={20} />
-            <a
-              href={`https://${domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-            >
-              {domain}
-            </a>
-          </>
-        ) : (
-          <>
-            <Building2 size={16} className="text-white/40" />
-            <span className="text-sm font-medium text-white/50">Independent</span>
-          </>
-        )}
-      </div>
-
-      {/* Members */}
-      <div className="flex flex-wrap gap-1.5">
-        {attendees.map((attendee) => (
-          <div
-            key={attendee.id}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-lg group"
+    <div className="inline-flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10 group">
+      {domain ? (
+        <>
+          <DomainLogo domain={domain} size={16} />
+          <a
+            href={`https://${domain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-white/70 hover:text-white transition-colors"
           >
-            {attendee.link ? (
-              <a
-                href={attendee.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white hover:text-[#ff393a] transition-colors flex items-center gap-1"
-              >
-                {attendee.name}
-                <ExternalLink size={11} className="text-white/30" />
-              </a>
-            ) : (
-              <span className="text-sm text-white">{attendee.name}</span>
-            )}
-            {editable && (
-              <button
-                onClick={() => onDelete(attendee.id)}
-                disabled={deletingId === attendee.id}
-                className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
-              >
-                {deletingId === attendee.id ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Trash2 size={12} />
-                )}
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+            {domain}
+          </a>
+          {attendees.length > 1 && (
+            <span className="text-xs text-white/40">({attendees.length})</span>
+          )}
+        </>
+      ) : (
+        <>
+          <Building2 size={14} className="text-white/40" />
+          {attendees.map((a) => (
+            <span key={a.id} className="text-sm text-white/70">{a.name}</span>
+          ))}
+        </>
+      )}
+      {editable && attendees.length === 1 && (
+        <button
+          onClick={() => onDelete(attendees[0].id)}
+          disabled={deletingId === attendees[0].id}
+          className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
+        >
+          {deletingId === attendees[0].id ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Trash2 size={12} />
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -198,7 +176,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-white">Industry RSVPs</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex flex-wrap gap-2">
           {orgGroups.map((group) => (
             <OrgCard
               key={group.domain || '_independent'}
@@ -294,7 +272,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
 
       {/* Org-grouped attendee cards */}
       {attendees.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex flex-wrap gap-2">
           {orgGroups.map((group) => (
             <OrgCard
               key={group.domain || '_independent'}

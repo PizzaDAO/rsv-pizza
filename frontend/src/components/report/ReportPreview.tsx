@@ -206,7 +206,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {report.notableAttendees.length > 0 && (
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
           <h2 className="text-lg font-semibold text-white mb-3">Industry RSVPs</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-wrap gap-2">
             {groupAttendeesByOrg(report.notableAttendees).map((group) => (
               <ReportOrgCard key={group.domain || '_independent'} group={group} />
             ))}
@@ -302,7 +302,7 @@ function groupAttendeesByOrg(attendees: NotableAttendee[]) {
   }
 
   const groups = [...map.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
     .map(([domain, members]) => ({ domain, attendees: members }));
 
   if (independent.length > 0) {
@@ -342,46 +342,30 @@ function ReportOrgCard({ group }: { group: { domain: string | null; attendees: N
   const { domain, attendees } = group;
 
   return (
-    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-2">
-      <div className="flex items-center gap-2">
-        {domain ? (
-          <>
-            <ReportOrgFavicon domain={domain} size={20} />
-            <a
-              href={`https://${domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-            >
-              {domain}
-            </a>
-          </>
-        ) : (
-          <>
-            <Building2 size={16} className="text-white/40" />
-            <span className="text-sm font-medium text-white/50">Independent</span>
-          </>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {attendees.map((attendee) => (
-          <span key={attendee.id} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/5 rounded-lg">
-            {attendee.link ? (
-              <a
-                href={attendee.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white hover:text-[#ff393a] transition-colors flex items-center gap-1"
-              >
-                {attendee.name}
-                <ExternalLink size={11} className="text-white/30" />
-              </a>
-            ) : (
-              <span className="text-sm text-white">{attendee.name}</span>
-            )}
-          </span>
-        ))}
-      </div>
+    <div className="inline-flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
+      {domain ? (
+        <>
+          <ReportOrgFavicon domain={domain} size={16} />
+          <a
+            href={`https://${domain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
+            {domain}
+          </a>
+          {attendees.length > 1 && (
+            <span className="text-xs text-white/40">({attendees.length})</span>
+          )}
+        </>
+      ) : (
+        <>
+          <Building2 size={14} className="text-white/40" />
+          {attendees.map((a) => (
+            <span key={a.id} className="text-sm text-white/70">{a.name}</span>
+          ))}
+        </>
+      )}
     </div>
   );
 }
