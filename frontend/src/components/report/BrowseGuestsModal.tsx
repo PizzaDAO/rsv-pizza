@@ -116,7 +116,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -192,7 +192,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
                         ? 'text-yellow-400 hover:bg-yellow-400/10'
                         : 'text-white/20 hover:text-yellow-400 hover:bg-yellow-400/10'
                     }`}
-                    title={isNotable ? 'Remove from notable attendees' : 'Mark as notable attendee'}
+                    title={isNotable ? 'Remove from industry RSVPs' : 'Mark as industry RSVP'}
                   >
                     {isToggling ? (
                       <Loader2 size={18} className="animate-spin" />

@@ -399,7 +399,7 @@ export const TableRow: React.FC<TableRowProps> = ({
               ? 'text-yellow-400 hover:bg-yellow-400/10'
               : 'text-white/0 group-hover:text-white/30 hover:!text-yellow-400 hover:!bg-yellow-400/10'
           }`}
-          title={isNotable ? 'Remove from notable attendees' : 'Mark as notable attendee'}
+          title={isNotable ? 'Remove from industry RSVPs' : 'Mark as industry RSVP'}
         >
           {isTogglingNotable ? (
             <Loader2 size={14} className="animate-spin" />

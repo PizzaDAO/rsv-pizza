@@ -517,7 +517,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         </div>
       )}
 
-      {/* Notable Attendees */}
+      {/* Industry RSVPs */}
       <div className="card p-6">
         <NotableAttendeesList
           attendees={report.notableAttendees}
