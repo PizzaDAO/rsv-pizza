@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, ExternalLink, Loader2, Star, Users } from 'lucide-react';
 import { NotableAttendee, Guest } from '../../types';
 import { BrowseGuestsModal } from './BrowseGuestsModal';
+import { extractEmailDomain } from '../../utils/emailUtils';
 
 interface NotableAttendeesListProps {
   attendees: NotableAttendee[];
@@ -59,23 +60,37 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-white">Notable Attendees</h3>
         <div className="flex flex-wrap gap-2">
-          {attendees.map((attendee) => (
-            <div key={attendee.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
-              <Star size={14} className="text-yellow-400" />
-              {attendee.link ? (
-                <a
-                  href={attendee.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-white hover:text-[#ff393a] transition-colors"
-                >
-                  {attendee.name}
-                </a>
-              ) : (
-                <span className="text-sm text-white">{attendee.name}</span>
-              )}
-            </div>
-          ))}
+          {attendees.map((attendee) => {
+            const domain = attendee.email ? extractEmailDomain(attendee.email) : null;
+            return (
+              <div key={attendee.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
+                <Star size={14} className="text-yellow-400" />
+                {attendee.link ? (
+                  <a
+                    href={attendee.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white hover:text-[#ff393a] transition-colors"
+                  >
+                    {attendee.name}
+                  </a>
+                ) : (
+                  <span className="text-sm text-white">{attendee.name}</span>
+                )}
+                {domain && (
+                  <a
+                    href={`https://${domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-white/40 hover:text-white/70 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {domain}
+                  </a>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -163,38 +178,52 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
       {/* List of attendees */}
       {attendees.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {attendees.map((attendee) => (
-            <div
-              key={attendee.id}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 group"
-            >
-              <Star size={14} className="text-yellow-400" />
-              {attendee.link ? (
-                <a
-                  href={attendee.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-white hover:text-[#ff393a] transition-colors flex items-center gap-1"
-                >
-                  {attendee.name}
-                  <ExternalLink size={12} className="text-white/40" />
-                </a>
-              ) : (
-                <span className="text-sm text-white">{attendee.name}</span>
-              )}
-              <button
-                onClick={() => handleDelete(attendee.id)}
-                disabled={deletingId === attendee.id}
-                className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
+          {attendees.map((attendee) => {
+            const domain = attendee.email ? extractEmailDomain(attendee.email) : null;
+            return (
+              <div
+                key={attendee.id}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 group"
               >
-                {deletingId === attendee.id ? (
-                  <Loader2 size={14} className="animate-spin" />
+                <Star size={14} className="text-yellow-400" />
+                {attendee.link ? (
+                  <a
+                    href={attendee.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white hover:text-[#ff393a] transition-colors flex items-center gap-1"
+                  >
+                    {attendee.name}
+                    <ExternalLink size={12} className="text-white/40" />
+                  </a>
                 ) : (
-                  <Trash2 size={14} />
+                  <span className="text-sm text-white">{attendee.name}</span>
                 )}
-              </button>
-            </div>
-          ))}
+                {domain && (
+                  <a
+                    href={`https://${domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-white/40 hover:text-white/70 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {domain}
+                  </a>
+                )}
+                <button
+                  onClick={() => handleDelete(attendee.id)}
+                  disabled={deletingId === attendee.id}
+                  className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
+                >
+                  {deletingId === attendee.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : (
         !isAdding && (

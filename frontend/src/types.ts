@@ -486,6 +486,7 @@ export interface NotableAttendee {
   name: string;
   link: string | null;
   guestId: string | null;
+  email: string | null;
   sortOrder: number;
   createdAt: string;
 }

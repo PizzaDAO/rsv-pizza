@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, Star, Search, Loader2 } from 'lucide-react';
 import { Guest } from '../../types';
 import { IconInput } from '../IconInput';
+import { ClickableEmail } from '../ClickableEmail';
 import { addNotableAttendee, deleteNotableAttendeeByGuestId, getNotableGuestIds } from '../../lib/api';
 
 interface BrowseGuestsModalProps {
@@ -176,7 +177,9 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
                   <div className="flex-1 min-w-0">
                     <span className="font-semibold text-white text-sm">{guest.name}</span>
                     {guest.email && (
-                      <span className="text-white/40 text-xs ml-2 truncate">{guest.email}</span>
+                      <span className="text-white/40 text-xs ml-2">
+                        <ClickableEmail email={guest.email} className="text-white/40 text-xs" />
+                      </span>
                     )}
                   </div>
 

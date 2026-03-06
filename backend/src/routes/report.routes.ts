@@ -41,7 +41,10 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
       where: { id: partyId },
       include: {
         socialPosts: { orderBy: { sortOrder: 'asc' } },
-        notableAttendees: { orderBy: { sortOrder: 'asc' } },
+        notableAttendees: {
+          orderBy: { sortOrder: 'asc' },
+          include: { guest: { select: { email: true } } },
+        },
         guests: {
           select: {
             id: true,
@@ -127,7 +130,11 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
 
         // Related data
         socialPosts: party.socialPosts,
-        notableAttendees: party.notableAttendees,
+        notableAttendees: party.notableAttendees.map(a => ({
+          ...a,
+          email: (a as any).guest?.email || null,
+          guest: undefined,
+        })),
         featuredPhotos: party.photos,
 
         // Wallet address list for CSV export
@@ -325,7 +332,10 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
       where: { reportPublicSlug: publicSlug },
       include: {
         socialPosts: { orderBy: { sortOrder: 'asc' } },
-        notableAttendees: { orderBy: { sortOrder: 'asc' } },
+        notableAttendees: {
+          orderBy: { sortOrder: 'asc' },
+          include: { guest: { select: { email: true } } },
+        },
         guests: {
           select: {
             id: true,
@@ -410,7 +420,11 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
 
         // Related data
         socialPosts: party.socialPosts,
-        notableAttendees: party.notableAttendees,
+        notableAttendees: party.notableAttendees.map(a => ({
+          ...a,
+          email: (a as any).guest?.email || null,
+          guest: undefined,
+        })),
         featuredPhotos: party.photos,
 
         // Wallet address list for CSV export

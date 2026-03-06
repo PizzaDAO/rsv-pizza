@@ -3,6 +3,7 @@ import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink,
 import { EventReport, PageViewStats } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
+import { extractEmailDomain } from '../../utils/emailUtils';
 
 interface ReportPreviewProps {
   report: EventReport;
@@ -211,23 +212,36 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
           <h2 className="text-lg font-semibold text-white mb-3">Notable Attendees</h2>
           <div className="flex flex-wrap gap-2">
-            {report.notableAttendees.map((attendee) => (
-              <div key={attendee.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
-                <Star size={14} className="text-yellow-400" />
-                {attendee.link ? (
-                  <a
-                    href={attendee.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-white hover:text-[#ff393a] transition-colors"
-                  >
-                    {attendee.name}
-                  </a>
-                ) : (
-                  <span className="text-sm text-white">{attendee.name}</span>
-                )}
-              </div>
-            ))}
+            {report.notableAttendees.map((attendee) => {
+              const domain = attendee.email ? extractEmailDomain(attendee.email) : null;
+              return (
+                <div key={attendee.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+                  <Star size={14} className="text-yellow-400" />
+                  {attendee.link ? (
+                    <a
+                      href={attendee.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-white hover:text-[#ff393a] transition-colors"
+                    >
+                      {attendee.name}
+                    </a>
+                  ) : (
+                    <span className="text-sm text-white">{attendee.name}</span>
+                  )}
+                  {domain && (
+                    <a
+                      href={`https://${domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-white/40 hover:text-white/70 hover:underline"
+                    >
+                      {domain}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
