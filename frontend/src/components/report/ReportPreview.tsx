@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick, FileText } from 'lucide-react';
+import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, Star, X, MousePointerClick, FileText, Download } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
@@ -185,6 +185,24 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
               />
             ))}
           </div>
+          {report.walletAddressList && report.walletAddressList.length > 0 && (
+            <button
+              onClick={() => {
+                const csv = 'wallet_address\n' + report.walletAddressList!.join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${report.name.replace(/[^a-zA-Z0-9]/g, '_')}_wallet_addresses.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-sm"
+            >
+              <Download size={16} />
+              Export Wallet Addresses ({report.walletAddressList.length})
+            </button>
+          )}
         </div>
       )}
 

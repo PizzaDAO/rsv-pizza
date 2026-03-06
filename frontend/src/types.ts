@@ -550,6 +550,9 @@ export interface EventReport {
   notableAttendees: NotableAttendee[];
   featuredPhotos: Photo[];
 
+  // Wallet addresses for CSV export
+  walletAddressList?: string[];
+
   // Calculated stats
   stats: ReportStats;
 }

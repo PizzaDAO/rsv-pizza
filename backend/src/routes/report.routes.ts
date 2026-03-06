@@ -130,6 +130,11 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         notableAttendees: party.notableAttendees,
         featuredPhotos: party.photos,
 
+        // Wallet address list for CSV export
+        walletAddressList: party.guests
+          .filter(g => g.ethereumAddress)
+          .map(g => g.ethereumAddress as string),
+
         // Calculated stats
         stats: {
           totalRsvps,
@@ -407,6 +412,11 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         socialPosts: party.socialPosts,
         notableAttendees: party.notableAttendees,
         featuredPhotos: party.photos,
+
+        // Wallet address list for CSV export
+        walletAddressList: party.guests
+          .filter(g => g.ethereumAddress)
+          .map(g => g.ethereumAddress as string),
 
         // Calculated stats (some fields hidden for privacy)
         stats: {
