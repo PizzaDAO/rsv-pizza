@@ -217,6 +217,89 @@ export async function uploadEventPhoto(
 }
 
 /**
+ * Upload a venue photo to Supabase Storage
+ * @param file The image file to upload
+ * @param partyId The party ID
+ * @param venueId The venue ID
+ * @returns Object with URL and metadata, or null if upload failed
+ */
+export async function uploadVenuePhoto(
+  file: File,
+  partyId: string,
+  venueId: string
+): Promise<{
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+} | null> {
+  try {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      console.error('Invalid file type:', file.type);
+      return null;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      console.error('File too large:', file.size);
+      return null;
+    }
+
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const fileName = `venues/${partyId}/${venueId}/${timestamp}-${random}.${fileExt}`;
+
+    // Get image dimensions
+    let width: number | undefined;
+    let height: number | undefined;
+
+    try {
+      const dimensions = await getImageDimensions(file);
+      width = dimensions.width;
+      height = dimensions.height;
+    } catch (e) {
+      console.warn('Could not get image dimensions:', e);
+    }
+
+    // Upload to Supabase Storage (reuse event-photos bucket)
+    const { error } = await supabase.storage
+      .from('event-photos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading venue photo:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-photos')
+      .getPublicUrl(fileName);
+
+    return {
+      url: urlData.publicUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      width,
+      height,
+    };
+  } catch (error) {
+    console.error('Error uploading venue photo:', error);
+    return null;
+  }
+}
+
+/**
  * Get image dimensions from a File object
  */
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -290,6 +373,10 @@ export interface DbParty {
   donation_recipient?: string | null;
   donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
+  venue_report_published?: boolean;
+  venue_report_slug?: string | null;
+  venue_report_title?: string | null;
+  venue_report_notes?: string | null;
   pinned_apps?: string[];
   region?: string | null;
 }
@@ -339,6 +426,7 @@ const SAFE_PARTY_COLUMNS = `
   flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
   luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
   report_published, report_public_slug,
+  venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
   region
 `;
@@ -1102,6 +1190,8 @@ export async function updateParty(
     nft_chain?: string | null;
     music_enabled?: boolean;
     music_notes?: string | null;
+    venue_report_title?: string | null;
+    venue_report_notes?: string | null;
     pinned_apps?: string[];
     region?: string | null;
   }
@@ -1152,6 +1242,8 @@ export async function updateParty(
         nftChain: updates.nft_chain,
         musicEnabled: updates.music_enabled,
         musicNotes: updates.music_notes,
+        venueReportTitle: updates.venue_report_title,
+        venueReportNotes: updates.venue_report_notes,
         pinnedApps: updates.pinned_apps,
         region: updates.region,
       });

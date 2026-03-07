@@ -128,6 +128,24 @@ export interface PizzaSettings {
 // Venue status tracking
 export type VenueStatus = 'researching' | 'contacted' | 'negotiating' | 'confirmed' | 'deposit_paid' | 'paid_in_full' | 'declined';
 
+// Venue photo model
+export type VenuePhotoCategory = 'interior' | 'exterior' | 'capacity' | 'amenities' | 'other';
+
+export interface VenuePhoto {
+  id: string;
+  venueId: string;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  caption: string | null;
+  category: VenuePhotoCategory | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
 // Venue model (for venue picker)
 export interface Venue {
   id: string;
@@ -144,9 +162,30 @@ export interface Venue {
   contactPhone: string | null;
   status: VenueStatus;
   isSelected: boolean;
+  pros: string | null;
+  cons: string | null;
   notes: string | null;
+  photos?: VenuePhoto[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Venue Report types
+export interface VenueReport {
+  partyId: string;
+  partyName: string;
+  date?: string | null;
+  timezone?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  eventImageUrl?: string | null;
+  title: string | null;
+  notes: string | null;
+  published?: boolean;
+  slug?: string | null;
+  hasPassword?: boolean;
+  password?: string | null;
+  venues: Venue[];
 }
 
 // Legacy VenueInfo interface (for backwards compatibility with Party fields)

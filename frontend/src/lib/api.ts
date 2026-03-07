@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -132,6 +132,8 @@ export interface UpdatePartyData {
   fundraisingGoal?: number | null;
   musicEnabled?: boolean;
   musicNotes?: string | null;
+  venueReportTitle?: string | null;
+  venueReportNotes?: string | null;
   pinnedApps?: string[];
   region?: string | null;
 }
@@ -212,6 +214,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       fundraisingGoal: data.fundraisingGoal,
       musicEnabled: data.musicEnabled,
       musicNotes: data.musicNotes,
+      venueReportTitle: data.venueReportTitle,
+      venueReportNotes: data.venueReportNotes,
       pinnedApps: data.pinnedApps,
       region: data.region,
     },
@@ -918,6 +922,8 @@ export interface VenueCreateData {
   contactPhone?: string;
   status?: VenueStatus;
   notes?: string;
+  pros?: string;
+  cons?: string;
 }
 
 export interface VenueUpdateData extends Partial<VenueCreateData> {}
@@ -2150,4 +2156,216 @@ export async function fetchUnderbossDashboard(
   region: GPPRegion
 ): Promise<UnderbossDashboardData> {
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
+}
+
+// ============================================
+// Venue Photo API functions
+// ============================================
+
+// Create venue photo record
+export async function createVenuePhoto(
+  partyId: string,
+  venueId: string,
+  data: {
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    width?: number;
+    height?: number;
+    caption?: string;
+    category?: VenuePhotoCategory;
+  }
+): Promise<VenuePhoto | null> {
+  try {
+    const response = await apiRequest<{ photo: VenuePhoto }>(
+      `/api/parties/${partyId}/venues/${venueId}/photos`,
+      {
+        method: 'POST',
+        body: data,
+        requireAuth: true,
+      }
+    );
+    return response.photo;
+  } catch (error) {
+    console.error('Error creating venue photo:', error);
+    throw error;
+  }
+}
+
+// List venue photos
+export async function getVenuePhotos(
+  partyId: string,
+  venueId: string
+): Promise<VenuePhoto[]> {
+  try {
+    const response = await apiRequest<{ photos: VenuePhoto[] }>(
+      `/api/parties/${partyId}/venues/${venueId}/photos`,
+      {
+        method: 'GET',
+        requireAuth: true,
+      }
+    );
+    return response.photos;
+  } catch (error) {
+    console.error('Error fetching venue photos:', error);
+    return [];
+  }
+}
+
+// Update venue photo
+export async function updateVenuePhoto(
+  partyId: string,
+  venueId: string,
+  photoId: string,
+  data: { caption?: string; category?: VenuePhotoCategory; sortOrder?: number }
+): Promise<VenuePhoto | null> {
+  try {
+    const response = await apiRequest<{ photo: VenuePhoto }>(
+      `/api/parties/${partyId}/venues/${venueId}/photos/${photoId}`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+    return response.photo;
+  } catch (error) {
+    console.error('Error updating venue photo:', error);
+    throw error;
+  }
+}
+
+// Delete venue photo
+export async function deleteVenuePhoto(
+  partyId: string,
+  venueId: string,
+  photoId: string
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/venues/${venueId}/photos/${photoId}`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error deleting venue photo:', error);
+    return false;
+  }
+}
+
+// ============================================
+// Venue Report API functions
+// ============================================
+
+// Get venue report data (host only)
+export async function getVenueReport(partyId: string): Promise<VenueReport | null> {
+  try {
+    const response = await apiRequest<{ venueReport: VenueReport }>(
+      `/api/parties/${partyId}/venue-report`,
+      {
+        method: 'GET',
+        requireAuth: true,
+      }
+    );
+    return response.venueReport;
+  } catch (error) {
+    console.error('Error fetching venue report:', error);
+    return null;
+  }
+}
+
+// Update venue report title/notes
+export async function updateVenueReport(
+  partyId: string,
+  data: { title?: string | null; notes?: string | null }
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/venue-report`,
+      {
+        method: 'PATCH',
+        body: data,
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error updating venue report:', error);
+    return false;
+  }
+}
+
+// Publish venue report
+export async function publishVenueReport(
+  partyId: string,
+  password?: string
+): Promise<{ venueReportSlug: string; publicUrl: string } | null> {
+  try {
+    return await apiRequest<{ success: boolean; venueReportSlug: string; publicUrl: string }>(
+      `/api/parties/${partyId}/venue-report/publish`,
+      {
+        method: 'POST',
+        body: password ? { password } : undefined,
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error publishing venue report:', error);
+    return null;
+  }
+}
+
+// Unpublish venue report
+export async function unpublishVenueReport(partyId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/parties/${partyId}/venue-report/publish`,
+      {
+        method: 'DELETE',
+        requireAuth: true,
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error unpublishing venue report:', error);
+    return false;
+  }
+}
+
+// Check if published venue report requires password (public)
+export async function checkVenueReportPassword(
+  slug: string
+): Promise<{ requiresPassword: boolean; name: string; title: string | null } | null> {
+  try {
+    return await apiRequest<{ requiresPassword: boolean; name: string; title: string | null }>(
+      `/api/reports/public/${slug}/venue/check`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch {
+    return null;
+  }
+}
+
+// Fetch published venue report (public, with optional password)
+export async function fetchPublicVenueReport(
+  slug: string,
+  password?: string
+): Promise<{ venueReport: VenueReport } | null> {
+  try {
+    const params = password ? `?password=${encodeURIComponent(password)}` : '';
+    return await apiRequest<{ venueReport: VenueReport }>(
+      `/api/reports/public/${slug}/venue${params}`,
+      {
+        method: 'GET',
+        requireAuth: false,
+      }
+    );
+  } catch (error) {
+    console.error('Error fetching public venue report:', error);
+    return null;
+  }
 }

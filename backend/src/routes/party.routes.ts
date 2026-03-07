@@ -259,7 +259,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       musicEnabled, musicNotes, photoModeration,
       nftEnabled, nftChain,
       pinnedApps,
-      region
+      region,
+      venueReportTitle, venueReportNotes
     } = req.body;
 
     // Verify ownership or super admin
@@ -317,6 +318,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(nftChain !== undefined && { nftChain: nftChain || null }),
         ...(pinnedApps !== undefined && { pinnedApps }),
         ...(region !== undefined && { region: region || null }),
+        ...(venueReportTitle !== undefined && { venueReportTitle: venueReportTitle || null }),
+        ...(venueReportNotes !== undefined && { venueReportNotes: venueReportNotes || null }),
       },
       include: {
         user: { select: { name: true } },
