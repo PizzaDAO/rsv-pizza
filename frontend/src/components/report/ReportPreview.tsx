@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, X, MousePointerClick, FileText, Download, Building2 } from 'lucide-react';
-import { EventReport, PageViewStats, NotableAttendee } from '../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, X, MousePointerClick, FileText, Download, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { EventReport, PageViewStats, NotableAttendee, Photo } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
@@ -12,6 +12,7 @@ interface ReportPreviewProps {
 }
 
 export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewProps) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const config = report.reportStatsConfig || {};
   const socialPostViews = report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0);
   const socialPostCount = report.socialPosts.length;
@@ -156,13 +157,18 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
           <h2 className="text-lg font-semibold text-white mb-4">Media</h2>
           {report.featuredPhotos.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
-              {report.featuredPhotos.map((photo) => (
-                <img
+              {report.featuredPhotos.map((photo, i) => (
+                <button
                   key={photo.id}
-                  src={photo.thumbnailUrl || photo.url}
-                  alt={photo.caption || 'Event photo'}
-                  className="w-full aspect-square object-cover rounded-lg"
-                />
+                  onClick={() => setLightboxIndex(i)}
+                  className="w-full aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={photo.thumbnailUrl || photo.url}
+                    alt={photo.caption || 'Event photo'}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -179,6 +185,16 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
             </a>
           )}
         </div>
+      )}
+
+      {/* Photo Lightbox */}
+      {lightboxIndex !== null && report.featuredPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={report.featuredPhotos}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
       )}
 
       {/* Stats */}
@@ -335,6 +351,93 @@ function ReportOrgFavicon({ domain, size = 20 }: { domain: string; size?: number
       className="rounded flex-shrink-0"
       onError={() => setFailed(true)}
     />
+  );
+}
+
+function PhotoLightbox({
+  photos,
+  index,
+  onClose,
+  onNavigate,
+}: {
+  photos: Photo[];
+  index: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[index];
+  const hasPrev = index > 0;
+  const hasNext = index < photos.length - 1;
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+    else if (e.key === 'ArrowLeft' && hasPrev) onNavigate(index - 1);
+    else if (e.key === 'ArrowRight' && hasNext) onNavigate(index + 1);
+  }, [index, hasPrev, hasNext, onClose, onNavigate]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 text-white/60 hover:text-white transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {/* Counter */}
+      {photos.length > 1 && (
+        <div className="absolute top-4 left-4 text-sm text-white/50 z-10">
+          {index + 1} / {photos.length}
+        </div>
+      )}
+
+      {/* Prev */}
+      {hasPrev && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(index - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/40 hover:text-white transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {/* Image */}
+      <img
+        src={photo.url}
+        alt={photo.caption || 'Event photo'}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+        onClick={(e) => e.stopPropagation()}
+      />
+
+      {/* Caption */}
+      {photo.caption && (
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/70 rounded-lg text-sm text-white/80 max-w-lg text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {photo.caption}
+        </div>
+      )}
+
+      {/* Next */}
+      {hasNext && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(index + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/40 hover:text-white transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+    </div>
   );
 }
 

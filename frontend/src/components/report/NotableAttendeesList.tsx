@@ -139,8 +139,6 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showBrowseModal, setShowBrowseModal] = useState(false);
 
-  const orgGroups = groupByOrg(attendees);
-
   // Count total RSVPs per domain from the full guest list
   const domainRsvpCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -150,6 +148,19 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
     }
     return counts;
   }, [guests]);
+
+  // Group notable attendees by org, sorted by total guest count then alphabetically
+  const orgGroups = useMemo(() => {
+    const groups = groupByOrg(attendees);
+    return groups.sort((a, b) => {
+      if (!a.domain && b.domain) return 1;
+      if (a.domain && !b.domain) return -1;
+      if (!a.domain || !b.domain) return 0;
+      const countA = domainRsvpCounts.get(a.domain) || a.attendees.length;
+      const countB = domainRsvpCounts.get(b.domain) || b.attendees.length;
+      return countB - countA || a.domain.localeCompare(b.domain);
+    });
+  }, [attendees, domainRsvpCounts]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
