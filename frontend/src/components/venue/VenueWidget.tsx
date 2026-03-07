@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapPin, Users, DollarSign, Plus, Pencil, Trash2, Check, Globe, Loader2, Phone, Mail, Building2, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Users, DollarSign, Plus, Pencil, Trash2, Check, Globe, Loader2, Phone, Mail, Building2, ChevronDown, ChevronUp, Camera, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { getVenues, createVenue, updateVenue, deleteVenue, selectVenue, deselectVenue, VenueCreateData } from '../../lib/api';
 import { VenueForm } from './VenueForm';
+import { VenuePhotoUpload } from './VenuePhotoUpload';
+import { VenuePhotoGallery } from './VenuePhotoGallery';
 
 interface VenueWidgetProps {
   partyId: string;
@@ -252,6 +254,12 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                             Website
                           </a>
                         )}
+                        {venue.photos && venue.photos.length > 0 && (
+                          <span className="flex items-center gap-1 text-white/50">
+                            <Camera size={12} />
+                            {venue.photos.length}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -309,6 +317,30 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                       </div>
                     )}
 
+                    {/* Pros & Cons */}
+                    {(venue.pros || venue.cons) && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {venue.pros && (
+                          <div className="text-sm">
+                            <p className="flex items-center gap-1 text-xs text-green-400/60 mb-1">
+                              <ThumbsUp size={10} />
+                              Pros
+                            </p>
+                            <p className="text-white/70 whitespace-pre-wrap text-xs">{venue.pros}</p>
+                          </div>
+                        )}
+                        {venue.cons && (
+                          <div className="text-sm">
+                            <p className="flex items-center gap-1 text-xs text-red-400/60 mb-1">
+                              <ThumbsDown size={10} />
+                              Cons
+                            </p>
+                            <p className="text-white/70 whitespace-pre-wrap text-xs">{venue.cons}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Notes */}
                     {venue.notes && (
                       <div className="text-sm">
@@ -316,6 +348,29 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                         <p className="text-white/70 whitespace-pre-wrap">{venue.notes}</p>
                       </div>
                     )}
+
+                    {/* Photos */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-white/40 flex items-center gap-1">
+                          <Camera size={12} />
+                          Photos {venue.photos && venue.photos.length > 0 && `(${venue.photos.length})`}
+                        </p>
+                      </div>
+                      <VenuePhotoUpload
+                        partyId={partyId}
+                        venueId={venue.id}
+                        onPhotoAdded={loadVenues}
+                      />
+                      {venue.photos && venue.photos.length > 0 && (
+                        <VenuePhotoGallery
+                          photos={venue.photos}
+                          partyId={partyId}
+                          venueId={venue.id}
+                          onPhotoDeleted={loadVenues}
+                        />
+                      )}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-2 border-t border-white/10">

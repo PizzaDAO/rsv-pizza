@@ -40,6 +40,11 @@ router.get('/:partyId/venues', async (req: AuthRequest, res: Response, next: Nex
         { isSelected: 'desc' },
         { createdAt: 'desc' },
       ],
+      include: {
+        photos: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
     });
 
     res.json({ venues });
@@ -55,7 +60,7 @@ router.post('/:partyId/venues', async (req: AuthRequest, res: Response, next: Ne
     const {
       name, address, website, capacity, cost, organization,
       pointPerson, contactName, contactEmail, contactPhone,
-      status, notes
+      status, notes, pros, cons
     } = req.body;
 
     // Verify ownership or super admin
@@ -83,6 +88,8 @@ router.post('/:partyId/venues', async (req: AuthRequest, res: Response, next: Ne
         contactPhone: contactPhone?.trim() || null,
         status: status || 'researching',
         notes: notes?.trim() || null,
+        pros: pros?.trim() || null,
+        cons: cons?.trim() || null,
       },
     });
 
@@ -99,7 +106,7 @@ router.patch('/:partyId/venues/:venueId', async (req: AuthRequest, res: Response
     const {
       name, address, website, capacity, cost, organization,
       pointPerson, contactName, contactEmail, contactPhone,
-      status, notes
+      status, notes, pros, cons
     } = req.body;
 
     // Verify ownership or super admin
@@ -132,6 +139,13 @@ router.patch('/:partyId/venues/:venueId', async (req: AuthRequest, res: Response
         ...(contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
         ...(status !== undefined && { status: status || 'researching' }),
         ...(notes !== undefined && { notes: notes?.trim() || null }),
+        ...(pros !== undefined && { pros: pros?.trim() || null }),
+        ...(cons !== undefined && { cons: cons?.trim() || null }),
+      },
+      include: {
+        photos: {
+          orderBy: { sortOrder: 'asc' },
+        },
       },
     });
 

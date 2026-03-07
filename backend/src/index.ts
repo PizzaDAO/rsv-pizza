@@ -18,6 +18,8 @@ import raffleRoutes from './routes/raffle.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
+import venuePhotoRoutes from './routes/venue-photo.routes.js';
+import venueReportRoutes from './routes/venue-report.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
@@ -97,6 +99,8 @@ app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
 app.use('/api/parties', displayRoutes); // Display routes (host management, some public)
 app.use('/api/parties', performerRoutes); // Performer/music routes
+app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)
+app.use('/api/parties', venueReportRoutes); // Venue report routes (includes public)
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
@@ -112,6 +116,7 @@ app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
+app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);

@@ -137,6 +137,13 @@ model Party {
   reportPassword     String?   @map("report_password")
   reportStatsConfig  Json?     @map("report_stats_config")
 
+  // Venue report settings
+  venueReportPublished Boolean  @default(false) @map("venue_report_published")
+  venueReportSlug      String?  @unique @map("venue_report_slug")
+  venueReportPassword  String?  @map("venue_report_password")
+  venueReportTitle     String?  @map("venue_report_title")
+  venueReportNotes     String?  @map("venue_report_notes")
+
   // Pinned apps (for Apps Hub tab bar)
   pinnedApps  Json?   @default("[]") @map("pinned_apps")
 
@@ -757,12 +764,38 @@ model Venue {
   // Selection
   isSelected   Boolean   @default(false) @map("is_selected")
 
+  // Pros/Cons
+  pros         String?
+  cons         String?
+
   notes        String?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  photos       VenuePhoto[]
+
   @@index([partyId, isSelected])
   @@map("venues")
+}
+
+model VenuePhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @map("venue_id") @db.Uuid
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  url       String
+  fileName  String   @map("file_name")
+  fileSize  Int      @map("file_size")
+  mimeType  String   @map("mime_type")
+  width     Int?
+  height    Int?
+  caption   String?
+  category  String?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([venueId, sortOrder])
+  @@map("venue_photos")
 }
 
 // ============================================

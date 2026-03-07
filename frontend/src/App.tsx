@@ -15,6 +15,7 @@ import { GPPLandingPage } from './pages/GPPLandingPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { DJPage } from './pages/DJPage';
 import { PublicReportPage } from './pages/PublicReportPage';
+import { PublicVenueReportPage } from './pages/PublicVenueReportPage';
 import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { AdminPage } from './pages/AdminPage';
@@ -33,6 +34,7 @@ function App() {
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
+            <Route path="/venue-report/:slug" element={<PublicVenueReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />

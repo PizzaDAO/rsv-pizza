@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Search } from 'lucide-react';
+import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Search, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { VenueCreateData } from '../../lib/api';
 import { IconInput } from '../IconInput';
@@ -145,6 +145,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
   const [contactPhone, setContactPhone] = useState(venue?.contactPhone || '');
   const [status, setStatus] = useState<VenueStatus>(venue?.status || 'researching');
   const [notes, setNotes] = useState(venue?.notes || '');
+  const [pros, setPros] = useState(venue?.pros || '');
+  const [cons, setCons] = useState(venue?.cons || '');
 
   // Use refs to avoid stale closures in the Google Maps event listener
   const nameRef = useRef(name);
@@ -290,6 +292,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
         contactPhone: contactPhone.trim() || undefined,
         status,
         notes: notes.trim() || undefined,
+        pros: pros.trim() || undefined,
+        cons: cons.trim() || undefined,
       });
       onClose();
     } catch (err) {
@@ -469,19 +473,41 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
             </div>
           </div>
 
+          {/* Pros & Cons Section */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-white/60">Pros & Cons</h3>
+            <IconInput
+              icon={ThumbsUp}
+              iconSize={16}
+              multiline
+              rows={2}
+              value={pros}
+              onChange={(e) => setPros(e.target.value)}
+              placeholder="Pros (e.g., great location, good price, flexible hours...)"
+            />
+            <IconInput
+              icon={ThumbsDown}
+              iconSize={16}
+              multiline
+              rows={2}
+              value={cons}
+              onChange={(e) => setCons(e.target.value)}
+              placeholder="Cons (e.g., limited parking, no kitchen, noise restrictions...)"
+            />
+          </div>
+
           {/* Notes Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/60">Notes</h3>
-            <div className="relative">
-              <FileText size={16} className="absolute left-3 top-3 text-white/40 pointer-events-none" />
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes about this venue option..."
-                rows={3}
-                className="w-full !pl-10 resize-none"
-              />
-            </div>
+            <IconInput
+              icon={FileText}
+              iconSize={16}
+              multiline
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional notes about this venue option..."
+            />
           </div>
 
           {/* Error Message */}

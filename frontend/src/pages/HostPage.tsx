@@ -19,6 +19,7 @@ import { updateParty } from '../lib/supabase';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
+import { VenueReportWidget } from '../components/venue-report';
 import { MusicWidget } from '../components/music';
 import { ReportWidget } from '../components/report';
 import { StaffingWidget } from '../components/staffing';
@@ -314,16 +315,21 @@ function HostPageContent() {
               )}
 
               {activeTab === 'venue' && party && (
-                <div className="card p-6">
-                  <VenueWidget
-                    partyId={party.id}
-                    onVenueSelect={() => {
-                      if (party?.inviteCode) {
-                        loadParty(party.inviteCode);
-                      }
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="card p-6">
+                    <VenueWidget
+                      partyId={party.id}
+                      onVenueSelect={() => {
+                        if (party?.inviteCode) {
+                          loadParty(party.inviteCode);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="card p-6 mt-4">
+                    <VenueReportWidget partyId={party.id} />
+                  </div>
+                </>
               )}
 
               {activeTab === 'music' && (
