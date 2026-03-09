@@ -562,7 +562,7 @@ export function GPPLandingPage() {
                 PizzaDAO Resources
               </h3>
               <p className="text-sm" style={{ color: C.mutedText }}>
-                Common questions about hosting and what to expect on the day.
+                A guide to all the PizzaDAO websites and apps out there.
               </p>
             </a>
           </div>
