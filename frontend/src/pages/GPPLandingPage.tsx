@@ -306,8 +306,9 @@ export function GPPLandingPage() {
                     type="text"
                     value={telegram}
                     onChange={(e) => setTelegram(e.target.value)}
-                    placeholder="Telegram username (optional)"
+                    placeholder="Telegram username"
                     className="gpp-input w-full"
+                    required
                     disabled={isSubmitting}
                   />
                   <p className="text-xs mt-1.5" style={{ color: C.mutedText }}>
