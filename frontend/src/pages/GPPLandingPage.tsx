@@ -414,7 +414,7 @@ export function GPPLandingPage() {
       <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="flex flex-col items-center gap-1">
           <a
-            href="https://pizzadao.xyz/join"
+            href="https://pizzadao.org"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"
