@@ -413,7 +413,6 @@ export function GPPLandingPage() {
       {/* ─── FOOTER ─── */}
       <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="flex flex-col items-center gap-1">
-          <span className="text-sm" style={{ color: 'rgba(0,0,0,0.4)' }}>Powered by</span>
           <a
             href="https://pizzadao.xyz/join"
             target="_blank"
