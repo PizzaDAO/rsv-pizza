@@ -2,11 +2,12 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
-import { Header } from '../components/Header';
-import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 /* ── colour tokens (from the 2026 flyer) ────────────────── */
 const C = {
@@ -22,22 +23,10 @@ const C = {
   cardBorder:'rgba(0,0,0,0.08)',
 };
 
-/* ── tiny CSS cloud (pure CSS, no SVG files needed) ──────── */
-const Cloud: React.FC<{ className?: string; size?: number }> = ({ className = '', size = 80 }) => (
-  <div
-    className={`absolute pointer-events-none ${className}`}
-    style={{
-      width: size,
-      height: size * 0.45,
-      background: 'rgba(255,255,255,0.55)',
-      borderRadius: '999px',
-      filter: 'blur(2px)',
-    }}
-  />
-);
 
 export function GPPLandingPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,11 +34,90 @@ export function GPPLandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
   const cityDataRef = useRef<CityData | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // OTP state
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [confettiPieces, setConfettiPieces] = useState<Array<{
+    id: number;
+    img: string;
+    x: number;
+    y: number;
+    angle: number;
+    distance: number;
+    size: number;
+    rotation: number;
+  }>>([]);
+  const [parachutes, setParachutes] = useState<Array<{
+    id: number;
+    x: number;
+    size: number;
+    delay: number;
+    duration: number;
+  }>>([]);
 
   const handleCitySelected = (data: CityData) => {
     cityDataRef.current = data;
     setCity(data.cityName);
   };
+
+  async function verifyOtp(fullCode: string) {
+    setOtpStatus('verifying');
+    try {
+      const response = await fetch(`${API_URL}/api/auth/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: fullCode }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Invalid code');
+      }
+      const data = await response.json();
+      // Store auth
+      localStorage.setItem('authToken', data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      setOtpStatus('success');
+      // Redirect to host dashboard
+      setTimeout(() => {
+        navigate(success!.hostPageUrl.replace(/^https?:\/\/[^/]+/, ''));
+      }, 1500);
+    } catch (err: any) {
+      setOtpStatus('error');
+      setOtpError(err.message || 'Invalid code');
+    }
+  }
+
+  function handleOtpChange(index: number, value: string) {
+    if (value && !/^\d$/.test(value)) return;
+    const newCode = [...otpCode];
+    newCode[index] = value;
+    setOtpCode(newCode);
+    if (value && index < 5) otpRefs.current[index + 1]?.focus();
+    if (value && index === 5) {
+      const fullCode = newCode.join('');
+      if (fullCode.length === 6) verifyOtp(fullCode);
+    }
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtpCode(pasted.split(''));
+      verifyOtp(pasted);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,11 +139,49 @@ export function GPPLandingPage() {
       });
 
       if (response.success) {
-        setSuccess({
+        // Fire confetti burst from button position
+        const rect = buttonRef.current?.getBoundingClientRect();
+        if (rect) {
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const pieces = Array.from({ length: 45 }, (_, i) => {
+            // Weight red confetti (1, 4) ~60% of the time
+            const img = Math.random() < 0.6
+              ? `/gpp-confetti-${Math.random() < 0.5 ? '1' : '4'}.png`
+              : `/gpp-confetti-${[2, 3, 5, 6, 7][Math.floor(Math.random() * 5)]}.png`;
+            return {
+              id: i,
+              img,
+              x: centerX,
+              y: centerY,
+              angle: Math.random() * 360,
+              distance: 150 + Math.random() * 300,
+              size: 10 + Math.random() * 15,
+              rotation: Math.random() * 720 - 360,
+            };
+          });
+          setConfettiPieces(pieces);
+        }
+
+        // Fire parachute pizza box drops
+        const chutes = Array.from({ length: 4 }, (_, i) => ({
+          id: i,
+          x: 10 + Math.random() * 80,
+          size: 80 + Math.random() * 40,
+          delay: i * 0.4,
+          duration: 4 + Math.random() * 2,
+        }));
+        setParachutes(chutes);
+
+        // Delay transition to success state so user sees the animations
+        const successData = {
           hostPageUrl: response.hostPageUrl,
           eventName: response.event.name,
           email: email.trim(),
-        });
+        };
+        setTimeout(() => {
+          setSuccess(successData);
+        }, 4000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event. Please try again.');
@@ -95,7 +201,6 @@ export function GPPLandingPage() {
           <title>Event Created! | Global Pizza Party</title>
         </Helmet>
 
-        {/* dark header on light background */}
         <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -111,55 +216,89 @@ export function GPPLandingPage() {
         </header>
 
         <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 relative">
-          {/* decorative clouds */}
-          <Cloud className="top-12 left-[8%] opacity-60" size={100} />
-          <Cloud className="top-24 right-[12%] opacity-40" size={70} />
-
           <div className="max-w-lg w-full text-center">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ background: `${C.green}22` }}
-            >
-              <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
-            </div>
+            {otpStatus === 'success' ? (
+              <>
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `${C.green}22` }}>
+                  <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
+                </div>
+                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>You're signed in!</h1>
+                <p className="text-lg" style={{ color: C.mutedText }}>Redirecting to your host dashboard...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `${C.green}22` }}>
+                  <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
+                </div>
 
-            <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
-              Your Global Pizza Party is Live!
-            </h1>
+                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
+                  Your Global Pizza Party is Live!
+                </h1>
 
-            <p className="text-lg mb-8" style={{ color: C.mutedText }}>
-              <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
-              Check your email for a login code to access your host dashboard.
-            </p>
+                <p className="text-lg mb-8" style={{ color: C.mutedText }}>
+                  <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
+                </p>
 
-            <div className="space-y-4">
-              <button
-                onClick={() => navigate(`/login?email=${encodeURIComponent(success.email)}&redirect=${encodeURIComponent(success.hostPageUrl)}`)}
-                className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
-                style={{ background: C.red }}
-                onMouseEnter={e => (e.currentTarget.style.background = C.redHover)}
-                onMouseLeave={e => (e.currentTarget.style.background = C.red)}
-              >
-                Sign In to Host Dashboard
-                <ArrowRight size={20} />
-              </button>
+                {/* OTP Input */}
+                <div className="p-6 rounded-2xl border mb-6" style={{ background: C.cardBg, borderColor: C.cardBorder }}>
+                  <p className="text-sm mb-4" style={{ color: C.mutedText }}>
+                    Enter the 6-digit code we sent to <span className="font-medium" style={{ color: C.darkText }}>{success.email}</span>
+                  </p>
 
-              <button
-                onClick={() => navigate('/')}
-                className="w-full py-3 rounded-xl font-medium transition-all border"
-                style={{
-                  background: 'rgba(255,255,255,0.7)',
-                  borderColor: 'rgba(0,0,0,0.12)',
-                  color: C.darkText,
-                }}
-              >
-                Return Home
-              </button>
-            </div>
+                  <div className="flex justify-center gap-2 mb-4" onPaste={handleOtpPaste}>
+                    {otpCode.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        disabled={otpStatus === 'verifying'}
+                        className="w-12 h-14 text-center text-2xl font-bold rounded-lg border-2 focus:outline-none transition-all"
+                        style={{
+                          background: 'rgba(255,255,255,0.85)',
+                          borderColor: otpStatus === 'error' ? C.red : 'rgba(0,0,0,0.12)',
+                          color: C.darkText,
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = C.red; }}
+                        onBlur={(e) => { e.target.style.borderColor = otpStatus === 'error' ? C.red : 'rgba(0,0,0,0.12)'; }}
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </div>
 
-            <p className="text-sm mt-8" style={{ color: C.mutedText }}>
-              Didn't receive an email? Check your spam folder or request a new login code from the host page.
-            </p>
+                  {otpStatus === 'verifying' && (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" style={{ color: C.red }} />
+                      <span className="text-sm" style={{ color: C.mutedText }}>Verifying...</span>
+                    </div>
+                  )}
+
+                  {otpStatus === 'error' && (
+                    <p className="text-sm" style={{ color: C.red }}>{otpError}</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full py-3 rounded-xl font-medium transition-all border"
+                  style={{
+                    background: 'rgba(255,255,255,0.7)',
+                    borderColor: 'rgba(0,0,0,0.12)',
+                    color: C.darkText,
+                  }}
+                >
+                  Return Home
+                </button>
+
+                <p className="text-sm mt-6" style={{ color: C.mutedText }}>
+                  Didn't receive a code? Check your spam folder.
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -171,9 +310,19 @@ export function GPPLandingPage() {
   /* ──────────────── MAIN PAGE ──────────────── */
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen relative overflow-hidden"
       style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
     >
+      {/* ─── Decorative pizza vectors ─── */}
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, animation: 'drift-right 14s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, animation: 'drift-left 12s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '22%', left: '6%', width: 100, animation: 'drift-right 16s ease-in-out infinite' }} />
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '48%', left: '-5%', width: 260, scaleX: -1, animation: 'drift-left 13s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '42%', right: '3%', width: 130, animation: 'drift-right 10s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '65%', right: '8%', width: 110, animation: 'drift-left 15s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '75%', left: '2%', width: 90, animation: 'drift-right 11s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '88%', right: '-2%', width: 140, animation: 'drift-left 17s ease-in-out infinite' }} />
+
       <Helmet>
         <title>Host a Global Pizza Party | RSV.Pizza</title>
         <meta
@@ -210,11 +359,6 @@ export function GPPLandingPage() {
 
       {/* ─── HERO ─── */}
       <div className="relative overflow-hidden">
-        {/* Decorative clouds */}
-        <Cloud className="top-10 left-[5%] opacity-50" size={120} />
-        <Cloud className="top-32 right-[8%] opacity-40" size={90} />
-        <Cloud className="top-56 left-[60%] opacity-30 hidden md:block" size={60} />
-
         <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-20">
           <div className="grid md:grid-cols-2 gap-10 items-center">
             {/* Left: Flyer Image */}
@@ -315,6 +459,7 @@ export function GPPLandingPage() {
                 </div>
 
                 <button
+                  ref={buttonRef}
                   type="submit"
                   disabled={isSubmitting}
                   className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-60"
@@ -355,9 +500,9 @@ export function GPPLandingPage() {
           </h2>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Host Guide */}
+            {/* Sponsor One Sheet */}
             <a
-              href="https://docs.google.com/presentation/d/e/2PACX-1vSNFVmhuegxE6QhHFHBC1WCVGJ4eA-Zl-SpzcQG0kMuG1bQf3GA_01BaWtLoL-VUgTT0y3M330lGB5D/pub?start=false&loop=false&delayms=3000"
+              href="https://docs.google.com/presentation/d/e/2PACX-1vQHSFx8OYH1yznE4XjiqD9TTOyCqkPVNyeOTVpkOghZleUKm-ISp09JNvksbo_hvfzDG-4MQLRV9u1q/pub?start=false&loop=false&delayms=3000"
               target="_blank"
               rel="noopener noreferrer"
               className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
@@ -370,10 +515,10 @@ export function GPPLandingPage() {
                 <BookOpen className="w-6 h-6" style={{ color: C.red }} />
               </div>
               <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
-                GPP Host Guide
+                Sponsor One Sheet
               </h3>
               <p className="text-sm" style={{ color: C.mutedText }}>
-                Everything you need to know about hosting a successful Global Pizza Party.
+                Everything you need to talk to sponsors about the Global Pizza Party.
               </p>
             </a>
 
@@ -417,7 +562,7 @@ export function GPPLandingPage() {
                 PizzaDAO Resources
               </h3>
               <p className="text-sm" style={{ color: C.mutedText }}>
-                Common questions about hosting and what to expect on the day.
+                A guide to all the PizzaDAO websites and apps out there.
               </p>
             </a>
           </div>
@@ -427,9 +572,8 @@ export function GPPLandingPage() {
       {/* ─── FOOTER ─── */}
       <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="flex flex-col items-center gap-1">
-          <span className="text-sm" style={{ color: 'rgba(0,0,0,0.4)' }}>Powered by</span>
           <a
-            href="https://pizzadao.xyz/join"
+            href="https://pizzadao.org"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"
@@ -439,10 +583,100 @@ export function GPPLandingPage() {
         </div>
       </footer>
 
+      {/* ─── CONFETTI + PARACHUTE OVERLAY ─── */}
+      {(confettiPieces.length > 0 || parachutes.length > 0) && (
+        <div className="fixed inset-0 pointer-events-none z-[100]">
+          {confettiPieces.map((p) => (
+            <img
+              key={p.id}
+              src={p.img}
+              alt=""
+              className="absolute"
+              style={{
+                left: p.x,
+                top: p.y,
+                width: p.size,
+                height: p.size,
+                objectFit: 'contain',
+                animation: 'confetti-fly 2.5s ease-out forwards',
+                '--confetti-tx': `${Math.cos(p.angle * Math.PI / 180) * p.distance}px`,
+                '--confetti-ty': `${Math.sin(p.angle * Math.PI / 180) * p.distance}px`,
+                '--confetti-rot': `${p.rotation}deg`,
+              } as React.CSSProperties}
+            />
+          ))}
+          {parachutes.map((p) => (
+            <img
+              key={`chute-${p.id}`}
+              src="/gpp-parachute.png"
+              alt=""
+              className="absolute"
+              style={{
+                left: `${p.x}%`,
+                top: -150,
+                width: p.size,
+                animation: `parachute-drop ${p.duration}s ease-in ${p.delay}s forwards`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       <CornerLinks />
 
       {/* ─── SCOPED LIGHT-THEME OVERRIDES ─── */}
       <style>{`
+        /* Drifting animation for decorative pizza vectors */
+        @keyframes drift-right {
+          0% { transform: translateX(0); }
+          50% { transform: translateX(50px); }
+          100% { transform: translateX(0); }
+        }
+        @keyframes drift-left {
+          0% { transform: translateX(0); }
+          50% { transform: translateX(-50px); }
+          100% { transform: translateX(0); }
+        }
+
+        /* Confetti burst animation */
+        @keyframes confetti-fly {
+          0% {
+            transform: translate(-50%, -50%) rotate(0deg) scale(1);
+            opacity: 1;
+          }
+          70% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate(
+              calc(-50% + var(--confetti-tx)),
+              calc(-50% + var(--confetti-ty))
+            ) rotate(var(--confetti-rot)) scale(0.5);
+            opacity: 0;
+          }
+        }
+
+        /* Parachute pizza box drop animation */
+        @keyframes parachute-drop {
+          0% {
+            transform: translateY(0) translateX(0);
+            opacity: 1;
+          }
+          25% {
+            transform: translateY(25vh) translateX(20px);
+          }
+          50% {
+            transform: translateY(50vh) translateX(-15px);
+          }
+          75% {
+            transform: translateY(75vh) translateX(10px);
+          }
+          100% {
+            transform: translateY(110vh) translateX(-5px);
+            opacity: 0.8;
+          }
+        }
+
         /* Override the dark global input styles for the GPP page */
         .gpp-input,
         .gpp-light-input input {
