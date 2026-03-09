@@ -5,6 +5,9 @@ import { CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle }
 import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 /* ── colour tokens (from the 2026 flyer) ────────────────── */
 const C = {
@@ -23,6 +26,7 @@ const C = {
 
 export function GPPLandingPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,6 +35,12 @@ export function GPPLandingPage() {
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
   const cityDataRef = useRef<CityData | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // OTP state
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [otpError, setOtpError] = useState<string | null>(null);
   const [confettiPieces, setConfettiPieces] = useState<Array<{
     id: number;
     img: string;
@@ -53,6 +63,61 @@ export function GPPLandingPage() {
     cityDataRef.current = data;
     setCity(data.cityName);
   };
+
+  async function verifyOtp(fullCode: string) {
+    setOtpStatus('verifying');
+    try {
+      const response = await fetch(`${API_URL}/api/auth/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: fullCode }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Invalid code');
+      }
+      const data = await response.json();
+      // Store auth
+      localStorage.setItem('authToken', data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      setOtpStatus('success');
+      // Redirect to host dashboard
+      setTimeout(() => {
+        navigate(success!.hostPageUrl.replace(/^https?:\/\/[^/]+/, ''));
+      }, 1500);
+    } catch (err: any) {
+      setOtpStatus('error');
+      setOtpError(err.message || 'Invalid code');
+    }
+  }
+
+  function handleOtpChange(index: number, value: string) {
+    if (value && !/^\d$/.test(value)) return;
+    const newCode = [...otpCode];
+    newCode[index] = value;
+    setOtpCode(newCode);
+    if (value && index < 5) otpRefs.current[index + 1]?.focus();
+    if (value && index === 5) {
+      const fullCode = newCode.join('');
+      if (fullCode.length === 6) verifyOtp(fullCode);
+    }
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtpCode(pasted.split(''));
+      verifyOtp(pasted);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,16 +144,22 @@ export function GPPLandingPage() {
         if (rect) {
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          const pieces = Array.from({ length: 30 }, (_, i) => ({
-            id: i,
-            img: `/gpp-confetti-${Math.floor(Math.random() * 7) + 1}.png`,
-            x: centerX,
-            y: centerY,
-            angle: Math.random() * 360,
-            distance: 150 + Math.random() * 300,
-            size: 20 + Math.random() * 25,
-            rotation: Math.random() * 720 - 360,
-          }));
+          const pieces = Array.from({ length: 45 }, (_, i) => {
+            // Weight red confetti (1, 4) ~60% of the time
+            const img = Math.random() < 0.6
+              ? `/gpp-confetti-${Math.random() < 0.5 ? '1' : '4'}.png`
+              : `/gpp-confetti-${[2, 3, 5, 6, 7][Math.floor(Math.random() * 5)]}.png`;
+            return {
+              id: i,
+              img,
+              x: centerX,
+              y: centerY,
+              angle: Math.random() * 360,
+              distance: 150 + Math.random() * 300,
+              size: 10 + Math.random() * 15,
+              rotation: Math.random() * 720 - 360,
+            };
+          });
           setConfettiPieces(pieces);
         }
 
@@ -110,7 +181,7 @@ export function GPPLandingPage() {
         };
         setTimeout(() => {
           setSuccess(successData);
-        }, 2000);
+        }, 4000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event. Please try again.');
@@ -130,7 +201,6 @@ export function GPPLandingPage() {
           <title>Event Created! | Global Pizza Party</title>
         </Helmet>
 
-        {/* dark header on light background */}
         <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -147,50 +217,88 @@ export function GPPLandingPage() {
 
         <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 relative">
           <div className="max-w-lg w-full text-center">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ background: `${C.green}22` }}
-            >
-              <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
-            </div>
+            {otpStatus === 'success' ? (
+              <>
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `${C.green}22` }}>
+                  <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
+                </div>
+                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>You're signed in!</h1>
+                <p className="text-lg" style={{ color: C.mutedText }}>Redirecting to your host dashboard...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `${C.green}22` }}>
+                  <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
+                </div>
 
-            <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
-              Your Global Pizza Party is Live!
-            </h1>
+                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
+                  Your Global Pizza Party is Live!
+                </h1>
 
-            <p className="text-lg mb-8" style={{ color: C.mutedText }}>
-              <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
-              Check your email for a login code to access your host dashboard.
-            </p>
+                <p className="text-lg mb-8" style={{ color: C.mutedText }}>
+                  <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
+                </p>
 
-            <div className="space-y-4">
-              <button
-                onClick={() => navigate(`/login?email=${encodeURIComponent(success.email)}&redirect=${encodeURIComponent(success.hostPageUrl)}`)}
-                className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
-                style={{ background: C.red }}
-                onMouseEnter={e => (e.currentTarget.style.background = C.redHover)}
-                onMouseLeave={e => (e.currentTarget.style.background = C.red)}
-              >
-                Sign In to Host Dashboard
-                <ArrowRight size={20} />
-              </button>
+                {/* OTP Input */}
+                <div className="p-6 rounded-2xl border mb-6" style={{ background: C.cardBg, borderColor: C.cardBorder }}>
+                  <p className="text-sm mb-4" style={{ color: C.mutedText }}>
+                    Enter the 6-digit code we sent to <span className="font-medium" style={{ color: C.darkText }}>{success.email}</span>
+                  </p>
 
-              <button
-                onClick={() => navigate('/')}
-                className="w-full py-3 rounded-xl font-medium transition-all border"
-                style={{
-                  background: 'rgba(255,255,255,0.7)',
-                  borderColor: 'rgba(0,0,0,0.12)',
-                  color: C.darkText,
-                }}
-              >
-                Return Home
-              </button>
-            </div>
+                  <div className="flex justify-center gap-2 mb-4" onPaste={handleOtpPaste}>
+                    {otpCode.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        disabled={otpStatus === 'verifying'}
+                        className="w-12 h-14 text-center text-2xl font-bold rounded-lg border-2 focus:outline-none transition-all"
+                        style={{
+                          background: 'rgba(255,255,255,0.85)',
+                          borderColor: otpStatus === 'error' ? C.red : 'rgba(0,0,0,0.12)',
+                          color: C.darkText,
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = C.red; }}
+                        onBlur={(e) => { e.target.style.borderColor = otpStatus === 'error' ? C.red : 'rgba(0,0,0,0.12)'; }}
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </div>
 
-            <p className="text-sm mt-8" style={{ color: C.mutedText }}>
-              Didn't receive an email? Check your spam folder or request a new login code from the host page.
-            </p>
+                  {otpStatus === 'verifying' && (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" style={{ color: C.red }} />
+                      <span className="text-sm" style={{ color: C.mutedText }}>Verifying...</span>
+                    </div>
+                  )}
+
+                  {otpStatus === 'error' && (
+                    <p className="text-sm" style={{ color: C.red }}>{otpError}</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full py-3 rounded-xl font-medium transition-all border"
+                  style={{
+                    background: 'rgba(255,255,255,0.7)',
+                    borderColor: 'rgba(0,0,0,0.12)',
+                    color: C.darkText,
+                  }}
+                >
+                  Return Home
+                </button>
+
+                <p className="text-sm mt-6" style={{ color: C.mutedText }}>
+                  Didn't receive a code? Check your spam folder.
+                </p>
+              </>
+            )}
           </div>
         </div>
 
