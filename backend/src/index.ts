@@ -14,6 +14,7 @@ import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
+import rentalRoutes from './routes/rental.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import performerRoutes from './routes/performer.routes.js';
@@ -98,6 +99,7 @@ app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
 app.use('/api/parties', displayRoutes); // Display routes (host management, some public)
+app.use('/api/parties', rentalRoutes); // Rental routes (host management, some public)
 app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)
 app.use('/api/parties', venueReportRoutes); // Venue report routes (includes public)
@@ -115,6 +117,7 @@ app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
+app.use('/api/rentals', rentalRoutes); // Public rental viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
 app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug
 

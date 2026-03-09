@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Monitor, Loader2, AlertCircle, Map, Link, MapPin, X } from 'lucide-react';
 import { Display } from '../../types';
 import { getPartyDisplays, createDisplay, updateDisplay, deleteDisplay } from '../../lib/api';
+import { updateParty } from '../../lib/supabase';
+import { usePizza } from '../../contexts/PizzaContext';
 import { DisplayCard } from './DisplayCard';
 import { DisplayForm, DisplayFormData } from './DisplayForm';
 import { IconInput } from '../IconInput';
@@ -12,16 +14,12 @@ interface FloorplanPin {
   y: number; // percentage 0-100
 }
 
-interface FloorplanData {
-  url: string;
-  pins: FloorplanPin[];
-}
-
 interface DisplaysWidgetProps {
   partyId: string;
 }
 
 export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
+  const { party, loadParty } = usePizza();
   const [displays, setDisplays] = useState<Display[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,7 +28,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const [editingDisplay, setEditingDisplay] = useState<Display | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Floorplan state
+  // Floorplan state - now backed by party.floorplanUrl / party.floorplanData
   const [floorplanUrl, setFloorplanUrl] = useState('');
   const [floorplanInput, setFloorplanInput] = useState('');
   const [showFloorplanInput, setShowFloorplanInput] = useState(false);
@@ -42,6 +40,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
   const floorplanRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const migrationDone = useRef(false);
 
   const loadDisplays = useCallback(async () => {
     try {
@@ -62,40 +61,76 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
     loadDisplays();
   }, [loadDisplays]);
 
-  // Load floorplan data from localStorage
+  // Load floorplan data from party (DB) with localStorage migration
   useEffect(() => {
-    const saved = localStorage.getItem(`floorplan-${partyId}`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed === 'object' && parsed.url) {
-          // New format: { url, pins }
-          setFloorplanUrl(parsed.url);
-          setFloorplanInput(parsed.url);
-          setPins(parsed.pins || []);
-        } else if (typeof parsed === 'string') {
-          // Legacy format: just a URL string
-          setFloorplanUrl(parsed);
-          setFloorplanInput(parsed);
+    if (!party) return;
+
+    // If party has floorplan data in DB, use it
+    if (party.floorplanUrl) {
+      setFloorplanUrl(party.floorplanUrl);
+      setFloorplanInput(party.floorplanUrl);
+      const data = party.floorplanData as any;
+      setPins(data?.pins || []);
+      // Clear localStorage if it still has old data
+      localStorage.removeItem(`floorplan-${partyId}`);
+      return;
+    }
+
+    // Migration: if party has no floorplanUrl but localStorage has data, migrate to DB
+    if (!migrationDone.current) {
+      migrationDone.current = true;
+      const saved = localStorage.getItem(`floorplan-${partyId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          let url = '';
+          let pinData: FloorplanPin[] = [];
+          if (typeof parsed === 'object' && parsed.url) {
+            url = parsed.url;
+            pinData = parsed.pins || [];
+          } else if (typeof parsed === 'string') {
+            url = parsed;
+          }
+
+          if (url) {
+            setFloorplanUrl(url);
+            setFloorplanInput(url);
+            setPins(pinData);
+            // Migrate to DB
+            updateParty(partyId, {
+              floorplan_url: url,
+              floorplan_data: { pins: pinData },
+            }).then((success) => {
+              if (success) {
+                localStorage.removeItem(`floorplan-${partyId}`);
+              }
+            });
+          }
+        } catch {
+          // Legacy format: plain string
+          const url = saved;
+          setFloorplanUrl(url);
+          setFloorplanInput(url);
           setPins([]);
+          updateParty(partyId, {
+            floorplan_url: url,
+            floorplan_data: { pins: [] },
+          }).then((success) => {
+            if (success) {
+              localStorage.removeItem(`floorplan-${partyId}`);
+            }
+          });
         }
-      } catch {
-        // Legacy format: plain string (not JSON)
-        setFloorplanUrl(saved);
-        setFloorplanInput(saved);
-        setPins([]);
       }
     }
-  }, [partyId]);
+  }, [party, partyId]);
 
-  // Save floorplan data to localStorage whenever pins or URL change
+  // Save floorplan data to DB
   const saveFloorplanData = useCallback((url: string, pinData: FloorplanPin[]) => {
-    if (url) {
-      const data: FloorplanData = { url, pins: pinData };
-      localStorage.setItem(`floorplan-${partyId}`, JSON.stringify(data));
-    } else {
-      localStorage.removeItem(`floorplan-${partyId}`);
-    }
+    updateParty(partyId, {
+      floorplan_url: url || null,
+      floorplan_data: url ? { pins: pinData } : {},
+    });
   }, [partyId]);
 
   // Close popovers when clicking outside
@@ -187,7 +222,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
     } else {
       setFloorplanUrl('');
       setPins([]);
-      localStorage.removeItem(`floorplan-${partyId}`);
+      saveFloorplanData('', []);
     }
     setShowFloorplanInput(false);
   };

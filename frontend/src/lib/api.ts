@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Rental, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -136,6 +136,8 @@ export interface UpdatePartyData {
   venueReportNotes?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  floorplanUrl?: string | null;
+  floorplanData?: any;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -218,6 +220,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       venueReportNotes: data.venueReportNotes,
       pinnedApps: data.pinnedApps,
       region: data.region,
+      floorplanUrl: data.floorplanUrl,
+      floorplanData: data.floorplanData,
     },
   });
 }
@@ -1597,6 +1601,106 @@ export async function getDisplayPhotos(
     });
   } catch (error) {
     console.error('Error fetching display photos:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Rental API Functions
+// ============================================
+
+export interface CreateRentalData {
+  name: string;
+  description?: string | null;
+  shapeType?: string;
+  color?: string;
+  borderColor?: string | null;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  price?: number | null;
+  priceUnit?: string;
+  capacity?: number | null;
+  status?: string;
+  bookedBy?: string | null;
+  bookedEmail?: string | null;
+  bookedNotes?: string | null;
+  showLabel?: boolean;
+  showOnDisplay?: boolean;
+  opacity?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateRentalData extends Partial<CreateRentalData> {}
+
+export async function getPartyRentals(partyId: string): Promise<{ rentals: Rental[] } | null> {
+  try {
+    return await apiRequest<{ rentals: Rental[] }>(`/api/parties/${partyId}/rentals`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching rentals:', error);
+    return null;
+  }
+}
+
+export async function createRental(
+  partyId: string,
+  data: CreateRentalData
+): Promise<{ rental: Rental } | null> {
+  try {
+    return await apiRequest<{ rental: Rental }>(`/api/parties/${partyId}/rentals`, {
+      method: 'POST',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error creating rental:', error);
+    return null;
+  }
+}
+
+export async function updateRental(
+  partyId: string,
+  rentalId: string,
+  data: UpdateRentalData
+): Promise<{ rental: Rental } | null> {
+  try {
+    return await apiRequest<{ rental: Rental }>(`/api/parties/${partyId}/rentals/${rentalId}`, {
+      method: 'PATCH',
+      body: data,
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error updating rental:', error);
+    return null;
+  }
+}
+
+export async function deleteRental(partyId: string, rentalId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/rentals/${rentalId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting rental:', error);
+    return false;
+  }
+}
+
+export async function getPublicRentals(partyId: string): Promise<{ rentals: Rental[] } | null> {
+  try {
+    return await apiRequest<{ rentals: Rental[] }>(`/api/rentals/view/${partyId}/rentals`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching public rentals:', error);
     return null;
   }
 }

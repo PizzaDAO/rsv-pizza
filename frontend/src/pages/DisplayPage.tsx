@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2 } from 'lucide-react';
-import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
-import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo } from '../types';
+import { getDisplayForViewer, getDisplayPhotos, getPublicRentals } from '../lib/api';
+import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, FloorplanConfig, Photo, Rental } from '../types';
+import { FloorplanCanvas } from '../components/shared/FloorplanCanvas';
 
 export function DisplayPage() {
   const { partyId, slug } = useParams<{ partyId: string; slug: string }>();
@@ -13,6 +14,7 @@ export function DisplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [rentals, setRentals] = useState<Rental[]>([]);
 
   const loadDisplay = useCallback(async () => {
     if (!partyId || !slug) return;
@@ -56,6 +58,25 @@ export function DisplayPage() {
     }, refreshMs);
     return () => clearInterval(interval);
   }, [data, partyId, slug]);
+
+  // Floorplan: load rentals initially and auto-refresh
+  useEffect(() => {
+    if (!data || data.display.contentType !== 'floorplan' || !partyId) return;
+    const config = data.display.contentConfig as FloorplanConfig;
+
+    // Initial load
+    getPublicRentals(partyId).then((result) => {
+      if (result) setRentals(result.rentals);
+    });
+
+    // Auto-refresh
+    const refreshMs = (config.refreshInterval || 30) * 1000;
+    const interval = setInterval(async () => {
+      const result = await getPublicRentals(partyId);
+      if (result) setRentals(result.rentals);
+    }, refreshMs);
+    return () => clearInterval(interval);
+  }, [data, partyId]);
 
   // Slideshow / photo rotation
   useEffect(() => {
@@ -121,6 +142,7 @@ export function DisplayPage() {
           {display.contentType === 'slideshow' && <SlideshowDisplay config={display.contentConfig as SlideshowConfig} />}
           {display.contentType === 'photos' && <PhotosDisplay config={display.contentConfig as PhotosConfig} photos={photos} currentIndex={currentSlideIndex} />}
           {display.contentType === 'upload' && <UploadDisplay config={display.contentConfig as UploadConfig} />}
+          {display.contentType === 'floorplan' && <FloorplanDisplay config={display.contentConfig as FloorplanConfig} party={party} rentals={rentals} />}
         </div>
       </div>
     </>
@@ -300,5 +322,42 @@ function UploadDisplay({ config }: { config: UploadConfig }) {
       alt="Display content"
       className="max-w-full max-h-full object-contain"
     />
+  );
+}
+
+function FloorplanDisplay({
+  config,
+  party,
+  rentals,
+}: {
+  config: FloorplanConfig;
+  party: DisplayViewerData['party'];
+  rentals: Rental[];
+}) {
+  // Get floorplan URL from party data
+  const floorplanUrl = party.floorplanUrl;
+
+  if (!floorplanUrl) {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-white/50 text-xl">No floorplan uploaded</p>
+        <p className="text-white/30 text-sm">Upload a floorplan image in the Venue tab</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full p-4">
+      <FloorplanCanvas
+        floorplanUrl={floorplanUrl}
+        rentalShapes={config.showRentals !== false ? rentals : []}
+        mode="view-only"
+        showRentalShapes={config.showRentals !== false}
+        showLabels={config.showLabels !== false}
+        showPrices={config.showPrices ?? false}
+        showStatus={config.showStatus !== false}
+        maxHeight="100vh"
+      />
+    </div>
   );
 }

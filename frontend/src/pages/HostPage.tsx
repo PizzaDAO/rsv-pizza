@@ -24,6 +24,7 @@ import { MusicWidget } from '../components/music';
 import { ReportWidget } from '../components/report';
 import { StaffingWidget } from '../components/staffing';
 import { DisplaysWidget } from '../components/displays';
+import { RentalsWidget } from '../components/rentals';
 import { RaffleWidget } from '../components/raffle';
 import { BudgetTab } from '../components/budget';
 import { ChecklistTab } from '../components/checklist';
@@ -34,9 +35,9 @@ import { PINNABLE_APPS } from '../lib/appDefinitions';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'rentals' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'rentals', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -379,6 +380,10 @@ function HostPageContent() {
 
               {activeTab === 'displays' && party && (
                 <DisplaysWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'rentals' && party && (
+                <RentalsWidget partyId={party.id} />
               )}
 
               {activeTab === 'raffle' && party && (

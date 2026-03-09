@@ -259,6 +259,8 @@ export interface Party {
   donationEthAddress?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  floorplanUrl?: string | null;
+  floorplanData?: any;
 }
 
 export interface Donation {
@@ -626,8 +628,50 @@ export interface StaffStats {
   uniqueRoles: string[];
 }
 
+// Rental Widget types
+export type RentalShapeType = 'rectangle' | 'circle' | 'square';
+export type RentalStatus = 'available' | 'reserved' | 'sold';
+
+export interface Rental {
+  id: string;
+  partyId: string;
+  name: string;
+  description?: string | null;
+  shapeType: RentalShapeType;
+  color: string;
+  borderColor?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  price?: number | null;
+  priceUnit?: string | null;
+  capacity?: number | null;
+  status: RentalStatus;
+  bookedBy?: string | null;
+  bookedEmail?: string | null;
+  bookedNotes?: string | null;
+  showLabel: boolean;
+  showOnDisplay: boolean;
+  opacity: number;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Floorplan display config
+export interface FloorplanConfig {
+  showRentals?: boolean;
+  showDisplayPins?: boolean;
+  showLabels?: boolean;
+  showPrices?: boolean;
+  showStatus?: boolean;
+  refreshInterval?: number;
+}
+
 // Display Widget types
-export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom';
+export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'floorplan' | 'custom';
 
 export interface SlideContent {
   type: 'image' | 'text' | 'qr';
@@ -707,6 +751,7 @@ export interface DisplayViewerData {
     eventImageUrl: string | null;
     inviteCode: string;
     customUrl: string | null;
+    floorplanUrl?: string | null;
   };
   photos?: Photo[];
 }

@@ -78,7 +78,7 @@ router.post('/:partyId/displays', requireAuth, async (req: AuthRequest, res: Res
     }
 
     // Validate content type
-    const validContentTypes = ['slideshow', 'qr_code', 'event_info', 'photos', 'upload', 'custom'];
+    const validContentTypes = ['slideshow', 'qr_code', 'event_info', 'photos', 'upload', 'floorplan', 'custom'];
     if (!validContentTypes.includes(contentType)) {
       throw new AppError(`Invalid content type. Must be one of: ${validContentTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
@@ -177,7 +177,7 @@ router.patch('/:partyId/displays/:displayId', requireAuth, async (req: AuthReque
 
     // Validate content type if provided
     if (contentType) {
-      const validContentTypes = ['slideshow', 'qr_code', 'event_info', 'photos', 'upload', 'custom'];
+      const validContentTypes = ['slideshow', 'qr_code', 'event_info', 'photos', 'upload', 'floorplan', 'custom'];
       if (!validContentTypes.includes(contentType)) {
         throw new AppError(`Invalid content type. Must be one of: ${validContentTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
       }
@@ -278,6 +278,7 @@ router.get('/view/:partyId/:slug', async (req: AuthRequest, res: Response, next:
             eventImageUrl: true,
             inviteCode: true,
             customUrl: true,
+            floorplanUrl: true,
           },
         },
       },

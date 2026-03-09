@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link } from 'lucide-react';
+import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link, Shapes } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import {
@@ -10,6 +10,7 @@ import {
   PhotosConfig,
   EventInfoConfig,
   UploadConfig,
+  FloorplanConfig,
 } from '../../types';
 
 interface DisplayFormProps {
@@ -36,6 +37,7 @@ const contentTypes: { value: DisplayContentType; label: string; icon: React.Reac
   { value: 'event_info', label: 'Event Info', icon: <Info size={20} />, description: 'Event details display' },
   { value: 'photos', label: 'Photo Wall', icon: <Camera size={20} />, description: 'Live photo gallery' },
   { value: 'upload', label: 'Upload', icon: <Upload size={20} />, description: 'Image or video upload' },
+  { value: 'floorplan', label: 'Floorplan', icon: <Shapes size={20} />, description: 'Venue map with rentals' },
 ];
 
 const RESOLUTION_PRESETS = [
@@ -84,6 +86,11 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [eventShowLocation, setEventShowLocation] = useState(true);
   const [uploadMediaUrl, setUploadMediaUrl] = useState('');
   const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
+  const [floorplanShowRentals, setFloorplanShowRentals] = useState(true);
+  const [floorplanShowLabels, setFloorplanShowLabels] = useState(true);
+  const [floorplanShowPrices, setFloorplanShowPrices] = useState(false);
+  const [floorplanShowStatus, setFloorplanShowStatus] = useState(true);
+  const [floorplanRefreshInterval, setFloorplanRefreshInterval] = useState(30);
 
   // Initialize from existing display config
   useEffect(() => {
@@ -112,6 +119,13 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
         case 'upload':
           setUploadMediaUrl(config.mediaUrl || '');
           setUploadMediaType(config.mediaType || 'image');
+          break;
+        case 'floorplan':
+          setFloorplanShowRentals(config.showRentals ?? true);
+          setFloorplanShowLabels(config.showLabels ?? true);
+          setFloorplanShowPrices(config.showPrices ?? false);
+          setFloorplanShowStatus(config.showStatus ?? true);
+          setFloorplanRefreshInterval(config.refreshInterval || 30);
           break;
       }
     }
@@ -163,6 +177,15 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
           mediaUrl: uploadMediaUrl.trim(),
           mediaType: uploadMediaType,
         } as UploadConfig;
+        break;
+      case 'floorplan':
+        contentConfig = {
+          showRentals: floorplanShowRentals,
+          showLabels: floorplanShowLabels,
+          showPrices: floorplanShowPrices,
+          showStatus: floorplanShowStatus,
+          refreshInterval: floorplanRefreshInterval,
+        } as FloorplanConfig;
         break;
       case 'custom':
         contentConfig = {};
@@ -419,6 +442,48 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     />
                   </div>
                 )}
+              </div>
+            )}
+
+            {contentType === 'floorplan' && (
+              <div className="space-y-4">
+                <p className="text-xs text-white/40">
+                  Displays the venue floorplan with rental spaces. Upload a floorplan image in the Venue tab first.
+                </p>
+                <div className="space-y-3">
+                  <Checkbox
+                    checked={floorplanShowRentals}
+                    onChange={() => setFloorplanShowRentals(!floorplanShowRentals)}
+                    label="Show rental shapes"
+                  />
+                  <Checkbox
+                    checked={floorplanShowLabels}
+                    onChange={() => setFloorplanShowLabels(!floorplanShowLabels)}
+                    label="Show rental labels"
+                  />
+                  <Checkbox
+                    checked={floorplanShowPrices}
+                    onChange={() => setFloorplanShowPrices(!floorplanShowPrices)}
+                    label="Show prices"
+                  />
+                  <Checkbox
+                    checked={floorplanShowStatus}
+                    onChange={() => setFloorplanShowStatus(!floorplanShowStatus)}
+                    label="Show availability status"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    min={10}
+                    max={300}
+                    value={floorplanRefreshInterval}
+                    onChange={(e) => setFloorplanRefreshInterval(parseInt(e.target.value) || 30)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    placeholder="Refresh interval (seconds)"
+                  />
+                  <p className="text-xs text-white/40 pl-1 mt-1">How often to refresh rental status</p>
+                </div>
               </div>
             )}
           </div>

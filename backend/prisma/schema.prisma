@@ -144,6 +144,10 @@ model Party {
   venueReportTitle     String?  @map("venue_report_title")
   venueReportNotes     String?  @map("venue_report_notes")
 
+  // Floorplan settings
+  floorplanUrl  String? @map("floorplan_url")
+  floorplanData Json?   @default("{}") @map("floorplan_data")
+
   // Pinned apps (for Apps Hub tab bar)
   pinnedApps  Json?   @default("[]") @map("pinned_apps")
 
@@ -160,6 +164,7 @@ model Party {
   donations        Donation[]
   raffles          Raffle[]
   displays         Display[]
+  rentals          Rental[]
   staff            Staff[]
   performers       Performer[]
   venues           Venue[]
@@ -656,6 +661,57 @@ model Display {
   @@unique([partyId, slug])
   @@index([partyId])
   @@map("displays")
+}
+
+// ============================================
+// Rental Widget Models
+// ============================================
+
+model Rental {
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  // Identity
+  name        String
+  description String?
+
+  // Shape
+  shapeType   String @default("rectangle") @map("shape_type")
+  color       String @default("#ff393a")
+  borderColor String? @default("#ffffff") @map("border_color")
+
+  // Position (percentage-based 0-100)
+  x      Float @default(50)
+  y      Float @default(50)
+  width  Float @default(10)
+  height Float @default(10)
+  rotation Float? @default(0)
+
+  // Rental details
+  price     Decimal? @db.Decimal(10, 2)
+  priceUnit String?  @default("flat") @map("price_unit")
+  capacity  Int?
+  status    String   @default("available")
+
+  // Booking info
+  bookedBy    String? @map("booked_by")
+  bookedEmail String? @map("booked_email")
+  bookedNotes String? @map("booked_notes")
+
+  // Display options
+  showLabel     Boolean @default(true) @map("show_label")
+  showOnDisplay Boolean @default(true) @map("show_on_display")
+  opacity       Float   @default(0.3)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("rentals")
 }
 
 // ============================================
