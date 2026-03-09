@@ -8,6 +8,34 @@ import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
 
+/* ── colour tokens (from the 2026 flyer) ────────────────── */
+const C = {
+  skyTop:    '#7EC8E3',
+  skyBot:    '#B6E4F7',
+  red:       '#E52828',
+  redHover:  '#CC2020',
+  green:     '#2E7D32',
+  yellow:    '#FFD600',
+  darkText:  '#1a1a1a',
+  mutedText: '#555',
+  cardBg:    'rgba(255,255,255,0.92)',
+  cardBorder:'rgba(0,0,0,0.08)',
+};
+
+/* ── tiny CSS cloud (pure CSS, no SVG files needed) ──────── */
+const Cloud: React.FC<{ className?: string; size?: number }> = ({ className = '', size = 80 }) => (
+  <div
+    className={`absolute pointer-events-none ${className}`}
+    style={{
+      width: size,
+      height: size * 0.45,
+      background: 'rgba(255,255,255,0.55)',
+      borderRadius: '999px',
+      filter: 'blur(2px)',
+    }}
+  />
+);
+
 export function GPPLandingPage() {
   const navigate = useNavigate();
   const [city, setCity] = useState('');
@@ -20,7 +48,6 @@ export function GPPLandingPage() {
 
   const handleCitySelected = (data: CityData) => {
     cityDataRef.current = data;
-    // Use just the city name (not full formatted address) as the city value
     setCity(data.cityName);
   };
 
@@ -57,35 +84,61 @@ export function GPPLandingPage() {
     }
   };
 
-  // Success state
+  /* ──────────────── SUCCESS STATE ──────────────── */
   if (success) {
     return (
-      <div className="min-h-screen">
+      <div
+        className="min-h-screen"
+        style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
+      >
         <Helmet>
           <title>Event Created! | Global Pizza Party</title>
         </Helmet>
 
-        <Header variant="transparent" />
+        {/* dark header on light background */}
+        <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
+              <span
+                className="hidden sm:inline"
+                style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem', color: C.darkText }}
+              >
+                RSV.Pizza
+              </span>
+            </a>
+          </div>
+        </header>
 
-        <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
+        <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 relative">
+          {/* decorative clouds */}
+          <Cloud className="top-12 left-[8%] opacity-60" size={100} />
+          <Cloud className="top-24 right-[12%] opacity-40" size={70} />
+
           <div className="max-w-lg w-full text-center">
-            <div className="w-20 h-20 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-10 h-10 text-[#39d98a]" />
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{ background: `${C.green}22` }}
+            >
+              <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
             </div>
 
-            <h1 className="text-3xl font-bold text-white mb-4">
+            <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
               Your Global Pizza Party is Live!
             </h1>
 
-            <p className="text-white/70 text-lg mb-8">
-              <span className="text-white font-medium">{success.eventName}</span> has been created.
+            <p className="text-lg mb-8" style={{ color: C.mutedText }}>
+              <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
               Check your email for a login code to access your host dashboard.
             </p>
 
             <div className="space-y-4">
               <button
                 onClick={() => navigate(`/login?email=${encodeURIComponent(success.email)}&redirect=${encodeURIComponent(success.hostPageUrl)}`)}
-                className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-lg"
+                className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
+                style={{ background: C.red }}
+                onMouseEnter={e => (e.currentTarget.style.background = C.redHover)}
+                onMouseLeave={e => (e.currentTarget.style.background = C.red)}
               >
                 Sign In to Host Dashboard
                 <ArrowRight size={20} />
@@ -93,13 +146,18 @@ export function GPPLandingPage() {
 
               <button
                 onClick={() => navigate('/')}
-                className="w-full btn-secondary"
+                className="w-full py-3 rounded-xl font-medium transition-all border"
+                style={{
+                  background: 'rgba(255,255,255,0.7)',
+                  borderColor: 'rgba(0,0,0,0.12)',
+                  color: C.darkText,
+                }}
               >
                 Return Home
               </button>
             </div>
 
-            <p className="text-white/50 text-sm mt-8">
+            <p className="text-sm mt-8" style={{ color: C.mutedText }}>
               Didn't receive an email? Check your spam folder or request a new login code from the host page.
             </p>
           </div>
@@ -110,76 +168,148 @@ export function GPPLandingPage() {
     );
   }
 
+  /* ──────────────── MAIN PAGE ──────────────── */
   return (
-    <div className="min-h-screen">
+    <div
+      className="min-h-screen"
+      style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
+    >
       <Helmet>
         <title>Host a Global Pizza Party | RSV.Pizza</title>
-        <meta name="description" content="Join the worldwide celebration of pizza! Host a Global Pizza Party in your city and connect with pizza lovers around the world." />
+        <meta
+          name="description"
+          content="Join the worldwide celebration of pizza! Host a Global Pizza Party in your city and connect with pizza lovers around the world."
+        />
       </Helmet>
 
-      <Header variant="transparent" />
+      {/* ─── LIGHT HEADER ─── */}
+      <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
+            <span
+              className="hidden sm:inline"
+              style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem', color: C.darkText }}
+            >
+              RSV.Pizza
+            </span>
+          </a>
+          <a
+            href="/login"
+            className="text-sm font-medium px-4 py-2 rounded-lg border transition-colors"
+            style={{
+              color: C.darkText,
+              borderColor: 'rgba(0,0,0,0.15)',
+              background: 'rgba(255,255,255,0.5)',
+            }}
+          >
+            Log In / Sign Up
+          </a>
+        </div>
+      </header>
 
-      {/* Hero Section */}
+      {/* ─── HERO ─── */}
       <div className="relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#ff6b35]/20 via-transparent to-[#ff393a]/20" />
+        {/* Decorative clouds */}
+        <Cloud className="top-10 left-[5%] opacity-50" size={120} />
+        <Cloud className="top-32 right-[8%] opacity-40" size={90} />
+        <Cloud className="top-56 left-[60%] opacity-30 hidden md:block" size={60} />
 
-        <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-20">
+          <div className="grid md:grid-cols-2 gap-10 items-center">
             {/* Left: Hero Content */}
             <div>
-              <div className="inline-flex items-center gap-2 bg-[#ff6b35]/20 text-[#ff6b35] px-4 py-2 rounded-full text-sm font-medium mb-6">
-                <Globe className="w-4 h-4" />
-                Join the Worldwide Celebration
+              {/* PizzaDAO logo badge */}
+              <div className="flex items-center gap-2 mb-6">
+                <img src="/pizzadao-logo.svg" alt="PizzaDAO" className="h-6 opacity-80" />
+                <span className="text-sm font-medium" style={{ color: 'rgba(0,0,0,0.5)' }}>presents</span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                Host a Global<br />
-                <span className="text-[#ff6b35]">Pizza Party</span>
+              {/* Title — matches flyer: big red "2026", white bold "GLOBAL PIZZA PARTY" */}
+              <h1 className="mb-4 leading-none">
+                <span
+                  className="block font-extrabold"
+                  style={{ color: C.red, fontSize: 'clamp(4rem, 10vw, 7rem)', lineHeight: 0.95 }}
+                >
+                  2026
+                </span>
+                <span
+                  className="block font-extrabold italic"
+                  style={{
+                    color: '#fff',
+                    fontSize: 'clamp(1.6rem, 4.5vw, 3rem)',
+                    lineHeight: 1.1,
+                    textShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  GLOBAL PIZZA<br />PARTY
+                </span>
               </h1>
 
-              <p className="text-xl text-white/70 mb-8 leading-relaxed">
-                Connect with hundreds of cities worldwide celebrating the universal language of pizza.
-                Create your event in seconds and join the party!
+              <p
+                className="text-lg md:text-xl font-bold mb-2"
+                style={{ color: C.red }}
+              >
+                May 22
+              </p>
+              <p
+                className="text-lg md:text-xl font-semibold mb-8"
+                style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+              >
+                In a City Near You
               </p>
 
-              {/* Features list */}
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="flex items-center gap-3 text-white/80">
-                  <div className="w-8 h-8 bg-[#ff393a]/20 rounded-lg flex items-center justify-center">
-                    <Pizza className="w-4 h-4 text-[#ff393a]" />
+              {/* Feature chips */}
+              <div className="grid grid-cols-2 gap-3 mb-8">
+                {[
+                  { icon: Pizza, label: 'Pre-designed event page' },
+                  { icon: Users, label: 'RSVP management' },
+                  { icon: Camera, label: 'Photo sharing' },
+                  { icon: Globe, label: 'Global GPP network' },
+                ].map(({ icon: Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(4px)' }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: `${C.red}22` }}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: C.red }} />
+                    </div>
+                    <span className="text-sm font-medium" style={{ color: C.darkText }}>{label}</span>
                   </div>
-                  <span className="text-sm">Pre-designed event page</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/80">
-                  <div className="w-8 h-8 bg-[#ff393a]/20 rounded-lg flex items-center justify-center">
-                    <Users className="w-4 h-4 text-[#ff393a]" />
-                  </div>
-                  <span className="text-sm">RSVP management</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/80">
-                  <div className="w-8 h-8 bg-[#ff393a]/20 rounded-lg flex items-center justify-center">
-                    <Camera className="w-4 h-4 text-[#ff393a]" />
-                  </div>
-                  <span className="text-sm">Photo sharing</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/80">
-                  <div className="w-8 h-8 bg-[#ff393a]/20 rounded-lg flex items-center justify-center">
-                    <Globe className="w-4 h-4 text-[#ff393a]" />
-                  </div>
-                  <span className="text-sm">Global GPP network</span>
-                </div>
+                ))}
               </div>
             </div>
 
             {/* Right: Sign Up Form */}
-            <div className="card p-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Create Your Event</h2>
-              <p className="text-white/60 mb-6">Fill in your details to get started</p>
+            <div
+              className="p-7 md:p-8 rounded-2xl shadow-lg border"
+              style={{
+                background: C.cardBg,
+                borderColor: C.cardBorder,
+              }}
+            >
+              <h2 className="text-2xl font-bold mb-1" style={{ color: C.darkText }}>
+                Create Your Event
+              </h2>
+              <p className="text-sm mb-6" style={{ color: C.mutedText }}>
+                Fill in your details to get started
+              </p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 {error && (
-                  <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-4 rounded-xl text-sm">
+                  <div
+                    className="p-4 rounded-xl text-sm"
+                    style={{
+                      background: `${C.red}12`,
+                      border: `1px solid ${C.red}40`,
+                      color: C.red,
+                    }}
+                  >
                     {error.includes('https://') ? (
                       <>
                         {error.split('https://')[0]}
@@ -187,7 +317,7 @@ export function GPPLandingPage() {
                           href={`https://${error.split('https://')[1]}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="underline hover:text-red-300"
+                          className="underline opacity-80 hover:opacity-100"
                         >
                           https://{error.split('https://')[1]}
                         </a>
@@ -196,55 +326,49 @@ export function GPPLandingPage() {
                   </div>
                 )}
 
+                {/* City */}
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-white/80 mb-2">
-                    What city are you hosting in?
-                  </label>
-                  <LocationAutocomplete
-                    value={city}
-                    onChange={(val) => {
-                      setCity(val);
-                      // Clear structured data if user edits manually
-                      cityDataRef.current = null;
-                    }}
-                    onCitySelected={handleCitySelected}
-                    types={['(cities)']}
-                    placeholder="e.g., New York, London, Tokyo"
-                    disabled={isSubmitting}
-                  />
+                  <div className="gpp-light-input">
+                    <LocationAutocomplete
+                      value={city}
+                      onChange={(val) => {
+                        setCity(val);
+                        cityDataRef.current = null;
+                      }}
+                      onCitySelected={handleCitySelected}
+                      types={['(cities)']}
+                      placeholder="What city are you hosting in?"
+                      disabled={isSubmitting}
+                      className="gpp-input"
+                    />
+                  </div>
                 </div>
 
+                {/* Host Name */}
                 <div>
-                  <label htmlFor="hostName" className="block text-sm font-medium text-white/80 mb-2">
-                    What's your name?
-                  </label>
                   <input
-                    id="hostName"
                     type="text"
                     value={hostName}
                     onChange={(e) => setHostName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full"
+                    placeholder="What's your name?"
+                    className="gpp-input w-full"
                     required
                     disabled={isSubmitting}
                   />
                 </div>
 
+                {/* Email */}
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-white/80 mb-2">
-                    Email address
-                  </label>
                   <input
-                    id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full"
+                    placeholder="Email address"
+                    className="gpp-input w-full"
                     required
                     disabled={isSubmitting}
                   />
-                  <p className="text-xs text-white/50 mt-2">
+                  <p className="text-xs mt-2" style={{ color: C.mutedText }}>
                     We'll send you a login code to manage your event
                   </p>
                 </div>
@@ -252,7 +376,10 @@ export function GPPLandingPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-lg"
+                  className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-60"
+                  style={{ background: C.red }}
+                  onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = C.redHover; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = C.red; }}
                 >
                   {isSubmitting ? (
                     <>
@@ -268,9 +395,9 @@ export function GPPLandingPage() {
                 </button>
               </form>
 
-              <p className="text-center text-white/50 text-sm mt-6">
+              <p className="text-center text-sm mt-6" style={{ color: C.mutedText }}>
                 Already have an account?{' '}
-                <a href="/login" className="text-[#ff393a] hover:underline">
+                <a href="/login" className="font-medium hover:underline" style={{ color: C.red }}>
                   Sign in
                 </a>
               </p>
@@ -279,53 +406,87 @@ export function GPPLandingPage() {
         </div>
       </div>
 
-      {/* Resources Section */}
-      <div className="border-t border-white/10">
+      {/* ─── FLYER IMAGE BANNER ─── */}
+      <div className="max-w-6xl mx-auto px-4 pb-12">
+        <div className="rounded-2xl overflow-hidden shadow-lg border" style={{ borderColor: 'rgba(255,255,255,0.3)' }}>
+          <img
+            src="/gpp-flyer-2026.png"
+            alt="2026 Global Pizza Party — May 22 — In a City Near You"
+            className="w-full h-auto object-cover"
+          />
+        </div>
+      </div>
+
+      {/* ─── RESOURCES SECTION ─── */}
+      <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="max-w-6xl mx-auto px-4 py-16">
-          <h2 className="text-2xl font-bold text-white text-center mb-12">Resources for Hosts</h2>
+          <h2 className="text-2xl font-bold text-center mb-12" style={{ color: C.darkText }}>
+            Resources for Hosts
+          </h2>
 
           <div className="grid md:grid-cols-3 gap-6">
+            {/* Host Guide */}
             <a
               href="https://docs.google.com/presentation/d/e/2PACX-1vSNFVmhuegxE6QhHFHBC1WCVGJ4eA-Zl-SpzcQG0kMuG1bQf3GA_01BaWtLoL-VUgTT0y3M330lGB5D/pub?start=false&loop=false&delayms=3000"
               target="_blank"
               rel="noopener noreferrer"
-              className="card p-6 hover:bg-white/5 transition-colors group"
+              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
+              style={{ background: C.cardBg, borderColor: C.cardBorder }}
             >
-              <div className="w-12 h-12 bg-[#ff6b35]/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#ff6b35]/30 transition-colors">
-                <BookOpen className="w-6 h-6 text-[#ff6b35]" />
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
+                style={{ background: `${C.red}15` }}
+              >
+                <BookOpen className="w-6 h-6" style={{ color: C.red }} />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">GPP Host Guide</h3>
-              <p className="text-white/60 text-sm">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
+                GPP Host Guide
+              </h3>
+              <p className="text-sm" style={{ color: C.mutedText }}>
                 Everything you need to know about hosting a successful Global Pizza Party.
               </p>
             </a>
 
+            {/* Telegram */}
             <a
               href="https://t.me/+Qr-B8Y6DYH4yMjIx"
               target="_blank"
               rel="noopener noreferrer"
-              className="card p-6 hover:bg-white/5 transition-colors group"
+              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
+              style={{ background: C.cardBg, borderColor: C.cardBorder }}
             >
-              <div className="w-12 h-12 bg-[#39d98a]/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#39d98a]/30 transition-colors">
-                <MessageCircle className="w-6 h-6 text-[#39d98a]" />
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
+                style={{ background: `${C.green}15` }}
+              >
+                <MessageCircle className="w-6 h-6" style={{ color: C.green }} />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Telegram Community</h3>
-              <p className="text-white/60 text-sm">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
+                Telegram Community
+              </h3>
+              <p className="text-sm" style={{ color: C.mutedText }}>
                 Join fellow hosts and the PizzaDAO team for support and coordination.
               </p>
             </a>
 
+            {/* PizzaDAO Resources */}
             <a
               href="https://pizzadao.xyz/landing"
               target="_blank"
               rel="noopener noreferrer"
-              className="card p-6 hover:bg-white/5 transition-colors group"
+              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
+              style={{ background: C.cardBg, borderColor: C.cardBorder }}
             >
-              <div className="w-12 h-12 bg-[#5c7cfa]/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#5c7cfa]/30 transition-colors">
-                <HelpCircle className="w-6 h-6 text-[#5c7cfa]" />
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
+                style={{ background: '#5c7cfa15' }}
+              >
+                <HelpCircle className="w-6 h-6" style={{ color: '#5c7cfa' }} />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">PizzaDAO Resources</h3>
-              <p className="text-white/60 text-sm">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
+                PizzaDAO Resources
+              </h3>
+              <p className="text-sm" style={{ color: C.mutedText }}>
                 Common questions about hosting and what to expect on the day.
               </p>
             </a>
@@ -333,8 +494,77 @@ export function GPPLandingPage() {
         </div>
       </div>
 
-      <Footer className="border-t border-white/10" />
+      {/* ─── FOOTER ─── */}
+      <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-sm" style={{ color: 'rgba(0,0,0,0.4)' }}>Powered by</span>
+          <a
+            href="https://pizzadao.xyz/join"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+          >
+            <img src="/pizzadao-logo.svg" alt="PizzaDAO" className="h-7" />
+          </a>
+        </div>
+      </footer>
+
       <CornerLinks />
+
+      {/* ─── SCOPED LIGHT-THEME OVERRIDES ─── */}
+      <style>{`
+        /* Override the dark global input styles for the GPP page */
+        .gpp-input,
+        .gpp-light-input input {
+          background: rgba(255,255,255,0.85) !important;
+          border: 1px solid rgba(0,0,0,0.12) !important;
+          color: #1a1a1a !important;
+          border-radius: 12px !important;
+          padding: 12px 16px !important;
+        }
+        .gpp-input:focus,
+        .gpp-light-input input:focus {
+          border-color: ${C.red} !important;
+          background: #fff !important;
+          outline: none !important;
+        }
+        .gpp-input::placeholder,
+        .gpp-light-input input::placeholder {
+          color: #999 !important;
+        }
+        /* LocationAutocomplete has a MapPin icon with left padding */
+        .gpp-light-input input {
+          padding-left: 2.75rem !important;
+        }
+        .gpp-light-input .absolute {
+          color: #999 !important;
+        }
+
+        /* Override Google Maps autocomplete dropdown to be light */
+        .pac-container {
+          background-color: #fff !important;
+          border: 1px solid rgba(0,0,0,0.12) !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;
+        }
+        .pac-item {
+          background-color: #fff !important;
+          border-top: 1px solid rgba(0,0,0,0.06) !important;
+          color: #1a1a1a !important;
+        }
+        .pac-item:hover {
+          background-color: #f5f5f5 !important;
+        }
+        .pac-item-selected,
+        .pac-item-selected:hover {
+          background-color: #eee !important;
+        }
+        .pac-item-query {
+          color: #1a1a1a !important;
+        }
+        .pac-matched {
+          color: ${C.red} !important;
+        }
+      `}</style>
     </div>
   );
 }

@@ -72,6 +72,7 @@ RSVP to secure your slice!`,
   hideGuests: false,
   photosEnabled: true,
   photosPublic: true,
+  eventImageUrl: 'https://rsv.pizza/gpp-flyer-2026.png',
 };
 
 // Helper function to send GPP welcome email with magic link
@@ -255,6 +256,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         hideGuests: GPP_DEFAULTS.hideGuests,
         photosEnabled: GPP_DEFAULTS.photosEnabled,
         photosPublic: GPP_DEFAULTS.photosPublic,
+        eventImageUrl: GPP_DEFAULTS.eventImageUrl,
         customUrl: customUrl,
         date: defaultDate,
         region: inferredRegion,
