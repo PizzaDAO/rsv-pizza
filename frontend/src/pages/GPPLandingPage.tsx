@@ -58,6 +58,8 @@ export function GPPLandingPage() {
     size: number;
     delay: number;
     duration: number;
+    swayAmount: number;
+    swaySpeed: number;
   }>>([]);
 
   const handleCitySelected = (data: CityData) => {
@@ -165,17 +167,19 @@ export function GPPLandingPage() {
           setConfettiPieces(pieces);
         }
 
-        // Fire parachute pizza box drops
+        // Fire parachute pizza box drops — each with unique speed & sway
         const chutes = Array.from({ length: 4 }, (_, i) => ({
           id: i,
-          x: 10 + Math.random() * 80,
-          size: 80 + Math.random() * 40,
-          delay: i * 0.4,
-          duration: 4 + Math.random() * 2,
+          x: 15 + Math.random() * 70,
+          size: 70 + Math.random() * 50,
+          delay: 0.5 + i * 0.6,
+          duration: 5 + i * 1.5 + Math.random() * 1.5,  // 5–10s, slower = more variety
+          swayAmount: 15 + Math.random() * 25,           // 15–40px sway
+          swaySpeed: 1.5 + Math.random() * 1.5,          // 1.5–3s per sway cycle
         }));
         setParachutes(chutes);
 
-        // Delay transition to success state so user sees the animations
+        // Delay transition to success state so user sees the full animation
         const successData = {
           hostPageUrl: response.hostPageUrl,
           eventName: response.event.name,
@@ -183,7 +187,7 @@ export function GPPLandingPage() {
         };
         setTimeout(() => {
           setSuccess(successData);
-        }, 4000);
+        }, 8000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event. Please try again.');
@@ -624,18 +628,27 @@ export function GPPLandingPage() {
             />
           ))}
           {parachutes.map((p) => (
-            <img
+            <div
               key={`chute-${p.id}`}
-              src="/gpp-parachute.png"
-              alt=""
               className="absolute"
               style={{
                 left: `${p.x}%`,
                 top: -150,
                 width: p.size,
-                animation: `parachute-drop ${p.duration}s ease-in ${p.delay}s forwards`,
+                animation: `parachute-drop ${p.duration}s linear ${p.delay}s forwards`,
               }}
-            />
+            >
+              <img
+                src="/gpp-parachute.png"
+                alt=""
+                className="w-full"
+                style={{
+                  animation: `parachute-sway ${p.swaySpeed}s ease-in-out ${p.delay}s infinite`,
+                  '--sway-amount': `${p.swayAmount}px`,
+                  '--sway-rot': `${8 + p.id * 5}deg`,
+                } as React.CSSProperties}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -674,24 +687,34 @@ export function GPPLandingPage() {
           }
         }
 
-        /* Parachute pizza box drop animation */
+        /* Parachute pizza box — constant-speed vertical drop */
         @keyframes parachute-drop {
           0% {
-            transform: translateY(0) translateX(0);
+            transform: translateY(0);
             opacity: 1;
           }
-          25% {
-            transform: translateY(25vh) translateX(20px);
-          }
-          50% {
-            transform: translateY(50vh) translateX(-15px);
-          }
-          75% {
-            transform: translateY(75vh) translateX(10px);
+          90% {
+            opacity: 1;
           }
           100% {
-            transform: translateY(110vh) translateX(-5px);
-            opacity: 0.8;
+            transform: translateY(calc(100vh + 200px));
+            opacity: 0;
+          }
+        }
+
+        /* Parachute sway — horizontal drift + rotation, loops independently */
+        @keyframes parachute-sway {
+          0% {
+            transform: translateX(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(var(--sway-amount)) rotate(var(--sway-rot));
+          }
+          75% {
+            transform: translateX(calc(-1 * var(--sway-amount))) rotate(calc(-1 * var(--sway-rot)));
+          }
+          100% {
+            transform: translateX(0) rotate(0deg);
           }
         }
 
