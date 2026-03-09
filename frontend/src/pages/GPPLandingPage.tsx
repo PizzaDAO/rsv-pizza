@@ -500,9 +500,9 @@ export function GPPLandingPage() {
           </h2>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Host Guide */}
+            {/* Sponsor One Sheet */}
             <a
-              href="https://docs.google.com/presentation/d/e/2PACX-1vSNFVmhuegxE6QhHFHBC1WCVGJ4eA-Zl-SpzcQG0kMuG1bQf3GA_01BaWtLoL-VUgTT0y3M330lGB5D/pub?start=false&loop=false&delayms=3000"
+              href="https://docs.google.com/presentation/d/e/2PACX-1vQHSFx8OYH1yznE4XjiqD9TTOyCqkPVNyeOTVpkOghZleUKm-ISp09JNvksbo_hvfzDG-4MQLRV9u1q/pub?start=false&loop=false&delayms=3000"
               target="_blank"
               rel="noopener noreferrer"
               className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
@@ -515,10 +515,10 @@ export function GPPLandingPage() {
                 <BookOpen className="w-6 h-6" style={{ color: C.red }} />
               </div>
               <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
-                GPP Host Guide
+                Sponsor One Sheet
               </h3>
               <p className="text-sm" style={{ color: C.mutedText }}>
-                Everything you need to know about hosting a successful Global Pizza Party.
+                Everything you need to talk to sponsors about the Global Pizza Party.
               </p>
             </a>
 
