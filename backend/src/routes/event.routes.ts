@@ -133,6 +133,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
+    // Strip emails from coHosts for public response
+    const sanitizedCoHosts = (party.coHosts as any[] || []).map(({ email, ...rest }: any) => rest);
+
     // Build host profile from user data
     const hostProfile = party.user ? {
       name: party.user.name || null,
@@ -164,7 +167,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         eventImageUrl: party.eventImageUrl,
         description: party.description,
         rsvpClosedAt: party.rsvpClosedAt,
-        coHosts: party.coHosts,
+        coHosts: sanitizedCoHosts,
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
         eventTags: party.eventTags,
