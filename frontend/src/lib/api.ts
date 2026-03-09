@@ -735,6 +735,7 @@ export interface CreateGPPEventData {
   city: string;
   hostName: string;
   email: string;
+  telegram?: string;
   country?: string;
   countryCode?: string;
   cityLat?: number;

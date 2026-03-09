@@ -41,6 +41,7 @@ export function GPPLandingPage() {
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
+  const [telegram, setTelegram] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
@@ -62,6 +63,7 @@ export function GPPLandingPage() {
         city: city.trim(),
         hostName: hostName.trim(),
         email: email.trim(),
+        telegram: telegram.trim() || undefined,
         ...(cd && {
           country: cd.country,
           countryCode: cd.countryCode,
@@ -296,6 +298,21 @@ export function GPPLandingPage() {
                     required
                     disabled={isSubmitting}
                   />
+                </div>
+
+                {/* Telegram */}
+                <div>
+                  <input
+                    type="text"
+                    value={telegram}
+                    onChange={(e) => setTelegram(e.target.value)}
+                    placeholder="Telegram username (optional)"
+                    className="gpp-input w-full"
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-xs mt-1.5" style={{ color: C.mutedText }}>
+                    So we can add you to the host group chat
+                  </p>
                 </div>
 
                 {/* Email */}
