@@ -2,8 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
-import { Header } from '../components/Header';
-import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
@@ -22,19 +20,6 @@ const C = {
   cardBorder:'rgba(0,0,0,0.08)',
 };
 
-/* ── tiny CSS cloud (pure CSS, no SVG files needed) ──────── */
-const Cloud: React.FC<{ className?: string; size?: number }> = ({ className = '', size = 80 }) => (
-  <div
-    className={`absolute pointer-events-none ${className}`}
-    style={{
-      width: size,
-      height: size * 0.45,
-      background: 'rgba(255,255,255,0.55)',
-      borderRadius: '999px',
-      filter: 'blur(2px)',
-    }}
-  />
-);
 
 export function GPPLandingPage() {
   const navigate = useNavigate();
@@ -111,10 +96,6 @@ export function GPPLandingPage() {
         </header>
 
         <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 relative">
-          {/* decorative clouds */}
-          <Cloud className="top-12 left-[8%] opacity-60" size={100} />
-          <Cloud className="top-24 right-[12%] opacity-40" size={70} />
-
           <div className="max-w-lg w-full text-center">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
@@ -175,14 +156,14 @@ export function GPPLandingPage() {
       style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
     >
       {/* ─── Decorative pizza vectors ─── */}
-      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none opacity-[0.07] select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, transform: 'rotate(12deg)' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.09] select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, transform: 'rotate(-15deg)' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.06] select-none" style={{ top: '22%', left: '6%', width: 100, transform: 'rotate(30deg)' }} />
-      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none opacity-[0.05] select-none hidden md:block" style={{ top: '48%', left: '-5%', width: 260, transform: 'rotate(-8deg) scaleX(-1)' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.08] select-none" style={{ top: '42%', right: '3%', width: 130, transform: 'rotate(22deg)' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.10] select-none hidden md:block" style={{ top: '65%', right: '8%', width: 110, transform: 'rotate(-18deg)' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.06] select-none" style={{ top: '75%', left: '2%', width: 90, transform: 'rotate(40deg)' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.05] select-none hidden md:block" style={{ top: '88%', right: '-2%', width: 140, transform: 'rotate(15deg)' }} />
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, animation: 'drift-right 30s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, animation: 'drift-left 25s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '22%', left: '6%', width: 100, animation: 'drift-right 35s ease-in-out infinite' }} />
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '48%', left: '-5%', width: 260, scaleX: -1, animation: 'drift-left 28s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '42%', right: '3%', width: 130, animation: 'drift-right 22s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '65%', right: '8%', width: 110, animation: 'drift-left 32s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '75%', left: '2%', width: 90, animation: 'drift-right 26s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '88%', right: '-2%', width: 140, animation: 'drift-left 38s ease-in-out infinite' }} />
 
       <Helmet>
         <title>Host a Global Pizza Party | RSV.Pizza</title>
@@ -220,11 +201,6 @@ export function GPPLandingPage() {
 
       {/* ─── HERO ─── */}
       <div className="relative overflow-hidden">
-        {/* Decorative clouds */}
-        <Cloud className="top-10 left-[5%] opacity-50" size={120} />
-        <Cloud className="top-32 right-[8%] opacity-40" size={90} />
-        <Cloud className="top-56 left-[60%] opacity-30 hidden md:block" size={60} />
-
         <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-20">
           <div className="grid md:grid-cols-2 gap-10 items-center">
             {/* Left: Flyer Image */}
@@ -453,6 +429,18 @@ export function GPPLandingPage() {
 
       {/* ─── SCOPED LIGHT-THEME OVERRIDES ─── */}
       <style>{`
+        /* Drifting animation for decorative pizza vectors */
+        @keyframes drift-right {
+          0% { transform: translateX(0); }
+          50% { transform: translateX(30px); }
+          100% { transform: translateX(0); }
+        }
+        @keyframes drift-left {
+          0% { transform: translateX(0); }
+          50% { transform: translateX(-30px); }
+          100% { transform: translateX(0); }
+        }
+
         /* Override the dark global input styles for the GPP page */
         .gpp-input,
         .gpp-light-input input {
