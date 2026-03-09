@@ -169,7 +169,7 @@ async function sendGPPWelcomeEmail(
 // POST /api/gpp/events - Create a GPP event (simplified flow, no auth required)
 router.post('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, country, countryCode, cityLat, cityLng } = req.body;
+    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng } = req.body;
 
     // Validate required fields
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
@@ -181,10 +181,14 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       throw new AppError('Valid email is required', 400, 'VALIDATION_ERROR');
     }
+    if (!telegram || typeof telegram !== 'string' || telegram.trim().length === 0) {
+      throw new AppError('Telegram username is required', 400, 'VALIDATION_ERROR');
+    }
 
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedCity = city.trim();
     const normalizedHostName = hostName.trim();
+    const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
 
     // Generate custom URL from city name (lowercase, no spaces)
     const customUrl = normalizedCity.toLowerCase().replace(/\s+/g, '');
@@ -226,7 +230,14 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         data: {
           email: normalizedEmail,
           name: normalizedHostName,
+          telegram: normalizedTelegram,
         },
+      });
+    } else if (normalizedTelegram) {
+      // Update existing user's telegram if provided
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { telegram: normalizedTelegram },
       });
     }
 

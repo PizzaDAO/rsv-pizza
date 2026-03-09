@@ -19,6 +19,7 @@ model User {
   youtube                    String?
   tiktok                     String?
   linkedin                   String?
+  telegram                   String?
   website                    String?
   defaultDietaryRestrictions String[]
   defaultLikedToppings       String[]
