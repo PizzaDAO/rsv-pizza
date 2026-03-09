@@ -180,7 +180,19 @@ export function GPPLandingPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 {error && (
                   <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-4 rounded-xl text-sm">
-                    {error}
+                    {error.includes('https://') ? (
+                      <>
+                        {error.split('https://')[0]}
+                        <a
+                          href={`https://${error.split('https://')[1]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-red-300"
+                        >
+                          https://{error.split('https://')[1]}
+                        </a>
+                      </>
+                    ) : error}
                   </div>
                 )}
 
