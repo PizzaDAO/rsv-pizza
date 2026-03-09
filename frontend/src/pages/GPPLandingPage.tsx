@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Globe, Pizza, Users, Camera, CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
@@ -217,72 +217,13 @@ export function GPPLandingPage() {
 
         <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-20">
           <div className="grid md:grid-cols-2 gap-10 items-center">
-            {/* Left: Hero Content */}
-            <div>
-              {/* PizzaDAO logo badge */}
-              <div className="flex items-center gap-2 mb-6">
-                <img src="/pizzadao-logo.svg" alt="PizzaDAO" className="h-6 opacity-80" />
-                <span className="text-sm font-medium" style={{ color: 'rgba(0,0,0,0.5)' }}>presents</span>
-              </div>
-
-              {/* Title — matches flyer: big red "2026", white bold "GLOBAL PIZZA PARTY" */}
-              <h1 className="mb-4 leading-none">
-                <span
-                  className="block font-extrabold"
-                  style={{ color: C.red, fontSize: 'clamp(4rem, 10vw, 7rem)', lineHeight: 0.95 }}
-                >
-                  2026
-                </span>
-                <span
-                  className="block font-extrabold italic"
-                  style={{
-                    color: '#fff',
-                    fontSize: 'clamp(1.6rem, 4.5vw, 3rem)',
-                    lineHeight: 1.1,
-                    textShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  GLOBAL PIZZA<br />PARTY
-                </span>
-              </h1>
-
-              <p
-                className="text-lg md:text-xl font-bold mb-2"
-                style={{ color: C.red }}
-              >
-                May 22
-              </p>
-              <p
-                className="text-lg md:text-xl font-semibold mb-8"
-                style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
-              >
-                In a City Near You
-              </p>
-
-              {/* Feature chips */}
-              <div className="grid grid-cols-2 gap-3 mb-8">
-                {[
-                  { icon: Pizza, label: 'Pre-designed event page' },
-                  { icon: Users, label: 'RSVP management' },
-                  { icon: Camera, label: 'Photo sharing' },
-                  { icon: Globe, label: 'Global GPP network' },
-                ].map(({ icon: Icon, label }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(4px)' }}
-                  >
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: `${C.red}22` }}
-                    >
-                      <Icon className="w-3.5 h-3.5" style={{ color: C.red }} />
-                    </div>
-                    <span className="text-sm font-medium" style={{ color: C.darkText }}>{label}</span>
-                  </div>
-                ))}
-              </div>
+            {/* Left: Flyer Image */}
+            <div className="flex items-center justify-center">
+              <img
+                src="/gpp-flyer-2026.png"
+                alt="2026 Global Pizza Party — May 22 — In a City Near You"
+                className="w-full max-w-md rounded-2xl shadow-lg"
+              />
             </div>
 
             {/* Right: Sign Up Form */}
@@ -403,17 +344,6 @@ export function GPPLandingPage() {
               </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ─── FLYER IMAGE BANNER ─── */}
-      <div className="max-w-6xl mx-auto px-4 pb-12">
-        <div className="rounded-2xl overflow-hidden shadow-lg border" style={{ borderColor: 'rgba(255,255,255,0.3)' }}>
-          <img
-            src="/gpp-flyer-2026.png"
-            alt="2026 Global Pizza Party — May 22 — In a City Near You"
-            className="w-full h-auto object-cover"
-          />
         </div>
       </div>
 
