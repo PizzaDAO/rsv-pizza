@@ -383,6 +383,9 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
       });
     });
 
+    // Strip emails from coHosts for public response
+    const sanitizedCoHosts = (party.coHosts as any[] || []).map(({ email, ...rest }: any) => rest);
+
     res.json({
       report: {
         // Event details (public)
@@ -394,7 +397,7 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         address: party.address,
         eventImageUrl: party.eventImageUrl,
         description: party.description,
-        coHosts: party.coHosts,
+        coHosts: sanitizedCoHosts,
         host: party.user,
 
         // Report-specific fields
@@ -420,11 +423,13 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
 
         // Related data
         socialPosts: party.socialPosts,
-        notableAttendees: party.notableAttendees.map(a => ({
-          ...a,
-          email: (a as any).guest?.email || null,
-          guest: undefined,
-        })),
+        notableAttendees: party.notableAttendees.map(a => {
+          const { guest, ...attendee } = a as any;
+          return {
+            ...attendee,
+            // Don't expose email in public report
+          };
+        }),
         featuredPhotos: party.photos,
 
         // Wallet address list for CSV export
