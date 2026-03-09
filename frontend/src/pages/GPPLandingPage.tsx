@@ -168,14 +168,15 @@ export function GPPLandingPage() {
         }
 
         // Fire parachute pizza box drops — each with unique speed & sway
+        const sizes = [65, 80, 95, 110].sort(() => Math.random() - 0.5);
         const chutes = Array.from({ length: 4 }, (_, i) => ({
           id: i,
-          x: 15 + Math.random() * 70,
-          size: 70 + Math.random() * 50,
-          delay: 0.5 + i * 0.6,
-          duration: 5 + i * 1.5 + Math.random() * 1.5,  // 5–10s, slower = more variety
-          swayAmount: 15 + Math.random() * 25,           // 15–40px sway
-          swaySpeed: 1.5 + Math.random() * 1.5,          // 1.5–3s per sway cycle
+          x: 12 + Math.random() * 76,
+          size: sizes[i],
+          delay: 0.3 + i * 0.5 + Math.random() * 0.3,
+          duration: 5.5 + Math.random() * 4,              // 5.5–9.5s each
+          swayAmount: 12 + Math.random() * 30,            // 12–42px sway
+          swaySpeed: 1.2 + Math.random() * 2,             // 1.2–3.2s per sway cycle
         }));
         setParachutes(chutes);
 
@@ -635,7 +636,7 @@ export function GPPLandingPage() {
                 left: `${p.x}%`,
                 top: -150,
                 width: p.size,
-                animation: `parachute-drop ${p.duration}s linear ${p.delay}s forwards`,
+                animation: `parachute-drop ${p.duration}s cubic-bezier(0.15, 0, 0.4, 1) ${p.delay}s forwards`,
               }}
             >
               <img
@@ -645,7 +646,7 @@ export function GPPLandingPage() {
                 style={{
                   animation: `parachute-sway ${p.swaySpeed}s ease-in-out ${p.delay}s infinite`,
                   '--sway-amount': `${p.swayAmount}px`,
-                  '--sway-rot': `${8 + p.id * 5}deg`,
+                  '--sway-rot': `${6 + Math.random() * 14}deg`,
                 } as React.CSSProperties}
               />
             </div>
@@ -687,11 +688,14 @@ export function GPPLandingPage() {
           }
         }
 
-        /* Parachute pizza box — constant-speed vertical drop */
+        /* Parachute pizza box — gentle acceleration then steady drop */
         @keyframes parachute-drop {
           0% {
             transform: translateY(0);
             opacity: 1;
+          }
+          15% {
+            transform: translateY(3vh);
           }
           90% {
             opacity: 1;
