@@ -11,6 +11,7 @@ import {
   BarChart3,
   UserCog,
   Monitor,
+  Shapes,
   Ticket,
   Calculator,
   Package,
@@ -128,6 +129,14 @@ const apps: AppItem[] = [
     icon: Monitor,
     status: 'live',
     tab: 'displays',
+  },
+  {
+    id: 'rentals',
+    name: 'Rentals',
+    description: 'Venue rental spaces on your floorplan',
+    icon: Shapes,
+    status: 'live',
+    tab: 'rentals',
   },
   {
     id: 'raffle',
