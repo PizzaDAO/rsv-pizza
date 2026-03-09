@@ -185,6 +185,35 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedCity = city.trim();
     const normalizedHostName = hostName.trim();
 
+    // Generate custom URL from city name (lowercase, no spaces)
+    const customUrl = normalizedCity.toLowerCase().replace(/\s+/g, '');
+
+    // Check for existing GPP event in this city
+    const existingEvent = await prisma.party.findFirst({
+      where: {
+        customUrl,
+        eventType: 'gpp',
+      },
+      select: {
+        id: true,
+        name: true,
+        customUrl: true,
+        inviteCode: true,
+      },
+    });
+
+    if (existingEvent) {
+      const eventUrl = existingEvent.customUrl
+        ? `https://rsv.pizza/${existingEvent.customUrl}`
+        : `https://rsv.pizza/${existingEvent.inviteCode}`;
+
+      throw new AppError(
+        `A Global Pizza Party already exists for this city! Check it out: ${eventUrl}`,
+        409,
+        'DUPLICATE_CITY'
+      );
+    }
+
     // Find or create user
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -202,9 +231,6 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
 
     // Generate event name with city (no dash, just space)
     const eventName = `Global Pizza Party ${normalizedCity}`;
-
-    // Generate custom URL from city name (lowercase, no spaces)
-    const customUrl = normalizedCity.toLowerCase().replace(/\s+/g, '');
 
     // Calculate default date: May 22 of current or next year
     const now = new Date();
