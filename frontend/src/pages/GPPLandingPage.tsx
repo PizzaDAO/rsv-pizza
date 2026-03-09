@@ -171,9 +171,19 @@ export function GPPLandingPage() {
   /* ──────────────── MAIN PAGE ──────────────── */
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen relative overflow-hidden"
       style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
     >
+      {/* ─── Decorative pizza vectors ─── */}
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none opacity-[0.07] select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, transform: 'rotate(12deg)' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.09] select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, transform: 'rotate(-15deg)' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.06] select-none" style={{ top: '22%', left: '6%', width: 100, transform: 'rotate(30deg)' }} />
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none opacity-[0.05] select-none hidden md:block" style={{ top: '48%', left: '-5%', width: 260, transform: 'rotate(-8deg) scaleX(-1)' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.08] select-none" style={{ top: '42%', right: '3%', width: 130, transform: 'rotate(22deg)' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.10] select-none hidden md:block" style={{ top: '65%', right: '8%', width: 110, transform: 'rotate(-18deg)' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none opacity-[0.06] select-none" style={{ top: '75%', left: '2%', width: 90, transform: 'rotate(40deg)' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none opacity-[0.05] select-none hidden md:block" style={{ top: '88%', right: '-2%', width: 140, transform: 'rotate(15deg)' }} />
+
       <Helmet>
         <title>Host a Global Pizza Party | RSV.Pizza</title>
         <meta
