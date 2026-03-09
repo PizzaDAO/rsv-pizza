@@ -30,6 +30,24 @@ export function GPPLandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
   const cityDataRef = useRef<CityData | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [confettiPieces, setConfettiPieces] = useState<Array<{
+    id: number;
+    img: string;
+    x: number;
+    y: number;
+    angle: number;
+    distance: number;
+    size: number;
+    rotation: number;
+  }>>([]);
+  const [parachutes, setParachutes] = useState<Array<{
+    id: number;
+    x: number;
+    size: number;
+    delay: number;
+    duration: number;
+  }>>([]);
 
   const handleCitySelected = (data: CityData) => {
     cityDataRef.current = data;
@@ -56,11 +74,43 @@ export function GPPLandingPage() {
       });
 
       if (response.success) {
-        setSuccess({
+        // Fire confetti burst from button position
+        const rect = buttonRef.current?.getBoundingClientRect();
+        if (rect) {
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const pieces = Array.from({ length: 30 }, (_, i) => ({
+            id: i,
+            img: `/gpp-confetti-${Math.floor(Math.random() * 7) + 1}.png`,
+            x: centerX,
+            y: centerY,
+            angle: Math.random() * 360,
+            distance: 150 + Math.random() * 300,
+            size: 20 + Math.random() * 25,
+            rotation: Math.random() * 720 - 360,
+          }));
+          setConfettiPieces(pieces);
+        }
+
+        // Fire parachute pizza box drops
+        const chutes = Array.from({ length: 4 }, (_, i) => ({
+          id: i,
+          x: 10 + Math.random() * 80,
+          size: 80 + Math.random() * 40,
+          delay: i * 0.4,
+          duration: 4 + Math.random() * 2,
+        }));
+        setParachutes(chutes);
+
+        // Delay transition to success state so user sees the animations
+        const successData = {
           hostPageUrl: response.hostPageUrl,
           eventName: response.event.name,
           email: email.trim(),
-        });
+        };
+        setTimeout(() => {
+          setSuccess(successData);
+        }, 2000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event. Please try again.');
@@ -301,6 +351,7 @@ export function GPPLandingPage() {
                 </div>
 
                 <button
+                  ref={buttonRef}
                   type="submit"
                   disabled={isSubmitting}
                   className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-60"
@@ -424,6 +475,45 @@ export function GPPLandingPage() {
         </div>
       </footer>
 
+      {/* ─── CONFETTI + PARACHUTE OVERLAY ─── */}
+      {(confettiPieces.length > 0 || parachutes.length > 0) && (
+        <div className="fixed inset-0 pointer-events-none z-[100]">
+          {confettiPieces.map((p) => (
+            <img
+              key={p.id}
+              src={p.img}
+              alt=""
+              className="absolute"
+              style={{
+                left: p.x,
+                top: p.y,
+                width: p.size,
+                height: p.size,
+                objectFit: 'contain',
+                animation: 'confetti-fly 2.5s ease-out forwards',
+                '--confetti-tx': `${Math.cos(p.angle * Math.PI / 180) * p.distance}px`,
+                '--confetti-ty': `${Math.sin(p.angle * Math.PI / 180) * p.distance}px`,
+                '--confetti-rot': `${p.rotation}deg`,
+              } as React.CSSProperties}
+            />
+          ))}
+          {parachutes.map((p) => (
+            <img
+              key={`chute-${p.id}`}
+              src="/gpp-parachute.png"
+              alt=""
+              className="absolute"
+              style={{
+                left: `${p.x}%`,
+                top: -150,
+                width: p.size,
+                animation: `parachute-drop ${p.duration}s ease-in ${p.delay}s forwards`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       <CornerLinks />
 
       {/* ─── SCOPED LIGHT-THEME OVERRIDES ─── */}
@@ -438,6 +528,45 @@ export function GPPLandingPage() {
           0% { transform: translateX(0); }
           50% { transform: translateX(-50px); }
           100% { transform: translateX(0); }
+        }
+
+        /* Confetti burst animation */
+        @keyframes confetti-fly {
+          0% {
+            transform: translate(-50%, -50%) rotate(0deg) scale(1);
+            opacity: 1;
+          }
+          70% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate(
+              calc(-50% + var(--confetti-tx)),
+              calc(-50% + var(--confetti-ty))
+            ) rotate(var(--confetti-rot)) scale(0.5);
+            opacity: 0;
+          }
+        }
+
+        /* Parachute pizza box drop animation */
+        @keyframes parachute-drop {
+          0% {
+            transform: translateY(0) translateX(0);
+            opacity: 1;
+          }
+          25% {
+            transform: translateY(25vh) translateX(20px);
+          }
+          50% {
+            transform: translateY(50vh) translateX(-15px);
+          }
+          75% {
+            transform: translateY(75vh) translateX(10px);
+          }
+          100% {
+            transform: translateY(110vh) translateX(-5px);
+            opacity: 0.8;
+          }
         }
 
         /* Override the dark global input styles for the GPP page */
