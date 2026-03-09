@@ -2153,7 +2153,7 @@ export async function fetchUnderbossMe(): Promise<UnderbossMeResponse> {
 
 // Fetch underboss dashboard data (JWT auth)
 export async function fetchUnderbossDashboard(
-  region: GPPRegion
+  region: GPPRegion | 'all'
 ): Promise<UnderbossDashboardData> {
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
 }

@@ -1,10 +1,12 @@
 import React from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
+import { GPP_REGIONS } from '../../types';
 import type { UnderbossEvent } from '../../types';
 
 interface EventRowProps {
   event: UnderbossEvent;
+  showRegion?: boolean;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -38,7 +40,7 @@ function KitBadge({ status }: { status: string | null }) {
   );
 }
 
-export function EventRow({ event }: EventRowProps) {
+export function EventRow({ event, showRegion }: EventRowProps) {
   const eventUrl = event.customUrl
     ? `https://rsv.pizza/${event.customUrl}`
     : null;
@@ -69,6 +71,15 @@ export function EventRow({ event }: EventRowProps) {
           </div>
         </div>
       </td>
+
+      {/* Region (optional) */}
+      {showRegion && (
+        <td className="py-3 px-3">
+          <span className="text-xs text-white/50">
+            {GPP_REGIONS.find((r) => r.id === event.region)?.label || event.region || '\u2014'}
+          </span>
+        </td>
+      )}
 
       {/* Host */}
       <td className="py-3 px-3">

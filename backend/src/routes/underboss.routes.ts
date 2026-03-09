@@ -134,6 +134,7 @@ function formatEvent(party: any) {
     date: party.date,
     address: party.address,
     venueName: party.venueName,
+    region: party.region || null,
     host: {
       name: party.user?.name || null,
       email: party.user?.email || null,
@@ -210,16 +211,24 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
   try {
     const { region } = req.params;
 
-    // Verify the underboss is assigned to this region (admins can view any region)
-    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
-      throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
+    // Handle "all" region — admin only
+    if (region === 'all') {
+      if (req.underboss!.region !== '__admin__') {
+        throw new AppError('Only admins can view all regions', 403, 'FORBIDDEN');
+      }
+    } else {
+      // Verify the underboss is assigned to this region (admins can view any region)
+      if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
+        throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
+      }
     }
 
+    const whereClause = region === 'all'
+      ? { eventType: 'gpp' as const }
+      : { region, eventType: 'gpp' as const };
+
     const events = await prisma.party.findMany({
-      where: {
-        region,
-        eventType: 'gpp',
-      },
+      where: whereClause,
       include: {
         user: { select: { name: true, email: true } },
         guests: {
