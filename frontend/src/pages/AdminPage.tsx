@@ -146,7 +146,7 @@ export function AdminPage() {
 
   if (loading) {
     return (
-      <Layout className="gpp-theme">
+      <Layout className="gpp-theme gpp-gray">
         <div className="min-h-screen flex items-center justify-center">
           <Loader2 size={32} className="animate-spin text-white/40" />
         </div>
@@ -156,7 +156,7 @@ export function AdminPage() {
 
   if (!isAdminUser || error) {
     return (
-      <Layout className="gpp-theme">
+      <Layout className="gpp-theme gpp-gray">
         <div className="min-h-screen flex flex-col items-center justify-center px-4">
           <Shield size={48} className="text-red-400/60 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
@@ -169,7 +169,7 @@ export function AdminPage() {
   }
 
   return (
-    <Layout className="gpp-theme">
+    <Layout className="gpp-theme gpp-gray">
       <div className="min-h-screen">
         <Helmet>
           <title>Admin | RSV.Pizza</title>

@@ -106,7 +106,7 @@ export function UnderbossDashboard() {
   // Not logged in
   if (!authLoading && !user) {
     return (
-      <div className="min-h-screen gpp-theme">
+      <div className="min-h-screen gpp-theme gpp-gray">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
@@ -131,7 +131,7 @@ export function UnderbossDashboard() {
   // Loading state
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen gpp-theme">
+      <div className="min-h-screen gpp-theme gpp-gray">
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-white/40 mb-4" />
@@ -145,7 +145,7 @@ export function UnderbossDashboard() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen gpp-theme">
+      <div className="min-h-screen gpp-theme gpp-gray">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
@@ -160,7 +160,7 @@ export function UnderbossDashboard() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen gpp-theme">
+    <div className="min-h-screen gpp-theme gpp-gray">
       <Helmet>
         <title>{regionLabel} Dashboard | GPP Underboss</title>
       </Helmet>

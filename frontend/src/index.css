@@ -506,6 +506,11 @@ body.modal-open {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
 }
 
+/* Gray background variant for data-heavy admin pages */
+.gpp-theme.gpp-gray {
+  background: #f0f0f0 !important;
+}
+
 /* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
 .gpp-theme .gpp-badge { display: none !important; }
 
