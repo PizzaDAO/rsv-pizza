@@ -3,18 +3,37 @@
 @tailwind utilities;
 
 :root {
+  /* Backgrounds */
   --bg-main: #0b0b10;
   --bg-card: rgba(255, 255, 255, 0.07);
   --bg-card-hover: rgba(255, 255, 255, 0.1);
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --bg-surface-hover: rgba(255, 255, 255, 0.08);
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --bg-input: rgba(255, 255, 255, 0.06);
+  --bg-input-focus: rgba(255, 255, 255, 0.08);
+  --bg-header: #1a1a2e;
+
+  /* Text */
   --text-primary: rgba(255, 255, 255, 0.92);
   --text-secondary: rgba(255, 255, 255, 0.68);
   --text-muted: rgba(255, 255, 255, 0.45);
+  --text-faint: rgba(255, 255, 255, 0.20);
+  --text-inverted: #1a1a1a;
+
+  /* Borders */
   --stroke: rgba(255, 255, 255, 0.12);
   --stroke-hover: rgba(255, 255, 255, 0.2);
+  --stroke-strong: rgba(255, 255, 255, 0.3);
+
+  /* Accents */
   --accent: #ff393a;
   --accent-hover: #ff5555;
   --success: #39d98a;
   --warning: #ffb347;
+  --error: #ff393a;
+
+  --color-scheme: dark;
 }
 
 body {
@@ -324,16 +343,34 @@ body.modal-open {
 /* ─── GPP Light Theme ─── */
 /* Applied via .gpp-theme class on page wrapper */
 .gpp-theme {
+  /* Backgrounds */
   --bg-main: #B6E4F7;
   --bg-card: rgba(255, 255, 255, 0.92);
   --bg-card-hover: rgba(255, 255, 255, 0.96);
+  --bg-surface: rgba(0, 0, 0, 0.03);
+  --bg-surface-hover: rgba(0, 0, 0, 0.05);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --bg-input: rgba(255, 255, 255, 0.85);
+  --bg-input-focus: #fff;
+  --bg-header: rgba(255, 255, 255, 0.8);
+
+  /* Text */
   --text-primary: #1a1a1a;
   --text-secondary: #444;
   --text-muted: #777;
+  --text-faint: #999;
+  --text-inverted: #fff;
+
+  /* Borders */
   --stroke: rgba(0, 0, 0, 0.08);
   --stroke-hover: rgba(0, 0, 0, 0.15);
+  --stroke-strong: rgba(0, 0, 0, 0.2);
+
+  /* Accents (GPP red) */
   --accent: #E52828;
   --accent-hover: #CC2020;
+
+  --color-scheme: light;
 
   background: linear-gradient(to bottom, #7EC8E3, #B6E4F7) !important;
   color: #1a1a1a;
@@ -463,20 +500,26 @@ body.modal-open {
 }
 
 /* Google Maps Autocomplete light mode */
-.gpp-theme .pac-container {
+/* .pac-container is appended to <body>, outside .gpp-theme wrapper.
+   We duplicate rules with body.gpp-theme-active so it works both ways. */
+.gpp-theme .pac-container,
+body.gpp-theme-active .pac-container {
   background-color: #fff !important;
   border-color: rgba(0, 0, 0, 0.1) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
 }
-.gpp-theme .pac-item {
+.gpp-theme .pac-item,
+body.gpp-theme-active .pac-item {
   background-color: #fff !important;
   border-color: rgba(0, 0, 0, 0.06) !important;
   color: #1a1a1a !important;
 }
-.gpp-theme .pac-item:hover {
+.gpp-theme .pac-item:hover,
+body.gpp-theme-active .pac-item:hover {
   background-color: #f5f5f5 !important;
 }
-.gpp-theme .pac-item-query {
+.gpp-theme .pac-item-query,
+body.gpp-theme-active .pac-item-query {
   color: #1a1a1a !important;
 }
 

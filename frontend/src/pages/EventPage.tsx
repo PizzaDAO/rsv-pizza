@@ -13,6 +13,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
 import { LoginModal } from '../components/LoginModal';
@@ -423,9 +424,10 @@ export function EventPage() {
   }
 
   const isGPP = event?.eventType === 'gpp';
+  const { themeClass, backgroundStyle } = useTheme();
 
   return (
-    <div className={`min-h-screen ${isGPP ? 'gpp-theme' : ''}`}>
+    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>

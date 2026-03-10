@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAllParties, DbParty } from '../lib/supabase';
 import { Calendar, Users, MapPin, ChevronRight, PartyPopper } from 'lucide-react';
-import { Header } from '../components/Header';
+import { Layout } from '../components/Layout';
 
 export const PartiesListPage: React.FC = () => {
   const [parties, setParties] = useState<DbParty[]>([]);
@@ -38,18 +38,16 @@ export const PartiesListPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
-        <Header />
+      <Layout>
         <div className="flex items-center justify-center py-16">
           <div className="text-white/60">Loading parties...</div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e]">
-      <Header />
+    <Layout>
       <div className="py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
@@ -130,6 +128,6 @@ export const PartiesListPage: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };

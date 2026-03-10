@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Check, Mail, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
+import { Layout } from '../components/Layout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -146,7 +147,8 @@ export function AuthVerifyPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <Layout>
+    <div className="min-h-[60vh] flex items-center justify-center p-4">
       <div className="card p-8 max-w-md w-full text-center">
         {status === 'idle' && (
           <>
@@ -259,5 +261,6 @@ export function AuthVerifyPage() {
         )}
       </div>
     </div>
+    </Layout>
   );
 }

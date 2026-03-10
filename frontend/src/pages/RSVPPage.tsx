@@ -11,6 +11,7 @@ import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 import { uuid } from '../lib/utils';
+import { useTheme } from '../contexts/ThemeContext';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -31,7 +32,7 @@ export function RSVPPage() {
   const [showDonationForm, setShowDonationForm] = useState(false);
 
   const isGPP = party?.event_type === 'gpp';
-  const gppClass = isGPP ? 'gpp-theme' : '';
+  const { themeClass: gppClass, backgroundStyle: themeBackgroundStyle } = useTheme();
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');

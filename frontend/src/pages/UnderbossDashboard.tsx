@@ -8,6 +8,7 @@ import { RegionStats, EventTable } from '../components/underboss';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { GPP_REGIONS } from '../types';
 import type { UnderbossDashboardData, UnderbossStats } from '../types';
 
@@ -45,6 +46,7 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
 
 export function UnderbossDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { themeClass, backgroundStyle } = useTheme();
 
   const [allData, setAllData] = useState<UnderbossDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,7 +168,7 @@ export function UnderbossDashboard() {
   // Not logged in
   if (!authLoading && !user) {
     return (
-      <div className="min-h-screen gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
@@ -191,7 +193,7 @@ export function UnderbossDashboard() {
   // Loading state
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-white/40 mb-4" />
@@ -205,7 +207,7 @@ export function UnderbossDashboard() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
@@ -224,7 +226,7 @@ export function UnderbossDashboard() {
   const filteredGppRegions = GPP_REGIONS.filter((r) => availableRegions.includes(r.id));
 
   return (
-    <div className="min-h-screen gpp-theme relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+    <div className={`min-h-screen ${themeClass} relative overflow-hidden`} style={backgroundStyle}>
       {/* Floating deco */}
       <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
       <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />

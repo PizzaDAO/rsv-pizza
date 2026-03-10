@@ -6,6 +6,8 @@ import { getEventBySlug, PublicEvent, getPerformers } from '../lib/api';
 import { Performer, Song, Playlist, MusicPlatform, PerformerType } from '../types';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { CornerLinks } from '../components/CornerLinks';
+import { useTheme } from '../contexts/ThemeContext';
 import { PlatformIcon } from '../components/music/SongCard';
 
 // Type icons
@@ -106,9 +108,11 @@ export function DJPage() {
     loadData();
   }, [inviteCode]);
 
+  const { themeClass, backgroundStyle } = useTheme();
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${themeClass}`} style={backgroundStyle}>
         <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
       </div>
     );
@@ -116,7 +120,7 @@ export function DJPage() {
 
   if (error || !event) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${themeClass}`} style={backgroundStyle}>
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Page Not Found</h1>
@@ -163,7 +167,7 @@ export function DJPage() {
   const hasContent = sortedPerformers.length > 0 || songs.length > 0 || playlists.length > 0;
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
       <Helmet>
         <title>DJ Info - {event.name} | RSV.Pizza</title>
         <meta name="robots" content="noindex" />
@@ -400,6 +404,7 @@ export function DJPage() {
 
         <Footer className="mt-4 pb-2" />
       </div>
+      <CornerLinks />
     </div>
   );
 }
