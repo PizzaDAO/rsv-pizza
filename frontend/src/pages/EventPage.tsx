@@ -422,8 +422,10 @@ export function EventPage() {
     metaDescription = `Join us for ${event.name}! RSVP now.`;
   }
 
+  const isGPP = event?.eventType === 'gpp';
+
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${isGPP ? 'gpp-theme' : ''}`}>
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>
@@ -563,7 +565,7 @@ export function EventPage() {
 
               {/* Host Button - Desktop */}
               {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                <div className="p-4 bg-[#39d98a]/10 border-t border-white/10">
+                <div className="p-4 border-t border-white/10">
                   <button
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -667,7 +669,7 @@ export function EventPage() {
 
                 {/* Host Button - Mobile */}
                 {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                  <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
+                  <div className="p-4 border-b border-white/10">
                     <button
                       onClick={handleEditEvent}
                       className="btn-secondary w-full flex items-center justify-center gap-2"

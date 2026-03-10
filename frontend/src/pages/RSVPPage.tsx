@@ -30,6 +30,9 @@ export function RSVPPage() {
   const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
   const [showDonationForm, setShowDonationForm] = useState(false);
 
+  const isGPP = party?.event_type === 'gpp';
+  const gppClass = isGPP ? 'gpp-theme' : '';
+
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -374,7 +377,7 @@ export function RSVPPage() {
   // Password protection UI
   if (!isAuthenticated && party?.has_password) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
         <div className="card p-8 max-w-md w-full">
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
@@ -427,7 +430,7 @@ export function RSVPPage() {
     };
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
         <div className="card p-8 max-w-md text-center">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
             {alreadyRegistered ? (
@@ -465,7 +468,7 @@ export function RSVPPage() {
   // Step 1 - Personal Info
   if (step === 1) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
         <div className="card p-8 max-w-lg w-full relative">
           {/* Close button */}
           <button
@@ -573,7 +576,7 @@ export function RSVPPage() {
 
   // Step 2 - Pizza Preferences
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
       <div className="card p-8 max-w-2xl w-full relative">
         {/* Close button */}
         <button

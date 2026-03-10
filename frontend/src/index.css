@@ -315,3 +315,188 @@ body.modal-open {
 .animate-confetti {
   animation: confetti-fall ease-out forwards;
 }
+
+/* ─── GPP Light Theme ─── */
+/* Applied via .gpp-theme class on page wrapper */
+.gpp-theme {
+  --bg-main: #B6E4F7;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card-hover: rgba(255, 255, 255, 0.96);
+  --text-primary: #1a1a1a;
+  --text-secondary: #444;
+  --text-muted: #777;
+  --stroke: rgba(0, 0, 0, 0.08);
+  --stroke-hover: rgba(0, 0, 0, 0.15);
+  --accent: #E52828;
+  --accent-hover: #CC2020;
+
+  background: linear-gradient(to bottom, #7EC8E3, #B6E4F7) !important;
+  color: #1a1a1a;
+}
+
+/* Cards */
+.gpp-theme .card {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: none !important;
+}
+.gpp-theme .card:hover {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Text color overrides */
+.gpp-theme .text-white { color: #1a1a1a !important; }
+.gpp-theme .text-white\/90 { color: #1a1a1a !important; }
+.gpp-theme .text-white\/80 { color: #333 !important; }
+.gpp-theme .text-white\/70 { color: #444 !important; }
+.gpp-theme .text-white\/60 { color: #555 !important; }
+.gpp-theme .text-white\/50 { color: #666 !important; }
+.gpp-theme .text-white\/40 { color: #777 !important; }
+.gpp-theme .text-white\/30 { color: #888 !important; }
+.gpp-theme .text-white\/20 { color: #999 !important; }
+
+/* Border overrides */
+.gpp-theme .border-white\/10 { border-color: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .border-white\/20 { border-color: rgba(0, 0, 0, 0.12) !important; }
+
+/* Background overrides */
+.gpp-theme .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
+.gpp-theme .bg-white\/6 { background: rgba(0, 0, 0, 0.03) !important; }
+.gpp-theme .bg-white\/10 { background: rgba(0, 0, 0, 0.05) !important; }
+.gpp-theme .bg-white\/20 { background: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.05) !important; }
+.gpp-theme .hover\:bg-white\/10:hover { background: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .hover\:bg-white\/20:hover { background: rgba(0, 0, 0, 0.12) !important; }
+.gpp-theme .hover\:text-white:hover { color: #1a1a1a !important; }
+.gpp-theme .hover\:text-white\/60:hover { color: #444 !important; }
+
+/* Inputs */
+.gpp-theme input[type="text"],
+.gpp-theme input[type="email"],
+.gpp-theme input[type="number"],
+.gpp-theme input[type="password"],
+.gpp-theme input[type="url"],
+.gpp-theme input[type="tel"],
+.gpp-theme input[type="time"],
+.gpp-theme input[type="date"],
+.gpp-theme input[type="datetime-local"],
+.gpp-theme input[type="search"],
+.gpp-theme textarea,
+.gpp-theme select {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #1a1a1a !important;
+}
+.gpp-theme input:focus,
+.gpp-theme textarea:focus,
+.gpp-theme select:focus {
+  border-color: #E52828 !important;
+  background: #fff !important;
+}
+.gpp-theme input::placeholder,
+.gpp-theme textarea::placeholder {
+  color: #999 !important;
+}
+.gpp-theme input[type="time"],
+.gpp-theme input[type="date"],
+.gpp-theme input[type="datetime-local"] {
+  color-scheme: light !important;
+}
+.gpp-theme select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(0,0,0,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+}
+
+/* Buttons */
+.gpp-theme .btn-secondary {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #1a1a1a !important;
+}
+.gpp-theme .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Chips */
+.gpp-theme .chip {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #444 !important;
+}
+.gpp-theme .chip:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+.gpp-theme .chip.active,
+.gpp-theme .chip.liked {
+  color: white !important;
+}
+
+/* Header */
+.gpp-theme .site-header {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Footer */
+.gpp-theme footer {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+.gpp-theme footer .text-white\/40 { color: #777 !important; }
+
+/* Corner links */
+.gpp-theme .corner-link {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+.gpp-theme .corner-link:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #E52828 !important;
+}
+
+/* Google Maps Autocomplete light mode */
+.gpp-theme .pac-container {
+  background-color: #fff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+.gpp-theme .pac-item {
+  background-color: #fff !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  color: #1a1a1a !important;
+}
+.gpp-theme .pac-item:hover {
+  background-color: #f5f5f5 !important;
+}
+.gpp-theme .pac-item-query {
+  color: #1a1a1a !important;
+}
+
+/* Tabs — inactive black, active red tag with rounded top corners */
+.gpp-theme .text-white\/40.font-medium { color: #1a1a1a !important; }
+.gpp-theme .text-white.font-medium {
+  color: #E52828 !important;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px 12px !important;
+}
+.gpp-theme button > .bg-white { background: #E52828 !important; }
+
+/* Red buttons keep white text */
+.gpp-theme .btn-primary { color: white !important; }
+.gpp-theme .bg-\[\#ff393a\] { color: white !important; }
+.gpp-theme .bg-\[\#ff393a\] .text-white { color: white !important; }
+.gpp-theme .bg-red-500 { color: white !important; }
+.gpp-theme .bg-\[\#E52828\] { color: white !important; }
+
+/* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
+.gpp-theme .gpp-badge { display: none !important; }
+
+/* Round the bottom-right corner of the event image on desktop */
+.gpp-theme .card .aspect-square {
+  border-bottom-right-radius: 18px;
+  overflow: hidden;
+}
