@@ -306,21 +306,21 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="bg-theme-header border border-theme-stroke rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
+        <div className="flex items-center justify-between p-5 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-theme-text">
               {venue ? 'Edit Venue' : 'Add Venue Option'}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/50 hover:text-white transition-colors"
+            className="text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <X size={20} />
           </button>
@@ -330,7 +330,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
           {/* Search / Google Maps Link Quick-Fill */}
           {!venue && (
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none z-10" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -338,18 +338,18 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
                 onChange={handleSearchInputChange}
                 onPaste={handleSearchInputPaste}
                 placeholder="Search for a venue or paste a Google Maps link"
-                className="w-full !pl-10 bg-white/5 border border-dashed border-white/20 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-transparent py-2.5 pr-3 placeholder:text-white/30"
+                className="w-full !pl-10 bg-theme-surface border border-dashed border-theme-stroke-hover rounded-xl text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-transparent py-2.5 pr-3 placeholder:text-theme-text-faint"
                 autoFocus
               />
               {lookingUp && (
-                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-white/40" />
+                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-theme-text-muted" />
               )}
             </div>
           )}
 
           {/* Venue Info Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/60">Venue Details</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">Venue Details</h3>
 
             <IconInput
               icon={MapPin}
@@ -402,7 +402,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
 
           {/* Status & Cost Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/60">Status & Cost</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">Status & Cost</h3>
 
             <div className="grid grid-cols-2 gap-3">
               <select
@@ -412,7 +412,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
                 style={{ colorScheme: 'dark' }}
               >
                 {venueStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#1a1a2e]">
+                  <option key={option.value} value={option.value} className="bg-theme-header">
                     {option.label}
                   </option>
                 ))}
@@ -442,7 +442,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
 
           {/* Contact Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/60">Venue Contact</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">Venue Contact</h3>
 
             <IconInput
               icon={User}
@@ -475,7 +475,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
 
           {/* Pros & Cons Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/60">Pros & Cons</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">Pros & Cons</h3>
             <IconInput
               icon={ThumbsUp}
               iconSize={16}
@@ -498,7 +498,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
 
           {/* Notes Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/60">Notes</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">Notes</h3>
             <IconInput
               icon={FileText}
               iconSize={16}
@@ -522,7 +522,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>

@@ -215,11 +215,11 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       {/* Header with Stats and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
             <Camera size={20} className="text-[#ff393a]" />
             Photos
             {stats && stats.totalPhotos > 0 && (
-              <span className="text-white/50 font-normal text-sm">
+              <span className="text-theme-text-muted font-normal text-sm">
                 ({stats.totalPhotos})
               </span>
             )}
@@ -235,13 +235,13 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Filter */}
-          <div className="flex items-center bg-white/5 rounded-lg p-1">
+          <div className="flex items-center bg-theme-surface rounded-lg p-1">
             <button
               onClick={() => setFilter('all')}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 filter === 'all'
                   ? 'bg-[#ff393a] text-white'
-                  : 'text-white/60 hover:text-white'
+                  : 'text-theme-text-secondary hover:text-theme-text'
               }`}
             >
               All
@@ -252,7 +252,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                   filter === 'starred'
                     ? 'bg-[#ff393a] text-white'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-theme-text-secondary hover:text-theme-text'
                 }`}
               >
                 <Star size={14} />
@@ -264,7 +264,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 onClick={() => setFilter('pending')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                   filter === 'pending'
-                    ? 'bg-amber-500 text-white'
+                    ? 'bg-amber-500 text-theme-text'
                     : 'text-amber-400/70 hover:text-amber-400'
                 }`}
               >
@@ -328,9 +328,9 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
       {/* Photo Grid */}
       {photos.length === 0 ? (
-        <div className="text-center py-12 bg-white/5 rounded-xl">
-          <Camera className="w-12 h-12 text-white/20 mx-auto mb-3" />
-          <p className="text-white/60 mb-4">
+        <div className="text-center py-12 bg-theme-surface rounded-xl">
+          <Camera className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+          <p className="text-theme-text-secondary mb-4">
             {filter === 'starred' ? 'No starred photos yet' : filter === 'pending' ? 'No pending photos' : 'No photos yet'}
           </p>
           {filter === 'all' && (

@@ -170,14 +170,14 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a2e] rounded-xl border border-white/10 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">
+      <div className="bg-theme-header rounded-xl border border-theme-stroke max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
+          <h2 className="text-lg font-semibold text-theme-text">
             {sponsor ? 'Edit Sponsor' : 'Add Sponsor'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -192,7 +192,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Sponsor Info */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <Building2 size={16} />
               Sponsor Info
             </h3>
@@ -213,7 +213,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 placeholder="Website"
               />
               <IconInput
-                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
                 type="text"
                 value={formData.brandTwitter || ''}
                 onChange={e => handleChange('brandTwitter', e.target.value)}
@@ -224,7 +224,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Contact Info */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <User size={16} />
               Contact Info
             </h3>
@@ -258,14 +258,14 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 placeholder="Phone"
               />
               <IconInput
-                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
                 type="text"
                 value={formData.contactTwitter || ''}
                 onChange={e => handleChange('contactTwitter', e.target.value)}
                 placeholder="Contact X Handle"
               />
               <IconInput
-                customIcon={<TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />}
+                customIcon={<TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
                 type="text"
                 value={formData.telegram || ''}
                 onChange={e => handleChange('telegram', e.target.value)}
@@ -276,21 +276,21 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Pipeline */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <Calendar size={16} />
               Pipeline
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="relative">
-                <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <Calendar size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
                 <select
                   value={formData.status}
                   onChange={e => handleChange('status', e.target.value as SponsorStatus)}
-                  className="w-full !pl-14 bg-[#0d0d1a] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                  className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 >
                   {STATUS_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
+                    <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
                       {opt.label}
                     </option>
                   ))}
@@ -309,7 +309,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Fundraising */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <DollarSign size={16} />
               Fundraising
             </h3>
@@ -324,16 +324,16 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 placeholder="Amount"
               />
               <div className="relative">
-                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
                 <select
                   value={formData.sponsorshipType || ''}
                   onChange={e => handleChange('sponsorshipType', e.target.value as SponsorshipType || null)}
-                  className="w-full !pl-14 bg-[#0d0d1a] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                  className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 >
-                  <option value="" className="bg-[#1a1a2e] text-white/50">Contribution Type</option>
+                  <option value="" className="bg-theme-header text-theme-text-muted">Contribution Type</option>
                   {TYPE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
+                    <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
                       {opt.label}
                     </option>
                   ))}
@@ -351,7 +351,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Logo Upload */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <Image size={16} />
               Logo
             </h3>
@@ -360,7 +360,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 <img
                   src={logoPreview}
                   alt="Logo preview"
-                  className="w-16 h-16 object-contain rounded-lg border border-white/10 bg-white/5"
+                  className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
                 />
                 <button
                   type="button"
@@ -382,7 +382,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
                 >
                   <Upload size={16} />
                   Upload Logo
@@ -402,7 +402,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
 
           {/* Notes */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <FileText size={16} />
               Notes
             </h3>
@@ -417,7 +417,7 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end pt-4 border-t border-white/10">
+          <div className="flex justify-end pt-4 border-t border-theme-stroke">
             <button
               type="submit"
               disabled={isLoading || uploadingLogo}

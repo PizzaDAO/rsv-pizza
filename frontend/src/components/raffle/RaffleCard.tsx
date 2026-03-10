@@ -40,32 +40,32 @@ export function RaffleCard({
   const totalPrizes = raffle.prizes.reduce((sum, p) => sum + p.quantity, 0);
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-1 hover:bg-white/10 rounded transition-colors"
+            className="p-1 hover:bg-theme-surface-hover rounded transition-colors"
           >
-            {expanded ? <ChevronUp size={18} className="text-white/60" /> : <ChevronDown size={18} className="text-white/60" />}
+            {expanded ? <ChevronUp size={18} className="text-theme-text-secondary" /> : <ChevronDown size={18} className="text-theme-text-secondary" />}
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-white truncate">{raffle.name}</h3>
+              <h3 className="font-semibold text-theme-text truncate">{raffle.name}</h3>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
                 {statusConfig.label}
               </span>
             </div>
             {raffle.description && (
-              <p className="text-sm text-white/60 truncate mt-0.5">{raffle.description}</p>
+              <p className="text-sm text-theme-text-secondary truncate mt-0.5">{raffle.description}</p>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2 ml-4">
           {/* Stats */}
-          <div className="flex items-center gap-3 mr-2 text-sm text-white/60">
+          <div className="flex items-center gap-3 mr-2 text-sm text-theme-text-secondary">
             <span className="flex items-center gap-1">
               <Users size={14} />
               {entryCount}
@@ -81,14 +81,14 @@ export function RaffleCard({
             <>
               <button
                 onClick={onEdit}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                className="p-2 hover:bg-theme-surface-hover rounded-lg transition-colors text-theme-text-secondary hover:text-theme-text"
                 title="Edit raffle"
               >
                 <Edit2 size={16} />
               </button>
               <button
                 onClick={onDelete}
-                className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-white/60 hover:text-red-400"
+                className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-theme-text-secondary hover:text-red-400"
                 title="Delete raffle"
               >
                 <Trash2 size={16} />
@@ -100,11 +100,11 @@ export function RaffleCard({
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="border-t border-white/10 p-4 space-y-4">
+        <div className="border-t border-theme-stroke p-4 space-y-4">
           {/* Status Controls */}
           {raffle.status !== 'drawn' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-white/60 mr-2">Status:</span>
+              <span className="text-sm text-theme-text-secondary mr-2">Status:</span>
               {(['draft', 'open', 'closed'] as RaffleStatus[]).map((status) => (
                 <button
                   key={status}
@@ -113,7 +113,7 @@ export function RaffleCard({
                   className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                     raffle.status === status
                       ? `${statusColors[status].bg} ${statusColors[status].text} border border-current`
-                      : 'bg-white/5 text-white/60 hover:bg-white/10'
+                      : 'bg-theme-surface text-theme-text-secondary hover:bg-theme-surface-hover'
                   }`}
                 >
                   {statusColors[status].label}
@@ -141,7 +141,7 @@ export function RaffleCard({
           {/* Prizes Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-white/80">Prizes</h4>
+              <h4 className="text-sm font-medium text-theme-text">Prizes</h4>
               {raffle.status !== 'drawn' && (
                 <button
                   onClick={onAddPrize}
@@ -154,13 +154,13 @@ export function RaffleCard({
             </div>
 
             {raffle.prizes.length === 0 ? (
-              <p className="text-sm text-white/40 italic">No prizes added yet</p>
+              <p className="text-sm text-theme-text-muted italic">No prizes added yet</p>
             ) : (
               <div className="space-y-2">
                 {raffle.prizes.map((prize) => (
                   <div
                     key={prize.id}
-                    className="flex items-center gap-3 p-3 bg-white/5 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-theme-surface rounded-lg"
                   >
                     {prize.imageUrl ? (
                       <img
@@ -174,25 +174,25 @@ export function RaffleCard({
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white truncate">{prize.name}</p>
+                      <p className="font-medium text-theme-text truncate">{prize.name}</p>
                       {prize.description && (
-                        <p className="text-xs text-white/60 truncate">{prize.description}</p>
+                        <p className="text-xs text-theme-text-secondary truncate">{prize.description}</p>
                       )}
                     </div>
-                    <span className="text-sm text-white/60 px-2 py-1 bg-white/10 rounded">
+                    <span className="text-sm text-theme-text-secondary px-2 py-1 bg-theme-surface-hover rounded">
                       x{prize.quantity}
                     </span>
                     {raffle.status !== 'drawn' && (
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => onEditPrize(prize)}
-                          className="p-1.5 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
+                          className="p-1.5 hover:bg-theme-surface-hover rounded transition-colors text-theme-text-secondary hover:text-theme-text"
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => onDeletePrize(prize.id)}
-                          className="p-1.5 hover:bg-red-500/20 rounded transition-colors text-white/60 hover:text-red-400"
+                          className="p-1.5 hover:bg-red-500/20 rounded transition-colors text-theme-text-secondary hover:text-red-400"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -207,17 +207,17 @@ export function RaffleCard({
           {/* Entries Section (only when open or has entries) */}
           {(raffle.status === 'open' || raffle.entries.length > 0) && raffle.status !== 'drawn' && (
             <div>
-              <h4 className="text-sm font-medium text-white/80 mb-2">
+              <h4 className="text-sm font-medium text-theme-text mb-2">
                 Entries ({entryCount})
               </h4>
               {raffle.entries.length === 0 ? (
-                <p className="text-sm text-white/40 italic">No entries yet</p>
+                <p className="text-sm text-theme-text-muted italic">No entries yet</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {raffle.entries.map((entry) => (
                     <span
                       key={entry.id}
-                      className="px-3 py-1 bg-white/10 rounded-full text-sm text-white/80"
+                      className="px-3 py-1 bg-theme-surface-hover rounded-full text-sm text-theme-text"
                     >
                       {entry.guest?.name || 'Guest'}
                     </span>
@@ -230,7 +230,7 @@ export function RaffleCard({
           {/* Winners Section */}
           {raffle.status === 'drawn' && raffle.winners.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
+              <h4 className="text-sm font-medium text-theme-text mb-2 flex items-center gap-2">
                 <Trophy size={16} className="text-yellow-500" />
                 Winners
               </h4>
@@ -245,7 +245,7 @@ export function RaffleCard({
                       className={`p-1 rounded transition-colors ${
                         winner.claimedAt
                           ? 'text-green-400 hover:text-green-300'
-                          : 'text-white/40 hover:text-white/60'
+                          : 'text-theme-text-muted hover:text-theme-text-secondary'
                       }`}
                       title={winner.claimedAt ? 'Mark as unclaimed' : 'Mark as claimed'}
                     >
@@ -256,8 +256,8 @@ export function RaffleCard({
                       )}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white">{winner.guest?.name || 'Guest'}</p>
-                      <p className="text-xs text-white/60">Won: {winner.prize?.name || 'Prize'}</p>
+                      <p className="font-medium text-theme-text">{winner.guest?.name || 'Guest'}</p>
+                      <p className="text-xs text-theme-text-secondary">Won: {winner.prize?.name || 'Prize'}</p>
                     </div>
                     {winner.claimedAt && (
                       <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">

@@ -24,10 +24,10 @@ function DomainFavicon({ domain, size = 20 }: { domain: string; size?: number })
   if (failed) {
     return (
       <div
-        className="rounded bg-white/10 flex items-center justify-center flex-shrink-0"
+        className="rounded bg-theme-surface-hover flex items-center justify-center flex-shrink-0"
         style={{ width: size, height: size }}
       >
-        <span className="text-[10px] font-bold text-white/60 uppercase">{domain.charAt(0)}</span>
+        <span className="text-[10px] font-bold text-theme-text-secondary uppercase">{domain.charAt(0)}</span>
       </div>
     );
   }
@@ -152,13 +152,13 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[#1a1a2e] rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] flex flex-col">
+      <div className="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white">Browse Organizations</h2>
+        <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
+          <h2 className="text-lg font-bold text-theme-text">Browse Organizations</h2>
           <button
             onClick={onClose}
-            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -179,12 +179,12 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-white/40" />
+              <Loader2 size={24} className="animate-spin text-theme-text-muted" />
             </div>
           ) : filteredDomains.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Search size={36} className="text-white/20 mb-3" />
-              <p className="text-white/50 text-sm">
+              <Search size={36} className="text-theme-text-faint mb-3" />
+              <p className="text-theme-text-muted text-sm">
                 {searchQuery.trim() ? `No domains match "${searchQuery}"` : 'No organization domains found'}
               </p>
             </div>
@@ -199,31 +199,31 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
                   key={group.domain}
                   onClick={() => handleToggleDomain(group)}
                   disabled={isToggling}
-                  className="flex items-center gap-3 w-full py-2.5 px-2 -mx-2 rounded-lg hover:bg-white/5 transition-colors text-left"
+                  className="flex items-center gap-3 w-full py-2.5 px-2 -mx-2 rounded-lg hover:bg-theme-surface transition-colors text-left"
                 >
                   {/* Favicon */}
                   <DomainFavicon domain={group.domain} size={24} />
 
                   {/* Domain & count */}
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-white">{group.domain}</span>
-                    <span className="text-xs text-white/40 ml-2">
+                    <span className="text-sm font-medium text-theme-text">{group.domain}</span>
+                    <span className="text-xs text-theme-text-muted ml-2">
                       {group.guests.length} {group.guests.length === 1 ? 'RSVP' : 'RSVPs'}
                     </span>
                   </div>
 
                   {/* Selection indicator */}
                   {isToggling ? (
-                    <Loader2 size={18} className="animate-spin text-white/40 flex-shrink-0" />
+                    <Loader2 size={18} className="animate-spin text-theme-text-muted flex-shrink-0" />
                   ) : (
                     <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
                       selected
                         ? 'bg-[#ff393a] border-[#ff393a]'
                         : partial
                           ? 'border-[#ff393a] bg-[#ff393a]/20'
-                          : 'border-white/20'
+                          : 'border-theme-stroke-hover'
                     }`}>
-                      {(selected || partial) && <Check size={14} className="text-white" />}
+                      {(selected || partial) && <Check size={14} className="text-theme-text" />}
                     </div>
                   )}
                 </button>
@@ -233,8 +233,8 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
         </div>
 
         {/* Footer counter */}
-        <div className="px-4 py-3 border-t border-white/10 text-center">
-          <span className="text-sm text-white/50">
+        <div className="px-4 py-3 border-t border-theme-stroke text-center">
+          <span className="text-sm text-theme-text-muted">
             {selectedCount} {selectedCount === 1 ? 'organization' : 'organizations'} selected
           </span>
         </div>

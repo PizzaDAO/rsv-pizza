@@ -52,10 +52,10 @@ function DomainLogo({ domain, size = 20 }: { domain: string; size?: number }) {
   if (failed) {
     return (
       <div
-        className="rounded bg-white/10 flex items-center justify-center flex-shrink-0"
+        className="rounded bg-theme-surface-hover flex items-center justify-center flex-shrink-0"
         style={{ width: size, height: size }}
       >
-        <span className="text-[10px] font-bold text-white/60 uppercase">
+        <span className="text-[10px] font-bold text-theme-text-secondary uppercase">
           {domain.charAt(0)}
         </span>
       </div>
@@ -90,7 +90,7 @@ function OrgCard({
   const { domain, attendees } = group;
 
   return (
-    <div className="inline-flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10 group">
+    <div className="inline-flex items-center gap-2 bg-theme-surface rounded-lg px-3 py-2 border border-theme-stroke group">
       {domain ? (
         <>
           <DomainLogo domain={domain} size={16} />
@@ -98,19 +98,19 @@ function OrgCard({
             href={`https://${domain}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-white/70 hover:text-white transition-colors"
+            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             {domain}
           </a>
           {totalRsvps > 1 && (
-            <span className="text-xs text-white/40">({totalRsvps})</span>
+            <span className="text-xs text-theme-text-muted">({totalRsvps})</span>
           )}
         </>
       ) : (
         <>
-          <Building2 size={14} className="text-white/40" />
+          <Building2 size={14} className="text-theme-text-muted" />
           {attendees.map((a) => (
-            <span key={a.id} className="text-sm text-white/70">{a.name}</span>
+            <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
           ))}
         </>
       )}
@@ -118,7 +118,7 @@ function OrgCard({
         <button
           onClick={() => attendees.forEach(a => onDelete(a.id))}
           disabled={attendees.some(a => deletingId === a.id)}
-          className="p-0.5 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors"
+          className="p-0.5 text-transparent group-hover:text-theme-text-muted hover:!text-red-400 transition-colors"
         >
           {attendees.some(a => deletingId === a.id) ? (
             <Loader2 size={12} className="animate-spin" />
@@ -198,7 +198,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-white">Industry RSVPs</h3>
+        <h3 className="text-lg font-semibold text-theme-text">Industry RSVPs</h3>
         <div className="flex flex-wrap gap-2">
           {orgGroups.map((group) => (
             <OrgCard
@@ -218,14 +218,14 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Industry RSVPs</h3>
+        <h3 className="text-lg font-semibold text-theme-text">Industry RSVPs</h3>
         <div className="flex items-center gap-2">
           {!isAdding && (
             <>
               {guests.length > 0 && partyId && (
                 <button
                   onClick={() => setShowBrowseModal(true)}
-                  className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors"
+                  className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                 >
                   <Users size={16} />
                   Browse All
@@ -233,7 +233,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
               )}
               <button
                 onClick={() => setIsAdding(true)}
-                className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors"
+                className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
                 <Plus size={16} />
                 Add Manually
@@ -256,20 +256,20 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
 
       {/* Add new attendee form (manual) */}
       {isAdding && (
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke space-y-3">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name or company"
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+            className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
           <input
             type="url"
             value={newLink}
             onChange={(e) => setNewLink(e.target.value)}
             placeholder="Link to profile or website (optional)"
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+            className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
           <div className="flex gap-2">
             <button
@@ -310,9 +310,9 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
         </div>
       ) : (
         !isAdding && (
-          <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
-            <p className="text-white/40 text-sm">No industry RSVPs added yet</p>
-            <p className="text-white/30 text-xs mt-1">Add VIPs, notable companies, or influencers who attended</p>
+          <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
+            <p className="text-theme-text-muted text-sm">No industry RSVPs added yet</p>
+            <p className="text-theme-text-faint text-xs mt-1">Add VIPs, notable companies, or influencers who attended</p>
           </div>
         )
       )}

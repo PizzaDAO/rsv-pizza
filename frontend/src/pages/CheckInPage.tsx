@@ -88,7 +88,7 @@ export function CheckInPage() {
       return (
         <div className="flex flex-col items-center justify-center py-12">
           <Loader2 size={48} className="animate-spin text-[#ff393a] mb-4" />
-          <p className="text-white/60">Checking in guest...</p>
+          <p className="text-theme-text-secondary">Checking in guest...</p>
         </div>
       );
     }
@@ -99,10 +99,10 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
             <CheckCircle2 size={48} className="text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Checked In!</h2>
-          <p className="text-xl text-white/80 mb-4">{guestName}</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Checked In!</h2>
+          <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
-            <p className="text-white/50 text-sm flex items-center gap-2">
+            <p className="text-theme-text-muted text-sm flex items-center gap-2">
               <Clock size={14} />
               {formatCheckInTime(checkedInAt)}
             </p>
@@ -123,10 +123,10 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-6">
             <CheckCircle2 size={48} className="text-blue-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Already Checked In</h2>
-          <p className="text-xl text-white/80 mb-4">{guestName}</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Already Checked In</h2>
+          <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
-            <p className="text-white/50 text-sm flex items-center gap-2">
+            <p className="text-theme-text-muted text-sm flex items-center gap-2">
               <Clock size={14} />
               Checked in at {formatCheckInTime(checkedInAt)}
             </p>
@@ -147,8 +147,8 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
             <AlertCircle size={48} className="text-yellow-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Unauthorized</h2>
-          <p className="text-white/60 mb-4 max-w-md">{errorMessage}</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Unauthorized</h2>
+          <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
           <button
             onClick={() => navigate('/')}
             className="mt-4 btn-secondary"
@@ -165,8 +165,8 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-gray-500/20 flex items-center justify-center mb-6">
             <XCircle size={48} className="text-gray-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Not Found</h2>
-          <p className="text-white/60 mb-4 max-w-md">{errorMessage}</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Not Found</h2>
+          <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
           <button
             onClick={() => navigate('/')}
             className="mt-4 btn-secondary"
@@ -183,8 +183,8 @@ export function CheckInPage() {
         <div className="w-20 h-20 rounded-full bg-[#ff393a]/20 flex items-center justify-center mb-6">
           <XCircle size={48} className="text-[#ff393a]" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Check-in Failed</h2>
-        <p className="text-white/60 mb-4 max-w-md">{errorMessage}</p>
+        <h2 className="text-2xl font-bold text-theme-text mb-2">Check-in Failed</h2>
+        <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
         <div className="flex gap-4 mt-4">
           <button
             onClick={() => {
@@ -211,7 +211,7 @@ export function CheckInPage() {
       <div className="max-w-md mx-auto px-4 py-12">
         <div className="card p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold text-white mb-2">Guest Check-In</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Guest Check-In</h1>
           </div>
           {renderContent()}
         </div>

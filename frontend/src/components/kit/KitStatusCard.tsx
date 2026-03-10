@@ -56,14 +56,14 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
   };
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+      <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/10 rounded-lg">
-            <Package size={20} className="text-white/60" />
+          <div className="p-2 bg-theme-surface-hover rounded-lg">
+            <Package size={20} className="text-theme-text-secondary" />
           </div>
-          <span className="font-medium text-white">Party Kit</span>
+          <span className="font-medium text-theme-text">Party Kit</span>
         </div>
         <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${statusConfig.bgColor}/20 ${statusConfig.color}`}>
           {statusConfig.icon}
@@ -75,11 +75,11 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
       <div className="p-4 space-y-4">
         {/* Kit Tier */}
         <div>
-          <p className="text-sm text-white/50 mb-1">Kit Tier</p>
+          <p className="text-sm text-theme-text-muted mb-1">Kit Tier</p>
           {allocatedTier ? (
-            <p className="text-white font-medium">{allocatedTier.name}</p>
+            <p className="text-theme-text font-medium">{allocatedTier.name}</p>
           ) : (
-            <p className="text-white/70 text-sm italic">
+            <p className="text-theme-text-secondary text-sm italic">
               PizzaDAO will assign the appropriate tier for your event
             </p>
           )}
@@ -87,20 +87,20 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
 
         {/* Shipping Address */}
         <div>
-          <p className="text-sm text-white/50 mb-1">Shipping to</p>
-          <p className="text-white font-medium">{kit.recipientName}</p>
+          <p className="text-sm text-theme-text-muted mb-1">Shipping to</p>
+          <p className="text-theme-text font-medium">{kit.recipientName}</p>
           {formatAddress().map((line, i) => (
-            <p key={i} className="text-sm text-white/70">{line}</p>
+            <p key={i} className="text-sm text-theme-text-secondary">{line}</p>
           ))}
-          {kit.phone && <p className="text-sm text-white/50 mt-1">{kit.phone}</p>}
+          {kit.phone && <p className="text-sm text-theme-text-muted mt-1">{kit.phone}</p>}
         </div>
 
         {/* Tracking Info */}
         {kit.trackingNumber && (
           <div>
-            <p className="text-sm text-white/50 mb-1">Tracking</p>
+            <p className="text-sm text-theme-text-muted mb-1">Tracking</p>
             <div className="flex items-center gap-2">
-              <code className="text-sm text-white/80 bg-white/10 px-2 py-0.5 rounded">
+              <code className="text-sm text-theme-text bg-theme-surface-hover px-2 py-0.5 rounded">
                 {kit.trackingNumber}
               </code>
               {kit.trackingUrl && (
@@ -121,14 +121,14 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
         {/* Notes */}
         {kit.notes && (
           <div>
-            <p className="text-sm text-white/50 mb-1">Your Notes</p>
-            <p className="text-sm text-white/70">{kit.notes}</p>
+            <p className="text-sm text-theme-text-muted mb-1">Your Notes</p>
+            <p className="text-sm text-theme-text-secondary">{kit.notes}</p>
           </div>
         )}
 
         {/* Timeline */}
-        <div className="pt-2 border-t border-white/10">
-          <p className="text-xs text-white/40">
+        <div className="pt-2 border-t border-theme-stroke">
+          <p className="text-xs text-theme-text-muted">
             Requested {new Date(kit.requestedAt).toLocaleDateString()}
             {kit.approvedAt && ` | Approved ${new Date(kit.approvedAt).toLocaleDateString()}`}
             {kit.shippedAt && ` | Shipped ${new Date(kit.shippedAt).toLocaleDateString()}`}
@@ -143,7 +143,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
           {onEdit && (
             <button
               onClick={onEdit}
-              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2 rounded-lg transition-colors text-sm"
             >
               Edit Request
             </button>

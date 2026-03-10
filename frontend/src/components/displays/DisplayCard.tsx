@@ -83,20 +83,20 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
   const hasPhysicalDimensions = physW > 0 && physH > 0;
 
   return (
-    <div className={`card p-4 border ${display.isActive ? 'border-white/10' : 'border-red-500/30 bg-red-950/10'}`}>
+    <div className={`card p-4 border ${display.isActive ? 'border-theme-stroke' : 'border-red-500/30 bg-red-950/10'}`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-xl">
+          <div className="w-10 h-10 rounded-lg bg-theme-surface flex items-center justify-center text-xl">
             {contentTypeIcons[display.contentType]}
           </div>
           <div>
-            <h3 className="font-medium text-white flex items-center gap-2">
+            <h3 className="font-medium text-theme-text flex items-center gap-2">
               {display.name}
               {!display.isActive && (
                 <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">Inactive</span>
               )}
             </h3>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-theme-text-muted">
               {contentTypeLabels[display.contentType]} - {getContentDescription()}
             </p>
           </div>
@@ -109,21 +109,21 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
       )}
 
       {/* URL Display */}
-      <div className="bg-white/5 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
-        <Monitor size={14} className="text-white/40 flex-shrink-0" />
-        <span className="text-sm text-white/70 truncate flex-1 font-mono">
+      <div className="bg-theme-surface rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+        <Monitor size={14} className="text-theme-text-muted flex-shrink-0" />
+        <span className="text-sm text-theme-text-secondary truncate flex-1 font-mono">
           /display/{partyId.substring(0, 8)}.../{display.slug}
         </span>
         <button
           onClick={copyUrl}
-          className="text-white/40 hover:text-white transition-colors"
+          className="text-theme-text-muted hover:text-theme-text transition-colors"
           title="Copy URL"
         >
           <Copy size={14} />
         </button>
         <button
           onClick={openPreview}
-          className="text-white/40 hover:text-white transition-colors"
+          className="text-theme-text-muted hover:text-theme-text transition-colors"
           title="Open Preview"
         >
           <ExternalLink size={14} />
@@ -131,7 +131,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-sm text-white/50 mb-4">
+      <div className="flex items-center gap-4 text-sm text-theme-text-muted mb-4">
         <div className="flex items-center gap-1">
           <Eye size={14} />
           <span>{display.viewCount} views</span>
@@ -148,7 +148,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
           onClick={() => onToggleActive(display)}
           className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
             display.isActive
-              ? 'bg-white/5 hover:bg-white/10 text-white/70'
+              ? 'bg-theme-surface hover:bg-theme-surface-hover text-theme-text-secondary'
               : 'bg-green-500/10 hover:bg-green-500/20 text-green-400'
           }`}
         >
@@ -157,7 +157,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
         </button>
         <button
           onClick={() => onEdit(display)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-theme-surface hover:bg-theme-surface-hover text-theme-text-secondary transition-colors"
         >
           <Edit2 size={14} />
           Edit
@@ -198,20 +198,20 @@ function ScreenMockup({ width, height, resolution }: { width: number; height: nu
       <div className="flex flex-col items-center gap-1">
         <div className="relative flex items-center gap-1">
           {/* Width label on top */}
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-white/40 whitespace-nowrap">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-theme-text-muted whitespace-nowrap">
             {width}"
           </div>
           {/* Height label on the left */}
-          <div className="text-[10px] text-white/40 mr-1">
+          <div className="text-[10px] text-theme-text-muted mr-1">
             {height}"
           </div>
           {/* Screen rectangle */}
           <div
-            className="border-2 border-white/20 rounded bg-white/5 flex items-center justify-center"
+            className="border-2 border-theme-stroke-hover rounded bg-theme-surface flex items-center justify-center"
             style={{ width: mockupWidth, height: mockupHeight }}
           >
             {resolution && (
-              <span className="text-[9px] text-white/30">{resolution}</span>
+              <span className="text-[9px] text-theme-text-faint">{resolution}</span>
             )}
           </div>
         </div>

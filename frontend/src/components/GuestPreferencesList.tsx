@@ -45,9 +45,9 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
   if (guestsWithRequests.length === 0) {
     const content = (
       <div className={embedded ? "flex flex-col items-center justify-center min-h-[150px] text-center py-4" : "card p-6 flex flex-col items-center justify-center min-h-[200px] text-center"}>
-        <UserRoundX size={embedded ? 32 : 48} className="text-white/30 mb-4" />
-        <h3 className={`font-medium text-white/80 ${embedded ? 'text-lg' : 'text-xl'}`}>No Guest Requests Yet</h3>
-        <p className="text-white/50 mt-2 mb-4 text-sm">
+        <UserRoundX size={embedded ? 32 : 48} className="text-theme-text-faint mb-4" />
+        <h3 className={`font-medium text-theme-text ${embedded ? 'text-lg' : 'text-xl'}`}>No Guest Requests Yet</h3>
+        <p className="text-theme-text-muted mt-2 mb-4 text-sm">
           {guests.length > 0
             ? `${guests.length} guests have RSVP'd but none have submitted pizza requests yet.`
             : 'Guest requests will appear here once they RSVP.'}
@@ -81,7 +81,7 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
     <div className={embedded ? "" : "card p-6"}>
       <div className={`flex justify-between items-center ${embedded ? 'mb-3' : 'mb-4'}`}>
         <div className="flex items-center gap-3">
-          <h2 className={`font-bold text-white ${embedded ? 'text-lg' : 'text-xl'}`}>Guest Requests</h2>
+          <h2 className={`font-bold text-theme-text ${embedded ? 'text-lg' : 'text-xl'}`}>Guest Requests</h2>
           <span className="bg-[#ff393a]/20 text-[#ff393a] text-sm font-medium px-3 py-1 rounded-full border border-[#ff393a]/30">
             {guestsWithRequests.length} {guestsWithRequests.length === 1 ? 'Request' : 'Requests'}
           </span>
@@ -95,7 +95,7 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
         </button>
       </div>
 
-      <div className="divide-y divide-white/10">
+      <div className="divide-y divide-theme-stroke">
         {visibleGuests.map(guest => (
           <TableRow
             key={guest.id}
@@ -114,7 +114,7 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
       {hasMore && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full mt-4 py-3 flex items-center justify-center gap-2 text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors"
+          className="w-full mt-4 py-3 flex items-center justify-center gap-2 text-theme-text-secondary hover:text-theme-text bg-theme-surface hover:bg-theme-surface-hover rounded-xl border border-theme-stroke transition-colors"
         >
           {expanded ? (
             <>

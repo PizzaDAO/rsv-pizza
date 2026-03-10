@@ -30,14 +30,14 @@ export const BeverageOrderSummary: React.FC = () => {
   if (beverageRecommendations.length === 0) {
     return (
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
           <Beer size={20} className="text-[#ff393a]" />
           Beverage Order
         </h2>
-        <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-6 bg-white/5 rounded-xl border border-dashed border-white/20">
-          <Beer size={48} className="text-white/30 mb-4" />
-          <h3 className="text-lg font-medium text-white/80">No Beverages Selected</h3>
-          <p className="text-white/50 mt-2 text-sm">
+        <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-6 bg-theme-surface rounded-xl border border-dashed border-theme-stroke-hover">
+          <Beer size={48} className="text-theme-text-faint mb-4" />
+          <h3 className="text-lg font-medium text-theme-text">No Beverages Selected</h3>
+          <p className="text-theme-text-muted mt-2 text-sm">
             Configure beverage selection and generate recommendations to see your order.
           </p>
         </div>
@@ -47,7 +47,7 @@ export const BeverageOrderSummary: React.FC = () => {
 
   return (
     <div className="card p-6">
-      <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+      <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
         <Beer size={20} className="text-[#ff393a]" />
         Beverage Order
       </h2>
@@ -55,17 +55,17 @@ export const BeverageOrderSummary: React.FC = () => {
       <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
         <h3 className="font-medium text-blue-400 mb-2">Order Summary</h3>
         <div className="space-y-1 text-sm">
-          <p className="text-white/80">
-            <span className="text-white/60">Expected guests:</span>{' '}
-            <span className="font-semibold text-white">{expectedGuests}</span>
+          <p className="text-theme-text">
+            <span className="text-theme-text-secondary">Expected guests:</span>{' '}
+            <span className="font-semibold text-theme-text">{expectedGuests}</span>
           </p>
-          <p className="text-white/80">
-            <span className="text-white/60">Responded:</span>{' '}
-            <span className="font-semibold text-white">{respondedGuests}</span>
+          <p className="text-theme-text">
+            <span className="text-theme-text-secondary">Responded:</span>{' '}
+            <span className="font-semibold text-theme-text">{respondedGuests}</span>
           </p>
-          <p className="text-white/80 pt-1 border-t border-white/10 mt-2">
-            <span className="text-white/60">Total beverages:</span>{' '}
-            <span className="font-semibold text-white text-base">{totalBeverages}</span>
+          <p className="text-theme-text pt-1 border-t border-theme-stroke mt-2">
+            <span className="text-theme-text-secondary">Total beverages:</span>{' '}
+            <span className="font-semibold text-theme-text text-base">{totalBeverages}</span>
           </p>
         </div>
       </div>
@@ -74,12 +74,12 @@ export const BeverageOrderSummary: React.FC = () => {
         {beverageRecommendations.map(rec => (
           <div
             key={rec.id}
-            className="p-3 bg-white/5 border border-white/10 rounded-lg"
+            className="p-3 bg-theme-surface border border-theme-stroke rounded-lg"
           >
             <div className="flex justify-between items-center">
               <div>
-                <span className="font-semibold text-white">{rec.beverage.name}</span>
-                <span className="text-white/50 text-sm ml-2">
+                <span className="font-semibold text-theme-text">{rec.beverage.name}</span>
+                <span className="text-theme-text-muted text-sm ml-2">
                   ({rec.guestCount} {rec.guestCount === 1 ? 'guest' : 'guests'})
                 </span>
               </div>
@@ -88,7 +88,7 @@ export const BeverageOrderSummary: React.FC = () => {
               </span>
             </div>
             {rec.isForNonRespondents && (
-              <p className="text-xs text-white/40 mt-1">For non-respondents</p>
+              <p className="text-xs text-theme-text-muted mt-1">For non-respondents</p>
             )}
           </div>
         ))}

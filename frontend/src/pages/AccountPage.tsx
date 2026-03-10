@@ -292,7 +292,7 @@ export function AccountPage() {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 size={32} className="animate-spin text-white/60" />
+          <Loader2 size={32} className="animate-spin text-theme-text-secondary" />
         </div>
       </Layout>
     );
@@ -310,14 +310,14 @@ export function AccountPage() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+            className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Your Profile</h1>
-            <p className="text-white/60">Choose how you are displayed as a host or guest.</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Your Profile</h1>
+            <p className="text-theme-text-secondary">Choose how you are displayed as a host or guest.</p>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
@@ -355,7 +355,7 @@ export function AccountPage() {
                   />
                   <label
                     htmlFor="profilePicture"
-                    className="block w-24 h-24 rounded-full cursor-pointer overflow-hidden bg-[#ff393a]/20 border-2 border-white/10 hover:border-[#ff393a]/50 transition-colors"
+                    className="block w-24 h-24 rounded-full cursor-pointer overflow-hidden bg-[#ff393a]/20 border-2 border-theme-stroke hover:border-[#ff393a]/50 transition-colors"
                   >
                     {profilePicture ? (
                       <img
@@ -371,9 +371,9 @@ export function AccountPage() {
                   </label>
                   <label
                     htmlFor="profilePicture"
-                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-[#1a1a2e] border-2 border-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors"
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-theme-header border-2 border-theme-stroke-hover rounded-full flex items-center justify-center cursor-pointer hover:bg-theme-surface-hover transition-colors"
                   >
-                    <Upload size={14} className="text-white/70" />
+                    <Upload size={14} className="text-theme-text-secondary" />
                   </label>
                 </div>
               </div>
@@ -393,9 +393,9 @@ export function AccountPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Instagram */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <Instagram size={16} className="text-white/50" />
-                    <span className="text-white/50 text-sm">instagram.com/</span>
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <Instagram size={16} className="text-theme-text-muted" />
+                    <span className="text-theme-text-muted text-sm">instagram.com/</span>
                   </div>
                   <input
                     type="text"
@@ -408,11 +408,11 @@ export function AccountPage() {
 
                 {/* X (Twitter) */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-white/50 fill-current">
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-theme-text-muted fill-current">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                     </svg>
-                    <span className="text-white/50 text-sm">x.com/</span>
+                    <span className="text-theme-text-muted text-sm">x.com/</span>
                   </div>
                   <input
                     type="text"
@@ -431,9 +431,9 @@ export function AccountPage() {
 
                 {/* YouTube */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <Youtube size={16} className="text-white/50" />
-                    <span className="text-white/50 text-sm">youtube.com/@</span>
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <Youtube size={16} className="text-theme-text-muted" />
+                    <span className="text-theme-text-muted text-sm">youtube.com/@</span>
                   </div>
                   <input
                     type="text"
@@ -446,11 +446,11 @@ export function AccountPage() {
 
                 {/* TikTok */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-white/50 fill-current">
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-theme-text-muted fill-current">
                       <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
                     </svg>
-                    <span className="text-white/50 text-sm">tiktok.com/@</span>
+                    <span className="text-theme-text-muted text-sm">tiktok.com/@</span>
                   </div>
                   <input
                     type="text"
@@ -463,9 +463,9 @@ export function AccountPage() {
 
                 {/* LinkedIn */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <Linkedin size={16} className="text-white/50" />
-                    <span className="text-white/50 text-sm">linkedin.com</span>
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <Linkedin size={16} className="text-theme-text-muted" />
+                    <span className="text-theme-text-muted text-sm">linkedin.com</span>
                   </div>
                   <input
                     type="text"
@@ -478,8 +478,8 @@ export function AccountPage() {
 
                 {/* Website */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-shrink-0">
-                    <Globe size={16} className="text-white/50" />
+                  <div className="flex items-center gap-2 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 flex-shrink-0">
+                    <Globe size={16} className="text-theme-text-muted" />
                   </div>
                   <input
                     type="url"
@@ -493,15 +493,15 @@ export function AccountPage() {
             </div>
 
             {/* Pizza Preferences */}
-            <div className="pt-6 border-t border-white/10">
+            <div className="pt-6 border-t border-theme-stroke">
               <div className="flex items-center gap-3 mb-6">
                 <Pizza className="w-6 h-6 text-[#ff393a]" />
-                <h2 className="text-lg font-semibold text-white">Pizza Preferences</h2>
+                <h2 className="text-lg font-semibold text-theme-text">Pizza Preferences</h2>
               </div>
 
               {/* Dietary Restrictions */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-white/80 mb-3">
+                <label className="block text-sm font-medium text-theme-text mb-3">
                   Diet
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -512,7 +512,7 @@ export function AccountPage() {
                       onClick={() => toggleDietary(option)}
                       className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
                           ? 'bg-[#ff393a] text-white'
-                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                         }`}
                     >
                       {option}
@@ -523,7 +523,7 @@ export function AccountPage() {
 
               {/* Toppings */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-white/80 mb-3">
+                <label className="block text-sm font-medium text-theme-text mb-3">
                   Toppings
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -538,7 +538,7 @@ export function AccountPage() {
                             ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                             : isDisliked
                               ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                              : 'bg-white/5 border-white/10'
+                              : 'bg-theme-surface border-theme-stroke'
                           }`}
                       >
                         <button
@@ -548,10 +548,10 @@ export function AccountPage() {
                         >
                           <ThumbsUp
                             size={12}
-                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                               }`}
                           />
-                          <span className="text-white text-xs">{topping.name}</span>
+                          <span className="text-theme-text text-xs">{topping.name}</span>
                         </button>
                         <button
                           type="button"
@@ -560,7 +560,7 @@ export function AccountPage() {
                         >
                           <ThumbsDown
                             size={12}
-                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                               }`}
                           />
                         </button>
@@ -572,7 +572,7 @@ export function AccountPage() {
 
               {/* Drinks */}
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-3">
+                <label className="block text-sm font-medium text-theme-text mb-3">
                   Drink Preferences
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -587,7 +587,7 @@ export function AccountPage() {
                             ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                             : isDisliked
                               ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                              : 'bg-white/5 border-white/10'
+                              : 'bg-theme-surface border-theme-stroke'
                           }`}
                       >
                         <button
@@ -597,10 +597,10 @@ export function AccountPage() {
                         >
                           <ThumbsUp
                             size={12}
-                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                            className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                               }`}
                           />
-                          <span className="text-white text-xs">{drink.name}</span>
+                          <span className="text-theme-text text-xs">{drink.name}</span>
                         </button>
                         <button
                           type="button"
@@ -609,7 +609,7 @@ export function AccountPage() {
                         >
                           <ThumbsDown
                             size={12}
-                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                            className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                               }`}
                           />
                         </button>
@@ -647,10 +647,10 @@ export function AccountPage() {
           </form>
 
           {/* Logout Section */}
-          <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between">
+          <div className="mt-12 pt-6 border-t border-theme-stroke flex items-center justify-between">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-theme-text-secondary hover:text-theme-text transition-colors"
             >
               <LogOut size={18} />
               Log Out
@@ -675,12 +675,12 @@ export function AccountPage() {
                   <AlertTriangle size={24} className="text-[#ff393a]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Delete Account</h2>
-                  <p className="text-white/60 text-sm">This action cannot be undone</p>
+                  <h2 className="text-xl font-bold text-theme-text">Delete Account</h2>
+                  <p className="text-theme-text-secondary text-sm">This action cannot be undone</p>
                 </div>
               </div>
 
-              <p className="text-white/70 mb-6">
+              <p className="text-theme-text-secondary mb-6">
                 Are you sure you want to delete your account? All your data, including hosted parties and RSVP history, will be permanently removed.
               </p>
 

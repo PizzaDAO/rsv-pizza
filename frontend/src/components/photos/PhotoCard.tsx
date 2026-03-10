@@ -35,7 +35,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
 
   return (
     <div
-      className={`group relative aspect-square rounded-xl overflow-hidden bg-white/5 cursor-pointer ${
+      className={`group relative aspect-square rounded-xl overflow-hidden bg-theme-surface cursor-pointer ${
         isPending ? 'ring-2 ring-amber-500/50' : isRejected ? 'ring-2 ring-red-500/30 opacity-60' : ''
       }`}
       onClick={onClick}
@@ -54,7 +54,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       {/* Status Badge (pending/rejected) */}
       {isPending && (
         <div className="absolute top-2 left-2 z-10">
-          <div className="flex items-center gap-1 bg-amber-500/90 text-white text-xs font-medium px-2 py-1 rounded-full">
+          <div className="flex items-center gap-1 bg-amber-500/90 text-theme-text text-xs font-medium px-2 py-1 rounded-full">
             <Clock size={12} />
             Pending
           </div>
@@ -114,7 +114,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             className={`p-1.5 rounded-full transition-colors ${
               photo.starred
                 ? 'bg-yellow-400/20 text-yellow-400'
-                : 'bg-black/40 text-white hover:bg-yellow-400/20 hover:text-yellow-400'
+                : 'bg-black/40 text-theme-text hover:bg-yellow-400/20 hover:text-yellow-400'
             }`}
             title={photo.starred ? 'Unstar photo' : 'Star photo'}
           >
@@ -136,15 +136,15 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       {/* Bottom Info (on hover, only for non-pending or when no approve/reject) */}
       {(!isPending || !onApprove) && (
         <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="flex items-center justify-between text-white text-sm">
+          <div className="flex items-center justify-between text-theme-text text-sm">
             <div className="flex items-center gap-1.5">
-              <User size={14} className="text-white/60" />
+              <User size={14} className="text-theme-text-secondary" />
               <span className="truncate max-w-[100px]">{uploaderDisplayName}</span>
             </div>
-            <span className="text-white/60 text-xs">{formatDate(photo.createdAt)}</span>
+            <span className="text-theme-text-secondary text-xs">{formatDate(photo.createdAt)}</span>
           </div>
           {photo.caption && (
-            <p className="text-white/80 text-xs mt-1 truncate">{photo.caption}</p>
+            <p className="text-theme-text text-xs mt-1 truncate">{photo.caption}</p>
           )}
         </div>
       )}
@@ -155,13 +155,13 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           {photo.tags.slice(0, 2).map((tag, index) => (
             <span
               key={index}
-              className="bg-black/50 text-white/80 text-xs px-1.5 py-0.5 rounded"
+              className="bg-black/50 text-theme-text text-xs px-1.5 py-0.5 rounded"
             >
               #{tag}
             </span>
           ))}
           {photo.tags.length > 2 && (
-            <span className="bg-black/50 text-white/60 text-xs px-1.5 py-0.5 rounded">
+            <span className="bg-black/50 text-theme-text-secondary text-xs px-1.5 py-0.5 rounded">
               +{photo.tags.length - 2}
             </span>
           )}

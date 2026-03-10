@@ -41,7 +41,7 @@ export const PromoWidget: React.FC = () => {
 
   if (!party) {
     return (
-      <div className="card p-6 text-white/60">
+      <div className="card p-6 text-theme-text-secondary">
         No party loaded
       </div>
     );
@@ -63,19 +63,19 @@ export const PromoWidget: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleSection(section.id)}
-              className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-surface transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#ff393a]/10 flex items-center justify-center">
                   <Icon size={20} className="text-[#ff393a]" />
                 </div>
                 <div className="text-left">
-                  <p className="text-white font-medium">{section.label}</p>
-                  <p className="text-white/40 text-xs">{section.description}</p>
+                  <p className="text-theme-text font-medium">{section.label}</p>
+                  <p className="text-theme-text-muted text-xs">{section.description}</p>
                 </div>
               </div>
               <svg
-                className={`w-5 h-5 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-theme-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -86,7 +86,7 @@ export const PromoWidget: React.FC = () => {
 
             {/* Section Content */}
             {isExpanded && (
-              <div className="border-t border-white/10 p-4">
+              <div className="border-t border-theme-stroke p-4">
                 {section.id === 'social' && <SocialComposer party={party} />}
                 {section.id === 'publish' && <PlatformPublisher party={party} />}
                 {section.id === 'email' && <EmailOutreach party={party} guests={guests} />}

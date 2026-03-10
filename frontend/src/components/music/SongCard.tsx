@@ -41,7 +41,7 @@ const PlatformIcon: React.FC<{ platform: MusicPlatform; size?: number }> = ({ pl
     case 'apple_music': return <AppleMusicLogo size={size} />;
     case 'youtube': return <YouTubeLogo size={size} />;
     case 'soundcloud': return <SoundCloudLogo size={size} />;
-    default: return <Music size={size} className="text-white/60" />;
+    default: return <Music size={size} className="text-theme-text-secondary" />;
   }
 };
 
@@ -55,7 +55,7 @@ export const SongCard: React.FC<SongCardProps> = ({
   isDJ = false,
 }) => {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-3 transition-all hover:bg-white/[0.07]">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl p-3 transition-all hover:bg-theme-surface-hover">
       <div className="flex items-center gap-3">
         {/* Platform Icon */}
         <div className="flex-shrink-0">
@@ -64,8 +64,8 @@ export const SongCard: React.FC<SongCardProps> = ({
 
         {/* Main Content */}
         <div className="flex-1 min-w-0">
-          <h4 className="text-white font-medium text-sm truncate">{song.title}</h4>
-          <p className="text-white/60 text-xs truncate">{song.artist}</p>
+          <h4 className="text-theme-text font-medium text-sm truncate">{song.title}</h4>
+          <p className="text-theme-text-secondary text-xs truncate">{song.artist}</p>
         </div>
 
         {/* Actions */}
@@ -74,7 +74,7 @@ export const SongCard: React.FC<SongCardProps> = ({
             <a
               href={song.fileUrl}
               download
-              className="p-1.5 text-white/50 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+              className="p-1.5 text-theme-text-muted hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
               title="Download"
               onClick={(e) => e.stopPropagation()}
             >
@@ -86,7 +86,7 @@ export const SongCard: React.FC<SongCardProps> = ({
               href={song.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
               title="Open link"
               onClick={(e) => e.stopPropagation()}
             >
@@ -97,14 +97,14 @@ export const SongCard: React.FC<SongCardProps> = ({
             <>
               <button
                 onClick={() => onEdit(song)}
-                className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
                 title="Edit"
               >
                 <Edit2 size={14} />
               </button>
               <button
                 onClick={() => onDelete(song.id)}
-                className="p-1.5 text-white/50 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                className="p-1.5 text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                 title="Delete"
               >
                 <Trash2 size={14} />

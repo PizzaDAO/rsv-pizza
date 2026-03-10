@@ -131,8 +131,8 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
       {/* Recipient Filter */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <Users size={14} className="text-white/40" />
-          <span className="text-xs text-white/40">Recipients</span>
+          <Users size={14} className="text-theme-text-muted" />
+          <span className="text-xs text-theme-text-muted">Recipients</span>
         </div>
         <div className="flex gap-2">
           {([
@@ -146,8 +146,8 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
               onClick={() => setRecipientFilter(value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 recipientFilter === value
-                  ? 'bg-white/15 text-white border border-white/20'
-                  : 'bg-white/5 text-white/50 hover:text-white/70 hover:bg-white/10 border border-transparent'
+                  ? 'bg-theme-surface-hover text-theme-text border border-theme-stroke-hover'
+                  : 'bg-theme-surface text-theme-text-muted hover:text-theme-text-secondary hover:bg-theme-surface-hover border border-transparent'
               }`}
             >
               {label}
@@ -155,14 +155,14 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
           ))}
         </div>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-white/50">
+          <p className="text-xs text-theme-text-muted">
             {filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''} with email
           </p>
           {filteredGuests.length > 0 && (
             <button
               type="button"
               onClick={handleCopyEmails}
-              className="text-xs text-white/40 hover:text-white/60 flex items-center gap-1 transition-colors"
+              className="text-xs text-theme-text-muted hover:text-theme-text-secondary flex items-center gap-1 transition-colors"
             >
               {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
               Copy emails
@@ -173,7 +173,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
 
       {/* Template Selector */}
       <div>
-        <span className="text-xs text-white/40 mb-2 block">Template</span>
+        <span className="text-xs text-theme-text-muted mb-2 block">Template</span>
         <div className="flex gap-2 flex-wrap">
           {(Object.entries(templates) as [EmailTemplate, TemplateConfig][]).map(([key, config]) => (
             <button
@@ -182,8 +182,8 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
               onClick={() => handleTemplateChange(key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 template === key
-                  ? 'bg-white/15 text-white border border-white/20'
-                  : 'bg-white/5 text-white/50 hover:text-white/70 hover:bg-white/10 border border-transparent'
+                  ? 'bg-theme-surface-hover text-theme-text border border-theme-stroke-hover'
+                  : 'bg-theme-surface text-theme-text-muted hover:text-theme-text-secondary hover:bg-theme-surface-hover border border-transparent'
               }`}
             >
               {config.label}
@@ -220,9 +220,9 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
 
       {/* Preview */}
       {includeEventDetails && (
-        <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-          <span className="text-xs text-white/40 block mb-1">Event details footer preview:</span>
-          <div className="text-xs text-white/60 whitespace-pre-wrap">
+        <div className="bg-theme-surface border border-theme-stroke rounded-lg p-3">
+          <span className="text-xs text-theme-text-muted block mb-1">Event details footer preview:</span>
+          <div className="text-xs text-theme-text-secondary whitespace-pre-wrap">
             ---{'\n'}
             {party.name}{'\n'}
             {party.date && `Date: ${formatEventDateLong(party)}\n`}
@@ -247,7 +247,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         <button
           type="button"
           onClick={handleCopyBody}
-          className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+          className="flex-1 flex items-center justify-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           <Copy size={16} />
           Copy Email
@@ -264,7 +264,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         </button>
       </div>
 
-      <p className="text-xs text-white/30 text-center">
+      <p className="text-xs text-theme-text-faint text-center">
         Opens your default email client with the message pre-filled.
         {filteredGuests.length > 50 && ' Only the first 50 recipients will be included in the mailto link.'}
       </p>

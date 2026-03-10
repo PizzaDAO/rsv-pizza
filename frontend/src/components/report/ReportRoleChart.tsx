@@ -39,9 +39,9 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
 
   if (totalSelections === 0) {
     return (
-      <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
-        <BarChart3 className="w-12 h-12 text-white/20 mx-auto mb-3" />
-        <p className="text-white/40 text-sm">No role data available</p>
+      <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
+        <BarChart3 className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+        <p className="text-theme-text-muted text-sm">No role data available</p>
       </div>
     );
   }
@@ -54,10 +54,10 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-white">RSVP Roles</h3>
-      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+      <h3 className="text-lg font-semibold text-theme-text">RSVP Roles</h3>
+      <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
         {/* Summary line */}
-        <p className="text-white/50 text-xs mb-4">
+        <p className="text-theme-text-muted text-xs mb-4">
           {base} RSVPs / {totalSelections} role selections
           {totalSelections > base && ' (guests can select multiple roles)'}
         </p>
@@ -77,14 +77,14 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
                       className="w-3 h-3 rounded-sm flex-shrink-0"
                       style={{ backgroundColor: color }}
                     />
-                    <span className="text-sm text-white/80">{role}</span>
+                    <span className="text-sm text-theme-text">{role}</span>
                   </div>
-                  <span className="text-sm text-white/50">
+                  <span className="text-sm text-theme-text-muted">
                     {count} ({percentage.toFixed(0)}% of guests)
                   </span>
                 </div>
                 {/* Bar */}
-                <div className="w-full h-5 bg-white/5 rounded-md overflow-hidden">
+                <div className="w-full h-5 bg-theme-surface rounded-md overflow-hidden">
                   <div
                     className="h-full rounded-md transition-all duration-500"
                     style={{

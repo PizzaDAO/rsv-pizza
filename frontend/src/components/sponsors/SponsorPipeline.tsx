@@ -105,17 +105,17 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
   };
 
   return (
-    <div className="card p-4 bg-[#1a1a2e] border-white/10">
+    <div className="card p-4 bg-theme-header border-theme-stroke">
       {/* Fundraising Progress */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Target size={18} className="text-[#ff393a]" />
-            <span className="text-sm font-medium text-white">Fundraising</span>
+            <span className="text-sm font-medium text-theme-text">Fundraising</span>
           </div>
           {isEditingGoal ? (
             <div className="flex items-center gap-2">
-              <span className="text-white/60 text-sm">$</span>
+              <span className="text-theme-text-secondary text-sm">$</span>
               <input
                 ref={inputRef}
                 type="number"
@@ -124,10 +124,10 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
                 onBlur={handleSaveGoal}
                 onKeyDown={e => e.key === 'Enter' && handleSaveGoal()}
                 placeholder="Goal amount"
-                className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                className="w-24 bg-theme-surface-hover border border-theme-stroke-hover rounded px-2 py-1 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
               />
               {isSaving ? (
-                <Loader2 size={16} className="animate-spin text-white/40" />
+                <Loader2 size={16} className="animate-spin text-theme-text-muted" />
               ) : (
                 <button
                   type="button"
@@ -143,7 +143,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
           ) : (
             <button
               onClick={handleEditGoal}
-              className="flex items-center gap-1 text-white/60 hover:text-white text-sm transition-colors"
+              className="flex items-center gap-1 text-theme-text-secondary hover:text-theme-text text-sm transition-colors"
             >
               {goal > 0 ? formatCurrency(goal) : 'Set Goal'}
               <Edit2 size={14} />
@@ -152,7 +152,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
         </div>
 
         {/* Progress Bar */}
-        <div className="relative h-4 bg-white/10 rounded-full overflow-hidden mb-2">
+        <div className="relative h-4 bg-theme-surface-hover rounded-full overflow-hidden mb-2">
           <div
             className="absolute inset-y-0 left-0 bg-green-500 transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
@@ -161,11 +161,11 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
 
         {/* Legend */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-white/60">
+          <span className="text-theme-text-secondary">
             {formatCurrency(confirmed)}{goal > 0 ? ` of ${formatCurrency(goal)}` : ''}
           </span>
           {goal > 0 && (
-            <span className="text-white/40">
+            <span className="text-theme-text-muted">
               {Math.round(progressPercent)}%
             </span>
           )}
@@ -183,10 +183,10 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
               <React.Fragment key={status}>
                 <div className="flex flex-col items-center">
                   <span className={`text-lg font-bold ${config.color}`}>{count}</span>
-                  <span className="text-[10px] text-white/40">{config.label}</span>
+                  <span className="text-[10px] text-theme-text-muted">{config.label}</span>
                 </div>
                 {index < PIPELINE_STATUSES.length - 1 && (
-                  <span className="text-white/20 text-lg">→</span>
+                  <span className="text-theme-text-faint text-lg">→</span>
                 )}
               </React.Fragment>
             );
@@ -194,14 +194,14 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
         </div>
 
         {/* Secondary statuses */}
-        <div className="flex items-center justify-center gap-6 pt-2 border-t border-white/5">
+        <div className="flex items-center justify-center gap-6 pt-2 border-t border-theme-stroke">
           {SECONDARY_STATUSES.map(status => {
             const config = STATUS_CONFIG[status];
             const count = stats?.statusCounts[status] || 0;
             return (
               <div key={status} className="flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${config.bgColor}`} />
-                <span className="text-xs text-white/40">{config.label}</span>
+                <span className="text-xs text-theme-text-muted">{config.label}</span>
                 <span className={`text-xs font-medium ${config.color}`}>({count})</span>
               </div>
             );

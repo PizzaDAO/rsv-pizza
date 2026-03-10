@@ -24,7 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, className = '', style 
         {children}
       </main>
 
-      <Footer className="border-t border-white/10" />
+      <Footer className="border-t border-theme-stroke" />
 
       <CornerLinks />
     </div>

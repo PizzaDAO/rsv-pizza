@@ -203,7 +203,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                   onClick={show}
                   className="w-full btn-primary flex items-center justify-center gap-2"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-theme-text">
                     <path d="M12 1.5L5.5 12.5L12 16.5L18.5 12.5L12 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M5.5 12.5L12 22.5L18.5 12.5L12 16.5L5.5 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -214,8 +214,8 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
           </div>
 
           {/* Copy address fallback */}
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-            <p className="text-white/50 text-xs mb-2">Or send directly to:</p>
+          <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+            <p className="text-theme-text-muted text-xs mb-2">Or send directly to:</p>
             <div className="flex items-center justify-between gap-2">
               <code className="text-[#ff393a] font-mono text-sm break-all">
                 {recipientAddress}
@@ -223,13 +223,13 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
               <button
                 type="button"
                 onClick={handleCopyAddress}
-                className="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className="flex-shrink-0 p-2 hover:bg-theme-surface-hover rounded-lg transition-colors"
                 title="Copy address"
               >
                 {copied ? (
                   <Check size={16} className="text-[#39d98a]" />
                 ) : (
-                  <Copy size={16} className="text-white/60" />
+                  <Copy size={16} className="text-theme-text-secondary" />
                 )}
               </button>
             </div>
@@ -244,7 +244,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                 <button
                   type="button"
                   onClick={show}
-                  className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors bg-white/5 px-3 py-1.5 rounded-full border border-white/10"
+                  className="flex items-center gap-2 text-theme-text-secondary hover:text-theme-text text-sm transition-colors bg-theme-surface px-3 py-1.5 rounded-full border border-theme-stroke"
                 >
                   <div className="w-2 h-2 rounded-full bg-[#39d98a]" />
                   {ensName || truncatedAddress}
@@ -257,21 +257,21 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
               <button
                 type="button"
                 onClick={() => setShowChainMenu(!showChainMenu)}
-                className="flex items-center gap-1 text-white/60 hover:text-white text-sm transition-colors bg-white/5 px-3 py-1.5 rounded-full border border-white/10"
+                className="flex items-center gap-1 text-theme-text-secondary hover:text-theme-text text-sm transition-colors bg-theme-surface px-3 py-1.5 rounded-full border border-theme-stroke"
               >
                 {chainId ? getChainName(chainId) : 'Unknown'}
                 <ChevronDown size={14} />
               </button>
 
               {showChainMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-[#1a1a2e] border border-white/10 rounded-xl overflow-hidden z-50 min-w-[140px] shadow-xl">
+                <div className="absolute right-0 top-full mt-1 bg-theme-header border border-theme-stroke rounded-xl overflow-hidden z-50 min-w-[140px] shadow-xl">
                   {supportedChainIds.map((cId) => (
                     <button
                       key={cId}
                       type="button"
                       onClick={() => handleSwitchChain(cId)}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-white/10 transition-colors ${
-                        chainId === cId ? 'text-[#ff393a]' : 'text-white/70'
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-theme-surface-hover transition-colors ${
+                        chainId === cId ? 'text-[#ff393a]' : 'text-theme-text-secondary'
                       }`}
                     >
                       {getChainName(cId)}
@@ -283,25 +283,25 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
           </div>
 
           {/* Recipient info */}
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+          <div className="bg-theme-surface rounded-xl p-3 border border-theme-stroke">
             <div className="flex items-center justify-between">
-              <span className="text-white/40 text-xs">Sending to</span>
+              <span className="text-theme-text-muted text-xs">Sending to</span>
               {effectiveAddress && (
                 <a
                   href={`${getExplorerUrl(chainId || 1)}/address/${effectiveAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/40 hover:text-white/60 transition-colors"
+                  className="text-theme-text-muted hover:text-theme-text-secondary transition-colors"
                 >
                   <ExternalLink size={12} />
                 </a>
               )}
             </div>
             {isENS && (
-              <p className="text-white/70 text-sm font-medium mb-1">{recipientAddress}</p>
+              <p className="text-theme-text-secondary text-sm font-medium mb-1">{recipientAddress}</p>
             )}
             {ensLoading && isENS && (
-              <p className="text-white/40 text-xs">Resolving ENS name...</p>
+              <p className="text-theme-text-muted text-xs">Resolving ENS name...</p>
             )}
             {effectiveAddress && (
               <code className="text-[#ff393a] font-mono text-xs break-all">
@@ -336,7 +336,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
           {chainId && supportedChainIds.includes(chainId) && (
             <>
               <div>
-                <p className="text-white/40 text-xs mb-2">Select token</p>
+                <p className="text-theme-text-muted text-xs mb-2">Select token</p>
                 <TokenSelector
                   balances={balances}
                   isLoading={balancesLoading}
@@ -352,7 +352,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                     <div className="flex-1">
                       <IconInput
                         icon={() => (
-                          <span className="text-white/40 text-xs font-mono">
+                          <span className="text-theme-text-muted text-xs font-mono">
                             {selectedToken.token.symbol}
                           </span>
                         )}
@@ -373,13 +373,13 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                     </button>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-white/30 text-xs">
+                    <p className="text-theme-text-faint text-xs">
                       Balance: {parseFloat(selectedToken.formatted).toFixed(
                         selectedToken.token.decimals <= 6 ? 2 : 4
                       )} {selectedToken.token.symbol}
                     </p>
                     {usdPrice && amount && parseFloat(amount) > 0 && (
-                      <p className="text-white/40 text-xs">
+                      <p className="text-theme-text-muted text-xs">
                         &asymp; ${(parseFloat(amount) * usdPrice).toFixed(2)} USD
                       </p>
                     )}
@@ -395,7 +395,7 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                   disabled={!amount || parseFloat(amount) <= 0 || !canSendTx || ensLoading}
                   className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-white">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-theme-text">
                     <path d="M12 1.5L5.5 12.5L12 16.5L18.5 12.5L12 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M5.5 12.5L12 22.5L18.5 12.5L12 16.5L5.5 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>

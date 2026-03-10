@@ -158,11 +158,11 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
         {/* Header with Stats and Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
               <UserPlus size={20} className="text-[#ff393a]" />
               Staff
               {stats && stats.totalStaff > 0 && (
-                <span className="text-white/50 font-normal text-sm">
+                <span className="text-theme-text-muted font-normal text-sm">
                   ({stats.totalStaff})
                 </span>
               )}
@@ -179,7 +179,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
           <div className="flex items-center gap-2">
             {/* Filter */}
             {stats && stats.totalStaff > 0 && (
-              <div className="flex items-center bg-white/5 rounded-lg p-1 overflow-x-auto">
+              <div className="flex items-center bg-theme-surface rounded-lg p-1 overflow-x-auto">
                 {FILTER_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -187,7 +187,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                       filter === option.value
                         ? 'bg-[#ff393a] text-white'
-                        : 'text-white/60 hover:text-white'
+                        : 'text-theme-text-secondary hover:text-theme-text'
                     }`}
                   >
                     {option.icon}
@@ -210,31 +210,31 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
 
         {/* Stats Summary */}
         {stats && stats.totalStaff > 0 && (
-          <div className="grid grid-cols-4 gap-2 bg-white/5 rounded-xl p-3">
+          <div className="grid grid-cols-4 gap-2 bg-theme-surface rounded-xl p-3">
             <div className="text-center">
               <div className="text-gray-400 text-lg font-semibold">{stats.byStatus.invited}</div>
-              <div className="text-white/40 text-xs">Invited</div>
+              <div className="text-theme-text-muted text-xs">Invited</div>
             </div>
             <div className="text-center">
               <div className="text-green-400 text-lg font-semibold">{stats.byStatus.confirmed}</div>
-              <div className="text-white/40 text-xs">Confirmed</div>
+              <div className="text-theme-text-muted text-xs">Confirmed</div>
             </div>
             <div className="text-center">
               <div className="text-red-400 text-lg font-semibold">{stats.byStatus.declined}</div>
-              <div className="text-white/40 text-xs">Declined</div>
+              <div className="text-theme-text-muted text-xs">Declined</div>
             </div>
             <div className="text-center">
               <div className="text-blue-400 text-lg font-semibold">{stats.byStatus.checked_in}</div>
-              <div className="text-white/40 text-xs">Checked In</div>
+              <div className="text-theme-text-muted text-xs">Checked In</div>
             </div>
           </div>
         )}
 
         {/* Staff List */}
         {staffList.length === 0 ? (
-          <div className="text-center py-12 bg-white/5 rounded-xl">
-            <UserPlus className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60 mb-4">
+          <div className="text-center py-12 bg-theme-surface rounded-xl">
+            <UserPlus className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+            <p className="text-theme-text-secondary mb-4">
               {filter === 'all' ? 'No staff members yet' : `No ${filter.replace('_', ' ')} staff`}
             </p>
             {filter === 'all' && (

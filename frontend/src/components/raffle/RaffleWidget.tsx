@@ -172,8 +172,8 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
               <Gift className="w-5 h-5 text-[#ff393a]" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Raffles</h2>
-              <p className="text-sm text-white/60">Create raffles and draw winners</p>
+              <h2 className="text-lg font-semibold text-theme-text">Raffles</h2>
+              <p className="text-sm text-theme-text-secondary">Create raffles and draw winners</p>
             </div>
           </div>
           <button
@@ -192,7 +192,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
         )}
 
         {raffles.length === 0 ? (
-          <div className="text-center py-8 text-white/50">
+          <div className="text-center py-8 text-theme-text-muted">
             <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>No raffles yet</p>
             <p className="text-sm mt-1">Create a raffle to give away prizes to your guests</p>

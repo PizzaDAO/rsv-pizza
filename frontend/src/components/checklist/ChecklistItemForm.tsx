@@ -34,12 +34,12 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50" onClick={onClose}>
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Add Task</h2>
+          <h2 className="text-lg font-semibold text-theme-text">Add Task</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
           >
             <X size={20} />
           </button>
@@ -61,16 +61,16 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
             <div className="relative">
               <Calendar
                 size={20}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none"
               />
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] [color-scheme:dark]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-xl pl-10 pr-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] [color-scheme:dark]"
               />
             </div>
-            <p className="text-xs text-white/40 mt-1">Optional due date</p>
+            <p className="text-xs text-theme-text-muted mt-1">Optional due date</p>
           </div>
 
           {/* Error */}
@@ -84,7 +84,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>

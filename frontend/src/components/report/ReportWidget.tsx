@@ -344,9 +344,9 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     return (
       <div className="card p-8">
         <div className="text-center">
-          <FileText className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Event Report</h2>
-          <p className="text-white/60">No event data available</p>
+          <FileText className="w-16 h-16 text-theme-text-faint mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-theme-text mb-2">Event Report</h2>
+          <p className="text-theme-text-secondary">No event data available</p>
         </div>
       </div>
     );
@@ -357,7 +357,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Report Preview</h2>
+          <h2 className="text-xl font-semibold text-theme-text">Report Preview</h2>
           <button
             onClick={() => setShowPreview(false)}
             className="btn-secondary text-sm py-2 px-4"
@@ -376,14 +376,14 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-white">Event Report</h2>
-            <p className="text-white/60 text-sm mt-1">
+            <h2 className="text-xl font-semibold text-theme-text">Event Report</h2>
+            <p className="text-theme-text-secondary text-sm mt-1">
               Track engagement metrics and collect attendee social posts
             </p>
           </div>
           <div className="flex items-center gap-2">
             {saving && (
-              <div className="flex items-center gap-2 text-white/60 text-sm">
+              <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                 <Loader2 size={14} className="animate-spin" />
                 Saving...
               </div>
@@ -420,10 +420,10 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         </div>
 
         {/* Event Summary */}
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <h3 className="text-lg font-semibold text-white">{report.name}</h3>
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+          <h3 className="text-lg font-semibold text-theme-text">{report.name}</h3>
           {report.date && (
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-theme-text-secondary text-sm mt-1">
               {new Date(report.date).toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -433,14 +433,14 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             </p>
           )}
           {report.venueName && (
-            <p className="text-white/40 text-sm">{report.venueName}</p>
+            <p className="text-theme-text-muted text-sm">{report.venueName}</p>
           )}
         </div>
       </div>
 
       {/* Event Details Section */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Event Details</h3>
+        <h3 className="text-lg font-semibold text-theme-text mb-4">Event Details</h3>
         <div className="space-y-4">
           {/* Recap */}
           <div>
@@ -449,9 +449,9 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               onChange={(e) => handleChange('reportRecap', e.target.value || null)}
               placeholder="Write a recap of your event..."
               rows={4}
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
+              className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
             />
-            <p className="text-xs text-white/30 mt-1">A summary of the event for the report</p>
+            <p className="text-xs text-theme-text-faint mt-1">A summary of the event for the report</p>
           </div>
 
           {/* Flyer Artist & URLs */}
@@ -462,7 +462,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                 value={report.flyerArtist || ''}
                 onChange={(e) => handleChange('flyerArtist', e.target.value || null)}
                 placeholder="Flyer artist credit"
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
               />
             </div>
             <div>
@@ -471,7 +471,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                 value={report.flyerArtistUrl || ''}
                 onChange={(e) => handleChange('flyerArtistUrl', e.target.value || null)}
                 placeholder="Flyer artist link"
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
               />
             </div>
           </div>
@@ -482,7 +482,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               value={report.reportPhotosUrl || ''}
               onChange={(e) => handleChange('reportPhotosUrl', e.target.value || null)}
               placeholder="Raw photos / video drive link"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+              className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
             />
           </div>
         </div>
@@ -540,8 +540,8 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       {/* Featured Photos */}
       {report.featuredPhotos.length > 0 && (
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Featured Photos</h3>
-          <p className="text-white/40 text-xs mb-3">Starred photos from the Photos tab appear here</p>
+          <h3 className="text-lg font-semibold text-theme-text mb-4">Featured Photos</h3>
+          <p className="text-theme-text-muted text-xs mb-3">Starred photos from the Photos tab appear here</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {report.featuredPhotos.map((photo) => (
               <img
@@ -557,15 +557,15 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
       {/* Publish Section */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Publish Report</h3>
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+        <h3 className="text-lg font-semibold text-theme-text mb-4">Publish Report</h3>
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           {report.reportPublished ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-400">
                 <Eye size={16} />
                 <span className="text-sm font-medium">Report is published</span>
                 {report.reportPassword && (
-                  <span className="flex items-center gap-1 text-xs text-white/40 bg-white/5 px-2 py-0.5 rounded">
+                  <span className="flex items-center gap-1 text-xs text-theme-text-muted bg-theme-surface px-2 py-0.5 rounded">
                     <Lock size={10} />
                     Password protected
                   </span>
@@ -573,7 +573,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               </div>
               {report.reportPublicSlug && (
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-white/80 text-sm truncate">
+                  <div className="flex-1 bg-theme-surface-hover rounded-lg px-3 py-2 text-theme-text text-sm truncate">
                     {window.location.origin}/report/{report.reportPublicSlug}
                   </div>
                   <button
@@ -627,7 +627,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-white/60 text-sm">
+              <p className="text-theme-text-secondary text-sm">
                 Publish your report to share it with a public link.
               </p>
               <IconInput

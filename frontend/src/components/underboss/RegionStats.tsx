@@ -20,15 +20,15 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+    <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
       <div className="flex items-center gap-2 mb-2">
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}>
           <Icon size={16} />
         </div>
-        <span className="text-xs text-white/40 uppercase tracking-wider">{label}</span>
+        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
-      {subValue && <div className="text-xs text-white/40 mt-1">{subValue}</div>}
+      <div className="text-2xl font-bold text-theme-text">{value}</div>
+      {subValue && <div className="text-xs text-theme-text-muted mt-1">{subValue}</div>}
     </div>
   );
 }
@@ -36,14 +36,14 @@ function StatCard({
 function CompletionBar({ label, percent }: { label: string; percent: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs text-white/50 w-16 shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+      <span className="text-xs text-theme-text-muted w-16 shrink-0">{label}</span>
+      <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden">
         <div
           className="h-full bg-green-500/60 rounded-full transition-all duration-500"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="text-xs text-white/60 w-10 text-right">{percent}%</span>
+      <span className="text-xs text-theme-text-secondary w-10 text-right">{percent}%</span>
     </div>
   );
 }
@@ -93,10 +93,10 @@ export function RegionStats({ stats }: RegionStatsProps) {
       </div>
 
       {/* Completion rates */}
-      <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+      <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
         <div className="flex items-center gap-2 mb-3">
-          <TrendingUp size={14} className="text-white/40" />
-          <span className="text-xs text-white/40 uppercase tracking-wider">Completion Rates</span>
+          <TrendingUp size={14} className="text-theme-text-muted" />
+          <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion Rates</span>
         </div>
         <div className="space-y-3">
           <CompletionBar label="Venue" percent={stats.completionRate.venue} />

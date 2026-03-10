@@ -20,7 +20,7 @@ const PLATFORM_ORDER: EventPlatform[] = ['luma', 'meetup', 'eventbrite'];
 // Simple platform logos
 function LumaLogo() {
   return (
-    <div className="w-8 h-8 rounded-lg bg-[#7C5CFC] flex items-center justify-center text-white text-xs font-bold">
+    <div className="w-8 h-8 rounded-lg bg-[#7C5CFC] flex items-center justify-center text-theme-text text-xs font-bold">
       Lu
     </div>
   );
@@ -28,7 +28,7 @@ function LumaLogo() {
 
 function MeetupLogo() {
   return (
-    <div className="w-8 h-8 rounded-lg bg-[#ED1C40] flex items-center justify-center text-white text-xs font-bold">
+    <div className="w-8 h-8 rounded-lg bg-[#ED1C40] flex items-center justify-center text-theme-text text-xs font-bold">
       M
     </div>
   );
@@ -36,7 +36,7 @@ function MeetupLogo() {
 
 function EventbriteLogo() {
   return (
-    <div className="w-8 h-8 rounded-lg bg-[#F05537] flex items-center justify-center text-white text-xs font-bold">
+    <div className="w-8 h-8 rounded-lg bg-[#F05537] flex items-center justify-center text-theme-text text-xs font-bold">
       Eb
     </div>
   );
@@ -88,22 +88,22 @@ export const PlatformPublisher: React.FC<PlatformPublisherProps> = ({ party }) =
         const isExpanded = expandedPlatform === platform;
 
         return (
-          <div key={platform} className="border border-white/10 rounded-xl overflow-hidden">
+          <div key={platform} className="border border-theme-stroke rounded-xl overflow-hidden">
             {/* Platform Header */}
             <button
               type="button"
               onClick={() => handleExpand(platform)}
-              className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-surface transition-colors"
             >
               <div className="flex items-center gap-3">
                 {getPlatformLogo(platform)}
                 <div className="text-left">
-                  <p className="text-white font-medium text-sm">{config.name}</p>
-                  <p className="text-white/40 text-xs">Create event listing</p>
+                  <p className="text-theme-text font-medium text-sm">{config.name}</p>
+                  <p className="text-theme-text-muted text-xs">Create event listing</p>
                 </div>
               </div>
               <svg
-                className={`w-5 h-5 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-theme-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -114,33 +114,33 @@ export const PlatformPublisher: React.FC<PlatformPublisherProps> = ({ party }) =
 
             {/* Expanded Content */}
             {isExpanded && (
-              <div className="border-t border-white/10 p-4 space-y-3">
+              <div className="border-t border-theme-stroke p-4 space-y-3">
                 {/* Quick Copy Fields */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs text-white/40">Event Name</span>
-                      <p className="text-white text-sm truncate">{party.name}</p>
+                      <span className="text-xs text-theme-text-muted">Event Name</span>
+                      <p className="text-theme-text text-sm truncate">{party.name}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleCopy(party.name, `${platform}-name`)}
-                      className="ml-2 text-white/40 hover:text-white transition-colors flex-shrink-0"
+                      className="ml-2 text-theme-text-muted hover:text-theme-text transition-colors flex-shrink-0"
                     >
                       {copied === `${platform}-name` ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                     </button>
                   </div>
 
                   {party.date && (
-                    <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs text-white/40">Date & Time</span>
-                        <p className="text-white text-sm truncate">{formatEventDateLong(party)}</p>
+                        <span className="text-xs text-theme-text-muted">Date & Time</span>
+                        <p className="text-theme-text text-sm truncate">{formatEventDateLong(party)}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(formatEventDateLong(party), `${platform}-date`)}
-                        className="ml-2 text-white/40 hover:text-white transition-colors flex-shrink-0"
+                        className="ml-2 text-theme-text-muted hover:text-theme-text transition-colors flex-shrink-0"
                       >
                         {copied === `${platform}-date` ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                       </button>
@@ -148,30 +148,30 @@ export const PlatformPublisher: React.FC<PlatformPublisherProps> = ({ party }) =
                   )}
 
                   {(party.venueName || party.address) && (
-                    <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs text-white/40">Location</span>
-                        <p className="text-white text-sm truncate">{getLocationString(party)}</p>
+                        <span className="text-xs text-theme-text-muted">Location</span>
+                        <p className="text-theme-text text-sm truncate">{getLocationString(party)}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(getLocationString(party), `${platform}-location`)}
-                        className="ml-2 text-white/40 hover:text-white transition-colors flex-shrink-0"
+                        className="ml-2 text-theme-text-muted hover:text-theme-text transition-colors flex-shrink-0"
                       >
                         {copied === `${platform}-location` ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                       </button>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs text-white/40">RSVP Link</span>
-                      <p className="text-white text-sm truncate">{rsvpUrl}</p>
+                      <span className="text-xs text-theme-text-muted">RSVP Link</span>
+                      <p className="text-theme-text text-sm truncate">{rsvpUrl}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleCopy(rsvpUrl, `${platform}-link`)}
-                      className="ml-2 text-white/40 hover:text-white transition-colors flex-shrink-0"
+                      className="ml-2 text-theme-text-muted hover:text-theme-text transition-colors flex-shrink-0"
                     >
                       {copied === `${platform}-link` ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                     </button>
@@ -181,11 +181,11 @@ export const PlatformPublisher: React.FC<PlatformPublisherProps> = ({ party }) =
                 {/* Description Editor */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-white/40">Description (editable)</span>
+                    <span className="text-xs text-theme-text-muted">Description (editable)</span>
                     <button
                       type="button"
                       onClick={() => handleCopy(description, `${platform}-desc`)}
-                      className="text-xs text-white/40 hover:text-white/60 flex items-center gap-1 transition-colors"
+                      className="text-xs text-theme-text-muted hover:text-theme-text-secondary flex items-center gap-1 transition-colors"
                     >
                       {copied === `${platform}-desc` ? (
                         <>
@@ -220,7 +220,7 @@ export const PlatformPublisher: React.FC<PlatformPublisherProps> = ({ party }) =
                   Create on {config.name}
                 </button>
 
-                <p className="text-xs text-white/30 text-center">
+                <p className="text-xs text-theme-text-faint text-center">
                   Copy the details above, then paste them into {config.name}
                 </p>
               </div>

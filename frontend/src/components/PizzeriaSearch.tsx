@@ -134,7 +134,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
     return (
       <div className="flex items-center gap-1">
         <Star size={14} className="text-yellow-400 fill-yellow-400" />
-        <span className="text-white font-medium">{rating.toFixed(1)}</span>
+        <span className="text-theme-text font-medium">{rating.toFixed(1)}</span>
       </div>
     );
   };
@@ -153,7 +153,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
           <button
             key={option.provider}
             onClick={() => onSelectPizzeria(pizzeria, option)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-all hover:scale-105"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-theme-text transition-all hover:scale-105"
             style={{ backgroundColor: getProviderColor(option.provider) }}
           >
             <ShoppingCart size={14} />
@@ -168,7 +168,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
             href={option.deepLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white/90 bg-white/10 hover:bg-white/20 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-theme-text bg-theme-surface-hover hover:bg-theme-surface-hover transition-all"
           >
             {getProviderName(option.provider)}
             <ExternalLink size={12} />
@@ -179,7 +179,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
         {phoneOption && pizzeria.phone && (
           <a
             href={`tel:${pizzeria.phone}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white/90 bg-white/10 hover:bg-white/20 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-theme-text bg-theme-surface-hover hover:bg-theme-surface-hover transition-all"
           >
             <Phone size={14} />
             Call
@@ -193,7 +193,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
   return (
     <div className={className}>
-      <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Top Pizzerias Nearby</h3>
+      <h3 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">Top Pizzerias Nearby</h3>
 
       {/* Search options */}
       <div className="space-y-3 mb-6">
@@ -213,10 +213,10 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               Use My Location
             </button>
 
-            <div className="flex items-center gap-3 text-white/40">
-              <div className="flex-1 h-px bg-white/10" />
+            <div className="flex items-center gap-3 text-theme-text-muted">
+              <div className="flex-1 h-px bg-theme-surface-hover" />
               <span className="text-sm">or</span>
-              <div className="flex-1 h-px bg-white/10" />
+              <div className="flex-1 h-px bg-theme-surface-hover" />
             </div>
           </>
         )}
@@ -249,7 +249,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
       {/* Results */}
       {hasSearched && !loading && pizzerias.length === 0 && (
-        <div className="text-center py-8 text-white/50">
+        <div className="text-center py-8 text-theme-text-muted">
           <MapPin size={48} className="mx-auto mb-4 opacity-50" />
           <p>No pizzerias found in this area.</p>
           <p className="text-sm mt-1">Try a different location or increase the search radius.</p>
@@ -258,7 +258,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
 
       {pizzerias.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm text-white/50 mb-4">
+          <p className="text-sm text-theme-text-muted mb-4">
             Found {pizzerias.length} pizzeria{pizzerias.length !== 1 ? 's' : ''} nearby
           </p>
 
@@ -268,7 +268,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
           {pizzerias.length > DISPLAY_LIMIT && (
             <button
               onClick={() => setShowAllModal(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/80 hover:text-white transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl text-theme-text hover:text-theme-text transition-all"
             >
               View All {pizzerias.length} Pizzerias
               <ChevronRight size={18} />
@@ -284,15 +284,15 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
           onClick={() => setShowAllModal(false)}
         >
           <div
-            className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h2 className="text-xl font-bold text-white">All Pizzerias Nearby</h2>
+            <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
+              <h2 className="text-xl font-bold text-theme-text">All Pizzerias Nearby</h2>
               <button
                 onClick={() => setShowAllModal(false)}
-                className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
@@ -325,7 +325,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
     return (
       <div
         key={pizzeria.id}
-        className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/[0.07] transition-all"
+        className="border border-theme-stroke rounded-xl p-4 bg-theme-surface hover:bg-theme-surface-hover transition-all"
       >
         <div className="flex justify-between items-start gap-4">
           <div className="flex-1 min-w-0">
@@ -335,17 +335,17 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
                   href={googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-white hover:text-[#ff393a] hover:underline flex items-center gap-1"
+                  className="font-semibold text-theme-text hover:text-[#ff393a] hover:underline flex items-center gap-1"
                 >
                   {pizzeria.name}
                   <ExternalLink size={12} className="opacity-50" />
                 </a>
               ) : (
-                <span className="font-semibold text-white">{pizzeria.name}</span>
+                <span className="font-semibold text-theme-text">{pizzeria.name}</span>
               )}
               {renderStars(pizzeria.rating)}
               {pizzeria.reviewCount && (
-                <span className="text-white/40 text-sm">({pizzeria.reviewCount})</span>
+                <span className="text-theme-text-muted text-sm">({pizzeria.reviewCount})</span>
               )}
               {/* Guest vote badges */}
               {ranking && ranking.total > 0 && (
@@ -368,10 +368,10 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
                 </div>
               )}
             </div>
-            <p className="text-sm text-white/60 mt-1">{pizzeria.address}</p>
+            <p className="text-sm text-theme-text-secondary mt-1">{pizzeria.address}</p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               {pizzeria.distance && (
-                <span className="text-white/50">
+                <span className="text-theme-text-muted">
                   {formatDistance(pizzeria.distance)}
                 </span>
               )}
@@ -382,7 +382,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
                 </span>
               )}
               {pizzeria.priceLevel && (
-                <span className="text-white/50">
+                <span className="text-theme-text-muted">
                   {'$'.repeat(pizzeria.priceLevel)}
                 </span>
               )}
@@ -397,7 +397,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               href={googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-white/10 rounded-lg border border-white/10 flex-shrink-0 hover:bg-white/20 transition-colors group overflow-hidden relative"
+              className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-theme-surface-hover rounded-lg border border-theme-stroke flex-shrink-0 hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
               title="View on Google Maps"
             >
               {staticMapUrl ? (
@@ -409,7 +409,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               ) : (
                 <>
                   <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                  <span className="text-[10px] uppercase font-bold text-theme-text-secondary">View Map</span>
                 </>
               )}
             </a>

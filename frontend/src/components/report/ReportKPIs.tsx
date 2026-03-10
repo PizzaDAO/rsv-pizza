@@ -67,7 +67,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-white">Stats</h3>
+        <h3 className="text-lg font-semibold text-theme-text">Stats</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visibleStats.map((stat) => {
             const value = getDisplayValue(stat);
@@ -75,12 +75,12 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
             const Icon = stat.icon;
 
             return (
-              <div key={stat.key} className="bg-white/5 rounded-xl p-4 border border-white/10">
+              <div key={stat.key} className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
                 <div className="flex items-center gap-2 mb-2">
                   <Icon size={16} className={stat.color} />
-                  <span className="text-xs text-white/60">{stat.label}</span>
+                  <span className="text-xs text-theme-text-secondary">{stat.label}</span>
                 </div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-theme-text">
                   {value.toLocaleString()}
                 </div>
               </div>
@@ -93,7 +93,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-white">Stats</h3>
+      <h3 className="text-lg font-semibold text-theme-text">Stats</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {allStats.map((stat) => {
           const Icon = stat.icon;
@@ -107,16 +107,16 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
           return (
             <div
               key={stat.key}
-              className={`bg-white/5 rounded-xl p-4 border border-white/10 transition-opacity ${hidden ? 'opacity-40' : ''}`}
+              className={`bg-theme-surface rounded-xl p-4 border border-theme-stroke transition-opacity ${hidden ? 'opacity-40' : ''}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Icon size={16} className={stat.color} />
-                  <span className="text-xs text-white/60 truncate">{stat.label}</span>
+                  <span className="text-xs text-theme-text-secondary truncate">{stat.label}</span>
                 </div>
                 <button
                   onClick={() => updateConfig(stat.key, { hidden: !hidden })}
-                  className="text-white/30 hover:text-white/60 transition-colors flex-shrink-0 ml-1"
+                  className="text-theme-text-faint hover:text-theme-text-secondary transition-colors flex-shrink-0 ml-1"
                   title={hidden ? 'Show in report' : 'Hide from report'}
                 >
                   {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -134,12 +134,12 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
                   }
                 }}
                 placeholder={stat.autoValue != null ? String(stat.autoValue) : '0'}
-                className="w-full bg-transparent text-2xl font-bold text-white outline-none border-b border-white/10 focus:border-white/30 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full bg-transparent text-2xl font-bold text-theme-text outline-none border-b border-theme-stroke focus:border-theme-stroke-hover transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               {hasOverride && (
                 <button
                   onClick={() => updateConfig(stat.key, { override: null })}
-                  className="text-[10px] text-white/30 hover:text-white/50 mt-1"
+                  className="text-[10px] text-theme-text-faint hover:text-theme-text-muted mt-1"
                 >
                   reset to {stat.autoValue?.toLocaleString() ?? '0'}
                 </button>

@@ -45,7 +45,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
   const statusConfig = STATUS_CONFIG[staff.status];
 
   return (
-    <div className="flex items-start justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+    <div className="flex items-start justify-between p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors">
       <div className="flex items-start gap-3 flex-1 min-w-0">
         {/* Avatar */}
         <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
@@ -55,7 +55,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-white font-medium truncate">{staff.name}</p>
+            <p className="text-theme-text font-medium truncate">{staff.name}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusConfig.bgColor} ${statusConfig.color} flex items-center gap-1`}>
               {statusConfig.icon}
               {statusConfig.label}
@@ -68,7 +68,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
             {staff.email && (
               <a
                 href={`mailto:${staff.email}`}
-                className="flex items-center gap-1 text-white/50 hover:text-white text-xs"
+                className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text text-xs"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Mail size={12} />
@@ -78,7 +78,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
             {staff.phone && (
               <a
                 href={`tel:${staff.phone}`}
-                className="flex items-center gap-1 text-white/50 hover:text-white text-xs"
+                className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text text-xs"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Phone size={12} />
@@ -88,7 +88,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
           </div>
 
           {staff.notes && (
-            <div className="flex items-start gap-1 mt-2 text-white/40 text-xs">
+            <div className="flex items-start gap-1 mt-2 text-theme-text-muted text-xs">
               <FileText size={12} className="flex-shrink-0 mt-0.5" />
               <span className="line-clamp-2">{staff.notes}</span>
             </div>
@@ -120,7 +120,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
 
         <button
           onClick={() => onEdit(staff)}
-          className="text-white/50 hover:text-white text-sm font-medium"
+          className="text-theme-text-muted hover:text-theme-text text-sm font-medium"
         >
           Edit
         </button>

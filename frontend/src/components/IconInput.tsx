@@ -18,7 +18,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
     const iconElement = customIcon || (Icon ? (
       <Icon
         size={iconSize}
-        className={`absolute left-3 ${multiline ? 'top-3' : 'top-1/2 -translate-y-1/2'} text-white/40 pointer-events-none`}
+        className={`absolute left-3 ${multiline ? 'top-3' : 'top-1/2 -translate-y-1/2'} text-theme-text-muted pointer-events-none`}
       />
     ) : null);
 

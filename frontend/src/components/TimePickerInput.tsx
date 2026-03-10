@@ -112,11 +112,11 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
         onClick={handleInputClick}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={className || "w-32 bg-transparent border-none text-white text-sm focus:outline-none focus:ring-0 p-0 cursor-pointer"}
+        className={className || "w-32 bg-transparent border-none text-theme-text text-sm focus:outline-none focus:ring-0 p-0 cursor-pointer"}
       />
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-32 bg-[#1a1a1a] border border-white/20 rounded-lg shadow-xl max-h-64 overflow-y-auto z-50">
+        <div className="absolute top-full left-0 mt-1 w-32 bg-theme-card border border-theme-stroke-hover rounded-lg shadow-xl max-h-64 overflow-y-auto z-50">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((time24) => {
               const time12 = format12Hour(time24);
@@ -129,7 +129,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
                   className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                     isSelected
                       ? 'bg-[#4285f4] text-white font-medium'
-                      : 'text-white/80 hover:bg-white/10'
+                      : 'text-theme-text hover:bg-theme-surface-hover'
                   }`}
                 >
                   {time12}
@@ -137,7 +137,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
               );
             })
           ) : (
-            <div className="px-4 py-2 text-sm text-white/50">No matches</div>
+            <div className="px-4 py-2 text-sm text-theme-text-muted">No matches</div>
           )}
         </div>
       )}

@@ -94,17 +94,17 @@ export function WinnerPicker() {
 
   if (!party || guests.length === 0) {
     return (
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+      <div className="bg-theme-surface border border-theme-stroke rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center">
             <Trophy className="w-5 h-5 text-[#ff393a]" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Pick a Winner</h3>
-            <p className="text-sm text-white/60">Randomly select a guest</p>
+            <h3 className="text-lg font-semibold text-theme-text">Pick a Winner</h3>
+            <p className="text-sm text-theme-text-secondary">Randomly select a guest</p>
           </div>
         </div>
-        <div className="text-center py-8 text-white/50">
+        <div className="text-center py-8 text-theme-text-muted">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No guests yet</p>
           <p className="text-sm mt-1">Guests need to RSVP before you can pick a winner</p>
@@ -114,7 +114,7 @@ export function WinnerPicker() {
   }
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-center justify-between mb-4">
@@ -123,14 +123,14 @@ export function WinnerPicker() {
               <Trophy className="w-5 h-5 text-[#ff393a]" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Pick a Winner</h3>
-              <p className="text-sm text-white/60">Randomly select a lucky guest</p>
+              <h3 className="text-lg font-semibold text-theme-text">Pick a Winner</h3>
+              <p className="text-sm text-theme-text-secondary">Randomly select a lucky guest</p>
             </div>
           </div>
           {winnerHistory.length > 0 && (
             <button
               onClick={resetHistory}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
               title="Reset all winners"
             >
               <RotateCcw size={14} />
@@ -140,13 +140,13 @@ export function WinnerPicker() {
         </div>
 
         {/* Eligibility Toggle */}
-        <div className="flex gap-1 p-1 bg-white/5 rounded-xl mb-4">
+        <div className="flex gap-1 p-1 bg-theme-surface rounded-xl mb-4">
           <button
             onClick={() => setFilter('rsvp')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               filter === 'rsvp'
                 ? 'bg-[#ff393a] text-white shadow-lg shadow-[#ff393a]/20'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface'
             }`}
           >
             <Users size={16} />
@@ -157,7 +157,7 @@ export function WinnerPicker() {
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               filter === 'checkedIn'
                 ? 'bg-[#ff393a] text-white shadow-lg shadow-[#ff393a]/20'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface'
             }`}
           >
             <UserCheck size={16} />
@@ -175,8 +175,8 @@ export function WinnerPicker() {
               : winner
               ? 'border-yellow-500/50 bg-yellow-500/5'
               : isAnimating
-              ? 'border-white/30 bg-white/5'
-              : 'border-white/10 bg-white/[0.02]'
+              ? 'border-theme-stroke-hover bg-theme-surface'
+              : 'border-theme-stroke bg-theme-surface'
           }`}
         >
           {/* Celebration particles */}
@@ -194,22 +194,22 @@ export function WinnerPicker() {
                     <Crown className="w-6 h-6 text-yellow-500" />
                   </div>
                   <p
-                    className={`text-3xl font-bold text-white transition-all duration-300 ${
+                    className={`text-3xl font-bold text-theme-text transition-all duration-300 ${
                       showCelebration ? 'scale-110' : ''
                     }`}
                   >
                     {currentName}
                   </p>
                   {winner.email && (
-                    <p className="text-sm text-white/40 mt-2">{winner.email}</p>
+                    <p className="text-sm text-theme-text-muted mt-2">{winner.email}</p>
                   )}
                 </>
               ) : (
-                <p className="text-2xl font-bold text-white/80 animate-pulse">{currentName}</p>
+                <p className="text-2xl font-bold text-theme-text animate-pulse">{currentName}</p>
               )}
             </div>
           ) : (
-            <div className="text-white/40">
+            <div className="text-theme-text-muted">
               <Shuffle className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
                 {availableGuests.length === 0
@@ -226,9 +226,9 @@ export function WinnerPicker() {
           disabled={isAnimating || availableGuests.length === 0}
           className={`w-full mt-4 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-base transition-all ${
             isAnimating
-              ? 'bg-white/10 text-white/60 cursor-not-allowed'
+              ? 'bg-theme-surface-hover text-theme-text-secondary cursor-not-allowed'
               : availableGuests.length === 0
-              ? 'bg-white/5 text-white/30 cursor-not-allowed'
+              ? 'bg-theme-surface text-theme-text-faint cursor-not-allowed'
               : winner
               ? 'bg-[#ff393a]/20 text-[#ff393a] hover:bg-[#ff393a]/30 border border-[#ff393a]/30'
               : 'bg-[#ff393a] text-white hover:bg-[#ff5a5b] shadow-lg shadow-[#ff393a]/20'
@@ -257,8 +257,8 @@ export function WinnerPicker() {
 
       {/* Winner History */}
       {winnerHistory.length > 0 && (
-        <div className="border-t border-white/10 p-4">
-          <h4 className="text-sm font-medium text-white/60 mb-3 flex items-center gap-2">
+        <div className="border-t border-theme-stroke p-4">
+          <h4 className="text-sm font-medium text-theme-text-secondary mb-3 flex items-center gap-2">
             <Trophy size={14} className="text-yellow-500" />
             Winners This Session ({winnerHistory.length})
           </h4>
@@ -271,8 +271,8 @@ export function WinnerPicker() {
                 <span className="flex items-center justify-center w-6 h-6 bg-yellow-500/20 rounded-full text-xs font-bold text-yellow-500">
                   {index + 1}
                 </span>
-                <span className="flex-1 text-white font-medium">{w.guest.name}</span>
-                <span className="text-xs text-white/40">
+                <span className="flex-1 text-theme-text font-medium">{w.guest.name}</span>
+                <span className="text-xs text-theme-text-muted">
                   {w.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>

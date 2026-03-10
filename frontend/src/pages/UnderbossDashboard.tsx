@@ -172,8 +172,8 @@ export function UnderbossDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
-          <h1 className="text-2xl font-bold text-white mb-2">Underboss Dashboard</h1>
-          <p className="text-white/50 mb-6">
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Underboss Dashboard</h1>
+          <p className="text-theme-text-muted mb-6">
             Please log in to access the underboss dashboard.
           </p>
           <button
@@ -196,8 +196,8 @@ export function UnderbossDashboard() {
       <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
-          <Loader2 size={32} className="animate-spin text-white/40 mb-4" />
-          <p className="text-white/40 text-sm">Loading dashboard...</p>
+          <Loader2 size={32} className="animate-spin text-theme-text-muted mb-4" />
+          <p className="text-theme-text-muted text-sm">Loading dashboard...</p>
         </div>
         <Footer />
       </div>
@@ -211,8 +211,8 @@ export function UnderbossDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
-          <h1 className="text-2xl font-bold text-white mb-2">Error</h1>
-          <p className="text-white/50">{error}</p>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Error</h1>
+          <p className="text-theme-text-muted">{error}</p>
         </div>
         <Footer />
       </div>
@@ -253,7 +253,7 @@ export function UnderbossDashboard() {
                 <div className="relative">
                   <button
                     onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-                    className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
+                    className="flex items-center gap-2 text-2xl font-bold text-theme-text hover:text-red-500 transition-colors"
                   >
                     {regionLabel}
                     <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
@@ -264,25 +264,25 @@ export function UnderbossDashboard() {
                         className="fixed inset-0 z-40"
                         onClick={() => setRegionDropdownOpen(false)}
                       />
-                      <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[240px]">
+                      <div className="absolute top-full left-0 mt-2 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-2 min-w-[240px]">
                         {/* Select All */}
                         <button
                           onClick={selectAllRegions}
                           className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
                             selectedRegions.length === availableRegions.length
                               ? 'text-red-500 font-medium'
-                              : 'text-white/70 hover:bg-white/5 hover:text-white'
+                              : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
                           }`}
                         >
                           <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                             selectedRegions.length === availableRegions.length
-                              ? 'bg-red-500 border-red-500' : 'border-white/30'
+                              ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
                           }`}>
-                            {selectedRegions.length === availableRegions.length && <Check size={12} className="text-white" />}
+                            {selectedRegions.length === availableRegions.length && <Check size={12} className="text-theme-text" />}
                           </div>
                           All Regions
                         </button>
-                        <div className="border-b border-white/10 my-1" />
+                        <div className="border-b border-theme-stroke my-1" />
                         {filteredGppRegions.map((r) => (
                           <button
                             key={r.id}
@@ -290,14 +290,14 @@ export function UnderbossDashboard() {
                             className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
                               selectedRegions.includes(r.id)
                                 ? 'text-red-500 font-medium'
-                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
                             }`}
                           >
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                               selectedRegions.includes(r.id)
-                                ? 'bg-red-500 border-red-500' : 'border-white/30'
+                                ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
                             }`}>
-                              {selectedRegions.includes(r.id) && <Check size={12} className="text-white" />}
+                              {selectedRegions.includes(r.id) && <Check size={12} className="text-theme-text" />}
                             </div>
                             {r.label}
                           </button>
@@ -307,15 +307,15 @@ export function UnderbossDashboard() {
                   )}
                 </div>
               ) : (
-                <h1 className="text-2xl font-bold text-white">{regionLabel}</h1>
+                <h1 className="text-2xl font-bold text-theme-text">{regionLabel}</h1>
               )}
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-theme-text-muted">
                 Global Pizza Party &middot; Underboss Dashboard
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-3">
-            <div className="flex items-center gap-2 text-sm text-white/30">
+            <div className="flex items-center gap-2 text-sm text-theme-text-faint">
               <Shield size={14} />
               <span>
                 {isAdmin
@@ -342,7 +342,7 @@ export function UnderbossDashboard() {
 
         {/* Events Table */}
         <section>
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className="text-lg font-semibold text-theme-text mb-4">
             Events ({filteredData.events.length})
           </h2>
           <EventTable events={filteredData.events} showRegion={showRegionColumn} />
@@ -355,10 +355,10 @@ export function UnderbossDashboard() {
       {/* Add Underboss Modal */}
       {showAddUnderboss && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUnderboss(false)}>
-          <div className="bg-white border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Add Underboss</h3>
-              <button onClick={() => setShowAddUnderboss(false)} className="text-white/30 hover:text-white/60">
+              <h3 className="text-lg font-semibold text-theme-text">Add Underboss</h3>
+              <button onClick={() => setShowAddUnderboss(false)} className="text-theme-text-faint hover:text-theme-text-secondary">
                 <X size={20} />
               </button>
             </div>
@@ -368,7 +368,7 @@ export function UnderbossDashboard() {
                 <p className="text-green-400 font-medium mb-2">Underboss created!</p>
                 <button
                   onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); }}
-                  className="text-sm text-white/50 hover:text-white/70"
+                  className="text-sm text-theme-text-muted hover:text-theme-text-secondary"
                 >
                   Close
                 </button>
@@ -395,7 +395,7 @@ export function UnderbossDashboard() {
                     value={addUbForm.name}
                     onChange={(e) => setAddUbForm({ ...addUbForm, name: e.target.value })}
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
                   />
                 </div>
                 <div>
@@ -405,14 +405,14 @@ export function UnderbossDashboard() {
                     value={addUbForm.email}
                     onChange={(e) => setAddUbForm({ ...addUbForm, email: e.target.value })}
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
                   />
                 </div>
                 <div>
-                  <p className="text-sm text-white/60 mb-2">Regions</p>
+                  <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
                   <div className="grid grid-cols-2 gap-2">
                     {GPP_REGIONS.map(r => (
-                      <label key={r.id} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                      <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">
                         <input
                           type="checkbox"
                           checked={newUbRegions.includes(r.id)}
@@ -423,7 +423,7 @@ export function UnderbossDashboard() {
                               setNewUbRegions(prev => prev.filter(id => id !== r.id));
                             }
                           }}
-                          className="rounded border-white/20 bg-white/5"
+                          className="rounded border-theme-stroke-hover bg-theme-surface"
                         />
                         {r.label}
                       </label>

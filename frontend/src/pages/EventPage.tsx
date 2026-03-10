@@ -225,8 +225,8 @@ export function EventPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Event Not Found</h1>
-          <p className="text-white/60 mb-6">{error}</p>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Event Not Found</h1>
+          <p className="text-theme-text-secondary mb-6">{error}</p>
           <Link to="/" className="btn-primary inline-block">
             Go to Home
           </Link>
@@ -243,7 +243,7 @@ export function EventPage() {
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Password Required</h1>
           <form onSubmit={handlePasswordSubmit} className="space-y-3 mt-4">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
@@ -275,7 +275,7 @@ export function EventPage() {
             <div className="mt-4">
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-white rounded-xl border border-white/10 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-theme-text rounded-xl border border-theme-stroke transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 Already RSVP'd? Log in
@@ -287,9 +287,9 @@ export function EventPage() {
           {event.shareToUnlock && (
             <div className="mt-4">
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-white/40 text-sm">or</span>
-                <div className="flex-1 h-px bg-white/10" />
+                <div className="flex-1 h-px bg-theme-surface-hover" />
+                <span className="text-theme-text-muted text-sm">or</span>
+                <div className="flex-1 h-px bg-theme-surface-hover" />
               </div>
               {!showTweetInput ? (
                 <button
@@ -302,7 +302,7 @@ export function EventPage() {
                     window.open(intentUrl, '_blank');
                     setShowTweetInput(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-white rounded-xl border border-white/10 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-theme-text rounded-xl border border-theme-stroke transition-colors"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -311,7 +311,7 @@ export function EventPage() {
                 </button>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-white/60 text-sm text-center">
+                  <p className="text-theme-text-secondary text-sm text-center">
                     Paste your tweet URL to unlock the event
                   </p>
 
@@ -470,12 +470,12 @@ export function EventPage() {
       {/* Edit Password Prompt Modal */}
       {showEditPasswordPrompt && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-8 max-w-md w-full">
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Lock className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2 text-center">Host Password Required</h1>
-            <p className="text-white/60 mb-6 text-center">
+            <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Host Password Required</h1>
+            <p className="text-theme-text-secondary mb-6 text-center">
               Enter the password you set when creating this event to edit it.
             </p>
 
@@ -487,7 +487,7 @@ export function EventPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="block text-sm font-medium text-theme-text mb-2">
                   Password
                 </label>
                 <input
@@ -567,7 +567,7 @@ export function EventPage() {
 
               {/* Host Button - Desktop */}
               {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                <div className="p-4 border-t border-white/10">
+                <div className="p-4 border-t border-theme-stroke">
                   <button
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -580,7 +580,7 @@ export function EventPage() {
 
               {/* Donate Button - Desktop */}
               {event.donationEnabled && (
-                <div className="p-4 border-t border-white/10">
+                <div className="p-4 border-t border-theme-stroke">
                   <button
                     onClick={() => setShowDonationModal(true)}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -588,7 +588,7 @@ export function EventPage() {
                     <Heart size={16} />
                     Donate
                   </button>
-                  <p className="text-white/60 text-sm text-center mt-1">
+                  <p className="text-theme-text-secondary text-sm text-center mt-1">
                     {event.donationRecipient ? (
                       <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
                     ) : `Buy Pizza for ${event.name}`}
@@ -597,7 +597,7 @@ export function EventPage() {
               )}
 
               {/* Host and Guest Info */}
-              <div className="p-6 border-t border-white/10">
+              <div className="p-6 border-t border-theme-stroke">
                 <HostsList
                   hostName={event.hostName}
                   hostProfile={event.hostProfile}
@@ -607,8 +607,8 @@ export function EventPage() {
 
                 {/* Guest Count */}
                 {!event.hideGuests && (
-                  <div className="pt-4 border-t border-white/10 mt-4">
-                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                  <div className="pt-4 border-t border-theme-stroke mt-4">
+                    <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                       <Users className="w-4 h-4" />
                       <span>
                         {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
@@ -618,7 +618,7 @@ export function EventPage() {
                         <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
                       )}
                       {event.maxGuests && event.guestCount < event.maxGuests && (
-                        <span className="text-white/40 text-xs">
+                        <span className="text-theme-text-muted text-xs">
                           ({event.maxGuests - event.guestCount} spots left)
                         </span>
                       )}
@@ -657,8 +657,8 @@ export function EventPage() {
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center">
                         <div className="text-center">
-                          <MapPin className="w-16 h-16 text-white/80 mx-auto mb-2" />
-                          <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                          <MapPin className="w-16 h-16 text-theme-text mx-auto mb-2" />
+                          <p className="text-theme-text text-sm font-medium">View on Google Maps</p>
                         </div>
                       </div>
                     )}
@@ -671,7 +671,7 @@ export function EventPage() {
 
                 {/* Host Button - Mobile */}
                 {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                  <div className="p-4 border-b border-white/10">
+                  <div className="p-4 border-b border-theme-stroke">
                     <button
                       onClick={handleEditEvent}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -684,13 +684,13 @@ export function EventPage() {
               </div>
 
               {/* Event Title */}
-              <div className="p-6 pb-1 md:border-b md:border-white/10">
+              <div className="p-6 pb-1 md:border-b md:border-theme-stroke">
                 {event.eventType === 'gpp' && (
                   <div className="mb-3">
                     <GPPBadge />
                   </div>
                 )}
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+                <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
@@ -715,10 +715,10 @@ export function EventPage() {
                       <div className="flex items-start gap-3">
                         <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div>
-                          <p className="text-lg font-medium text-white">
+                          <p className="text-lg font-medium text-theme-text">
                             {formattedDate}
                           </p>
-                          <p className="text-base text-white/60">
+                          <p className="text-base text-theme-text-secondary">
                             {formattedTime}
                             {formattedEndTime && ` - ${formattedEndTime}`}
                             {timezoneAbbr && ` ${timezoneAbbr}`}
@@ -738,9 +738,9 @@ export function EventPage() {
                         <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div>
                           {event.venueName && (
-                            <p className="text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                            <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
                           )}
-                          <p className={`${event.venueName ? 'text-base text-white/60' : 'text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                          <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
                         </div>
                       </a>
                     )}
@@ -752,7 +752,7 @@ export function EventPage() {
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 w-24 h-24 bg-white/10 rounded-lg border border-white/10 hover:bg-white/20 transition-colors group overflow-hidden relative"
+                      className="flex-shrink-0 w-24 h-24 bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
                       title="View on Google Maps"
                     >
                       {staticMapUrl ? (
@@ -764,7 +764,7 @@ export function EventPage() {
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center">
                           <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                          <span className="text-[10px] uppercase font-bold text-white/70">View Map</span>
+                          <span className="text-[10px] uppercase font-bold text-theme-text-secondary">View Map</span>
                         </div>
                       )}
                     </a>
@@ -776,10 +776,10 @@ export function EventPage() {
                   <div className="md:hidden flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                     <div>
-                      <p className="text-lg font-medium text-white">
+                      <p className="text-lg font-medium text-theme-text">
                         {formattedDate}
                       </p>
-                      <p className="text-base text-white/60">
+                      <p className="text-base text-theme-text-secondary">
                         {formattedTime}
                         {formattedEndTime && ` - ${formattedEndTime}`}
                         {timezoneAbbr && ` ${timezoneAbbr}`}
@@ -799,9 +799,9 @@ export function EventPage() {
                     <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                     <div>
                       {event.venueName && (
-                        <p className="text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                        <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
                       )}
-                      <p className={`${event.venueName ? 'text-base text-white/60' : 'text-lg font-medium text-white group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                      <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
                     </div>
                   </a>
                 )}
@@ -816,7 +816,7 @@ export function EventPage() {
                     {userHasRSVPd ? "Edit RSVP" : "RSVP"}
                   </button>
                   {event.rsvpClosedAt && (
-                    <p className="text-center text-white/50 text-sm mt-3">
+                    <p className="text-center text-theme-text-muted text-sm mt-3">
                       RSVPs are closed for this event
                     </p>
                   )}
@@ -824,8 +824,8 @@ export function EventPage() {
 
                 {/* Guest Count - Mobile */}
                 {!event.hideGuests && (
-                  <div className="md:hidden pt-4 border-t border-white/10">
-                    <div className="flex items-center gap-2 text-white/60 text-sm">
+                  <div className="md:hidden pt-4 border-t border-theme-stroke">
+                    <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                       <Users className="w-4 h-4" />
                       <span>
                         {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
@@ -835,7 +835,7 @@ export function EventPage() {
                         <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
                       )}
                       {event.maxGuests && event.guestCount < event.maxGuests && (
-                        <span className="text-white/40 text-xs">
+                        <span className="text-theme-text-muted text-xs">
                           ({event.maxGuests - event.guestCount} spots left)
                         </span>
                       )}
@@ -845,8 +845,8 @@ export function EventPage() {
 
                 {/* Description */}
                 {event.description && (
-                  <div className="border-t border-white/10 pt-4 mt-4">
-                    <div className="text-white/80 leading-relaxed prose prose-invert prose-lg max-w-none">
+                  <div className="border-t border-theme-stroke pt-4 mt-4">
+                    <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
@@ -863,16 +863,16 @@ export function EventPage() {
                             <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
                           ),
                           h1: ({ node, ...props }) => (
-                            <h1 {...props} className="text-xl font-bold text-white mt-4 mb-2 first:mt-0" />
+                            <h1 {...props} className="text-xl font-bold text-theme-text mt-4 mb-2 first:mt-0" />
                           ),
                           h2: ({ node, ...props }) => (
-                            <h2 {...props} className="text-lg font-bold text-white mt-4 mb-2 first:mt-0" />
+                            <h2 {...props} className="text-lg font-bold text-theme-text mt-4 mb-2 first:mt-0" />
                           ),
                           h3: ({ node, ...props }) => (
-                            <h3 {...props} className="text-base font-semibold text-white mt-3 mb-2 first:mt-0" />
+                            <h3 {...props} className="text-base font-semibold text-theme-text mt-3 mb-2 first:mt-0" />
                           ),
                           strong: ({ node, ...props }) => (
-                            <strong {...props} className="font-semibold text-white" />
+                            <strong {...props} className="font-semibold text-theme-text" />
                           ),
                           em: ({ node, ...props }) => (
                             <em {...props} className="italic" />
@@ -882,9 +882,9 @@ export function EventPage() {
                           ),
                           code: ({ node, inline, ...props }) =>
                             inline ? (
-                              <code {...props} className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono" />
+                              <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
                             ) : (
-                              <code {...props} className="block bg-white/10 p-3 rounded text-xs font-mono overflow-x-auto my-3" />
+                              <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
                             ),
                         }}
                       >
@@ -896,17 +896,17 @@ export function EventPage() {
 
                 {/* Mobile: Location Section */}
                 {event.address && googleMapsUrl && (
-                  <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                  <div className="md:hidden border-t border-theme-stroke pt-6 mt-6">
                     {event.venueName && (
-                      <p className="text-white font-medium mb-1">{event.venueName}</p>
+                      <p className="text-theme-text font-medium mb-1">{event.venueName}</p>
                     )}
-                    <p className={`${event.venueName ? 'text-white/60 text-sm' : 'text-white font-medium'} mb-3`}>{event.address}</p>
+                    <p className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3`}>{event.address}</p>
                     {/* Google Maps Link */}
                     <a
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full h-48 bg-white/5 rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
+                      className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
                     >
                       {staticMapUrl ? (
                         <img
@@ -917,8 +917,8 @@ export function EventPage() {
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20">
                           <div className="text-center">
-                            <MapPin className="w-12 h-12 text-white/80 mx-auto mb-2" />
-                            <p className="text-white/80 text-sm font-medium">View on Google Maps</p>
+                            <MapPin className="w-12 h-12 text-theme-text mx-auto mb-2" />
+                            <p className="text-theme-text text-sm font-medium">View on Google Maps</p>
                           </div>
                         </div>
                       )}
@@ -928,7 +928,7 @@ export function EventPage() {
 
                 {/* Donate Button - Mobile */}
                 {event.donationEnabled && (
-                  <div className="md:hidden border-t border-white/10 pt-6 mt-6">
+                  <div className="md:hidden border-t border-theme-stroke pt-6 mt-6">
                     <button
                       onClick={() => setShowDonationModal(true)}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -936,7 +936,7 @@ export function EventPage() {
                       <Heart size={16} />
                       Donate
                     </button>
-                    <p className="text-white/60 text-sm text-center mt-1">
+                    <p className="text-theme-text-secondary text-sm text-center mt-1">
                       {event.donationRecipient ? (
                         <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
                       ) : `Supporting ${event.name}`}
@@ -945,7 +945,7 @@ export function EventPage() {
                 )}
 
                 {/* Mobile: Full Host Section */}
-                <div id="host-section" className="md:hidden border-t border-white/10 pt-6 mt-6">
+                <div id="host-section" className="md:hidden border-t border-theme-stroke pt-6 mt-6">
                   <HostsList
                     hostName={event.hostName}
                     hostProfile={event.hostProfile}
@@ -956,13 +956,13 @@ export function EventPage() {
                 </div>
 
                 {/* Music Lineup Section */}
-                <div className="border-t border-white/10 pt-6 mt-6">
+                <div className="border-t border-theme-stroke pt-6 mt-6">
                   <MusicWidget isHost={false} partyId={event.id} />
                 </div>
 
                 {/* Photo Gallery Section */}
                 {photoStats?.photosEnabled && (
-                  <div className="border-t border-white/10 pt-6 mt-6">
+                  <div className="border-t border-theme-stroke pt-6 mt-6">
                     {showPhotos ? (
                       <PhotoGallery
                         partyId={event.id}
@@ -975,10 +975,10 @@ export function EventPage() {
                     ) : (
                       <button
                         onClick={() => setShowPhotos(true)}
-                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/10"
+                        className="w-full flex items-center justify-center gap-3 py-4 bg-theme-surface hover:bg-theme-surface-hover rounded-xl transition-colors border border-theme-stroke"
                       >
                         <Camera className="w-5 h-5 text-[#ff393a]" />
-                        <span className="text-white font-medium">
+                        <span className="text-theme-text font-medium">
                           {photoStats.totalPhotos > 0
                             ? `View Photos (${photoStats.totalPhotos})`
                             : 'Share Photos'}

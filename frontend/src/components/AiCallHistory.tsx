@@ -40,7 +40,7 @@ export const AiCallHistory: React.FC<AiCallHistoryProps> = ({ partyId }) => {
 
   return (
     <div className="card p-6">
-      <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+      <h2 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
         <Phone size={20} className="text-[#8b5cf6]" />
         AI Call History
       </h2>
@@ -59,15 +59,15 @@ export const AiCallHistory: React.FC<AiCallHistoryProps> = ({ partyId }) => {
           return (
             <div
               key={call.callId}
-              className="bg-white/5 border border-white/10 rounded-xl overflow-hidden"
+              className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden"
             >
               <button
                 onClick={() => setExpandedCallId(isExpanded ? null : call.callId)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between p-4 text-left hover:bg-theme-surface transition-colors"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium text-sm truncate">{call.pizzeriaName}</p>
-                  <p className="text-white/50 text-xs mt-0.5">
+                  <p className="text-theme-text font-medium text-sm truncate">{call.pizzeriaName}</p>
+                  <p className="text-theme-text-muted text-xs mt-0.5">
                     {timeStr} &middot; Ordered by {call.customerName}
                   </p>
                 </div>
@@ -77,15 +77,15 @@ export const AiCallHistory: React.FC<AiCallHistoryProps> = ({ partyId }) => {
                       e.stopPropagation();
                       handleRemoveCall(call.callId);
                     }}
-                    className="p-1 text-white/30 hover:text-[#ff393a] transition-colors"
+                    className="p-1 text-theme-text-faint hover:text-[#ff393a] transition-colors"
                     title="Remove from history"
                   >
                     <Trash2 size={14} />
                   </button>
                   {isExpanded ? (
-                    <ChevronUp size={16} className="text-white/40" />
+                    <ChevronUp size={16} className="text-theme-text-muted" />
                   ) : (
-                    <ChevronDown size={16} className="text-white/40" />
+                    <ChevronDown size={16} className="text-theme-text-muted" />
                   )}
                 </div>
               </button>

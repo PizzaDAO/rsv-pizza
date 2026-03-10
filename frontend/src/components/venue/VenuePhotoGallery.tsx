@@ -63,7 +63,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
         {photos.map((photo, index) => (
           <div
             key={photo.id}
-            className="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-white/5"
+            className="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-theme-surface"
             onClick={() => openLightbox(index)}
           >
             <img
@@ -75,7 +75,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
 
             {/* Category badge */}
             {photo.category && (
-              <span className="absolute top-1 left-1 text-[10px] bg-black/60 text-white/80 px-1.5 py-0.5 rounded">
+              <span className="absolute top-1 left-1 text-[10px] bg-black/60 text-theme-text px-1.5 py-0.5 rounded">
                 {photo.category}
               </span>
             )}
@@ -95,7 +95,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
             {/* Caption overlay */}
             {photo.caption && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-1.5">
-                <p className="text-[10px] text-white/90 truncate">{photo.caption}</p>
+                <p className="text-[10px] text-theme-text truncate">{photo.caption}</p>
               </div>
             )}
           </div>
@@ -111,7 +111,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
           <button
             type="button"
             onClick={closeLightbox}
-            className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+            className="absolute top-4 right-4 text-theme-text-secondary hover:text-theme-text z-10"
           >
             <X size={24} />
           </button>
@@ -124,7 +124,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
                 e.stopPropagation();
                 navigateLightbox(-1);
               }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
             >
               <ChevronLeft size={24} />
             </button>
@@ -137,7 +137,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
                 e.stopPropagation();
                 navigateLightbox(1);
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
             >
               <ChevronRight size={24} />
             </button>
@@ -153,9 +153,9 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
             {photos[lightboxIndex].caption && (
-              <p className="text-white/80 text-sm mt-3 text-center">{photos[lightboxIndex].caption}</p>
+              <p className="text-theme-text text-sm mt-3 text-center">{photos[lightboxIndex].caption}</p>
             )}
-            <p className="text-white/40 text-xs mt-1">
+            <p className="text-theme-text-muted text-xs mt-1">
               {lightboxIndex + 1} of {photos.length}
             </p>
           </div>

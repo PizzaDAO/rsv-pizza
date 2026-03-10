@@ -393,8 +393,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
         <div className="flex items-center gap-3">
           <Monitor className="text-[#ff393a]" size={20} />
           <div>
-            <h3 className="font-medium text-white">Displays</h3>
-            <p className="text-sm text-white/50">
+            <h3 className="font-medium text-theme-text">Displays</h3>
+            <p className="text-sm text-theme-text-muted">
               Create screens for TVs, projectors, and tablets
             </p>
           </div>
@@ -412,8 +412,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <Map className="text-white/50" size={18} />
-            <h3 className="font-medium text-white text-sm">Venue Floorplan</h3>
+            <Map className="text-theme-text-muted" size={18} />
+            <h3 className="font-medium text-theme-text text-sm">Venue Floorplan</h3>
           </div>
           <button
             onClick={() => setShowFloorplanInput(!showFloorplanInput)}
@@ -446,7 +446,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
         {floorplanUrl ? (
           <div
             ref={floorplanRef}
-            className="relative rounded-lg overflow-hidden border border-white/10 cursor-crosshair select-none"
+            className="relative rounded-lg overflow-hidden border border-theme-stroke cursor-crosshair select-none"
             onClick={handleFloorplanClick}
           >
             <img
@@ -462,8 +462,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
             {/* "Click to place" hint when no pins are placed and there are displays */}
             {pins.length === 0 && displays.length > 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10">
-                  <p className="text-white/60 text-sm flex items-center gap-2">
+                <div className="bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-theme-stroke">
+                  <p className="text-theme-text-secondary text-sm flex items-center gap-2">
                     <MapPin size={14} className="text-[#ff393a]" />
                     Click to place displays
                   </p>
@@ -507,8 +507,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                   <div
                     className={`mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-lg whitespace-nowrap
                       ${isDisplayActive(pin.displayId)
-                        ? 'bg-black/80 text-white'
-                        : 'bg-black/60 text-white/60'
+                        ? 'bg-black/80 text-theme-text'
+                        : 'bg-black/60 text-theme-text-secondary'
                       }
                       ${selectedPinId === pin.displayId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
                       transition-opacity`}
@@ -524,8 +524,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                     ref={popoverRef}
                     className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50"
                   >
-                    <div className="bg-black/90 backdrop-blur border border-white/10 rounded-lg shadow-xl p-2 min-w-[120px]">
-                      <div className="text-xs text-white/70 px-2 py-1 truncate max-w-[150px]">
+                    <div className="bg-black/90 backdrop-blur border border-theme-stroke rounded-lg shadow-xl p-2 min-w-[120px]">
+                      <div className="text-xs text-theme-text-secondary px-2 py-1 truncate max-w-[150px]">
                         {getDisplayName(pin.displayId)}
                       </div>
                       <button
@@ -533,7 +533,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                           e.stopPropagation();
                           handleRemovePin(pin.displayId);
                         }}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-white/5 rounded transition-colors"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-theme-surface rounded transition-colors"
                       >
                         <X size={12} />
                         Remove from floorplan
@@ -551,8 +551,8 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                 ref={popoverRef}
                 style={getPopoverStyle(pendingClick.x, pendingClick.y)}
               >
-                <div className="bg-black/90 backdrop-blur border border-white/10 rounded-lg shadow-xl p-2 min-w-[160px] max-h-[200px] overflow-y-auto">
-                  <div className="text-xs text-white/50 px-2 py-1 mb-1">Place a display here</div>
+                <div className="bg-black/90 backdrop-blur border border-theme-stroke rounded-lg shadow-xl p-2 min-w-[160px] max-h-[200px] overflow-y-auto">
+                  <div className="text-xs text-theme-text-muted px-2 py-1 mb-1">Place a display here</div>
                   {unplacedDisplays.map((d) => (
                     <button
                       key={d.id}
@@ -560,7 +560,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                         e.stopPropagation();
                         handlePlaceDisplay(d.id);
                       }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-white hover:bg-white/10 rounded transition-colors text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-theme-text hover:bg-theme-surface-hover rounded transition-colors text-left"
                     >
                       <MapPin size={14} className="text-[#ff393a] shrink-0" />
                       <span className="truncate">{d.name}</span>
@@ -573,7 +573,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
             {/* Crosshair indicator at pending click location */}
             {pendingClick && (
               <div
-                className="absolute w-2 h-2 bg-[#ff393a] rounded-full border border-white/50 pointer-events-none"
+                className="absolute w-2 h-2 bg-[#ff393a] rounded-full border border-theme-stroke-hover pointer-events-none"
                 style={{
                   left: `${pendingClick.x}%`,
                   top: `${pendingClick.y}%`,
@@ -584,7 +584,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
             )}
           </div>
         ) : (
-          <p className="text-xs text-white/30 text-center py-3">
+          <p className="text-xs text-theme-text-faint text-center py-3">
             Add a floorplan image to see where displays are placed
           </p>
         )}
@@ -595,14 +595,14 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
             {pins.map((pin) => (
               <span
                 key={pin.displayId}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-theme-surface border border-theme-stroke text-theme-text-secondary"
               >
                 <MapPin size={10} className="text-[#ff393a]" />
                 {getDisplayName(pin.displayId)}
               </span>
             ))}
             {unplacedDisplays.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] text-white/30">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] text-theme-text-faint">
                 +{unplacedDisplays.length} unplaced
               </span>
             )}
@@ -613,9 +613,9 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
       {/* Display List */}
       {displays.length === 0 ? (
         <div className="card p-8 text-center">
-          <Monitor className="w-12 h-12 text-white/20 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">No displays yet</h3>
-          <p className="text-white/50 mb-4">
+          <Monitor className="w-12 h-12 text-theme-text-faint mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-theme-text mb-2">No displays yet</h3>
+          <p className="text-theme-text-muted mb-4">
             Create displays for TVs, projectors, or tablets at your event.
           </p>
           <button

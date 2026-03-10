@@ -117,12 +117,12 @@ export const StaffForm: React.FC<StaffFormProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-theme-text">
             {isEditing ? 'Edit Staff Member' : 'Add Staff Member'}
           </h2>
-          <button onClick={onClose} className="text-white/50 hover:text-white">
+          <button onClick={onClose} className="text-theme-text-muted hover:text-theme-text">
             <X size={20} />
           </button>
         </div>
@@ -153,7 +153,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                 required
               />
               {showRoleSuggestions && filteredRoleSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-[#1a1a2e] border border-white/20 rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute z-10 w-full mt-1 bg-theme-header border border-theme-stroke-hover rounded-lg shadow-lg overflow-hidden">
                   {filteredRoleSuggestions.map((suggestion) => (
                     <button
                       key={suggestion}
@@ -162,7 +162,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                         setRole(suggestion);
                         setShowRoleSuggestions(false);
                       }}
-                      className="w-full px-3 py-2 text-left text-white/80 hover:bg-white/10 text-sm"
+                      className="w-full px-3 py-2 text-left text-theme-text hover:bg-theme-surface-hover text-sm"
                     >
                       {suggestion}
                     </button>
@@ -194,10 +194,10 @@ export const StaffForm: React.FC<StaffFormProps> = ({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StaffStatus)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#ff393a]/50"
+            className="w-full bg-theme-surface border border-theme-stroke rounded-xl px-4 py-3 text-theme-text text-sm focus:outline-none focus:border-[#ff393a]/50"
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} className="bg-[#1a1a2e] text-white">
+              <option key={option.value} value={option.value} className="bg-theme-header text-theme-text">
                 {option.label}
               </option>
             ))}
@@ -205,14 +205,14 @@ export const StaffForm: React.FC<StaffFormProps> = ({
 
           {/* Pay Type Toggle */}
           <div>
-            <div className="flex rounded-xl overflow-hidden border border-white/10">
+            <div className="flex rounded-xl overflow-hidden border border-theme-stroke">
               <button
                 type="button"
                 onClick={() => setPayType('hourly')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
                   payType === 'hourly'
                     ? 'bg-[#ff393a] text-white'
-                    : 'bg-white/5 text-white/50 hover:text-white/80'
+                    : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
                 }`}
               >
                 Hourly
@@ -223,7 +223,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
                   payType === 'flat'
                     ? 'bg-[#ff393a] text-white'
-                    : 'bg-white/5 text-white/50 hover:text-white/80'
+                    : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
                 }`}
               >
                 Flat Fee
@@ -293,7 +293,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-xl transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2 rounded-xl transition-colors text-sm"
             >
               Cancel
             </button>

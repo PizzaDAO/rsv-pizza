@@ -188,12 +188,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a2e] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-[#1a1a2e] border-b border-white/10 p-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">
+      <div className="bg-theme-header rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-theme-header border-b border-theme-stroke p-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-theme-text">
             {display ? 'Edit Display' : 'Create Display'}
           </h2>
-          <button onClick={onClose} className="text-white/50 hover:text-white">
+          <button onClick={onClose} className="text-theme-text-muted hover:text-theme-text">
             <X size={24} />
           </button>
         </div>
@@ -229,7 +229,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               <select
                 value={resolutionPreset}
                 onChange={(e) => setResolutionPreset(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white h-[42px]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text h-[42px]"
               >
                 <option value="">Resolution</option>
                 {RESOLUTION_PRESETS.map((p) => (
@@ -250,7 +250,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
           {/* Content Type */}
           <div>
-            <p className="text-sm font-medium text-white/70 mb-2">Content Type</p>
+            <p className="text-sm font-medium text-theme-text-secondary mb-2">Content Type</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {contentTypes.map((type) => (
                 <button
@@ -260,22 +260,22 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   className={`p-3 rounded-lg border text-left transition-colors ${
                     contentType === type.value
                       ? 'border-[#ff393a] bg-[#ff393a]/10'
-                      : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      : 'border-theme-stroke bg-theme-surface hover:bg-theme-surface-hover'
                   }`}
                 >
-                  <div className={`mb-1 ${contentType === type.value ? 'text-[#ff393a]' : 'text-white/50'}`}>
+                  <div className={`mb-1 ${contentType === type.value ? 'text-[#ff393a]' : 'text-theme-text-muted'}`}>
                     {type.icon}
                   </div>
-                  <div className="text-sm font-medium text-white">{type.label}</div>
-                  <div className="text-xs text-white/50">{type.description}</div>
+                  <div className="text-sm font-medium text-theme-text">{type.label}</div>
+                  <div className="text-xs text-theme-text-muted">{type.description}</div>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Content Type Specific Options */}
-          <div className="border border-white/10 rounded-lg p-4 space-y-4">
-            <h3 className="font-medium text-white">Content Settings</h3>
+          <div className="border border-theme-stroke rounded-lg p-4 space-y-4">
+            <h3 className="font-medium text-theme-text">Content Settings</h3>
 
             {contentType === 'slideshow' && (
               <div className="space-y-2">
@@ -286,7 +286,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   onChange={(e) => setGoogleSlidesUrl(e.target.value)}
                   placeholder="Google Slides URL"
                 />
-                <p className="text-xs text-white/40 pl-1">Paste the share link from Google Slides</p>
+                <p className="text-xs text-theme-text-muted pl-1">Paste the share link from Google Slides</p>
               </div>
             )}
 
@@ -296,7 +296,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   <select
                     value={qrSize}
                     onChange={(e) => setQrSize(e.target.value as 'small' | 'medium' | 'large')}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
                     <option value="small">Small</option>
                     <option value="medium">Medium</option>
@@ -324,7 +324,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   <select
                     value={photosFilter}
                     onChange={(e) => setPhotosFilter(e.target.value as 'all' | 'starred')}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
                     <option value="all">All Photos</option>
                     <option value="starred">Starred Only</option>
@@ -334,7 +334,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   <select
                     value={photosLayout}
                     onChange={(e) => setPhotosLayout(e.target.value as 'grid' | 'slideshow')}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
                     <option value="grid">Grid</option>
                     <option value="slideshow">Slideshow</option>
@@ -348,7 +348,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                       max={6}
                       value={photosColumns}
                       onChange={(e) => setPhotosColumns(parseInt(e.target.value) || 3)}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                       placeholder="Columns (1-6)"
                     />
                   </div>
@@ -360,7 +360,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     max={300}
                     value={photosAutoRefresh}
                     onChange={(e) => setPhotosAutoRefresh(parseInt(e.target.value) || 30)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                     placeholder="Auto-refresh interval (seconds)"
                   />
                 </div>
@@ -393,7 +393,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   <select
                     value={uploadMediaType}
                     onChange={(e) => setUploadMediaType(e.target.value as 'image' | 'video')}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
                     <option value="image">Image</option>
                     <option value="video">Video</option>
@@ -406,11 +406,11 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   onChange={(e) => setUploadMediaUrl(e.target.value)}
                   placeholder="Media URL (image or video link)"
                 />
-                <p className="text-xs text-white/40 pl-1">
+                <p className="text-xs text-theme-text-muted pl-1">
                   Paste a direct link to an image or video file
                 </p>
                 {uploadMediaUrl && uploadMediaType === 'image' && (
-                  <div className="rounded-lg overflow-hidden border border-white/10">
+                  <div className="rounded-lg overflow-hidden border border-theme-stroke">
                     <img
                       src={uploadMediaUrl}
                       alt="Preview"
@@ -424,8 +424,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
           </div>
 
           {/* Display Settings */}
-          <div className="border border-white/10 rounded-lg p-4 space-y-4">
-            <h3 className="font-medium text-white">Display Settings</h3>
+          <div className="border border-theme-stroke rounded-lg p-4 space-y-4">
+            <h3 className="font-medium text-theme-text">Display Settings</h3>
 
             {(contentType === 'slideshow' || contentType === 'photos') && (
               <div>
@@ -435,7 +435,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   max={120}
                   value={rotationInterval}
                   onChange={(e) => setRotationInterval(parseInt(e.target.value) || 10)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   placeholder="Rotation interval (seconds)"
                 />
               </div>
@@ -453,7 +453,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   type="text"
                   value={backgroundColor}
                   onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono"
+                  className="flex-1 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text font-mono"
                   placeholder="Background color"
                 />
               </div>
@@ -481,11 +481,11 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+          <div className="flex items-center gap-3 pt-4 border-t border-theme-stroke">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 rounded-lg border border-white/10 text-white/70 hover:bg-white/5 transition-colors"
+              className="flex-1 px-4 py-2 rounded-lg border border-theme-stroke text-theme-text-secondary hover:bg-theme-surface transition-colors"
             >
               Cancel
             </button>

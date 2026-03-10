@@ -368,8 +368,8 @@ export function RSVPPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Party Not Found</h1>
-          <p className="text-white/60">{error}</p>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
+          <p className="text-theme-text-secondary">{error}</p>
         </div>
       </div>
     );
@@ -383,8 +383,8 @@ export function RSVPPage() {
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2 text-center">Password Required</h1>
-          <p className="text-white/60 mb-6 text-center">
+          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Password Required</h1>
+          <p className="text-theme-text-secondary mb-6 text-center">
             This event is password-protected
           </p>
 
@@ -442,16 +442,16 @@ export function RSVPPage() {
               <Check className="w-8 h-8 text-[#39d98a]" />
             )}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-theme-text mb-2">
             {getSuccessTitle()}
           </h1>
           {alreadyRegistered && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               This email has already been used to RSVP to this event.
             </p>
           )}
           {pendingApproval && !alreadyRegistered && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
@@ -474,7 +474,7 @@ export function RSVPPage() {
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+            className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
@@ -482,8 +482,8 @@ export function RSVPPage() {
           <div className="flex items-center gap-3 mb-6">
             <Pizza className="w-10 h-10 text-[#ff393a]" />
             <div>
-              <h1 className="text-2xl font-bold text-white">RSVP to {party?.name}</h1>
-              <p className="text-sm text-white/60">Step 1 of 2</p>
+              <h1 className="text-2xl font-bold text-theme-text">RSVP to {party?.name}</h1>
+              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
             </div>
           </div>
 
@@ -520,7 +520,7 @@ export function RSVPPage() {
 
             {/* What do you do? */}
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
+              <label className="block text-sm font-medium text-theme-text mb-2">
                 What do you do?
               </label>
               <div className="flex flex-wrap gap-2">
@@ -531,7 +531,7 @@ export function RSVPPage() {
                     onClick={() => toggleRole(role)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${roles.includes(role)
                         ? 'bg-[#ff393a] text-white'
-                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                       }`}
                   >
                     {role}
@@ -544,14 +544,14 @@ export function RSVPPage() {
             <button
               type="button"
               onClick={() => setMailingListOptIn(!mailingListOptIn)}
-              className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors cursor-pointer w-full"
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
             >
               {mailingListOptIn ? (
                 <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
               ) : (
-                <Square size={20} className="text-white/40 flex-shrink-0" />
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
-              <span className="text-sm text-white/80">
+              <span className="text-sm text-theme-text">
                 Want to join the mailing list?
               </span>
             </button>
@@ -582,7 +582,7 @@ export function RSVPPage() {
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
         >
           <X size={24} />
         </button>
@@ -590,15 +590,15 @@ export function RSVPPage() {
         <div className="flex items-center gap-3 mb-6">
           <Pizza className="w-10 h-10 text-[#ff393a]" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Pizza Requests</h1>
-            <p className="text-sm text-white/60">Step 2 of 2</p>
+            <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
+            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Dietary Restrictions */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-3">
+            <label className="block text-sm font-medium text-theme-text mb-3">
               Diet
             </label>
             <div className="flex flex-wrap gap-2">
@@ -609,7 +609,7 @@ export function RSVPPage() {
                   onClick={() => toggleDietary(option)}
                   className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
                       ? 'bg-[#ff393a] text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                     }`}
                 >
                   {option}
@@ -620,7 +620,7 @@ export function RSVPPage() {
 
           {/* Toppings */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-3">
+            <label className="block text-sm font-medium text-theme-text mb-3">
               Toppings
             </label>
             <div className="flex flex-wrap gap-2">
@@ -635,7 +635,7 @@ export function RSVPPage() {
                         ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                         : isDisliked
                           ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                          : 'bg-white/5 border-white/10'
+                          : 'bg-theme-surface border-theme-stroke'
                       }`}
                   >
                     <button
@@ -645,10 +645,10 @@ export function RSVPPage() {
                     >
                       <ThumbsUp
                         size={12}
-                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                           }`}
                       />
-                      <span className="text-white text-xs">{topping.name}</span>
+                      <span className="text-theme-text text-xs">{topping.name}</span>
                     </button>
                     <button
                       type="button"
@@ -657,7 +657,7 @@ export function RSVPPage() {
                     >
                       <ThumbsDown
                         size={12}
-                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                           }`}
                       />
                     </button>
@@ -670,7 +670,7 @@ export function RSVPPage() {
           {/* Drinks */}
           {availableBeverages.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
+              <label className="block text-sm font-medium text-theme-text mb-3">
                 Drink Preferences
               </label>
               <div className="flex flex-wrap gap-2">
@@ -685,7 +685,7 @@ export function RSVPPage() {
                           ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                           : isDisliked
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-white/5 border-white/10'
+                            : 'bg-theme-surface border-theme-stroke'
                         }`}
                     >
                       <button
@@ -695,10 +695,10 @@ export function RSVPPage() {
                       >
                         <ThumbsUp
                           size={12}
-                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                             }`}
                         />
-                        <span className="text-white text-xs">{drink.name}</span>
+                        <span className="text-theme-text text-xs">{drink.name}</span>
                       </button>
                       <button
                         type="button"
@@ -707,7 +707,7 @@ export function RSVPPage() {
                       >
                         <ThumbsDown
                           size={12}
-                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                             }`}
                         />
                       </button>
@@ -721,12 +721,12 @@ export function RSVPPage() {
           {/* Pizzeria Rankings - only show if party has location and pizzerias found */}
           {nearbyPizzerias.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
-                Favorite Pizzerias <span className="text-white/50 font-normal">(click to rank 1-3)</span>
+              <label className="block text-sm font-medium text-theme-text mb-3">
+                Favorite Pizzerias <span className="text-theme-text-muted font-normal">(click to rank 1-3)</span>
               </label>
               {loadingPizzerias ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-white/40" />
+                  <Loader2 size={20} className="animate-spin text-theme-text-muted" />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -741,13 +741,13 @@ export function RSVPPage() {
                         onClick={() => handlePizzeriaClick(pizzeria.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${rank
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            : 'bg-theme-surface border-theme-stroke hover:bg-theme-surface-hover'
                           }`}
                       >
                         {/* Rank badge or empty circle */}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${rank
                             ? 'bg-[#ff393a] text-white'
-                            : 'bg-white/10 text-white/30'
+                            : 'bg-theme-surface-hover text-theme-text-faint'
                           }`}>
                           {rank || '—'}
                         </div>
@@ -755,7 +755,7 @@ export function RSVPPage() {
                         {/* Pizzeria info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-white truncate">{pizzeria.name}</span>
+                            <span className="font-medium text-theme-text truncate">{pizzeria.name}</span>
                             {pizzeria.rating && (
                               <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
                                 <Star size={10} className="fill-yellow-400" />
@@ -763,12 +763,12 @@ export function RSVPPage() {
                               </span>
                             )}
                             {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs text-theme-text-muted">
                                 {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-white/50">
+                          <div className="flex items-center gap-1 text-xs text-theme-text-muted">
                             <MapPin size={10} />
                             <span className="truncate">{pizzeria.address}</span>
                           </div>
@@ -783,7 +783,7 @@ export function RSVPPage() {
               <button
                 type="button"
                 onClick={() => setShowSuggestModal(true)}
-                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-white/20 text-white/50 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm"
+                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-theme-stroke-hover text-theme-text-muted hover:text-theme-text hover:border-theme-stroke-hover hover:bg-theme-surface transition-all text-sm"
               >
                 <Plus size={14} />
                 Suggest a Pizzeria
@@ -793,13 +793,13 @@ export function RSVPPage() {
 
           {/* Suggest Pizzeria Sub-Modal */}
           {showSuggestModal && (
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-white">Suggest a pizzeria</p>
+                <p className="text-sm font-medium text-theme-text">Suggest a pizzeria</p>
                 <button
                   type="button"
                   onClick={() => setShowSuggestModal(false)}
-                  className="text-white/40 hover:text-white"
+                  className="text-theme-text-muted hover:text-theme-text"
                 >
                   <X size={16} />
                 </button>
@@ -820,7 +820,7 @@ export function RSVPPage() {
 
           {/* Donation Option - only show if donations are enabled */}
           {donationsEnabled && donationStats && !showDonationForm && (
-            <div className="border-t border-white/10 pt-4">
+            <div className="border-t border-theme-stroke pt-4">
               <button
                 type="button"
                 onClick={() => setShowDonationForm(true)}
@@ -830,26 +830,26 @@ export function RSVPPage() {
                   <Heart size={24} className="text-[#ff393a]" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-white font-medium">Donate</p>
-                  <p className="text-white/50 text-sm">
+                  <p className="text-theme-text font-medium">Donate</p>
+                  <p className="text-theme-text-muted text-sm">
                     {donationStats.message || 'Make a donation to help make this event possible'}
                   </p>
                 </div>
-                <ChevronRight size={20} className="text-white/40" />
+                <ChevronRight size={20} className="text-theme-text-muted" />
               </button>
             </div>
           )}
 
           {/* Donation Form - shows when user clicks to donate */}
           {donationsEnabled && donationStats && showDonationForm && (
-            <div className="border-t border-white/10 pt-4">
+            <div className="border-t border-theme-stroke pt-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30">
                   <Heart size={20} className="text-[#ff393a]" />
                 </div>
                 <div>
-                  <h3 className="text-white font-medium">Make a Donation</h3>
-                  <p className="text-white/50 text-sm">
+                  <h3 className="text-theme-text font-medium">Make a Donation</h3>
+                  <p className="text-theme-text-muted text-sm">
                     {donationStats.recipient ? (
                       <>Buy Pizza for {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
                     ) : 'Buy Pizza for this event'}
@@ -872,16 +872,16 @@ export function RSVPPage() {
             <button
               type="button"
               onClick={() => setSaveToProfile(!saveToProfile)}
-              className="flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+              className="flex items-center gap-3 w-full p-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors"
             >
               {saveToProfile ? (
                 <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
               ) : (
-                <Square size={20} className="text-white/40 flex-shrink-0" />
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
               <div className="text-left">
-                <span className="text-sm font-medium text-white">Save to profile</span>
-                <p className="text-xs text-white/50">Remember my preferences for future events</p>
+                <span className="text-sm font-medium text-theme-text">Save to profile</span>
+                <p className="text-xs text-theme-text-muted">Remember my preferences for future events</p>
               </div>
             </button>
           )}

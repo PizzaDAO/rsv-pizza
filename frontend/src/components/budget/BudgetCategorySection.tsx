@@ -47,26 +47,26 @@ export const BudgetCategorySection: React.FC<BudgetCategorySectionProps> = ({
   }
 
   return (
-    <div className="border border-white/10 rounded-xl overflow-hidden">
+    <div className="border border-theme-stroke rounded-xl overflow-hidden">
       {/* Category Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 transition-colors"
+        className="w-full flex items-center justify-between p-4 bg-theme-surface hover:bg-theme-surface-hover transition-colors"
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown size={18} className="text-white/40" />
+            <ChevronDown size={18} className="text-theme-text-muted" />
           ) : (
-            <ChevronRight size={18} className="text-white/40" />
+            <ChevronRight size={18} className="text-theme-text-muted" />
           )}
           <Icon size={18} className="text-[#ff393a]" />
-          <span className="font-medium text-white">{categoryInfo?.label || category}</span>
-          <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full">
+          <span className="font-medium text-theme-text">{categoryInfo?.label || category}</span>
+          <span className="text-xs text-theme-text-muted bg-theme-surface-hover px-2 py-0.5 rounded-full">
             {totals.count} item{totals.count !== 1 ? 's' : ''}
           </span>
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold text-white">{formatCurrency(totals.total)}</p>
+          <p className="text-sm font-semibold text-theme-text">{formatCurrency(totals.total)}</p>
           {totals.pending > 0 && (
             <p className="text-xs text-yellow-400">{formatCurrency(totals.pending)} pending</p>
           )}

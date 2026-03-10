@@ -80,7 +80,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
 
   return (
     <div
-      className={`bg-white/5 border border-white/10 rounded-xl p-4 transition-all ${
+      className={`bg-theme-surface border border-theme-stroke rounded-xl p-4 transition-all ${
         isDragging ? 'opacity-50' : 'opacity-100'
       }`}
       draggable={!!dragHandleProps}
@@ -91,7 +91,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
       <div className="flex items-start gap-3">
         {/* Drag Handle */}
         {dragHandleProps && (
-          <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 pt-1">
+          <div className="cursor-grab active:cursor-grabbing text-theme-text-faint hover:text-theme-text-secondary pt-1">
             <GripVertical size={18} />
           </div>
         )}
@@ -103,18 +103,18 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
         <div className="flex-1 min-w-0">
           {/* Header Row */}
           <div className="flex items-center justify-between gap-2 mb-1">
-            <h3 className="text-white font-medium truncate">{performer.name}</h3>
+            <h3 className="text-theme-text font-medium truncate">{performer.name}</h3>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
               {statusStyle.label}
             </span>
           </div>
 
           {/* Genre & Type */}
-          <div className="flex items-center gap-2 text-sm text-white/60 mb-2">
+          <div className="flex items-center gap-2 text-sm text-theme-text-secondary mb-2">
             <span>{typeLabel}</span>
             {performer.genre && (
               <>
-                <span className="text-white/30">|</span>
+                <span className="text-theme-text-faint">|</span>
                 <span>{performer.genre}</span>
               </>
             )}
@@ -122,7 +122,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
 
           {/* Time Slot */}
           {(performer.setTime || performer.setDuration) && (
-            <div className="text-sm text-white/70 mb-2">
+            <div className="text-sm text-theme-text-secondary mb-2">
               {performer.setTime && <span>{formatTime(performer.setTime)}</span>}
               {performer.setTime && performer.setDuration && <span> - </span>}
               {performer.setDuration && <span>({formatDuration(performer.setDuration)})</span>}
@@ -132,8 +132,8 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
           {/* Fee & Payment Status */}
           {performer.fee !== null && performer.fee !== undefined && (
             <div className="flex items-center gap-2 text-sm mb-2">
-              <DollarSign size={14} className="text-white/40" />
-              <span className="text-white/70">{formatFee(performer.fee)}</span>
+              <DollarSign size={14} className="text-theme-text-muted" />
+              <span className="text-theme-text-secondary">{formatFee(performer.fee)}</span>
               {performer.feePaid && (
                 <span className="flex items-center gap-1 text-green-400 text-xs">
                   <Check size={12} />
@@ -150,7 +150,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
                 href={`https://instagram.com/${performer.instagram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white/50 hover:text-white transition-colors"
+                className="text-theme-text-muted hover:text-theme-text transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Instagram size={16} />
@@ -165,7 +165,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white/50 hover:text-white transition-colors"
+                className="text-theme-text-muted hover:text-theme-text transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink size={16} />
@@ -178,14 +178,14 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => onEdit(performer)}
-            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
             title="Edit"
           >
             <Edit2 size={16} />
           </button>
           <button
             onClick={() => onDelete(performer.id)}
-            className="p-2 text-white/50 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            className="p-2 text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
             title="Delete"
           >
             <Trash2 size={16} />

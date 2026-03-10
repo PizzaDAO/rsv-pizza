@@ -22,7 +22,7 @@ export const ClickableEmail: React.FC<ClickableEmailProps> = ({ email, className
         href={`https://${domain}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-white/70 hover:text-white hover:underline inline-flex items-center gap-0.5"
+        className="text-theme-text-secondary hover:text-theme-text hover:underline inline-flex items-center gap-0.5"
         onClick={(e) => e.stopPropagation()}
         title={`Visit ${domain}`}
       >

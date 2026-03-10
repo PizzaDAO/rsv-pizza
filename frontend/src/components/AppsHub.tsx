@@ -240,7 +240,7 @@ function StatusBadge({ status }: { status: AppStatus }) {
   const styles = {
     live: 'bg-[#39d98a]/20 text-[#39d98a]',
     preview: 'bg-[#5c7cfa]/20 text-[#5c7cfa]',
-    'coming-soon': 'bg-white/10 text-white/40',
+    'coming-soon': 'bg-theme-surface-hover text-theme-text-muted',
   };
 
   const labels = {
@@ -275,13 +275,13 @@ function AppCard({
   const iconBg = {
     live: 'bg-[#39d98a]/15',
     preview: 'bg-[#5c7cfa]/15',
-    'coming-soon': 'bg-white/5',
+    'coming-soon': 'bg-theme-surface',
   };
 
   const iconColor = {
     live: 'text-[#39d98a]',
     preview: 'text-[#5c7cfa]',
-    'coming-soon': 'text-white/30',
+    'coming-soon': 'text-theme-text-faint',
   };
 
   const Icon = app.icon;
@@ -325,7 +325,7 @@ function AppCard({
           className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all cursor-pointer ${
             isPinned
               ? 'bg-[#ff393a]/20 text-[#ff393a] opacity-100'
-              : 'bg-white/5 text-white/30 opacity-0 group-hover:opacity-100 hover:text-white/60 hover:bg-white/10'
+              : 'bg-theme-surface text-theme-text-faint opacity-0 group-hover:opacity-100 hover:text-theme-text-secondary hover:bg-theme-surface-hover'
           }`}
           title={isPinned ? 'Unpin from tab bar' : 'Pin to tab bar'}
         >
@@ -340,7 +340,7 @@ function AppCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-white truncate">{app.name}</span>
+            <span className="text-sm font-medium text-theme-text truncate">{app.name}</span>
             {isPinned && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#ff393a]/15 text-[#ff393a]">
                 Pinned
@@ -350,7 +350,7 @@ function AppCard({
               <ExternalLink size={12} className="text-[#5c7cfa] flex-shrink-0" />
             )}
           </div>
-          <p className="text-xs text-white/40 leading-relaxed">{app.description}</p>
+          <p className="text-xs text-theme-text-muted leading-relaxed">{app.description}</p>
           <div className="mt-2">
             <StatusBadge status={app.status} />
           </div>
@@ -377,8 +377,8 @@ function AppSection({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider mb-3">
-        {title} <span className="text-white/30">({sectionApps.length})</span>
+      <h3 className="text-sm font-medium text-theme-text-secondary uppercase tracking-wider mb-3">
+        {title} <span className="text-theme-text-faint">({sectionApps.length})</span>
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {sectionApps.map((app) => (
@@ -435,7 +435,7 @@ export function AppsHub({
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-xs text-theme-text-muted mt-1">
             Click an app to open it. Hover and click the pin icon to add it to your tab bar.
           </p>
         </div>

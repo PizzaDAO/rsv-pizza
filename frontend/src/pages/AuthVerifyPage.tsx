@@ -155,8 +155,8 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Mail className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Enter Your Code</h1>
-            <p className="text-white/60 mb-6">We sent a 6-digit code to your email</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Enter Your Code</h1>
+            <p className="text-theme-text-secondary mb-6">We sent a 6-digit code to your email</p>
 
             <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
               {code.map((digit, index) => (
@@ -169,13 +169,13 @@ export function AuthVerifyPage() {
                   value={digit}
                   onChange={(e) => handleCodeChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
+                  className="w-12 h-14 text-center text-2xl font-bold bg-theme-surface border border-theme-stroke-hover rounded-lg text-theme-text focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
                   autoFocus={index === 0}
                 />
               ))}
             </div>
 
-            <p className="text-white/40 text-sm">
+            <p className="text-theme-text-muted text-sm">
               Didn't receive a code?{' '}
               <button
                 onClick={() => navigate('/login')}
@@ -190,8 +190,8 @@ export function AuthVerifyPage() {
         {status === 'verifying' && (
           <>
             <Loader2 className="w-16 h-16 animate-spin text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">Verifying...</h1>
-            <p className="text-white/60">Please wait while we sign you in</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Verifying...</h1>
+            <p className="text-theme-text-secondary">Please wait while we sign you in</p>
           </>
         )}
 
@@ -200,8 +200,8 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <User className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Complete Your Profile</h1>
-            <p className="text-white/60 mb-6">What should we call you?</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Complete Your Profile</h1>
+            <p className="text-theme-text-secondary mb-6">What should we call you?</p>
             <div className="mb-4">
               <IconInput
                 ref={nameInputRef}
@@ -233,16 +233,16 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
               <Check className="w-8 h-8 text-[#39d98a]" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Welcome back!</h1>
-            <p className="text-white/60">Redirecting you to the app...</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Welcome back!</h1>
+            <p className="text-theme-text-secondary">Redirecting you to the app...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
-            <p className="text-white/60 mb-6">{error}</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Verification Failed</h1>
+            <p className="text-theme-text-secondary mb-6">{error}</p>
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleEnterNewCode}

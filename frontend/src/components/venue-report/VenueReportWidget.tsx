@@ -100,7 +100,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+        <Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" />
       </div>
     );
   }
@@ -108,8 +108,8 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
   if (!report) {
     return (
       <div className="card p-8 text-center">
-        <Building2 size={32} className="mx-auto mb-3 text-white/20" />
-        <p className="text-white/60">No venues added yet. Add venues first to create a venue report.</p>
+        <Building2 size={32} className="mx-auto mb-3 text-theme-text-faint" />
+        <p className="text-theme-text-secondary">No venues added yet. Add venues first to create a venue report.</p>
       </div>
     );
   }
@@ -118,14 +118,14 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
             <Building2 size={20} className="text-[#ff393a]" />
             Venue Report Preview
           </h2>
           <button
             type="button"
             onClick={() => setShowPreview(false)}
-            className="text-sm text-white/50 hover:text-white"
+            className="text-sm text-theme-text-muted hover:text-theme-text"
           >
             Back to Edit
           </button>
@@ -139,15 +139,15 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
           <Building2 size={20} className="text-[#ff393a]" />
           Venue Report
-          {saving && <Loader2 size={14} className="animate-spin text-white/40" />}
+          {saving && <Loader2 size={14} className="animate-spin text-theme-text-muted" />}
         </h2>
         <button
           type="button"
           onClick={() => setShowPreview(true)}
-          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white"
+          className="flex items-center gap-1.5 text-sm text-theme-text-muted hover:text-theme-text"
         >
           <Eye size={14} />
           Preview
@@ -177,7 +177,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
 
       {/* Venue Summary */}
       <div className="space-y-2">
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-theme-text-muted">
           {report.venues.length} venue{report.venues.length !== 1 ? 's' : ''} included
           {report.venues.filter(v => v.photos && v.photos.length > 0).length > 0 &&
             ` (${report.venues.reduce((sum, v) => sum + (v.photos?.length || 0), 0)} photos)`
@@ -185,7 +185,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
         </p>
         <div className="space-y-1">
           {report.venues.map(venue => (
-            <div key={venue.id} className="flex items-center gap-2 text-sm text-white/60">
+            <div key={venue.id} className="flex items-center gap-2 text-sm text-theme-text-secondary">
               <span className={venue.isSelected ? 'text-[#ff393a] font-medium' : ''}>
                 {venue.name}
               </span>
@@ -195,7 +195,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
                 </span>
               )}
               {venue.photos && venue.photos.length > 0 && (
-                <span className="text-[10px] text-white/30">
+                <span className="text-[10px] text-theme-text-faint">
                   {venue.photos.length} photo{venue.photos.length !== 1 ? 's' : ''}
                 </span>
               )}
@@ -205,8 +205,8 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
       </div>
 
       {/* Publish Section */}
-      <div className="border-t border-white/10 pt-4 space-y-4">
-        <h3 className="text-sm font-medium text-white/60">Sharing</h3>
+      <div className="border-t border-theme-stroke pt-4 space-y-4">
+        <h3 className="text-sm font-medium text-theme-text-secondary">Sharing</h3>
 
         {/* Password option */}
         <Checkbox
@@ -260,7 +260,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
                 type="button"
                 onClick={handleUnpublish}
                 disabled={publishing}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm"
+                className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium px-4 py-2 rounded-lg transition-colors text-sm"
               >
                 <EyeOff size={14} />
                 Unpublish
@@ -271,9 +271,9 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
 
         {/* Published link */}
         {report.published && report.slug && (
-          <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center gap-3">
-            <Link2 size={14} className="text-white/40 flex-shrink-0" />
-            <span className="text-sm text-white/60 truncate flex-1">
+          <div className="bg-theme-surface border border-theme-stroke rounded-lg p-3 flex items-center gap-3">
+            <Link2 size={14} className="text-theme-text-muted flex-shrink-0" />
+            <span className="text-sm text-theme-text-secondary truncate flex-1">
               {window.location.origin}/venue-report/{report.slug}
             </span>
             <button

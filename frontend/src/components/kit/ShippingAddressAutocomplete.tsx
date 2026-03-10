@@ -195,7 +195,7 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
 
   return (
     <div className="relative">
-      <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10" />
+      <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none z-10" />
       <input
         ref={inputRef}
         type="text"
@@ -203,7 +203,7 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50 !pl-9 ${className}`}
+        className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50 !pl-9 ${className}`}
       />
     </div>
   );

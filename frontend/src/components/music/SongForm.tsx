@@ -127,20 +127,20 @@ export const SongForm: React.FC<SongFormProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5"
+        className="bg-theme-header border border-theme-stroke rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Music size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-theme-text">
               {isEditing ? 'Edit Song' : 'Add Song'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -159,7 +159,7 @@ export const SongForm: React.FC<SongFormProps> = ({
             {formData.url && formData.platform !== 'other' && (
               <div className="flex items-center gap-1.5 mt-1.5 ml-1">
                 <PlatformIcon platform={formData.platform} size={14} />
-                <span className="text-xs text-white/50">{platformLabels[formData.platform]} detected</span>
+                <span className="text-xs text-theme-text-muted">{platformLabels[formData.platform]} detected</span>
               </div>
             )}
           </div>
@@ -175,7 +175,7 @@ export const SongForm: React.FC<SongFormProps> = ({
                 ? 'border-[#ff393a] bg-[#ff393a]/10'
                 : formData.file
                   ? 'border-green-500/30 bg-green-500/5'
-                  : 'border-white/10 hover:border-white/20'
+                  : 'border-theme-stroke hover:border-theme-stroke-hover'
             }`}
           >
             <input
@@ -191,7 +191,7 @@ export const SongForm: React.FC<SongFormProps> = ({
                 <span className="text-sm truncate max-w-[300px]">{formData.file.name}</span>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1 text-white/40">
+              <div className="flex flex-col items-center gap-1 text-theme-text-muted">
                 <Upload size={20} />
                 <span className="text-sm">Upload audio file or drag &amp; drop</span>
                 <span className="text-xs">.mp3, .wav, .m4a, .ogg, .flac</span>
@@ -205,7 +205,7 @@ export const SongForm: React.FC<SongFormProps> = ({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>

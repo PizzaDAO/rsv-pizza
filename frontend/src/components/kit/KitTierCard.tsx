@@ -37,34 +37,34 @@ export const KitTierCard: React.FC<KitTierCardProps> = ({
         w-full text-left p-4 rounded-xl border-2 transition-all
         ${selected
           ? 'border-[#ff393a] bg-[#ff393a]/10'
-          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-hover hover:bg-theme-surface-hover'
         }
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className={`p-2 rounded-lg ${selected ? 'bg-[#ff393a]/20 text-[#ff393a]' : 'bg-white/10 text-white/60'}`}>
+        <div className={`p-2 rounded-lg ${selected ? 'bg-[#ff393a]/20 text-[#ff393a]' : 'bg-theme-surface-hover text-theme-text-secondary'}`}>
           {getIcon()}
         </div>
         {selected && (
           <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#ff393a]">
-            <Check size={14} className="text-white" />
+            <Check size={14} className="text-theme-text" />
           </div>
         )}
       </div>
 
-      <h3 className={`font-semibold mb-1 ${selected ? 'text-white' : 'text-white/80'}`}>
+      <h3 className={`font-semibold mb-1 ${selected ? 'text-theme-text' : 'text-theme-text'}`}>
         {tier.name}
       </h3>
-      <p className="text-sm text-white/50 mb-3">
+      <p className="text-sm text-theme-text-muted mb-3">
         {tier.description}
       </p>
 
       <div className="space-y-1.5">
         {tier.contents.map((item, index) => (
           <div key={index} className="flex items-center gap-2 text-sm">
-            <Check size={14} className={selected ? 'text-[#ff393a]' : 'text-white/40'} />
-            <span className={selected ? 'text-white/90' : 'text-white/60'}>{item}</span>
+            <Check size={14} className={selected ? 'text-[#ff393a]' : 'text-theme-text-muted'} />
+            <span className={selected ? 'text-theme-text' : 'text-theme-text-secondary'}>{item}</span>
           </div>
         ))}
       </div>

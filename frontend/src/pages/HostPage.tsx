@@ -154,8 +154,8 @@ function HostPageContent() {
         <div className="min-h-[60vh] flex items-center justify-center p-4">
           <div className="card p-8 max-w-md text-center">
             <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">Party Not Found</h1>
-            <p className="text-white/60 mb-6">{error || 'Unable to load party.'}</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
+            <p className="text-theme-text-secondary mb-6">{error || 'Unable to load party.'}</p>
             <button onClick={() => navigate('/')} className="btn-primary">
               Go to Home
             </button>
@@ -197,7 +197,7 @@ function HostPageContent() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
 
-        <div className="host-tabs border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
+        <div className="host-tabs border-b border-theme-stroke mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -205,14 +205,14 @@ function HostPageContent() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${activeTab === tab.id
-                    ? 'text-white'
-                    : 'text-white/40 hover:text-white/60'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
                   }`}
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-text" />
                 )}
               </button>
             );
@@ -235,11 +235,11 @@ function HostPageContent() {
 
               {activeTab === 'pizza' && (
                 <>
-                  <div className="card p-4 bg-[#1a1a2e] border-white/10">
+                  <div className="card p-4 bg-theme-header border-theme-stroke">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <span className="text-sm font-medium text-white">Expected Guests</span>
-                        <p className="text-xs text-white/50 mt-0.5">Adjust for non-respondents</p>
+                        <span className="text-sm font-medium text-theme-text">Expected Guests</span>
+                        <p className="text-xs text-theme-text-muted mt-0.5">Adjust for non-respondents</p>
                       </div>
                       <input
                         type="number"
@@ -249,7 +249,7 @@ function HostPageContent() {
                           const value = e.target.value ? parseInt(e.target.value, 10) : null;
                           setOrderExpectedGuests(value);
                         }}
-                        className="w-20 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+                        className="w-20 bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-center focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
                       />
                     </div>
 
@@ -281,10 +281,10 @@ function HostPageContent() {
                               className="absolute top-0 flex flex-col items-center"
                               style={{ left: `${rsvpsPercent}%`, transform: 'translateX(-50%)' }}
                             >
-                              <span className="text-[10px] text-white/60 font-medium whitespace-nowrap">
+                              <span className="text-[10px] text-theme-text-secondary font-medium whitespace-nowrap">
                                 {guests.length} RSVPs
                               </span>
-                              <div className="w-0.5 h-2 bg-white/30 mt-0.5" />
+                              <div className="w-0.5 h-2 bg-theme-surface-hover mt-0.5" />
                             </div>
                           )}
 
@@ -294,15 +294,15 @@ function HostPageContent() {
                             max={maxValue}
                             value={currentValue}
                             onChange={(e) => setOrderExpectedGuests(parseInt(e.target.value, 10))}
-                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#ff393a]"
+                            className="w-full h-2 bg-theme-surface-hover rounded-lg appearance-none cursor-pointer accent-[#ff393a]"
                             style={{
                               background: `linear-gradient(to right, #ff393a 0%, #ff393a ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) ${((currentValue - minValue) / (maxValue - minValue)) * 100}%, rgba(255,255,255,0.1) 100%)`
                             }}
                           />
 
                           <div className="flex justify-between mt-1">
-                            <span className="text-[10px] text-white/40">{minValue}</span>
-                            <span className="text-[10px] text-white/40">{maxValue}</span>
+                            <span className="text-[10px] text-theme-text-muted">{minValue}</span>
+                            <span className="text-[10px] text-theme-text-muted">{maxValue}</span>
                           </div>
                         </div>
                       );
@@ -357,7 +357,7 @@ function HostPageContent() {
                     label="Require Photo Approval"
                   />
                   {photoModerationEnabled && (
-                    <p className="text-xs text-white/40 -mt-2 ml-8">
+                    <p className="text-xs text-theme-text-muted -mt-2 ml-8">
                       Guest photos must be approved by a host before appearing in the gallery.
                     </p>
                   )}
@@ -406,8 +406,8 @@ function HostPageContent() {
               {activeTab === 'gpp' && party && (
                 <div className="space-y-4">
                   <div className="mb-4">
-                    <h2 className="text-xl font-semibold text-white">Global Pizza Party</h2>
-                    <p className="text-white/60 text-sm mt-1">
+                    <h2 className="text-xl font-semibold text-theme-text">Global Pizza Party</h2>
+                    <p className="text-theme-text-secondary text-sm mt-1">
                       Request party kits and access GPP-specific features for your event.
                     </p>
                   </div>

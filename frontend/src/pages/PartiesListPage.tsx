@@ -40,7 +40,7 @@ export const PartiesListPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center py-16">
-          <div className="text-white/60">Loading parties...</div>
+          <div className="text-theme-text-secondary">Loading parties...</div>
         </div>
       </Layout>
     );
@@ -51,7 +51,7 @@ export const PartiesListPage: React.FC = () => {
       <div className="py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-theme-text flex items-center gap-2">
               <PartyPopper className="text-[#ff393a]" />
               All Parties
             </h1>
@@ -65,7 +65,7 @@ export const PartiesListPage: React.FC = () => {
 
           {parties.length === 0 ? (
             <div className="card p-8 text-center">
-              <p className="text-white/60">No parties found.</p>
+              <p className="text-theme-text-secondary">No parties found.</p>
               <Link to="/" className="text-[#ff393a] hover:underline mt-2 inline-block">
                 Create your first party
               </Link>
@@ -76,12 +76,12 @@ export const PartiesListPage: React.FC = () => {
                 <Link
                   key={party.id}
                   to={`/host/${party.invite_code}`}
-                  className="block card p-4 hover:bg-white/[0.07] transition-all group"
+                  className="block card p-4 hover:bg-theme-surface-hover transition-all group"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-lg font-semibold text-white truncate">
+                        <h2 className="text-lg font-semibold text-theme-text truncate">
                           {party.name}
                         </h2>
                         {party.rsvp_closed_at && (
@@ -90,7 +90,7 @@ export const PartiesListPage: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-white/60">
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-theme-text-secondary">
                         {party.host_name && (
                           <span>Host: {party.host_name}</span>
                         )}
@@ -113,13 +113,13 @@ export const PartiesListPage: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-white/40 mt-1">
+                      <div className="text-xs text-theme-text-muted mt-1">
                         Created: {formatCreatedAt(party.created_at)} | Code: {party.invite_code}
                       </div>
                     </div>
                     <ChevronRight
                       size={20}
-                      className="text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0 ml-2"
+                      className="text-theme-text-faint group-hover:text-theme-text-secondary transition-colors flex-shrink-0 ml-2"
                     />
                   </div>
                 </Link>

@@ -72,14 +72,14 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50" onClick={onClose}>
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-theme-text">
             {item ? 'Edit Expense' : 'Add Expense'}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
           >
             <X size={20} />
           </button>
@@ -88,7 +88,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-1">
+            <label className="block text-sm font-medium text-theme-text mb-1">
               Description *
             </label>
             <input
@@ -96,7 +96,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Pizza from Joe's"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               autoFocus
             />
           </div>
@@ -104,27 +104,27 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
           {/* Category and Cost */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">
+              <label className="block text-sm font-medium text-theme-text mb-1">
                 Category
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as BudgetCategory)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               >
                 {BUDGET_CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id} className="bg-[#1a1a2e]">
+                  <option key={cat.id} value={cat.id} className="bg-theme-header">
                     {cat.label}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">
+              <label className="block text-sm font-medium text-theme-text mb-1">
                 Cost *
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted">$</span>
                 <input
                   type="number"
                   step="0.01"
@@ -132,7 +132,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                   value={cost}
                   onChange={(e) => setCost(e.target.value)}
                   placeholder="0.00"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-7 pr-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
             </div>
@@ -140,7 +140,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-1">
+            <label className="block text-sm font-medium text-theme-text mb-1">
               Status
             </label>
             <div className="flex gap-2">
@@ -150,7 +150,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   status === 'pending'
                     ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                    : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
+                    : 'bg-theme-surface text-theme-text-secondary border border-theme-stroke hover:bg-theme-surface-hover'
                 }`}
               >
                 Pending
@@ -161,7 +161,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   status === 'paid'
                     ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
+                    : 'bg-theme-surface text-theme-text-secondary border border-theme-stroke hover:bg-theme-surface-hover'
                 }`}
               >
                 Paid
@@ -171,7 +171,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
           {/* Point Person */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-1">
+            <label className="block text-sm font-medium text-theme-text mb-1">
               Point Person
             </label>
             <input
@@ -179,13 +179,13 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               value={pointPerson}
               onChange={(e) => setPointPerson(e.target.value)}
               placeholder="Who's handling this?"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
             />
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-1">
+            <label className="block text-sm font-medium text-theme-text mb-1">
               Notes
             </label>
             <textarea
@@ -193,13 +193,13 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional details..."
               rows={2}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
             />
           </div>
 
           {/* Receipt URL */}
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-1">
+            <label className="block text-sm font-medium text-theme-text mb-1">
               Receipt URL
             </label>
             <input
@@ -207,7 +207,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               value={receiptUrl}
               onChange={(e) => setReceiptUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
             />
           </div>
 
@@ -222,7 +222,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>

@@ -124,8 +124,8 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
         <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <Check size={32} className="text-[#39d98a]" />
         </div>
-        <h3 className="text-lg font-medium text-white mb-2">Payment Method Saved!</h3>
-        <p className="text-white/60 text-sm">Your card is securely stored for future orders.</p>
+        <h3 className="text-lg font-medium text-theme-text mb-2">Payment Method Saved!</h3>
+        <p className="text-theme-text-secondary text-sm">Your card is securely stored for future orders.</p>
       </div>
     );
   }
@@ -133,14 +133,14 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-white/80 mb-2">
+        <label className="block text-sm font-medium text-theme-text mb-2">
           <CreditCard size={14} className="inline mr-1" />
           Card Information
         </label>
-        <div className="p-4 bg-white/5 rounded-xl border border-white/20 focus-within:border-[#ff393a]/50 transition-colors">
+        <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke-hover focus-within:border-[#ff393a]/50 transition-colors">
           <CardElement options={cardElementOptions} />
         </div>
-        <p className="mt-2 text-xs text-white/40 flex items-center gap-1">
+        <p className="mt-2 text-xs text-theme-text-muted flex items-center gap-1">
           <Lock size={12} />
           Your card is securely stored by Stripe. We never see your full card number.
         </p>
@@ -203,7 +203,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = (props) => {
   if (!stripePromise) {
     return (
       <div className="text-center py-8">
-        <p className="text-white/60">
+        <p className="text-theme-text-secondary">
           Payment is not configured. Please set up Stripe to enable payments.
         </p>
       </div>
@@ -213,8 +213,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = (props) => {
   if (!stripeReady) {
     return (
       <div className="text-center py-8">
-        <Loader2 size={24} className="animate-spin mx-auto text-white/50" />
-        <p className="text-white/60 mt-2">Loading payment form...</p>
+        <Loader2 size={24} className="animate-spin mx-auto text-theme-text-muted" />
+        <p className="text-theme-text-secondary mt-2">Loading payment form...</p>
       </div>
     );
   }
