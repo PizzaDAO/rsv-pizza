@@ -316,11 +316,13 @@ body.modal-open {
   animation: confetti-fall ease-out forwards;
 }
 
-/* ─── GPP Light Theme ─── */
-/* Applied via .gpp-theme class on page wrapper */
-.gpp-theme, .gpp-theme * {
+/* Pizza cursor sitewide */
+*, *::before, *::after {
   cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='24' transform='rotate(180 16 16)'>🍕</text></svg>") 4 4, auto;
 }
+
+/* ─── GPP Light Theme ─── */
+/* Applied via .gpp-theme class on page wrapper */
 .gpp-theme {
   --bg-main: #B6E4F7;
   --bg-card: rgba(255, 255, 255, 0.92);
