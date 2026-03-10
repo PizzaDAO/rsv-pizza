@@ -180,7 +180,7 @@ export const HostsList: React.FC<HostsListProps> = ({
               />
             ) : coHost.name === 'PizzaDAO' ? (
               <img
-                src="/pizzadao-logo.svg"
+                src="/pizzadao-avatar.jpg"
                 alt="PizzaDAO"
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
               />
@@ -283,7 +283,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
               />
             ) : coHost.name === 'PizzaDAO' ? (
               <img
-                src="/pizzadao-logo.svg"
+                src="/pizzadao-avatar.jpg"
                 alt="PizzaDAO"
                 className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
               />
