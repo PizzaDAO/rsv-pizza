@@ -488,6 +488,7 @@ body.modal-open {
   border-radius: 8px 8px 0 0;
   padding: 8px 14px 12px !important;
 }
+.gpp-theme .host-tabs .text-white > span { color: #1a1a1a !important; }
 .gpp-theme .host-tabs button > .bg-white { background: #E52828 !important; }
 
 /* Red buttons keep white text */
