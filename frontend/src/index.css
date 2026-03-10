@@ -519,3 +519,15 @@ body.modal-open {
   border-bottom-right-radius: 18px;
   overflow: hidden;
 }
+
+/* Drifting animation for decorative pizza vectors */
+@keyframes drift-right {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(50px); }
+  100% { transform: translateX(0); }
+}
+@keyframes drift-left {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-50px); }
+  100% { transform: translateX(0); }
+}

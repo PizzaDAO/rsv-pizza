@@ -169,13 +169,21 @@ export function AdminPage() {
   }
 
   return (
-    <Layout className="gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
-      <div className="min-h-screen">
+    <Layout className="gpp-theme relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      {/* Floating deco */}
+      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '40%', left: '2%', width: 100, opacity: 0.4, animation: 'drift-right 16s ease-in-out infinite' }} />
+      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '60%', right: '1%', width: 120, opacity: 0.4, animation: 'drift-left 13s ease-in-out infinite' }} />
+      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '80%', left: '4%', width: 90, opacity: 0.35, animation: 'drift-right 11s ease-in-out infinite' }} />
+
+      <div className="min-h-screen relative z-10">
         <Helmet>
           <title>Admin | RSV.Pizza</title>
         </Helmet>
 
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+          <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
               <ShieldCheck size={20} className="text-red-500" />
@@ -426,6 +434,7 @@ export function AdminPage() {
               </table>
             </div>
           </section>
+          </div>
         </main>
       </div>
     </Layout>
