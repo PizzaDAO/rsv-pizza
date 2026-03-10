@@ -25,7 +25,8 @@ export function UnderbossDashboard() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
-  const [addUbForm, setAddUbForm] = useState({ name: '', email: '', region: '' as string });
+  const [addUbForm, setAddUbForm] = useState({ name: '', email: '' });
+  const [newUbRegions, setNewUbRegions] = useState<string[]>([]);
   const [addUbLoading, setAddUbLoading] = useState(false);
   const [addUbError, setAddUbError] = useState<string | null>(null);
   const [addUbSuccess, setAddUbSuccess] = useState(false);
@@ -76,13 +77,22 @@ export function UnderbossDashboard() {
             navigate(`/underboss/${targetRegion}`, { replace: true });
           }
           loadDashboard(targetRegion);
-        } else if (me.isUnderboss && me.region) {
+        } else if (me.isUnderboss) {
           setIsAdmin(false);
-          // Underboss: auto-redirect to their region
-          if (!region || region !== me.region) {
-            navigate(`/underboss/${me.region}`, { replace: true });
+          // Determine assigned regions (fall back to [region] for legacy)
+          const assignedRegions = (me.regions && me.regions.length > 0) ? me.regions : (me.region ? [me.region] : []);
+          if (assignedRegions.length === 0) {
+            setLoading(false);
+            setError('You are not authorized to access the underboss dashboard.');
+            return;
           }
-          loadDashboard(me.region);
+          // If no region param or current region is not in assigned regions, redirect to first assigned region
+          if (!region || !assignedRegions.includes(region)) {
+            navigate(`/underboss/${assignedRegions[0]}`, { replace: true });
+            loadDashboard(assignedRegions[0]);
+          } else {
+            loadDashboard(region);
+          }
         } else {
           // Not authorized
           setLoading(false);
@@ -175,57 +185,74 @@ export function UnderbossDashboard() {
               <Globe size={20} className="text-red-500" />
             </div>
             <div>
-              {/* Region title with switcher for admins */}
-              {isAdmin ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-                    className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
-                  >
-                    {regionLabel}
-                    <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {regionDropdownOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setRegionDropdownOpen(false)}
-                      />
-                      <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[220px]">
-                        {/* All Regions option for admins */}
-                        <button
-                          key="all"
-                          onClick={() => handleRegionSwitch('all')}
-                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                            region === 'all'
-                              ? 'bg-red-500/20 text-red-500 font-medium'
-                              : 'text-white/70 hover:bg-white/5 hover:text-white'
-                          }`}
-                        >
-                          All Regions
-                        </button>
-                        {/* Divider */}
-                        <div className="border-b border-white/10 my-1" />
-                        {GPP_REGIONS.map((r) => (
-                          <button
-                            key={r.id}
-                            onClick={() => handleRegionSwitch(r.id)}
-                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                              r.id === region
-                                ? 'bg-red-500/20 text-red-500 font-medium'
-                                : 'text-white/70 hover:bg-white/5 hover:text-white'
-                            }`}
-                          >
-                            {r.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <h1 className="text-2xl font-bold text-white">{regionLabel}</h1>
-              )}
+              {/* Region title with switcher for admins and multi-region underbosses */}
+              {(() => {
+                const assignedRegions = meData?.regions && meData.regions.length > 0
+                  ? meData.regions
+                  : (meData?.region ? [meData.region] : []);
+                const showSwitcher = isAdmin || assignedRegions.length > 1;
+
+                if (showSwitcher) {
+                  const filteredRegions = isAdmin
+                    ? GPP_REGIONS
+                    : GPP_REGIONS.filter(r => assignedRegions.includes(r.id));
+
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                        className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
+                      >
+                        {regionLabel}
+                        <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {regionDropdownOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setRegionDropdownOpen(false)}
+                          />
+                          <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[220px]">
+                            {/* All Regions option for admins */}
+                            {isAdmin && (
+                              <>
+                                <button
+                                  key="all"
+                                  onClick={() => handleRegionSwitch('all')}
+                                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                                    region === 'all'
+                                      ? 'bg-red-500/20 text-red-500 font-medium'
+                                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                  }`}
+                                >
+                                  All Regions
+                                </button>
+                                {/* Divider */}
+                                <div className="border-b border-white/10 my-1" />
+                              </>
+                            )}
+                            {filteredRegions.map((r) => (
+                              <button
+                                key={r.id}
+                                onClick={() => handleRegionSwitch(r.id)}
+                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                                  r.id === region
+                                    ? 'bg-red-500/20 text-red-500 font-medium'
+                                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                }`}
+                              >
+                                {r.label}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                } else {
+                  return <h1 className="text-2xl font-bold text-white">{regionLabel}</h1>;
+                }
+              })()}
               <p className="text-sm text-white/40">
                 Global Pizza Party &middot; Underboss Dashboard
               </p>
@@ -283,7 +310,7 @@ export function UnderbossDashboard() {
               <div className="text-center py-6">
                 <p className="text-green-400 font-medium mb-2">Underboss created!</p>
                 <button
-                  onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '', region: '' }); }}
+                  onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); }}
                   className="text-sm text-white/50 hover:text-white/70"
                 >
                   Close
@@ -292,10 +319,11 @@ export function UnderbossDashboard() {
             ) : (
               <form onSubmit={async (e) => {
                 e.preventDefault();
+                if (newUbRegions.length === 0) return;
                 setAddUbLoading(true);
                 setAddUbError(null);
                 try {
-                  await createUnderboss(addUbForm);
+                  await createUnderboss({ ...addUbForm, regions: newUbRegions });
                   setAddUbSuccess(true);
                 } catch (err: any) {
                   setAddUbError(err.message || 'Failed to create underboss');
@@ -324,22 +352,31 @@ export function UnderbossDashboard() {
                   />
                 </div>
                 <div>
-                  <select
-                    value={addUbForm.region}
-                    onChange={(e) => setAddUbForm({ ...addUbForm, region: e.target.value })}
-                    required
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/20"
-                  >
-                    <option value="">Select Region</option>
-                    {GPP_REGIONS.map((r) => (
-                      <option key={r.id} value={r.id}>{r.label}</option>
+                  <p className="text-sm text-white/60 mb-2">Regions</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {GPP_REGIONS.map(r => (
+                      <label key={r.id} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newUbRegions.includes(r.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewUbRegions(prev => [...prev, r.id]);
+                            } else {
+                              setNewUbRegions(prev => prev.filter(id => id !== r.id));
+                            }
+                          }}
+                          className="rounded border-white/20 bg-white/5"
+                        />
+                        {r.label}
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 {addUbError && <p className="text-sm text-red-400">{addUbError}</p>}
                 <button
                   type="submit"
-                  disabled={addUbLoading}
+                  disabled={addUbLoading || newUbRegions.length === 0}
                   className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   {addUbLoading ? 'Creating...' : 'Create Underboss'}

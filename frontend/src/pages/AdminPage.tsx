@@ -31,7 +31,7 @@ export function AdminPage() {
   const [underbosses, setUnderbosses] = useState<UnderbossAdmin[]>([]);
   const [ubName, setUbName] = useState('');
   const [ubEmail, setUbEmail] = useState('');
-  const [ubRegion, setUbRegion] = useState('');
+  const [ubRegions, setUbRegions] = useState<string[]>([]);
   const [addingUb, setAddingUb] = useState(false);
   const [ubMessage, setUbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -110,19 +110,19 @@ export function AdminPage() {
 
   async function handleAddUnderboss(e: React.FormEvent) {
     e.preventDefault();
-    if (!ubName.trim() || !ubEmail.trim() || !ubRegion) return;
+    if (!ubName.trim() || !ubEmail.trim() || ubRegions.length === 0) return;
     setAddingUb(true);
     setUbMessage(null);
     try {
       const result = await createUnderboss({
         name: ubName.trim(),
         email: ubEmail.trim(),
-        region: ubRegion,
+        regions: ubRegions,
       });
       setUnderbosses((prev) => [...prev, result.underboss]);
       setUbName('');
       setUbEmail('');
-      setUbRegion('');
+      setUbRegions([]);
       setUbMessage({ type: 'success', text: `Created underboss ${result.underboss.name}. They can now log in at /underboss.` });
     } catch (err: any) {
       setUbMessage({ type: 'error', text: err.message || 'Failed to create underboss' });
@@ -316,7 +316,7 @@ export function AdminPage() {
             )}
 
             <form onSubmit={handleAddUnderboss} className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 mb-3">
                 <div className="flex-1">
                   <IconInput
                     icon={User}
@@ -337,26 +337,37 @@ export function AdminPage() {
                     required
                   />
                 </div>
-                <select
-                  value={ubRegion}
-                  onChange={(e) => setUbRegion(e.target.value)}
-                  required
-                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                >
-                  <option value="" disabled>Region</option>
-                  {GPP_REGIONS.map((r) => (
-                    <option key={r.id} value={r.id}>{r.label}</option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  disabled={addingUb || !ubName.trim() || !ubEmail.trim() || !ubRegion}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
-                >
-                  {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  Add Underboss
-                </button>
               </div>
+              <div className="mb-3">
+                <p className="text-sm text-white/60 mb-2">Regions</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {GPP_REGIONS.map(r => (
+                    <label key={r.id} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ubRegions.includes(r.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setUbRegions(prev => [...prev, r.id]);
+                          } else {
+                            setUbRegions(prev => prev.filter(id => id !== r.id));
+                          }
+                        }}
+                        className="rounded border-white/20 bg-white/5"
+                      />
+                      {r.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={addingUb || !ubName.trim() || !ubEmail.trim() || ubRegions.length === 0}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                Add Underboss
+              </button>
             </form>
 
             <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
@@ -365,7 +376,7 @@ export function AdminPage() {
                   <tr className="border-b border-white/10 text-white/40 text-left">
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Region</th>
+                    <th className="px-4 py-3 font-medium">Regions</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
@@ -376,7 +387,7 @@ export function AdminPage() {
                       <td className="px-4 py-3 text-white/80">{ub.name}</td>
                       <td className="px-4 py-3 text-white/60">{ub.email}</td>
                       <td className="px-4 py-3 text-white/60">
-                        {GPP_REGIONS.find((r) => r.id === ub.region)?.label || ub.region}
+                        {(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}
                       </td>
                       <td className="px-4 py-3">
                         <span

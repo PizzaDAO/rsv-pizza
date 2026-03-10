@@ -2124,7 +2124,7 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; region: string; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+export async function createUnderboss(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
@@ -2144,6 +2144,7 @@ export interface UnderbossMeResponse {
   isAdmin: boolean;
   isUnderboss: boolean;
   region: string | null;
+  regions: string[];
   name: string | null;
   email: string;
 }

@@ -969,6 +969,7 @@ model Underboss {
   name        String
   email       String
   region      String
+  regions     String[] @default([])
   accessToken String   @unique @map("access_token")
   isActive    Boolean  @default(true) @map("is_active")
   notes       String?
