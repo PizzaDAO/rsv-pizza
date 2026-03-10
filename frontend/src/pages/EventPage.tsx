@@ -565,7 +565,7 @@ export function EventPage() {
 
               {/* Host Button - Desktop */}
               {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                <div className="p-4 bg-[#39d98a]/10 border-t border-white/10">
+                <div className="p-4 border-t border-white/10">
                   <button
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -669,7 +669,7 @@ export function EventPage() {
 
                 {/* Host Button - Mobile */}
                 {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
-                  <div className="p-4 bg-[#39d98a]/10 border-b border-white/10">
+                  <div className="p-4 border-b border-white/10">
                     <button
                       onClick={handleEditEvent}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
