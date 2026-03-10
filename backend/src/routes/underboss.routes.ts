@@ -11,8 +11,14 @@ interface UnderbossRequest extends AuthRequest {
     name: string;
     email: string;
     region: string;
+    regions: string[];
     isActive: boolean;
   };
+}
+
+function isAuthorizedForRegion(underboss: { regions: string[] }, region: string): boolean {
+  if (underboss.regions.includes('__admin__')) return true;
+  return underboss.regions.includes(region);
 }
 
 // Login-based underboss middleware — requires JWT auth, then looks up underboss by email
@@ -34,6 +40,7 @@ async function requireUnderbossAuth(
         name: 'Admin',
         email,
         region: '__admin__', // Special marker — admin can view any region
+        regions: ['__admin__'],
         isActive: true,
       };
       return next();
@@ -42,14 +49,25 @@ async function requireUnderbossAuth(
     // Look up underboss by email
     const underboss = await prisma.underboss.findFirst({
       where: { email: email.toLowerCase(), isActive: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        region: true,
+        regions: true,
+        isActive: true,
+      },
     });
 
     if (underboss) {
+      // Fall back to [region] if regions array is empty (legacy data)
+      const regions = underboss.regions.length > 0 ? underboss.regions : [underboss.region];
       req.underboss = {
         id: underboss.id,
         name: underboss.name,
         email: underboss.email,
         region: underboss.region,
+        regions,
         isActive: underboss.isActive,
       };
       return next();
@@ -173,6 +191,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
         isAdmin: true,
         isUnderboss: false,
         region: null,
+        regions: ['__admin__'],
         name: 'Admin',
         email,
       });
@@ -184,10 +203,13 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
     });
 
     if (underboss) {
+      // Fall back to [region] if regions array is empty (legacy data)
+      const regions = underboss.regions.length > 0 ? underboss.regions : [underboss.region];
       return res.json({
         isAdmin: false,
         isUnderboss: true,
         region: underboss.region,
+        regions,
         name: underboss.name,
         email: underboss.email,
       });
@@ -198,6 +220,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       isAdmin: false,
       isUnderboss: false,
       region: null,
+      regions: [],
       name: null,
       email,
     });
@@ -213,12 +236,12 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
 
     // Handle "all" region — admin only
     if (region === 'all') {
-      if (req.underboss!.region !== '__admin__') {
+      if (!req.underboss!.regions.includes('__admin__')) {
         throw new AppError('Only admins can view all regions', 403, 'FORBIDDEN');
       }
     } else {
       // Verify the underboss is assigned to this region (admins can view any region)
-      if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
+      if (!isAuthorizedForRegion(req.underboss!, region)) {
         throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
       }
     }
@@ -263,7 +286,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     const limit = parseInt(req.query.limit as string) || 50;
     const skip = (page - 1) * limit;
 
-    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
+    if (!isAuthorizedForRegion(req.underboss!, region)) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -305,7 +328,7 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
   try {
     const { region, partyId } = req.params;
 
-    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
+    if (!isAuthorizedForRegion(req.underboss!, region)) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -357,7 +380,7 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
   try {
     const { region } = req.params;
 
-    if (req.underboss!.region !== '__admin__' && req.underboss!.region !== region) {
+    if (!isAuthorizedForRegion(req.underboss!, region)) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -391,10 +414,18 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    const { name, email, region, notes } = req.body;
+    const { name, email, region, regions: regionsInput, notes } = req.body;
 
-    if (!name || !email || !region) {
-      throw new AppError('Name, email, and region are required', 400, 'VALIDATION_ERROR');
+    // Accept regions array or legacy single region
+    let regions: string[] = [];
+    if (Array.isArray(regionsInput) && regionsInput.length > 0) {
+      regions = regionsInput;
+    } else if (region) {
+      regions = [region];
+    }
+
+    if (!name || !email || regions.length === 0) {
+      throw new AppError('Name, email, and at least one region are required', 400, 'VALIDATION_ERROR');
     }
 
     // Generate a placeholder token for the DB column (required by schema) but it's no longer used for auth
@@ -404,7 +435,8 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       data: {
         name,
         email: email.toLowerCase(),
-        region,
+        region: regions[0], // Deprecated field — set to first region
+        regions,
         accessToken: placeholderToken,
         notes: notes || null,
       },
@@ -416,6 +448,7 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
         name: underboss.name,
         email: underboss.email,
         region: underboss.region,
+        regions: underboss.regions,
         isActive: underboss.isActive,
         notes: underboss.notes,
         createdAt: underboss.createdAt,
@@ -440,6 +473,7 @@ router.get('/admin/list', requireAuth, async (req: AuthRequest, res: Response, n
         name: true,
         email: true,
         region: true,
+        regions: true,
         isActive: true,
         notes: true,
         createdAt: true,
@@ -461,22 +495,34 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
     }
 
     const { id } = req.params;
-    const { name, email, region, notes, isActive } = req.body;
+    const { name, email, region, regions, notes, isActive } = req.body;
+
+    const updateData: any = {
+      ...(name !== undefined && { name }),
+      ...(email !== undefined && { email }),
+      ...(region !== undefined && { region }),
+      ...(notes !== undefined && { notes: notes || null }),
+      ...(isActive !== undefined && { isActive }),
+    };
+
+    // Handle regions array update
+    if (Array.isArray(regions)) {
+      updateData.regions = regions;
+      // Also update deprecated region field to first region
+      if (regions.length > 0) {
+        updateData.region = regions[0];
+      }
+    }
 
     const underboss = await prisma.underboss.update({
       where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(email !== undefined && { email }),
-        ...(region !== undefined && { region }),
-        ...(notes !== undefined && { notes: notes || null }),
-        ...(isActive !== undefined && { isActive }),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,
         email: true,
         region: true,
+        regions: true,
         isActive: true,
         notes: true,
         createdAt: true,
@@ -520,7 +566,7 @@ router.patch('/admin/assign-region/:partyId', requireAuth, async (req: AuthReque
     const { partyId } = req.params;
     const { region } = req.body;
 
-    const validRegions = ['usa', 'canada', 'central-america', 'south-america', 'western-europe', 'eastern-europe', 'africa', 'india', 'china', 'middle-east', 'asia', 'oceania'];
+    const validRegions = ['usa', 'canada', 'central-america', 'south-america', 'western-europe', 'eastern-europe', 'west-africa', 'east-africa', 'south-africa', 'india', 'china', 'middle-east', 'asia', 'oceania'];
     if (region && !validRegions.includes(region)) {
       throw new AppError(`Invalid region. Must be one of: ${validRegions.join(', ')}`, 400, 'VALIDATION_ERROR');
     }

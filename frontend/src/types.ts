@@ -906,7 +906,7 @@ export interface ChecklistData {
 // Underboss Dashboard types
 // ============================================
 
-export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
+export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'west-africa' | 'east-africa' | 'south-africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
 
 export const GPP_REGIONS: { id: GPPRegion; label: string }[] = [
   { id: 'usa', label: 'USA' },
@@ -915,7 +915,9 @@ export const GPP_REGIONS: { id: GPPRegion; label: string }[] = [
   { id: 'south-america', label: 'South America' },
   { id: 'western-europe', label: 'Western Europe' },
   { id: 'eastern-europe', label: 'Eastern Europe' },
-  { id: 'africa', label: 'Africa' },
+  { id: 'west-africa', label: 'West Africa' },
+  { id: 'east-africa', label: 'East Africa' },
+  { id: 'south-africa', label: 'South Africa' },
   { id: 'india', label: 'India' },
   { id: 'china', label: 'China' },
   { id: 'middle-east', label: 'Middle East' },
@@ -993,6 +995,7 @@ export interface UnderbossAdmin {
   name: string;
   email: string;
   region: string;
+  regions: string[];
   isActive: boolean;
   notes: string | null;
   createdAt: string;

@@ -41,9 +41,17 @@ function countryCodeToRegion(countryCode: string): string | null {
   const middleEast = ['SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'IQ', 'IR', 'SY', 'JO', 'LB', 'IL', 'PS', 'EG'];
   if (middleEast.includes(cc)) return 'middle-east';
 
-  // Africa (excluding Egypt which is in Middle East)
-  const africa = ['ZA', 'NG', 'KE', 'GH', 'ET', 'TZ', 'UG', 'RW', 'SN', 'CI', 'CM', 'AO', 'MZ', 'MG', 'ZW', 'ZM', 'BW', 'NA', 'MW', 'ML', 'BF', 'NE', 'TD', 'GN', 'BJ', 'TG', 'SL', 'LR', 'MR', 'GA', 'CG', 'CD', 'DJ', 'ER', 'SO', 'SD', 'SS', 'CF', 'GQ', 'ST', 'KM', 'SC', 'MU', 'CV', 'GM', 'GW', 'LS', 'SZ', 'TN', 'DZ', 'MA', 'LY'];
-  if (africa.includes(cc)) return 'africa';
+  // West Africa
+  const westAfrica = ['NG', 'GH', 'SN', 'CI', 'CM', 'ML', 'BF', 'NE', 'TD', 'GN', 'BJ', 'TG', 'SL', 'LR', 'MR', 'GA', 'CG', 'CF', 'GQ', 'ST', 'CV', 'GM', 'GW'];
+  if (westAfrica.includes(cc)) return 'west-africa';
+
+  // East Africa (includes North African countries)
+  const eastAfrica = ['KE', 'ET', 'TZ', 'UG', 'RW', 'MZ', 'MG', 'MW', 'DJ', 'ER', 'SO', 'SD', 'SS', 'CD', 'KM', 'SC', 'MU', 'TN', 'DZ', 'MA', 'LY'];
+  if (eastAfrica.includes(cc)) return 'east-africa';
+
+  // South Africa
+  const southAfrica = ['ZA', 'AO', 'ZW', 'ZM', 'BW', 'NA', 'LS', 'SZ'];
+  if (southAfrica.includes(cc)) return 'south-africa';
 
   // Oceania
   const oceania = ['AU', 'NZ', 'FJ', 'PG', 'WS', 'TO', 'VU', 'SB', 'KI', 'FM', 'MH', 'PW', 'TV', 'NR', 'GU', 'NC', 'PF'];
