@@ -519,26 +519,26 @@ export function GPPLandingPage() {
       <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-bold text-center mb-3" style={{ color: C.darkText }}>
-            Find a Party Near You
+            Last Year's Global Pizza Party
           </h2>
           <p className="text-center text-sm mb-8" style={{ color: C.mutedText }}>
-            Explore Global Pizza Party events happening around the world
+            See where communities around the world came together for pizza
           </p>
 
           <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
             <iframe
-              src="https://map.pizzadao.xyz"
+              src="https://www.google.com/maps/d/u/0/embed?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA"
               className="w-full"
               style={{ height: 500, border: 'none' }}
               title="Global Pizza Party Map"
               loading="lazy"
-              allow="geolocation"
+              allowFullScreen
             />
           </div>
 
           <div className="text-center mt-6">
             <a
-              href="https://map.pizzadao.xyz"
+              href="https://www.google.com/maps/d/u/0/viewer?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5"
