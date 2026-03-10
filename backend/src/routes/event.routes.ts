@@ -133,8 +133,30 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
-    // Strip emails from coHosts for public response
-    const sanitizedCoHosts = (party.coHosts as any[] || []).map(({ email, ...rest }: any) => rest);
+    // Enrich coHosts with user profile data (avatar, socials) then strip emails
+    const rawCoHosts = (party.coHosts as any[] || []);
+    const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
+    let profilesByEmail: Record<string, any> = {};
+    if (coHostEmails.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { email: { in: coHostEmails } },
+        select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
+      });
+      profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
+    }
+    const sanitizedCoHosts = rawCoHosts.map(({ email, ...rest }: any) => {
+      const profile = email ? profilesByEmail[email] : null;
+      if (profile) {
+        return {
+          ...rest,
+          avatar_url: rest.avatar_url || profile.profilePictureUrl || null,
+          twitter: rest.twitter || profile.twitter || null,
+          website: rest.website || profile.website || null,
+          instagram: rest.instagram || profile.instagram || null,
+        };
+      }
+      return rest;
+    });
 
     // Build host profile from user data
     const hostProfile = party.user ? {
