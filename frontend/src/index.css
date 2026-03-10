@@ -495,6 +495,13 @@ body.modal-open {
 .gpp-theme .bg-red-500 { color: white !important; }
 .gpp-theme .bg-\[\#E52828\] { color: white !important; }
 
+/* Modal — solid white card with shadow for contrast on light background */
+.gpp-theme .fixed.inset-0 .card {
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
+}
+
 /* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
 .gpp-theme .gpp-badge { display: none !important; }
 
