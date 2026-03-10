@@ -173,7 +173,7 @@ export function GPPLandingPage() {
           id: i,
           x: 12 + Math.random() * 76,
           size: sizes[i],
-          delay: 0.3 + i * 0.5 + Math.random() * 0.3,
+          delay: i * 0.4 + Math.random() * 0.2,
           duration: 5.5 + Math.random() * 4,              // 5.5–9.5s each
           swayAmount: 12 + Math.random() * 30,            // 12–42px sway
           swaySpeed: 1.2 + Math.random() * 2,             // 1.2–3.2s per sway cycle
