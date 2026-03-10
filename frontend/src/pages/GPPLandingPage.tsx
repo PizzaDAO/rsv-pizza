@@ -525,11 +525,11 @@ export function GPPLandingPage() {
             See where communities around the world came together for pizza
           </p>
 
-          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
+          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder, height: 500 }}>
             <iframe
               src="https://www.google.com/maps/d/u/0/embed?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA"
               className="w-full"
-              style={{ height: 500, border: 'none' }}
+              style={{ height: 600, border: 'none', marginTop: -100 }}
               title="Global Pizza Party Map"
               loading="lazy"
               allowFullScreen
