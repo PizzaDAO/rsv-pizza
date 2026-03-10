@@ -234,10 +234,11 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
   try {
     const { region } = req.params;
 
-    // Handle "all" region — admin only
+    // Handle "all" region — admins see everything, underbosses see their assigned regions
     if (region === 'all') {
-      if (!req.underboss!.regions.includes('__admin__')) {
-        throw new AppError('Only admins can view all regions', 403, 'FORBIDDEN');
+      const isAdminUser = req.underboss!.regions.includes('__admin__');
+      if (!isAdminUser && req.underboss!.regions.length === 0) {
+        throw new AppError('Not authorized for any region', 403, 'FORBIDDEN');
       }
     } else {
       // Verify the underboss is assigned to this region (admins can view any region)
@@ -246,9 +247,15 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       }
     }
 
-    const whereClause = region === 'all'
-      ? { eventType: 'gpp' as const }
-      : { region, eventType: 'gpp' as const };
+    let whereClause;
+    if (region === 'all') {
+      const isAdminUser = req.underboss!.regions.includes('__admin__');
+      whereClause = isAdminUser
+        ? { eventType: 'gpp' as const }
+        : { eventType: 'gpp' as const, region: { in: req.underboss!.regions } };
+    } else {
+      whereClause = { region, eventType: 'gpp' as const };
+    }
 
     const events = await prisma.party.findMany({
       where: whereClause,

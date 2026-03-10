@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -10,20 +9,54 @@ import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../l
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { GPP_REGIONS } from '../types';
-import type { UnderbossDashboardData, GPPRegion } from '../types';
+import type { UnderbossDashboardData, UnderbossStats } from '../types';
+
+function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
+  const totalEvents = events.length;
+  let totalRsvps = 0;
+  let totalApproved = 0;
+  let eventsWithVenue = 0;
+  let eventsWithBudget = 0;
+  let eventsWithKit = 0;
+
+  for (const e of events) {
+    totalRsvps += e.guestCount;
+    totalApproved += e.approvedCount;
+    if (e.progress.hasVenue) eventsWithVenue++;
+    if (e.progress.hasBudget) eventsWithBudget++;
+    if (e.progress.hasPartyKit) eventsWithKit++;
+  }
+
+  return {
+    totalEvents,
+    totalRsvps,
+    totalApproved,
+    eventsWithVenue,
+    eventsWithBudget,
+    eventsWithKit,
+    completionRate: {
+      venue: totalEvents > 0 ? Math.round((eventsWithVenue / totalEvents) * 100) : 0,
+      budget: totalEvents > 0 ? Math.round((eventsWithBudget / totalEvents) * 100) : 0,
+      partyKit: totalEvents > 0 ? Math.round((eventsWithKit / totalEvents) * 100) : 0,
+    },
+    avgRsvpsPerEvent: totalEvents > 0 ? Math.round(totalRsvps / totalEvents) : 0,
+  };
+}
 
 export function UnderbossDashboard() {
-  const { region } = useParams<{ region: string }>();
-  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
-  const [data, setData] = useState<UnderbossDashboardData | null>(null);
+  const [allData, setAllData] = useState<UnderbossDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [availableRegions, setAvailableRegions] = useState<string[]>([]);
+
+  // Add underboss modal state
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
   const [addUbForm, setAddUbForm] = useState({ name: '', email: '' });
   const [newUbRegions, setNewUbRegions] = useState<string[]>([]);
@@ -31,22 +64,38 @@ export function UnderbossDashboard() {
   const [addUbError, setAddUbError] = useState<string | null>(null);
   const [addUbSuccess, setAddUbSuccess] = useState(false);
 
-  const regionLabel = region === 'all' ? 'All Regions' : (GPP_REGIONS.find((r) => r.id === region)?.label || region || 'Unknown');
+  // Filter events and recompute stats based on selected regions
+  const filteredData = useMemo(() => {
+    if (!allData) return null;
+    const allSelected = selectedRegions.length === availableRegions.length;
+    if (allSelected) return allData;
 
-  const loadDashboard = useCallback(async (targetRegion: string) => {
+    const filteredEvents = allData.events.filter(
+      (e) => e.region && selectedRegions.includes(e.region)
+    );
+    return {
+      ...allData,
+      stats: recomputeStats(filteredEvents),
+      events: filteredEvents,
+    };
+  }, [allData, selectedRegions, availableRegions.length]);
+
+  // Derive the region label for the header
+  const regionLabel = useMemo(() => {
+    if (selectedRegions.length === 0) return 'No Regions';
+    if (selectedRegions.length === availableRegions.length) return 'All Regions';
+    if (selectedRegions.length === 1) {
+      return GPP_REGIONS.find((r) => r.id === selectedRegions[0])?.label || selectedRegions[0];
+    }
+    return `${selectedRegions.length} Regions`;
+  }, [selectedRegions, availableRegions.length]);
+
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    const validRegions = GPP_REGIONS.map((r) => r.id);
-    if (targetRegion !== 'all' && !validRegions.includes(targetRegion as GPPRegion)) {
-      setError(`Invalid region: ${targetRegion}`);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const result = await fetchUnderbossDashboard(targetRegion as GPPRegion | 'all');
-      setData(result);
+      const result = await fetchUnderbossDashboard('all');
+      setAllData(result);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
@@ -71,30 +120,22 @@ export function UnderbossDashboard() {
 
         if (me.isAdmin) {
           setIsAdmin(true);
-          // Admin with no region param: default to first region
-          const targetRegion = region || GPP_REGIONS[0].id;
-          if (!region) {
-            navigate(`/underboss/${targetRegion}`, { replace: true });
-          }
-          loadDashboard(targetRegion);
+          const allRegionIds = GPP_REGIONS.map((r) => r.id);
+          setAvailableRegions(allRegionIds);
+          setSelectedRegions(allRegionIds);
+          loadDashboard();
         } else if (me.isUnderboss) {
           setIsAdmin(false);
-          // Determine assigned regions (fall back to [region] for legacy)
           const assignedRegions = (me.regions && me.regions.length > 0) ? me.regions : (me.region ? [me.region] : []);
           if (assignedRegions.length === 0) {
             setLoading(false);
             setError('You are not authorized to access the underboss dashboard.');
             return;
           }
-          // If no region param or current region is not in assigned regions, redirect to first assigned region
-          if (!region || !assignedRegions.includes(region)) {
-            navigate(`/underboss/${assignedRegions[0]}`, { replace: true });
-            loadDashboard(assignedRegions[0]);
-          } else {
-            loadDashboard(region);
-          }
+          setAvailableRegions(assignedRegions);
+          setSelectedRegions(assignedRegions);
+          loadDashboard();
         } else {
-          // Not authorized
           setLoading(false);
           setError('You are not authorized to access the underboss dashboard.');
         }
@@ -105,12 +146,21 @@ export function UnderbossDashboard() {
     }
 
     checkAccess();
-  }, [user, authLoading, region, navigate, loadDashboard]);
+  }, [user, authLoading, loadDashboard]);
 
-  // Handle region switch for admins
-  const handleRegionSwitch = (newRegion: string) => {
-    setRegionDropdownOpen(false);
-    navigate(`/underboss/${newRegion}`);
+  const toggleRegion = (regionId: string) => {
+    setSelectedRegions((prev) => {
+      if (prev.includes(regionId)) {
+        // Don't allow deselecting the last region
+        if (prev.length === 1) return prev;
+        return prev.filter((r) => r !== regionId);
+      }
+      return [...prev, regionId];
+    });
+  };
+
+  const selectAllRegions = () => {
+    setSelectedRegions([...availableRegions]);
   };
 
   // Not logged in
@@ -167,7 +217,11 @@ export function UnderbossDashboard() {
     );
   }
 
-  if (!data) return null;
+  if (!filteredData) return null;
+
+  const showMultiSelect = availableRegions.length > 1;
+  const showRegionColumn = selectedRegions.length > 1;
+  const filteredGppRegions = GPP_REGIONS.filter((r) => availableRegions.includes(r.id));
 
   return (
     <div className="min-h-screen gpp-theme relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
@@ -193,74 +247,66 @@ export function UnderbossDashboard() {
               <Globe size={20} className="text-red-500" />
             </div>
             <div>
-              {/* Region title with switcher for admins and multi-region underbosses */}
-              {(() => {
-                const assignedRegions = meData?.regions && meData.regions.length > 0
-                  ? meData.regions
-                  : (meData?.region ? [meData.region] : []);
-                const showSwitcher = isAdmin || assignedRegions.length > 1;
-
-                if (showSwitcher) {
-                  const filteredRegions = isAdmin
-                    ? GPP_REGIONS
-                    : GPP_REGIONS.filter(r => assignedRegions.includes(r.id));
-
-                  return (
-                    <div className="relative">
-                      <button
-                        onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-                        className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
-                      >
-                        {regionLabel}
-                        <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {regionDropdownOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setRegionDropdownOpen(false)}
-                          />
-                          <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[220px]">
-                            {/* All Regions option for admins */}
-                            {isAdmin && (
-                              <>
-                                <button
-                                  key="all"
-                                  onClick={() => handleRegionSwitch('all')}
-                                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                                    region === 'all'
-                                      ? 'bg-red-500/20 text-red-500 font-medium'
-                                      : 'text-white/70 hover:bg-white/5 hover:text-white'
-                                  }`}
-                                >
-                                  All Regions
-                                </button>
-                                {/* Divider */}
-                                <div className="border-b border-white/10 my-1" />
-                              </>
-                            )}
-                            {filteredRegions.map((r) => (
-                              <button
-                                key={r.id}
-                                onClick={() => handleRegionSwitch(r.id)}
-                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                                  r.id === region
-                                    ? 'bg-red-500/20 text-red-500 font-medium'
-                                    : 'text-white/70 hover:bg-white/5 hover:text-white'
-                                }`}
-                              >
-                                {r.label}
-                              </button>
-                            ))}
+              {showMultiSelect ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                    className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
+                  >
+                    {regionLabel}
+                    <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {regionDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setRegionDropdownOpen(false)}
+                      />
+                      <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[240px]">
+                        {/* Select All */}
+                        <button
+                          onClick={selectAllRegions}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                            selectedRegions.length === availableRegions.length
+                              ? 'text-red-500 font-medium'
+                              : 'text-white/70 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                            selectedRegions.length === availableRegions.length
+                              ? 'bg-red-500 border-red-500' : 'border-white/30'
+                          }`}>
+                            {selectedRegions.length === availableRegions.length && <Check size={12} className="text-white" />}
                           </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                } else {
-                  return <h1 className="text-2xl font-bold text-white">{regionLabel}</h1>;
-                }
-              })()}
+                          All Regions
+                        </button>
+                        <div className="border-b border-white/10 my-1" />
+                        {filteredGppRegions.map((r) => (
+                          <button
+                            key={r.id}
+                            onClick={() => toggleRegion(r.id)}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              selectedRegions.includes(r.id)
+                                ? 'text-red-500 font-medium'
+                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                              selectedRegions.includes(r.id)
+                                ? 'bg-red-500 border-red-500' : 'border-white/30'
+                            }`}>
+                              {selectedRegions.includes(r.id) && <Check size={12} className="text-white" />}
+                            </div>
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <h1 className="text-2xl font-bold text-white">{regionLabel}</h1>
+              )}
               <p className="text-sm text-white/40">
                 Global Pizza Party &middot; Underboss Dashboard
               </p>
@@ -271,8 +317,8 @@ export function UnderbossDashboard() {
               <Shield size={14} />
               <span>
                 {isAdmin
-                  ? `Signed in as Admin (${data.underboss.email})`
-                  : `Signed in as ${data.underboss.name}`}
+                  ? `Signed in as Admin (${filteredData.underboss.email})`
+                  : `Signed in as ${filteredData.underboss.name}`}
               </span>
             </div>
             {isAdmin && (
@@ -289,15 +335,15 @@ export function UnderbossDashboard() {
 
         {/* Stats */}
         <section className="mb-8">
-          <RegionStats stats={data.stats} />
+          <RegionStats stats={filteredData.stats} />
         </section>
 
         {/* Events Table */}
         <section>
           <h2 className="text-lg font-semibold text-white mb-4">
-            Events ({data.events.length})
+            Events ({filteredData.events.length})
           </h2>
-          <EventTable events={data.events} showRegion={region === 'all'} />
+          <EventTable events={filteredData.events} showRegion={showRegionColumn} />
         </section>
         </div>
       </main>
