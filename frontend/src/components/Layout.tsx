@@ -5,11 +5,12 @@ import { CornerLinks } from './CornerLinks';
 
 interface LayoutProps {
   children: ReactNode;
+  className?: string;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, className = '' }) => {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={`min-h-screen flex flex-col ${className}`}>
       <Header />
 
       {/* Main content */}

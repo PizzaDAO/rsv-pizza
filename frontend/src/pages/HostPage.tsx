@@ -193,7 +193,7 @@ function HostPageContent() {
   const tabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
 
   return (
-    <Layout>
+    <Layout className={isGPP ? 'gpp-theme' : ''}>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
 

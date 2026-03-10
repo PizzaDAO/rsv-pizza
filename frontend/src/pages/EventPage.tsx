@@ -422,8 +422,10 @@ export function EventPage() {
     metaDescription = `Join us for ${event.name}! RSVP now.`;
   }
 
+  const isGPP = event?.eventType === 'gpp';
+
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${isGPP ? 'gpp-theme' : ''}`}>
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>
