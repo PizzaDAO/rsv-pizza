@@ -6,11 +6,12 @@ import { CornerLinks } from './CornerLinks';
 interface LayoutProps {
   children: ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, className = '' }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, className = '', style }) => {
   return (
-    <div className={`min-h-screen flex flex-col ${className}`}>
+    <div className={`min-h-screen flex flex-col ${className}`} style={style}>
       <Header />
 
       {/* Main content */}
