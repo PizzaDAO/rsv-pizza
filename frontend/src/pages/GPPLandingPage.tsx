@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Loader2, ArrowRight, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
 import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
@@ -515,78 +515,37 @@ export function GPPLandingPage() {
         </div>
       </div>
 
-      {/* ─── RESOURCES SECTION ─── */}
+      {/* ─── MAP SECTION ─── */}
       <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="max-w-6xl mx-auto px-4 py-16">
-          <h2 className="text-2xl font-bold text-center mb-12" style={{ color: C.darkText }}>
-            Resources for Hosts
+          <h2 className="text-2xl font-bold text-center mb-3" style={{ color: C.darkText }}>
+            Find a Party Near You
           </h2>
+          <p className="text-center text-sm mb-8" style={{ color: C.mutedText }}>
+            Explore Global Pizza Party events happening around the world
+          </p>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Sponsor One Sheet */}
+          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
+            <iframe
+              src="https://map.pizzadao.xyz"
+              className="w-full"
+              style={{ height: 500, border: 'none' }}
+              title="Global Pizza Party Map"
+              loading="lazy"
+              allow="geolocation"
+            />
+          </div>
+
+          <div className="text-center mt-6">
             <a
-              href="https://docs.google.com/presentation/d/e/2PACX-1vQHSFx8OYH1yznE4XjiqD9TTOyCqkPVNyeOTVpkOghZleUKm-ISp09JNvksbo_hvfzDG-4MQLRV9u1q/pub?start=false&loop=false&delayms=3000"
+              href="https://map.pizzadao.xyz"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
-              style={{ background: C.cardBg, borderColor: C.cardBorder }}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5"
+              style={{ background: C.red, color: '#fff' }}
             >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
-                style={{ background: `${C.red}15` }}
-              >
-                <BookOpen className="w-6 h-6" style={{ color: C.red }} />
-              </div>
-              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
-                Sponsor One Sheet
-              </h3>
-              <p className="text-sm" style={{ color: C.mutedText }}>
-                Everything you need to talk to sponsors about the Global Pizza Party.
-              </p>
-            </a>
-
-            {/* Telegram */}
-            <a
-              href="https://t.me/+Qr-B8Y6DYH4yMjIx"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
-              style={{ background: C.cardBg, borderColor: C.cardBorder }}
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
-                style={{ background: `${C.green}15` }}
-              >
-                <MessageCircle className="w-6 h-6" style={{ color: C.green }} />
-              </div>
-              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
-                Telegram Community
-              </h3>
-              <p className="text-sm" style={{ color: C.mutedText }}>
-                Join fellow hosts and the PizzaDAO team for support and coordination.
-              </p>
-            </a>
-
-            {/* PizzaDAO Resources */}
-            <a
-              href="https://pizzadao.xyz/landing"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-6 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-md group"
-              style={{ background: C.cardBg, borderColor: C.cardBorder }}
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors"
-                style={{ background: '#5c7cfa15' }}
-              >
-                <HelpCircle className="w-6 h-6" style={{ color: '#5c7cfa' }} />
-              </div>
-              <h3 className="text-lg font-semibold mb-2" style={{ color: C.darkText }}>
-                PizzaDAO Resources
-              </h3>
-              <p className="text-sm" style={{ color: C.mutedText }}>
-                A guide to all the PizzaDAO websites and apps out there.
-              </p>
+              Open Full Map
+              <ExternalLink size={16} />
             </a>
           </div>
         </div>

@@ -379,6 +379,8 @@ export interface DbParty {
   venue_report_notes?: string | null;
   pinned_apps?: string[];
   region?: string | null;
+  event_type?: string | null;
+  event_tags?: string[];
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
