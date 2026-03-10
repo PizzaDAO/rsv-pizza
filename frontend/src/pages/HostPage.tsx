@@ -197,7 +197,7 @@ function HostPageContent() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
 
-        <div className="border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
+        <div className="host-tabs border-b border-white/10 mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (

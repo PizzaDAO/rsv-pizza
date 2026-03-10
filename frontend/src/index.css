@@ -478,15 +478,15 @@ body.modal-open {
   color: #1a1a1a !important;
 }
 
-/* Tabs — inactive black, active red tag with rounded top corners */
-.gpp-theme .text-white\/40.font-medium { color: #1a1a1a !important; }
-.gpp-theme .text-white.font-medium {
+/* Host page tabs — inactive black, active red tag with rounded top corners */
+.gpp-theme .host-tabs .text-white\/40 { color: #1a1a1a !important; }
+.gpp-theme .host-tabs .text-white {
   color: #E52828 !important;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 8px 8px 0 0;
   padding: 8px 14px 12px !important;
 }
-.gpp-theme button > .bg-white { background: #E52828 !important; }
+.gpp-theme .host-tabs button > .bg-white { background: #E52828 !important; }
 
 /* Red buttons keep white text */
 .gpp-theme .btn-primary { color: white !important; }
