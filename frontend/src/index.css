@@ -484,7 +484,7 @@ body.modal-open {
 .gpp-theme .host-tabs .text-white\/40 { color: #1a1a1a !important; }
 .gpp-theme .host-tabs .text-white {
   color: #E52828 !important;
-  background: rgba(0, 0, 0, 0.1) !important;
+  background: #e0e0e0 !important;
   border-radius: 8px 8px 0 0;
   padding: 8px 14px 12px !important;
 }
