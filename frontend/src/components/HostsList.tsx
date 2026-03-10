@@ -178,6 +178,12 @@ export const HostsList: React.FC<HostsListProps> = ({
                 alt={coHost.name}
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
               />
+            ) : coHost.name === 'PizzaDAO' ? (
+              <img
+                src="/pizzadao-logo.svg"
+                alt="PizzaDAO"
+                className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
+              />
             ) : (
               <div className={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}>
                 <User className={`${config.icon} text-[#ff393a]`} />
@@ -273,6 +279,12 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
               <img
                 src={coHost.avatar_url}
                 alt={coHost.name}
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
+              />
+            ) : coHost.name === 'PizzaDAO' ? (
+              <img
+                src="/pizzadao-logo.svg"
+                alt="PizzaDAO"
                 className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
               />
             ) : (

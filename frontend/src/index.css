@@ -474,3 +474,12 @@ body.modal-open {
 .gpp-theme .pac-item-query {
   color: #1a1a1a !important;
 }
+
+/* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
+.gpp-theme .gpp-badge { display: none !important; }
+
+/* Round the bottom-right corner of the event image on desktop */
+.gpp-theme .card .aspect-square {
+  border-bottom-right-radius: 18px;
+  overflow: hidden;
+}
