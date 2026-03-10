@@ -497,7 +497,7 @@ export function GPPLandingPage() {
                     </>
                   ) : (
                     <>
-                      Create Your GPP Event
+                      Create Your Event
                       <ArrowRight size={20} />
                     </>
                   )}
