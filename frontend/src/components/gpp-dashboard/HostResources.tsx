@@ -44,7 +44,7 @@ export const HostResources: React.FC = () => (
             href={r.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="card p-5 flex flex-col gap-3 hover:bg-white/5 transition-colors group"
+            className="card p-5 flex flex-col gap-3 hover:-translate-y-1 hover:shadow-lg transition-all group"
           >
             <div
               className="w-10 h-10 rounded-lg flex items-center justify-center"
