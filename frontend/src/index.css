@@ -524,16 +524,16 @@ body.gpp-theme-active .pac-item-query {
 }
 
 /* Host page tabs — inactive black, active red tag with rounded top corners */
-.gpp-theme .host-tabs .text-white\/40 { color: #1a1a1a !important; }
-.gpp-theme .host-tabs .text-white {
+.gpp-theme .host-tabs .text-theme-text-muted { color: #1a1a1a !important; }
+.gpp-theme .host-tabs .text-theme-text {
   color: #E52828 !important;
   background: #fff !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   border-radius: 8px 8px 0 0;
   padding: 8px 14px 12px !important;
 }
-.gpp-theme .host-tabs .text-white > span { color: #1a1a1a !important; }
-.gpp-theme .host-tabs button > .bg-white { background: #E52828 !important; }
+.gpp-theme .host-tabs .text-theme-text > span { color: #1a1a1a !important; }
+.gpp-theme .host-tabs button > .bg-theme-text { background: #E52828 !important; }
 
 /* Red buttons keep white text */
 .gpp-theme .btn-primary { color: white !important; }
