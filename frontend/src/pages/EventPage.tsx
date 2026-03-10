@@ -965,7 +965,7 @@ export function EventPage() {
                       <PhotoGallery
                         partyId={event.id}
                         isHost={false}
-                        photoModeration={event.photoModeration}
+                        photoModeration={true}
                         uploaderName={existingGuestData?.name || user?.name || undefined}
                         uploaderEmail={existingGuestData?.email || user?.email}
                         guestId={existingGuestData?.id}

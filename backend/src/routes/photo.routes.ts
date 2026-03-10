@@ -276,8 +276,8 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
-    // Set initial status based on moderation setting
-    const initialStatus = party.photoModeration ? 'pending' : 'approved';
+    // All photos require approval
+    const initialStatus = 'pending';
 
     const photo = await prisma.photo.create({
       data: {

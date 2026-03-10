@@ -76,7 +76,7 @@ model Party {
   // Photo settings
   photosEnabled   Boolean @default(true) @map("photos_enabled")
   photosPublic    Boolean @default(true) @map("photos_public")
-  photoModeration Boolean @default(false) @map("photo_moderation")
+  photoModeration Boolean @default(true) @map("photo_moderation")
 
   // Party Kit settings
   kitEnabled  Boolean   @default(false) @map("kit_enabled")
