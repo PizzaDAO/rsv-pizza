@@ -233,10 +233,36 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Enrich coHosts with user profile data (avatar, socials)
+    const rawCoHosts = (party.coHosts as any[] || []);
+    const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
+    let enrichedCoHosts = rawCoHosts;
+    if (coHostEmails.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { email: { in: coHostEmails } },
+        select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
+      });
+      const profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
+      enrichedCoHosts = rawCoHosts.map((h: any) => {
+        const profile = h.email ? profilesByEmail[h.email] : null;
+        if (profile) {
+          return {
+            ...h,
+            avatar_url: h.avatar_url || profile.profilePictureUrl || null,
+            twitter: h.twitter || profile.twitter || null,
+            website: h.website || profile.website || null,
+            instagram: h.instagram || profile.instagram || null,
+          };
+        }
+        return h;
+      });
+    }
+
     // Return with hostName and userId for ownership checks
     res.json({
       party: {
         ...party,
+        coHosts: enrichedCoHosts,
         hostName: party.user?.name || null,
         user: undefined,
       }
