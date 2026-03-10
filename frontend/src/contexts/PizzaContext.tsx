@@ -118,6 +118,8 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationEthAddress: dbParty.donation_eth_address || null,
     pinnedApps: (dbParty.pinned_apps as string[]) ?? [],
     region: dbParty.region || null,
+    eventType: dbParty.event_type || null,
+    eventTags: dbParty.event_tags || [],
     guests,
   };
 }

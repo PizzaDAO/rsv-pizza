@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
@@ -30,13 +30,14 @@ import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
+import { GPPDashboardTab } from '../components/gpp-dashboard';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -72,10 +73,12 @@ function HostPageContent() {
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
 
-  const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : 'details';
+  const isGPP = party?.eventType === 'gpp';
+  const defaultTab: TabType = isGPP ? 'dashboard' : 'details';
+  const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : defaultTab;
 
   const setActiveTab = (newTab: TabType) => {
-    if (newTab === 'details') {
+    if (newTab === defaultTab) {
       navigate(`/host/${inviteCode}`);
     } else {
       navigate(`/host/${inviteCode}/${newTab}`);
@@ -173,6 +176,7 @@ function HostPageContent() {
   }
 
   const coreTabs = [
+    ...(isGPP ? [{ id: 'dashboard' as TabType, label: 'Dashboard', icon: Home }] : []),
     { id: 'details' as TabType, label: 'Settings', icon: Settings },
     { id: 'guests' as TabType, label: 'Guests', icon: Users },
     { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
@@ -215,9 +219,11 @@ function HostPageContent() {
           })}
         </div>
 
-        {activeTab === 'apps' && party ? (
+        {activeTab === 'dashboard' && party ? (
+          <GPPDashboardTab />
+        ) : activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
-        ) : activeTab !== 'apps' && (
+        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">
               {activeTab === 'guests' && (
