@@ -516,7 +516,7 @@ export function GPPLandingPage() {
       </div>
 
       {/* ─── MAP SECTION ─── */}
-      <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+      <div className="relative border-t" style={{ borderColor: 'rgba(0,0,0,0.08)', zIndex: 1 }}>
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-bold text-center mb-3" style={{ color: C.darkText }}>
             Last Year's Global Pizza Party
