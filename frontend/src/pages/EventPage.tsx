@@ -24,6 +24,7 @@ import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
+import { useConfetti } from '../hooks/useConfetti';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -54,6 +55,7 @@ export function EventPage() {
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
   const [verifyingTweet, setVerifyingTweet] = useState(false);
+  const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
 
   useEffect(() => {
     async function loadEvent() {
@@ -807,7 +809,13 @@ export function EventPage() {
                 {/* RSVP Button */}
                 <div className="pt-4">
                   <button
-                    onClick={handleRSVP}
+                    onClick={(e) => {
+                      if (isGPP) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                      }
+                      handleRSVP();
+                    }}
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
@@ -1023,6 +1031,8 @@ export function EventPage() {
         isOpen={showPizzaDAO}
         onClose={() => setShowPizzaDAO(false)}
       />
+
+      {ConfettiOverlay}
     </div>
   );
 }

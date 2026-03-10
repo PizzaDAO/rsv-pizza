@@ -531,3 +531,17 @@ body.modal-open {
   50% { transform: translateX(-50px); }
   100% { transform: translateX(0); }
 }
+@keyframes confetti-fly {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  70% { opacity: 1; }
+  100% {
+    transform: translate(
+      calc(-50% + var(--confetti-tx)),
+      calc(-50% + var(--confetti-ty))
+    ) rotate(var(--confetti-rot)) scale(0.5);
+    opacity: 0;
+  }
+}

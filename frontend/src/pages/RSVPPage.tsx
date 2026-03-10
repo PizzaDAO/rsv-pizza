@@ -11,6 +11,7 @@ import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 import { uuid } from '../lib/utils';
+import { useConfetti } from '../hooks/useConfetti';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -32,6 +33,7 @@ export function RSVPPage() {
 
   const isGPP = party?.event_type === 'gpp';
   const gppClass = isGPP ? 'gpp-theme' : '';
+  const { fireFromCenter, ConfettiOverlay } = useConfetti();
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -300,6 +302,7 @@ export function RSVPPage() {
         setGuestId(result.guest?.id || null);
 
         // Go directly to success - donation is handled on step 2
+        if (isGPP) fireFromCenter();
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -914,6 +917,7 @@ export function RSVPPage() {
           </div>
         </form>
       </div>
+      {ConfettiOverlay}
     </div>
   );
 }
