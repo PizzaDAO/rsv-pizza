@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
-  fetchUnderbossList, createUnderboss, deactivateUnderboss,
+  fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
 } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin } from '../types';
+import { Check, X, Pencil } from 'lucide-react';
 
 export function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,11 @@ export function AdminPage() {
   const [ubRegions, setUbRegions] = useState<string[]>([]);
   const [addingUb, setAddingUb] = useState(false);
   const [ubMessage, setUbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Edit regions state
+  const [editingUbId, setEditingUbId] = useState<string | null>(null);
+  const [editRegions, setEditRegions] = useState<string[]>([]);
+  const [savingRegions, setSavingRegions] = useState(false);
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -141,6 +147,28 @@ export function AdminPage() {
       setUbMessage({ type: 'success', text: `Deactivated ${name}` });
     } catch (err: any) {
       setUbMessage({ type: 'error', text: err.message || 'Failed to deactivate' });
+    }
+  }
+
+  function startEditRegions(ub: UnderbossAdmin) {
+    setEditingUbId(ub.id);
+    setEditRegions(ub.regions && ub.regions.length > 0 ? [...ub.regions] : [ub.region]);
+  }
+
+  async function saveEditRegions() {
+    if (!editingUbId || editRegions.length === 0) return;
+    setSavingRegions(true);
+    try {
+      const updated = await updateUnderboss(editingUbId, { regions: editRegions });
+      setUnderbosses((prev) =>
+        prev.map((u) => (u.id === editingUbId ? { ...u, regions: updated.regions || editRegions } : u))
+      );
+      setUbMessage({ type: 'success', text: 'Regions updated' });
+      setEditingUbId(null);
+    } catch (err: any) {
+      setUbMessage({ type: 'error', text: err.message || 'Failed to update regions' });
+    } finally {
+      setSavingRegions(false);
     }
   }
 
@@ -395,7 +423,54 @@ export function AdminPage() {
                       <td className="px-4 py-3 text-white/80">{ub.name}</td>
                       <td className="px-4 py-3 text-white/60">{ub.email}</td>
                       <td className="px-4 py-3 text-white/60">
-                        {(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}
+                        {editingUbId === ub.id ? (
+                          <div>
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {GPP_REGIONS.map(r => (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditRegions(prev =>
+                                      prev.includes(r.id)
+                                        ? prev.length > 1 ? prev.filter(id => id !== r.id) : prev
+                                        : [...prev, r.id]
+                                    );
+                                  }}
+                                  className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                                    editRegions.includes(r.id)
+                                      ? 'bg-red-500/20 text-red-500 border border-red-500/30 font-medium'
+                                      : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
+                                  }`}
+                                >
+                                  {r.label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={saveEditRegions}
+                                disabled={savingRegions || editRegions.length === 0}
+                                className="text-green-500 hover:text-green-400 disabled:opacity-50 p-1"
+                                title="Save"
+                              >
+                                {savingRegions ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                              </button>
+                              <button
+                                onClick={() => setEditingUbId(null)}
+                                className="text-white/40 hover:text-white/60 p-1"
+                                title="Cancel"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => startEditRegions(ub)}>
+                            <span>{(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}</span>
+                            <Pencil size={12} className="text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" />
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span
