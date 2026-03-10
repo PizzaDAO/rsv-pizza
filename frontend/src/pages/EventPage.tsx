@@ -427,7 +427,10 @@ export function EventPage() {
   const isGPP = event?.eventType === 'gpp';
 
   return (
-    <div className={`min-h-screen ${isGPP ? 'gpp-theme' : ''}`}>
+    <div
+      className={`min-h-screen ${isGPP ? 'gpp-theme' : ''}`}
+      onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}
+    >
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>
