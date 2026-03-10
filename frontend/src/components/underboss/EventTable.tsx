@@ -164,7 +164,7 @@ export function EventTable({ events, showRegion }: EventTableProps) {
               }}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                 isActive
-                  ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                  ? 'bg-red-500/20 text-red-500 border border-red-500/30'
                   : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60'
               }`}
             >
@@ -195,7 +195,7 @@ export function EventTable({ events, showRegion }: EventTableProps) {
               setProgressFilters([]);
               setRegionFilter('all');
             }}
-            className="text-xs text-orange-400/70 hover:text-orange-400 transition-colors"
+            className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
             Clear filters
           </button>

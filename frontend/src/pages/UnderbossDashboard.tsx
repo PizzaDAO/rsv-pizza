@@ -106,17 +106,17 @@ export function UnderbossDashboard() {
   // Not logged in
   if (!authLoading && !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+      <div className="min-h-screen gpp-theme">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-          <Shield size={48} className="mx-auto mb-4 text-orange-400/60" />
+          <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
           <h1 className="text-2xl font-bold text-white mb-2">Underboss Dashboard</h1>
           <p className="text-white/50 mb-6">
             Please log in to access the underboss dashboard.
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
-            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            className="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
           >
             <LogIn size={18} />
             Log In
@@ -131,7 +131,7 @@ export function UnderbossDashboard() {
   // Loading state
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+      <div className="min-h-screen gpp-theme">
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-white/40 mb-4" />
@@ -145,7 +145,7 @@ export function UnderbossDashboard() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+      <div className="min-h-screen gpp-theme">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
@@ -160,7 +160,7 @@ export function UnderbossDashboard() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+    <div className="min-h-screen gpp-theme">
       <Helmet>
         <title>{regionLabel} Dashboard | GPP Underboss</title>
       </Helmet>
@@ -171,8 +171,8 @@ export function UnderbossDashboard() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-              <Globe size={20} className="text-orange-400" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <Globe size={20} className="text-red-500" />
             </div>
             <div>
               {/* Region title with switcher for admins */}
@@ -180,7 +180,7 @@ export function UnderbossDashboard() {
                 <div className="relative">
                   <button
                     onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-                    className="flex items-center gap-2 text-2xl font-bold text-white hover:text-orange-300 transition-colors"
+                    className="flex items-center gap-2 text-2xl font-bold text-white hover:text-red-500 transition-colors"
                   >
                     {regionLabel}
                     <ChevronDown size={20} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
@@ -191,14 +191,14 @@ export function UnderbossDashboard() {
                         className="fixed inset-0 z-40"
                         onClick={() => setRegionDropdownOpen(false)}
                       />
-                      <div className="absolute top-full left-0 mt-2 z-50 bg-gray-800 border border-white/10 rounded-xl shadow-2xl py-2 min-w-[220px]">
+                      <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-white/10 rounded-xl shadow-2xl py-2 min-w-[220px]">
                         {/* All Regions option for admins */}
                         <button
                           key="all"
                           onClick={() => handleRegionSwitch('all')}
                           className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                             region === 'all'
-                              ? 'bg-orange-500/20 text-orange-300 font-medium'
+                              ? 'bg-red-500/20 text-red-500 font-medium'
                               : 'text-white/70 hover:bg-white/5 hover:text-white'
                           }`}
                         >
@@ -212,7 +212,7 @@ export function UnderbossDashboard() {
                             onClick={() => handleRegionSwitch(r.id)}
                             className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                               r.id === region
-                                ? 'bg-orange-500/20 text-orange-300 font-medium'
+                                ? 'bg-red-500/20 text-red-500 font-medium'
                                 : 'text-white/70 hover:bg-white/5 hover:text-white'
                             }`}
                           >
@@ -243,7 +243,7 @@ export function UnderbossDashboard() {
             {isAdmin && (
               <button
                 onClick={() => setShowAddUnderboss(true)}
-                className="flex items-center gap-1.5 text-sm text-orange-400/70 hover:text-orange-400 transition-colors"
+                className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
               >
                 <UserPlus size={14} />
                 Add Underboss
@@ -271,7 +271,7 @@ export function UnderbossDashboard() {
       {/* Add Underboss Modal */}
       {showAddUnderboss && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUnderboss(false)}>
-          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Add Underboss</h3>
               <button onClick={() => setShowAddUnderboss(false)} className="text-white/30 hover:text-white/60">
@@ -340,7 +340,7 @@ export function UnderbossDashboard() {
                 <button
                   type="submit"
                   disabled={addUbLoading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   {addUbLoading ? 'Creating...' : 'Create Underboss'}
                 </button>

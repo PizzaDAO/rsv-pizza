@@ -146,8 +146,8 @@ export function AdminPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-black flex items-center justify-center">
+      <Layout className="gpp-theme">
+        <div className="min-h-screen flex items-center justify-center">
           <Loader2 size={32} className="animate-spin text-white/40" />
         </div>
       </Layout>
@@ -156,8 +156,8 @@ export function AdminPage() {
 
   if (!isAdminUser || error) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4">
+      <Layout className="gpp-theme">
+        <div className="min-h-screen flex flex-col items-center justify-center px-4">
           <Shield size={48} className="text-red-400/60 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
           <p className="text-white/50 text-center max-w-md">
@@ -169,16 +169,16 @@ export function AdminPage() {
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-black text-white">
+    <Layout className="gpp-theme">
+      <div className="min-h-screen">
         <Helmet>
           <title>Admin | RSV.Pizza</title>
         </Helmet>
 
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <ShieldCheck size={20} className="text-yellow-400" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <ShieldCheck size={20} className="text-red-500" />
             </div>
             <div>
               <h1 className="text-2xl font-bold">Admin Panel</h1>
@@ -259,7 +259,7 @@ export function AdminPage() {
                         <span
                           className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                             admin.role === 'super_admin'
-                              ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                              ? 'bg-red-500/20 text-red-500 border border-red-500/30'
                               : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                           }`}
                         >
