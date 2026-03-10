@@ -16,42 +16,87 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
   return !!party;
 }
 
-// Default GPP checklist items for 2026
+// Default GPP checklist items
 const DEFAULT_CHECKLIST_ITEMS = [
   {
-    name: 'Submit Party Kit Shipping Address',
-    dueDate: new Date('2026-03-08'),
+    name: 'Create Event',
+    dueDate: null,
     isAuto: true,
-    autoRule: 'party_kit_submitted',
-    linkTab: 'gpp',
+    autoRule: 'event_created',
+    linkTab: null,
     sortOrder: 0,
     isDefault: true,
   },
   {
-    name: 'Co-hosts confirmed',
-    dueDate: new Date('2026-03-14'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: null,
+    name: 'Request Party Kit',
+    dueDate: null,
+    isAuto: true,
+    autoRule: 'party_kit_submitted',
+    linkTab: 'gpp',
     sortOrder: 1,
     isDefault: true,
   },
   {
-    name: 'Venue confirmed',
-    dueDate: new Date('2026-04-03'),
-    isAuto: true,
-    autoRule: 'venue_added',
-    linkTab: 'venue',
+    name: 'Build a Team',
+    dueDate: null,
+    isAuto: false,
+    autoRule: null,
+    linkTab: 'details',
     sortOrder: 2,
     isDefault: true,
   },
   {
-    name: 'Budget submitted',
-    dueDate: new Date('2026-04-10'),
+    name: 'Find a Venue',
+    dueDate: null,
+    isAuto: true,
+    autoRule: 'venue_added',
+    linkTab: 'venue',
+    sortOrder: 3,
+    isDefault: true,
+  },
+  {
+    name: 'Set Up Budget',
+    dueDate: null,
     isAuto: true,
     autoRule: 'budget_submitted',
     linkTab: 'budget',
-    sortOrder: 3,
+    sortOrder: 4,
+    isDefault: true,
+  },
+  {
+    name: 'Find Partners',
+    dueDate: null,
+    isAuto: false,
+    autoRule: null,
+    linkTab: 'sponsors',
+    sortOrder: 5,
+    isDefault: true,
+  },
+  {
+    name: 'Prepare for the Party',
+    dueDate: null,
+    isAuto: false,
+    autoRule: null,
+    linkTab: null,
+    sortOrder: 6,
+    isDefault: true,
+  },
+  {
+    name: 'Post to Socials',
+    dueDate: null,
+    isAuto: false,
+    autoRule: null,
+    linkTab: 'promo',
+    sortOrder: 7,
+    isDefault: true,
+  },
+  {
+    name: 'Throw the Party',
+    dueDate: null,
+    isAuto: false,
+    autoRule: null,
+    linkTab: null,
+    sortOrder: 8,
     isDefault: true,
   },
 ];
@@ -101,12 +146,13 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     });
 
     const autoCompleteStates = {
+      event_created: true,
       party_kit_submitted: !!partyKit,
       venue_added: !!(party?.venueName) || !!selectedVenue,
       budget_submitted: budgetItemCount > 0,
     };
 
-    // Check if defaults have been seeded
+    // Check if defaults have been seeded with current version
     const defaultCount = await prisma.checklistItem.count({
       where: { partyId, isDefault: true },
     });
@@ -114,7 +160,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     res.json({
       items,
       autoCompleteStates,
-      seeded: defaultCount > 0,
+      seeded: defaultCount === DEFAULT_CHECKLIST_ITEMS.length,
     });
   } catch (error) {
     next(error);
@@ -137,14 +183,21 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       where: { partyId, isDefault: true },
     });
 
-    if (existingDefaults > 0) {
-      // Already seeded, return existing items
+    if (existingDefaults === DEFAULT_CHECKLIST_ITEMS.length) {
+      // Already seeded with current version, return existing items
       const items = await prisma.checklistItem.findMany({
         where: { partyId },
         orderBy: { sortOrder: 'asc' },
       });
       res.json({ items, seeded: true });
       return;
+    }
+
+    // Delete stale defaults if any (preserves custom items)
+    if (existingDefaults > 0) {
+      await prisma.checklistItem.deleteMany({
+        where: { partyId, isDefault: true },
+      });
     }
 
     // Seed defaults

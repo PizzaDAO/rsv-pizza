@@ -2131,6 +2131,14 @@ export async function createUnderboss(data: { name: string; email: string; regio
   });
 }
 
+export async function updateUnderboss(id: string, data: { regions: string[] }): Promise<UnderbossAdmin> {
+  const result = await apiRequest<{ underboss: UnderbossAdmin }>(`/api/underboss/admin/${id}`, {
+    method: 'PATCH',
+    body: data,
+  });
+  return result.underboss;
+}
+
 export async function deactivateUnderboss(id: string): Promise<void> {
   await apiRequest(`/api/underboss/admin/${id}`, { method: 'DELETE' });
 }

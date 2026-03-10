@@ -313,9 +313,9 @@ function AppCard({
     <button
       onClick={handleClick}
       disabled={!isClickable}
-      className={`card p-5 text-left transition-colors w-full relative group ${
+      className={`card p-5 text-left transition-all w-full relative group ${
         isClickable
-          ? 'hover:bg-white/5 cursor-pointer'
+          ? 'hover:-translate-y-1 hover:shadow-lg cursor-pointer'
           : 'cursor-not-allowed opacity-50'
       }`}
     >

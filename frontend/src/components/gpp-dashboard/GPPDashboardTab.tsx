@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Image, Home, Package, DollarSign, CheckCircle, Circle, Loader2 } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2 } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist } from '../../lib/api';
 import { AutoCompleteStates } from '../../types';
 import { HostResources } from './HostResources';
-
-const DEFAULT_GPP_IMAGE = 'https://rsv.pizza/gpp-flyer-2026.png';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -40,40 +38,58 @@ export const GPPDashboardTab: React.FC = () => {
     if (!party) return [];
     return [
       {
-        label: 'Set event date & time',
-        done: !!party.date,
-        tab: 'details',
-        icon: Calendar,
+        label: 'Create Event',
+        done: true,
+        tab: null,
+        icon: PartyPopper,
       },
       {
-        label: 'Set event location',
-        done: !!party.address,
-        tab: 'details',
-        icon: MapPin,
-      },
-      {
-        label: 'Upload event image',
-        done: !!party.eventImageUrl && party.eventImageUrl !== DEFAULT_GPP_IMAGE,
-        tab: 'details',
-        icon: Image,
-      },
-      {
-        label: 'Confirm venue',
-        done: autoStates?.venue_added ?? !!party.venueName,
-        tab: 'venue',
-        icon: Home,
-      },
-      {
-        label: 'Request party kit',
+        label: 'Request Party Kit',
         done: autoStates?.party_kit_submitted ?? false,
         tab: 'gpp',
         icon: Package,
       },
       {
-        label: 'Set up budget',
+        label: 'Build a Team',
+        done: false,
+        tab: 'details',
+        icon: Users,
+      },
+      {
+        label: 'Find a Venue',
+        done: autoStates?.venue_added ?? !!party.venueName,
+        tab: 'venue',
+        icon: MapPin,
+      },
+      {
+        label: 'Set Up Budget',
         done: autoStates?.budget_submitted ?? false,
         tab: 'budget',
         icon: DollarSign,
+      },
+      {
+        label: 'Find Partners',
+        done: false,
+        tab: 'sponsors',
+        icon: Handshake,
+      },
+      {
+        label: 'Prepare for the Party',
+        done: false,
+        tab: null,
+        icon: ClipboardCheck,
+      },
+      {
+        label: 'Post to Socials',
+        done: false,
+        tab: 'promo',
+        icon: Megaphone,
+      },
+      {
+        label: 'Throw the Party',
+        done: false,
+        tab: null,
+        icon: Rocket,
       },
     ];
   }, [party, autoStates]);
@@ -142,11 +158,14 @@ export const GPPDashboardTab: React.FC = () => {
           <div className="space-y-1">
             {checklist.map((item) => {
               const Icon = item.icon;
+              const Wrapper = item.tab ? 'button' : 'div';
               return (
-                <button
+                <Wrapper
                   key={item.label}
-                  onClick={() => goToTab(item.tab)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                  onClick={item.tab ? () => goToTab(item.tab!) : undefined}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
+                    item.tab ? 'hover:bg-white/5 cursor-pointer' : ''
+                  }`}
                 >
                   {item.done ? (
                     <CheckCircle size={18} className="text-green-500 shrink-0" />
@@ -161,10 +180,12 @@ export const GPPDashboardTab: React.FC = () => {
                   >
                     {item.label}
                   </span>
-                  <span className="ml-auto text-xs text-white/20 group-hover:text-white/40 transition-colors">
-                    Go &rarr;
-                  </span>
-                </button>
+                  {item.tab && (
+                    <span className="ml-auto text-xs text-white/20 group-hover:text-white/40 transition-colors">
+                      Go &rarr;
+                    </span>
+                  )}
+                </Wrapper>
               );
             })}
           </div>

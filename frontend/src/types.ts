@@ -891,6 +891,7 @@ export interface ChecklistItem {
 }
 
 export interface AutoCompleteStates {
+  event_created: boolean;
   party_kit_submitted: boolean;
   venue_added: boolean;
   budget_submitted: boolean;
