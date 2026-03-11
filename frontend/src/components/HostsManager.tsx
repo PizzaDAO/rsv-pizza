@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserPlus, X, Globe, Instagram, GripVertical } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
@@ -21,6 +21,12 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 }) => {
   // Co-hosts state
   const [coHosts, setCoHosts] = useState<CoHost[]>(initialCoHosts);
+
+  // Sync from props when enriched data arrives asynchronously
+  useEffect(() => {
+    setCoHosts(initialCoHosts);
+  }, [initialCoHosts]);
+
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostEmail, setNewCoHostEmail] = useState('');
   const [newCoHostWebsite, setNewCoHostWebsite] = useState('');

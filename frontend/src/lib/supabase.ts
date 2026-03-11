@@ -745,6 +745,45 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     return null;
   }
 
+  // Enrich co-hosts with user profile data (avatar, socials)
+  // This mirrors the backend enrichment in party.routes.ts and event.routes.ts
+  if (party.co_hosts && Array.isArray(party.co_hosts)) {
+    const coHostEmails = (party.co_hosts as any[])
+      .map((h: any) => h.email)
+      .filter(Boolean);
+
+    if (coHostEmails.length > 0) {
+      try {
+        const { data: users } = await supabase
+          .from('User')
+          .select('email, "profilePictureUrl", twitter, website, instagram')
+          .in('email', coHostEmails);
+
+        if (users && users.length > 0) {
+          const profilesByEmail = Object.fromEntries(
+            users.map((u: any) => [u.email, u])
+          );
+          party.co_hosts = (party.co_hosts as any[]).map((h: any) => {
+            const profile = h.email ? profilesByEmail[h.email] : null;
+            if (profile) {
+              return {
+                ...h,
+                avatar_url: h.avatar_url || profile.profilePictureUrl || null,
+                twitter: h.twitter || profile.twitter || null,
+                website: h.website || profile.website || null,
+                instagram: h.instagram || profile.instagram || null,
+              };
+            }
+            return h;
+          });
+        }
+      } catch (err) {
+        // If User table query fails (e.g., RLS), continue without enrichment
+        console.warn('Could not enrich co-host profiles:', err);
+      }
+    }
+  }
+
   const { data: guests, error: guestsError } = await supabase
     .from('guests')
     .select('*')
