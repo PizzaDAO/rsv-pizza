@@ -304,8 +304,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       {/* Host Edit Modal */}
       {editingHostId && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={cancelEditingHost}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Edit Host</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Edit Host</h2>
 
             <div className="space-y-3">
               <input
@@ -313,7 +313,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 value={editHostName}
                 onChange={(e) => setEditHostName(e.target.value)}
                 placeholder="Name *"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <input
@@ -321,7 +321,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 value={editHostEmail}
                 onChange={(e) => setEditHostEmail(e.target.value)}
                 placeholder="Email (required to edit event)"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -330,14 +330,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   value={editHostWebsite}
                   onChange={(e) => setEditHostWebsite(e.target.value)}
                   placeholder="Website"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="url"
                   value={editHostAvatarUrl}
                   onChange={(e) => setEditHostAvatarUrl(e.target.value)}
                   placeholder="Avatar URL"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
@@ -354,14 +354,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                     }
                   }}
                   placeholder="Twitter (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="text"
                   value={editHostInstagram}
                   onChange={(e) => setEditHostInstagram(e.target.value)}
                   placeholder="Instagram (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
             </div>
@@ -375,7 +375,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
-                <span className="text-xs text-white/40">Avatar preview</span>
+                <span className="text-xs text-theme-text-muted">Avatar preview</span>
               </div>
             )}
 
@@ -383,7 +383,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <button
                 type="button"
                 onClick={cancelEditingHost}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 Cancel
               </button>
@@ -403,8 +403,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       {/* Add Host Modal */}
       {showAddHostModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddHostModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Add Host</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Add Host</h2>
 
             <div className="space-y-3">
               <input
@@ -412,7 +412,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 value={newCoHostName}
                 onChange={(e) => setNewCoHostName(e.target.value)}
                 placeholder="Name *"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <input
@@ -420,7 +420,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 value={newCoHostEmail}
                 onChange={(e) => setNewCoHostEmail(e.target.value)}
                 placeholder="Email (required to edit event)"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -429,14 +429,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   value={newCoHostWebsite}
                   onChange={(e) => setNewCoHostWebsite(e.target.value)}
                   placeholder="Website"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="url"
                   value={newCoHostAvatarUrl}
                   onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
                   placeholder="Avatar URL"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
@@ -453,14 +453,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                     }
                   }}
                   placeholder="Twitter (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="text"
                   value={newCoHostInstagram}
                   onChange={(e) => setNewCoHostInstagram(e.target.value)}
                   placeholder="Instagram (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
             </div>
@@ -474,7 +474,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
-                <span className="text-xs text-white/40">Avatar preview</span>
+                <span className="text-xs text-theme-text-muted">Avatar preview</span>
               </div>
             )}
 
@@ -482,7 +482,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddHostModal(false)}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 Cancel
               </button>

@@ -543,7 +543,8 @@ body.gpp-theme-active .pac-item-query {
 .gpp-theme .bg-\[\#E52828\] { color: white !important; }
 
 /* Modal — solid white card with shadow for contrast on light background */
-.gpp-theme .fixed.inset-0 .card {
+.gpp-theme .fixed.inset-0 .card,
+.gpp-theme .fixed.inset-0 .bg-theme-header {
   background: #fff !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
