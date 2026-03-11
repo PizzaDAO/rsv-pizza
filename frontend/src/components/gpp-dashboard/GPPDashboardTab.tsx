@@ -45,12 +45,14 @@ export const GPPDashboardTab: React.FC = () => {
         done: true,
         tab: null,
         icon: PartyPopper,
+        dueDate: null,
       },
       {
         label: 'Request Party Kit',
         done: autoStates?.party_kit_submitted ?? false,
         tab: 'gpp',
         icon: Package,
+        dueDate: '2026-03-17',
       },
       {
         label: 'Build a Team',
@@ -58,42 +60,49 @@ export const GPPDashboardTab: React.FC = () => {
         tab: null,
         onClick: () => setHostsExpanded(prev => !prev),
         icon: Users,
+        dueDate: '2026-03-30',
       },
       {
         label: 'Find a Venue',
         done: autoStates?.venue_added ?? !!party.venueName,
         tab: 'venue',
         icon: MapPin,
+        dueDate: '2026-04-08',
       },
       {
         label: 'Set Up Budget',
         done: autoStates?.budget_submitted ?? false,
         tab: 'budget',
         icon: DollarSign,
+        dueDate: '2026-04-18',
       },
       {
         label: 'Find Partners',
         done: false,
         tab: 'sponsors',
         icon: Handshake,
+        dueDate: '2026-03-15',
       },
       {
         label: 'Prepare for the Party',
         done: false,
         tab: null,
         icon: ClipboardCheck,
+        dueDate: '2026-04-20',
       },
       {
         label: 'Post to Socials',
         done: false,
         tab: 'promo',
         icon: Megaphone,
+        dueDate: '2026-04-22',
       },
       {
         label: 'Throw the Party',
         done: false,
         tab: null,
         icon: Rocket,
+        dueDate: '2026-05-22',
       },
     ];
   }, [party, autoStates, coHostCount]);
@@ -185,8 +194,19 @@ export const GPPDashboardTab: React.FC = () => {
                     >
                       {item.label}
                     </span>
+                    {item.dueDate && (
+                      <span className={`text-xs ml-auto mr-2 ${
+                        item.done
+                          ? 'text-theme-text-faint'
+                          : new Date(item.dueDate + 'T23:59:59') < new Date()
+                            ? 'text-[#ff393a] font-medium'
+                            : 'text-theme-text-faint'
+                      }`}>
+                        {new Date(item.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
                     {clickable && (
-                      <span className="ml-auto text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors">
+                      <span className={`${item.dueDate ? '' : 'ml-auto'} text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors`}>
                         {item.label === 'Build a Team' && hostsExpanded ? '\u25B2' : 'Go \u2192'}
                       </span>
                     )}
