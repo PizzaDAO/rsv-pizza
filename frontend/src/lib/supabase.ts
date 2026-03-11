@@ -745,6 +745,35 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     return null;
   }
 
+  // Enrich co-hosts with user profile data via backend API
+  // Direct Supabase User table query is blocked by RLS; the backend already enriches co-hosts
+  if (party.co_hosts && Array.isArray(party.co_hosts)) {
+    const coHostEmails = (party.co_hosts as any[])
+      .map((h: any) => h.email)
+      .filter(Boolean);
+
+    if (coHostEmails.length > 0) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+          const response = await fetch(`${apiUrl}/api/parties/${party.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.party?.coHosts) {
+              // Backend returns enriched coHosts (camelCase) — use them directly
+              party.co_hosts = data.party.coHosts;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not enrich co-host profiles via API:', err);
+      }
+    }
+  }
+
   const { data: guests, error: guestsError } = await supabase
     .from('guests')
     .select('*')

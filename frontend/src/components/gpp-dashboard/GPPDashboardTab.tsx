@@ -5,6 +5,7 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist } from '../../lib/api';
 import { AutoCompleteStates } from '../../types';
 import { HostResources } from './HostResources';
+import { HostsManager } from '../HostsManager';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -12,6 +13,8 @@ export const GPPDashboardTab: React.FC = () => {
   const { party, guests } = usePizza();
   const [autoStates, setAutoStates] = useState<AutoCompleteStates | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hostsExpanded, setHostsExpanded] = useState(false);
+  const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -51,8 +54,9 @@ export const GPPDashboardTab: React.FC = () => {
       },
       {
         label: 'Build a Team',
-        done: false,
-        tab: 'details',
+        done: coHostCount > 0,
+        tab: null,
+        onClick: () => setHostsExpanded(prev => !prev),
         icon: Users,
       },
       {
@@ -92,7 +96,7 @@ export const GPPDashboardTab: React.FC = () => {
         icon: Rocket,
       },
     ];
-  }, [party, autoStates]);
+  }, [party, autoStates, coHostCount]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;
@@ -158,34 +162,46 @@ export const GPPDashboardTab: React.FC = () => {
           <div className="space-y-1">
             {checklist.map((item) => {
               const Icon = item.icon;
-              const Wrapper = item.tab ? 'button' : 'div';
+              const clickable = item.tab || item.onClick;
+              const Wrapper = clickable ? 'button' : 'div';
               return (
-                <Wrapper
-                  key={item.label}
-                  onClick={item.tab ? () => goToTab(item.tab!) : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
-                    item.tab ? 'hover:bg-theme-surface cursor-pointer' : ''
-                  }`}
-                >
-                  {item.done ? (
-                    <CheckCircle size={18} className="text-green-500 shrink-0" />
-                  ) : (
-                    <Circle size={18} className="text-theme-text-faint shrink-0" />
-                  )}
-                  <Icon size={16} className={item.done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'} />
-                  <span
-                    className={`text-sm ${
-                      item.done ? 'text-theme-text-muted line-through' : 'text-theme-text'
+                <React.Fragment key={item.label}>
+                  <Wrapper
+                    onClick={clickable ? (item.onClick || (() => goToTab(item.tab!))) : undefined}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
+                      clickable ? 'hover:bg-theme-surface cursor-pointer' : ''
                     }`}
                   >
-                    {item.label}
-                  </span>
-                  {item.tab && (
-                    <span className="ml-auto text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors">
-                      Go &rarr;
+                    {item.done ? (
+                      <CheckCircle size={18} className="text-green-500 shrink-0" />
+                    ) : (
+                      <Circle size={18} className="text-theme-text-faint shrink-0" />
+                    )}
+                    <Icon size={16} className={item.done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'} />
+                    <span
+                      className={`text-sm ${
+                        item.done ? 'text-theme-text-muted line-through' : 'text-theme-text'
+                      }`}
+                    >
+                      {item.label}
                     </span>
+                    {clickable && (
+                      <span className="ml-auto text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors">
+                        {item.label === 'Build a Team' && hostsExpanded ? '\u25B2' : 'Go \u2192'}
+                      </span>
+                    )}
+                  </Wrapper>
+                  {item.label === 'Build a Team' && hostsExpanded && (
+                    <div className="ml-9 mr-3 mb-2 mt-1 p-4 bg-theme-surface rounded-xl border border-theme-stroke animate-fade-in">
+                      <HostsManager
+                        partyId={party.id}
+                        hostName={party.hostName || ''}
+                        initialCoHosts={party.coHosts || []}
+                        onCoHostsChange={(coHosts) => setCoHostCount(coHosts.length)}
+                      />
+                    </div>
                   )}
-                </Wrapper>
+                </React.Fragment>
               );
             })}
           </div>

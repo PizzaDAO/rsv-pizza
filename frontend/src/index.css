@@ -615,6 +615,24 @@ body.gpp-theme-active .pac-item-query {
   50% { transform: translateX(-50px); }
   100% { transform: translateX(0); }
 }
+/* Drawer slide-in animation */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
+/* Generic fade-in */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
 @keyframes confetti-fly {
   0% {
     transform: translate(-50%, -50%) rotate(0deg) scale(1);
