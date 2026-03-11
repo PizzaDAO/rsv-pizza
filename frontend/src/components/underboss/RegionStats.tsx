@@ -20,7 +20,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+    <div className="card p-4">
       <div className="flex items-center gap-2 mb-2">
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}>
           <Icon size={16} />
@@ -93,7 +93,7 @@ export function RegionStats({ stats }: RegionStatsProps) {
       </div>
 
       {/* Completion rates */}
-      <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+      <div className="card p-4">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={14} className="text-theme-text-muted" />
           <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion Rates</span>

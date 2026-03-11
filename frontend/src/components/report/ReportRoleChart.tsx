@@ -39,7 +39,7 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
 
   if (totalSelections === 0) {
     return (
-      <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
+      <div className="card p-6 text-center">
         <BarChart3 className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
         <p className="text-theme-text-muted text-sm">No role data available</p>
       </div>
@@ -55,7 +55,7 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-theme-text">RSVP Roles</h3>
-      <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+      <div className="card p-6">
         {/* Summary line */}
         <p className="text-theme-text-muted text-xs mb-4">
           {base} RSVPs / {totalSelections} role selections

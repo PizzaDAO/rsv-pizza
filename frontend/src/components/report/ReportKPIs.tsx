@@ -75,7 +75,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
             const Icon = stat.icon;
 
             return (
-              <div key={stat.key} className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+              <div key={stat.key} className="card p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Icon size={16} className={stat.color} />
                   <span className="text-xs text-theme-text-secondary">{stat.label}</span>
@@ -107,7 +107,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
           return (
             <div
               key={stat.key}
-              className={`bg-theme-surface rounded-xl p-4 border border-theme-stroke transition-opacity ${hidden ? 'opacity-40' : ''}`}
+              className={`card p-4 transition-opacity ${hidden ? 'opacity-40' : ''}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">

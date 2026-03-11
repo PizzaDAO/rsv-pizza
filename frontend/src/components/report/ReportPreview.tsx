@@ -66,7 +66,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       )}
 
       {/* Header with event info */}
-      <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+      <div className="card p-6">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Event image */}
           {report.eventImageUrl && (
@@ -145,7 +145,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Recap */}
       {report.reportRecap && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-3">Event Recap</h2>
           <p className="text-theme-text text-sm leading-relaxed whitespace-pre-wrap">{report.reportRecap}</p>
         </div>
@@ -153,7 +153,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Media */}
       {(report.reportPhotosUrl || report.featuredPhotos.length > 0) && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-4">Media</h2>
           {report.featuredPhotos.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
@@ -199,7 +199,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Stats */}
       {hasKPIs && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-4">Stats</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {visibleStats.map((stat) => (
@@ -220,7 +220,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Industry RSVPs */}
       {report.notableAttendees.length > 0 && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-3">Industry RSVPs</h2>
           <div className="flex flex-wrap gap-2">
             {groupAttendeesByOrg(report.notableAttendees).map((group) => (
@@ -232,14 +232,14 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Role Breakdown */}
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
         </div>
       )}
 
       {/* Social Posts */}
       {report.socialPosts.length > 0 && (
-        <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke">
+        <div className="card p-6">
           <SocialPostsList
             posts={report.socialPosts}
             onAdd={async () => {}}
