@@ -425,9 +425,11 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
         socialPosts: party.socialPosts,
         notableAttendees: party.notableAttendees.map(a => {
           const { guest, ...attendee } = a as any;
+          const fullEmail = guest?.email as string | undefined;
+          const domain = fullEmail?.split('@')[1] || null;
           return {
             ...attendee,
-            // Don't expose email in public report
+            email: domain ? `@${domain}` : null,
           };
         }),
         featuredPhotos: party.photos,
