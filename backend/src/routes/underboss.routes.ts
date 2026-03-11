@@ -80,15 +80,23 @@ async function requireUnderbossAuth(
   }
 }
 
-// Helper: compute progress for an event
+// Helper: compute progress for an event (9 items matching GPP host dashboard)
 function computeProgress(party: any) {
+  const coHosts = Array.isArray(party.coHosts) ? party.coHosts : [];
+  const sponsors = Array.isArray(party.sponsors) ? party.sponsors : [];
+  const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
+  const eventPassed = party.date ? new Date(party.date) < new Date() : false;
+
   return {
+    hasCreatedEvent: true,
+    hasPartyKit: !!party.partyKit,
+    hasCoHosts: coHosts.length > 0,
     hasVenue: !!(party.venueName || party.address),
     hasBudget: !!(party.budgetEnabled && party.budgetTotal),
-    hasPartyKit: !!party.partyKit,
-    hasEventImage: !!party.eventImageUrl,
-    hasDate: !!party.date,
-    hasAddress: !!party.address,
+    hasSponsors: sponsors.length > 0,
+    hasPrepared: false, // manual step — always false for now
+    hasSocialPosts: !!(party.xPostUrl || party.farcasterPostUrl),
+    hasThrown: eventPassed && checkedInCount > 0,
   };
 }
 
@@ -166,6 +174,9 @@ function formatEvent(party: any) {
     kitStatus: party.partyKit?.status || null,
     fundraisingGoal: party.fundraisingGoal ? Number(party.fundraisingGoal) : null,
     totalSponsored,
+    hostStatus: party.hostStatus || null,
+    underbossApproved: party.underbossApproved || false,
+    hostTags: party.hostTags || [],
     createdAt: party.createdAt,
   };
 }
@@ -405,6 +416,83 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
     const stats = computeStats(events);
 
     res.json({ region, stats });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// Event PATCH routes (underboss auth)
+// ============================================
+
+// PATCH /api/underboss/event/:partyId/host-status - Set host status (new/alum/pro)
+router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { hostStatus } = req.body;
+
+    const validStatuses = ['new', 'alum', 'pro', null];
+    if (!validStatuses.includes(hostStatus)) {
+      throw new AppError('Invalid host status. Must be "new", "alum", "pro", or null', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { hostStatus: hostStatus || null },
+      select: { id: true, hostStatus: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/approve - Toggle underboss approval
+router.patch('/event/:partyId/approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { approved } = req.body;
+
+    if (typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { underbossApproved: approved },
+      select: { id: true, underbossApproved: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/tags - Set host tags
+router.patch('/event/:partyId/tags', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { tags } = req.body;
+
+    if (!Array.isArray(tags)) {
+      throw new AppError('tags must be an array of strings', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate: tags must be strings, max 50 chars each, max 10 tags
+    const cleanTags = tags
+      .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+      .map((t: string) => t.trim().toLowerCase().slice(0, 50))
+      .slice(0, 10);
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { hostTags: cleanTags },
+      select: { id: true, hostTags: true },
+    });
+
+    res.json({ party });
   } catch (error) {
     next(error);
   }
