@@ -197,9 +197,9 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
                 <User className="w-5 h-5 text-[#ff393a]" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-white font-medium">{hostName}</p>
+                  <p className="text-white font-medium truncate">{hostName}</p>
                   <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
                 </div>
               </div>
@@ -215,24 +215,25 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
+            className={`p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
               }`}
           >
-            <div className="flex items-center gap-3 flex-1">
-              <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
+            {/* Top row: identity + remove button */}
+            <div className="flex items-center gap-3">
+              <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0">
                 <GripVertical size={18} />
               </div>
               {coHost.avatar_url ? (
-                <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover" />
+                <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center shrink-0">
                   <User className="w-5 h-5 text-[#ff393a]" />
                 </div>
               )}
-              <div className="flex-1">
-                <p className="text-white font-medium">{coHost.name}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium truncate">{coHost.name}</p>
                 {coHost.email && (
-                  <p className="text-white/50 text-xs">{coHost.email}</p>
+                  <p className="text-white/50 text-xs truncate">{coHost.email}</p>
                 )}
                 <div className="flex items-center gap-2 mt-1">
                   {coHost.website && (
@@ -254,8 +255,16 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   )}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => removeCoHost(coHost.id)}
+                className="text-[#ff393a] hover:text-[#ff5a5b] shrink-0"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="flex items-center gap-3">
+            {/* Bottom row: controls */}
+            <div className="flex items-center gap-3 mt-2 pl-9">
               <Checkbox
                 checked={coHost.showOnEvent !== false}
                 onChange={() => toggleCoHostShowOnEvent(coHost.id)}
@@ -276,13 +285,6 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 className="text-white/50 hover:text-white text-sm font-medium"
               >
                 Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => removeCoHost(coHost.id)}
-                className="text-[#ff393a] hover:text-[#ff5a5b]"
-              >
-                <X size={18} />
               </button>
             </div>
           </div>
