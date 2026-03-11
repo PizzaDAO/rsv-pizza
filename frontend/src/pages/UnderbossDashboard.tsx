@@ -8,7 +8,7 @@ import { RegionStats, EventTable } from '../components/underboss';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+// GPP theme applied directly — Underboss dashboard is always GPP
 import { GPP_REGIONS } from '../types';
 import type { UnderbossDashboardData, UnderbossStats } from '../types';
 
@@ -46,7 +46,14 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
 
 export function UnderbossDashboard() {
   const { user, loading: authLoading } = useAuth();
-  const { themeClass, backgroundStyle } = useTheme();
+  const themeClass = 'gpp-theme';
+  const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+  // Set body class for elements outside React tree
+  useEffect(() => {
+    document.body.classList.add('gpp-theme-active');
+    return () => { document.body.classList.remove('gpp-theme-active'); };
+  }, []);
 
   const [allData, setAllData] = useState<UnderbossDashboardData | null>(null);
   const [loading, setLoading] = useState(true);

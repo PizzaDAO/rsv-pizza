@@ -7,7 +7,7 @@ import { Performer, Song, Playlist, MusicPlatform, PerformerType } from '../type
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
-import { useTheme } from '../contexts/ThemeContext';
+// GPP theme applied directly — DJPage is always GPP
 import { PlatformIcon } from '../components/music/SongCard';
 
 // Type icons
@@ -108,7 +108,14 @@ export function DJPage() {
     loadData();
   }, [inviteCode]);
 
-  const { themeClass, backgroundStyle } = useTheme();
+  const themeClass = 'gpp-theme';
+  const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+  // Set body class for elements outside React tree
+  useEffect(() => {
+    document.body.classList.add('gpp-theme-active');
+    return () => { document.body.classList.remove('gpp-theme-active'); };
+  }, []);
 
   if (loading) {
     return (

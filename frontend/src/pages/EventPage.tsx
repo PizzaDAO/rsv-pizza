@@ -13,7 +13,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
 import { LoginModal } from '../components/LoginModal';
@@ -426,9 +426,11 @@ export function EventPage() {
   }
 
   const isGPP = event?.eventType === 'gpp';
-  const { themeClass, backgroundStyle } = useTheme();
+  const themeClass = isGPP ? 'gpp-theme' : '';
+  const backgroundStyle = isGPP ? { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties : undefined;
 
   return (
+    <ThemeProvider theme={isGPP ? 'gpp' : 'dark'}>
     <div
       className={`min-h-screen ${themeClass}`}
       style={backgroundStyle}
@@ -1040,5 +1042,6 @@ export function EventPage() {
 
       {ConfettiOverlay}
     </div>
+    </ThemeProvider>
   );
 }

@@ -25,7 +25,7 @@ function App() {
   return (
     <HelmetProvider>
       <AuthProvider>
-        <ThemeProvider theme="gpp">
+        <ThemeProvider theme="dark">
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomePage />} />

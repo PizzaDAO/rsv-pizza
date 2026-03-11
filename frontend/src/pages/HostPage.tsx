@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
@@ -397,10 +398,20 @@ function HostPageContent() {
   );
 }
 
+function HostPageThemeWrapper() {
+  const { party } = usePizza();
+  const isGPP = party?.eventType === 'gpp';
+  return (
+    <ThemeProvider theme={isGPP ? 'gpp' : 'dark'}>
+      <HostPageContent />
+    </ThemeProvider>
+  );
+}
+
 export function HostPage() {
   return (
     <PizzaProvider>
-      <HostPageContent />
+      <HostPageThemeWrapper />
     </PizzaProvider>
   );
 }

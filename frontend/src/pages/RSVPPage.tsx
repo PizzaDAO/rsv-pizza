@@ -11,7 +11,7 @@ import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 import { uuid } from '../lib/utils';
-import { useTheme } from '../contexts/ThemeContext';
+// GPP theme applied conditionally — gppClass + body class via useEffect
 import { useConfetti } from '../hooks/useConfetti';
 
 export function RSVPPage() {
@@ -33,7 +33,15 @@ export function RSVPPage() {
   const [showDonationForm, setShowDonationForm] = useState(false);
 
   const isGPP = party?.event_type === 'gpp';
-  const { themeClass: gppClass, backgroundStyle: themeBackgroundStyle } = useTheme();
+  const gppClass = isGPP ? 'gpp-theme' : '';
+  const themeBackgroundStyle = isGPP ? { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties : undefined;
+
+  // Set body class for Google Maps autocomplete styling
+  useEffect(() => {
+    if (isGPP) document.body.classList.add('gpp-theme-active');
+    else document.body.classList.remove('gpp-theme-active');
+    return () => { document.body.classList.remove('gpp-theme-active'); };
+  }, [isGPP]);
   const { fire: fireConfetti, fireFromCenter, ConfettiOverlay } = useConfetti();
 
   // Password protection state
