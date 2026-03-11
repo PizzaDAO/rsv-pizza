@@ -38,13 +38,13 @@ export function PizzaChefModal({ isOpen, onClose }: PizzaChefModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative w-[90vw] h-[90vh] rounded-2xl overflow-hidden bg-black/80 border border-white/10"
+        className="relative w-[90vw] h-[90vh] rounded-2xl overflow-hidden bg-black/80 border border-theme-stroke"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-colors"
+          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-theme-text-secondary hover:text-theme-text hover:bg-black/80 transition-colors"
         >
           <X size={20} />
         </button>

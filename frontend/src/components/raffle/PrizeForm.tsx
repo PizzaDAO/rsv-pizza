@@ -30,14 +30,14 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">
+      <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
+          <h2 className="text-lg font-semibold text-theme-text">
             {prize ? 'Edit Prize' : 'Add Prize'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+            className="p-2 hover:bg-theme-surface-hover rounded-lg transition-colors text-theme-text-secondary hover:text-theme-text"
           >
             <X size={20} />
           </button>
@@ -74,7 +74,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
               />
             </div>
             {imageUrl && (
-              <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg overflow-hidden bg-theme-surface-hover flex-shrink-0">
                 <img
                   src={imageUrl}
                   alt="Preview"
@@ -96,7 +96,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
             placeholder="Quantity"
           />
-          <p className="text-xs text-white/40 -mt-2 pl-1">Number of this prize to give away</p>
+          <p className="text-xs text-theme-text-muted -mt-2 pl-1">Number of this prize to give away</p>
 
           <div className="flex gap-3 pt-1">
             <button

@@ -95,9 +95,9 @@ export function PublicReportPage() {
           <div className="card p-8 text-center">
             {error === 'Report not found' ? (
               <>
-                <FileText className="w-16 h-16 text-white/20 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-white mb-2">Report Not Found</h2>
-                <p className="text-white/60">This report may have been unpublished or the link is invalid.</p>
+                <FileText className="w-16 h-16 text-theme-text-faint mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-theme-text mb-2">Report Not Found</h2>
+                <p className="text-theme-text-secondary">This report may have been unpublished or the link is invalid.</p>
               </>
             ) : (
               <div className="flex items-center justify-center gap-3 text-red-400">
@@ -116,12 +116,12 @@ export function PublicReportPage() {
       <Layout>
         <div className="max-w-4xl mx-auto py-12 px-4">
           <div className="card p-8 max-w-md mx-auto text-center">
-            <Lock className="w-12 h-12 text-white/30 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">Password Protected</h2>
+            <Lock className="w-12 h-12 text-theme-text-faint mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-theme-text mb-2">Password Protected</h2>
             {eventName && (
-              <p className="text-white/60 mb-4">{eventName}</p>
+              <p className="text-theme-text-secondary mb-4">{eventName}</p>
             )}
-            <p className="text-white/40 text-sm mb-6">Enter the password to view this report.</p>
+            <p className="text-theme-text-muted text-sm mb-6">Enter the password to view this report.</p>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <IconInput
                 icon={Lock}

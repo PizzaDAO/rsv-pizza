@@ -396,7 +396,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Music size={20} className="text-[#ff393a]" />
-          <h2 className="text-lg font-semibold text-white">Music</h2>
+          <h2 className="text-lg font-semibold text-theme-text">Music</h2>
         </div>
         {isHost && (
           <div className="flex items-center gap-2">
@@ -405,7 +405,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
               className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
                 musicEnabled
                   ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
-                  : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white/60'
+                  : 'bg-theme-surface border-theme-stroke text-theme-text-muted hover:bg-theme-surface-hover hover:text-theme-text-secondary'
               }`}
               title={musicEnabled ? 'Music visible to guests' : 'Music hidden from guests'}
             >
@@ -422,7 +422,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                   setTimeout(() => setCopied(false), 2000);
                 });
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-sm text-white/70 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover border border-theme-stroke rounded-lg text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               title="Copy DJ share link"
             >
               {copied ? (
@@ -451,13 +451,13 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
       {/* Loading */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 size={24} className="animate-spin text-white/50" />
+          <Loader2 size={24} className="animate-spin text-theme-text-muted" />
         </div>
       ) : (
         <>
           {/* Section Tabs (Host Only) */}
           {isHost && (
-            <div className="flex gap-2 mb-4 border-b border-white/10 pb-4">
+            <div className="flex gap-2 mb-4 border-b border-theme-stroke pb-4">
               {sections.map((section) => (
                 <button
                   key={section.id}
@@ -465,14 +465,14 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     activeSection === section.id
                       ? 'bg-[#ff393a] text-white'
-                      : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                      : 'bg-theme-surface text-theme-text-secondary hover:bg-theme-surface-hover hover:text-theme-text'
                   }`}
                 >
                   {section.icon}
                   <span>{section.label}</span>
                   {section.count > 0 && (
                     <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                      activeSection === section.id ? 'bg-white/20' : 'bg-white/10'
+                      activeSection === section.id ? 'bg-theme-surface-hover' : 'bg-theme-surface-hover'
                     }`}>
                       {section.count}
                     </span>
@@ -511,7 +511,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-white/50">
+                    <div className="text-center py-8 text-theme-text-muted">
                       <Mic2 size={32} className="mx-auto mb-2 opacity-50" />
                       <p>No performers added yet</p>
                       <p className="text-sm">Add DJs, bands, or solo artists</p>
@@ -552,7 +552,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-white/50">
+                <div className="text-center py-8 text-theme-text-muted">
                   <Disc3 size={32} className="mx-auto mb-2 opacity-50" />
                   <p>No songs added yet</p>
                   <p className="text-sm">Add individual songs with links to Spotify, YouTube, etc.</p>
@@ -563,7 +563,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
               {isSongDragOver && (
                 <div className="border-2 border-dashed border-[#ff393a] bg-[#ff393a]/10 rounded-xl p-4 text-center">
                   <Upload size={20} className="mx-auto mb-1 text-[#ff393a]" />
-                  <p className="text-sm text-white/60">Drop audio file here</p>
+                  <p className="text-sm text-theme-text-secondary">Drop audio file here</p>
                 </div>
               )}
               {/* Add Song Button */}
@@ -593,7 +593,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-white/50">
+                <div className="text-center py-8 text-theme-text-muted">
                   <ListMusic size={32} className="mx-auto mb-2 opacity-50" />
                   <p>No playlists added yet</p>
                   <p className="text-sm">Add Spotify, Apple Music, or YouTube playlists</p>
@@ -617,7 +617,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
               {/* Songs */}
               {songs.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-theme-text-secondary mb-2 flex items-center gap-2">
                     <Disc3 size={14} />
                     Songs
                   </h3>
@@ -638,7 +638,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
               {/* Playlists */}
               {playlists.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-theme-text-secondary mb-2 flex items-center gap-2">
                     <ListMusic size={14} />
                     Playlists
                   </h3>

@@ -69,15 +69,15 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a1a] rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-theme-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-white/10">
-          <h2 className="text-2xl font-bold text-white">
+        <div className="flex justify-between items-center p-6 border-b border-theme-stroke">
+          <h2 className="text-2xl font-bold text-theme-text">
             {step === 1 ? 'Add Emails' : 'Invite Guests'}
           </h2>
           <button
             onClick={handleClose}
-            className="text-white/60 hover:text-white transition-colors"
+            className="text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
@@ -113,19 +113,19 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
               {/* Email List */}
               {emails.length > 0 && (
                 <div className="mt-6 space-y-2">
-                  <h3 className="text-sm font-medium text-white/60 mb-3">
+                  <h3 className="text-sm font-medium text-theme-text-secondary mb-3">
                     Added Emails ({emails.length})
                   </h3>
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {emails.map((email, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3"
+                        className="flex items-center justify-between bg-theme-surface border border-theme-stroke rounded-lg p-3"
                       >
-                        <span className="text-white text-sm">{email}</span>
+                        <span className="text-theme-text text-sm">{email}</span>
                         <button
                           onClick={() => handleRemoveEmail(email)}
-                          className="text-white/40 hover:text-[#ff393a] transition-colors"
+                          className="text-theme-text-muted hover:text-[#ff393a] transition-colors"
                         >
                           <X size={16} />
                         </button>
@@ -140,19 +140,19 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Left Sidebar - Email List */}
               <div className="md:col-span-1">
-                <h3 className="text-sm font-medium text-white/60 mb-3">
+                <h3 className="text-sm font-medium text-theme-text-secondary mb-3">
                   Inviting {emails.length} {emails.length === 1 ? 'Person' : 'People'}
                 </h3>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {emails.map((email, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg p-3"
+                      className="flex items-center gap-3 bg-theme-surface border border-theme-stroke rounded-lg p-3"
                     >
-                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 text-xs font-medium">
+                      <div className="w-8 h-8 rounded-full bg-theme-surface-hover flex items-center justify-center text-theme-text-secondary text-xs font-medium">
                         {email.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-white text-sm truncate">{email}</span>
+                      <span className="text-theme-text text-sm truncate">{email}</span>
                     </div>
                   ))}
                 </div>
@@ -160,8 +160,8 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
 
               {/* Right Side - Message Preview */}
               <div className="md:col-span-2 space-y-3">
-                <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-3">
-                  <p className="text-white text-lg">
+                <div className="bg-theme-surface border border-theme-stroke rounded-xl p-6 space-y-3">
+                  <p className="text-theme-text text-lg">
                     Hi, {hostName} invites you to join {eventName}.
                   </p>
 
@@ -172,26 +172,26 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
                     className="w-full min-h-[120px] resize-none"
                   />
 
-                  <div className="bg-white/10 border border-white/20 rounded-lg p-4">
-                    <p className="text-white/80 text-sm font-medium mb-1">RSVP:</p>
-                    <p className="text-white/60 text-sm break-all font-mono">{inviteLink}</p>
+                  <div className="bg-theme-surface-hover border border-theme-stroke-hover rounded-lg p-4">
+                    <p className="text-theme-text text-sm font-medium mb-1">RSVP:</p>
+                    <p className="text-theme-text-secondary text-sm break-all font-mono">{inviteLink}</p>
                   </div>
 
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 bg-white/10 rounded flex items-center justify-center flex-shrink-0">
-                      <Send size={18} className="text-white/60" />
+                    <div className="w-10 h-10 bg-theme-surface-hover rounded flex items-center justify-center flex-shrink-0">
+                      <Send size={18} className="text-theme-text-secondary" />
                     </div>
                     <div>
-                      <p className="text-white text-sm mb-1">
+                      <p className="text-theme-text text-sm mb-1">
                         We will send them an invite link to register for the event.
                       </p>
-                      <p className="text-white/60 text-xs">
+                      <p className="text-theme-text-secondary text-xs">
                         Guests will be automatically approved when they complete their registration.
                       </p>
                     </div>
                   </div>
 
-                  <p className="text-white/50 text-xs">
+                  <p className="text-theme-text-muted text-xs">
                     You can bypass registration and payment by adding guests directly to the guest list.{' '}
                     <button
                       onClick={handleClose}
@@ -207,7 +207,7 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center p-6 border-t border-white/10">
+        <div className="flex justify-between items-center p-6 border-t border-theme-stroke">
           {step === 2 ? (
             <>
               <button

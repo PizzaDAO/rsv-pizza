@@ -135,7 +135,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
     return (
       <div className="card p-8 text-center">
         <AlertCircle className="w-12 h-12 text-[#ff393a] mx-auto mb-4" />
-        <p className="text-white/60 mb-4">{error}</p>
+        <p className="text-theme-text-secondary mb-4">{error}</p>
         <button
           onClick={loadBudget}
           className="btn-secondary inline-flex items-center gap-2"
@@ -156,7 +156,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       {/* Budget Overview Card */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Budget Overview</h2>
+          <h2 className="text-lg font-semibold text-theme-text">Budget Overview</h2>
           <button
             onClick={() => setShowForm(true)}
             className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2"
@@ -184,11 +184,11 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
 
       {/* Expenses by Category */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Expenses</h2>
+        <h2 className="text-lg font-semibold text-theme-text mb-4">Expenses</h2>
 
         {budget.items.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-white/40 mb-4">No expenses recorded yet</p>
+            <p className="text-theme-text-muted mb-4">No expenses recorded yet</p>
             <button
               onClick={() => setShowForm(true)}
               className="btn-secondary inline-flex items-center gap-2"
@@ -232,9 +232,9 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(null)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white mb-3">Delete Expense?</h2>
-            <p className="text-white/60 mb-6">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-theme-text mb-3">Delete Expense?</h2>
+            <p className="text-theme-text-secondary mb-6">
               This will permanently delete this expense item. This action cannot be undone.
             </p>
             <div className="flex gap-3">

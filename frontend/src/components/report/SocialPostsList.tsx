@@ -95,9 +95,9 @@ function LinkPreview({ url, platform }: { url: string; platform: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-2 flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors text-sm text-white/60 hover:text-white/80"
+      className="mt-2 flex items-center gap-2 px-3 py-2 bg-theme-surface rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-sm text-theme-text-secondary hover:text-theme-text"
     >
-      <div className={`w-5 h-5 ${platformInfo.color} rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
+      <div className={`w-5 h-5 ${platformInfo.color} rounded flex items-center justify-center text-theme-text text-[10px] font-bold flex-shrink-0`}>
         {platformInfo.icon}
       </div>
       <span className="truncate">{url}</span>
@@ -169,9 +169,9 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Social Posts</h3>
+          <h3 className="text-lg font-semibold text-theme-text">Social Posts</h3>
           {totalViews > 0 && (
-            <div className="flex items-center gap-1.5 text-white/60 text-sm">
+            <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm">
               <Eye size={14} />
               <span>{totalViews.toLocaleString()} total views</span>
             </div>
@@ -181,30 +181,30 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
           {posts.map((post) => {
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
-              <div key={post.id} className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+              <div key={post.id} className="bg-theme-surface rounded-xl border border-theme-stroke overflow-hidden">
                 <div className="flex items-center gap-2 p-2">
-                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
+                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-theme-text text-[9px] font-bold flex-shrink-0`}>
                     {platform.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     {post.title && (
-                      <p className="text-xs text-white font-medium truncate">{post.title}</p>
+                      <p className="text-xs text-theme-text font-medium truncate">{post.title}</p>
                     )}
                     {post.authorHandle && (
-                      <span className="text-[10px] text-white/60">@{post.authorHandle}</span>
+                      <span className="text-[10px] text-theme-text-secondary">@{post.authorHandle}</span>
                     )}
                     {!post.title && !post.authorHandle && (
-                      <p className="text-[10px] text-white/40 truncate">{post.url}</p>
+                      <p className="text-[10px] text-theme-text-muted truncate">{post.url}</p>
                     )}
                   </div>
                   {post.views != null && (
-                    <div className="flex items-center gap-1 text-white/60 text-[10px] flex-shrink-0">
+                    <div className="flex items-center gap-1 text-theme-text-secondary text-[10px] flex-shrink-0">
                       <Eye size={10} />
                       <span>{post.views.toLocaleString()}</span>
                     </div>
                   )}
                   <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                    <ExternalLink size={12} className="text-white/40 hover:text-white/60" />
+                    <ExternalLink size={12} className="text-theme-text-muted hover:text-theme-text-secondary" />
                   </a>
                 </div>
                 {/* Embed for Twitter/X posts */}
@@ -231,9 +231,9 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Social Posts</h3>
+          <h3 className="text-lg font-semibold text-theme-text">Social Posts</h3>
           {totalViews > 0 && (
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-xs text-theme-text-muted mt-0.5">
               {totalViews.toLocaleString()} total views across {posts.length} post{posts.length !== 1 ? 's' : ''}
             </p>
           )}
@@ -241,7 +241,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
         {!isAdding && (
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors"
+            className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <Plus size={16} />
             Add Post
@@ -251,7 +251,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
 
       {/* Add new post form */}
       {isAdding && (
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke space-y-3">
           <div className="flex gap-2">
             {Object.entries(PLATFORMS).map(([key, platform]) => (
               <button
@@ -259,8 +259,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
                 onClick={() => setNewPlatform(key)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   newPlatform === key
-                    ? `${platform.color} text-white`
-                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    ? `${platform.color} text-theme-text`
+                    : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                 }`}
               >
                 {platform.name}
@@ -323,31 +323,31 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
             return (
               <div
                 key={post.id}
-                className="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
+                className="bg-theme-surface rounded-xl border border-theme-stroke overflow-hidden"
               >
                 {/* Post header row */}
                 <div className="flex items-center gap-2 p-2">
-                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
+                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-theme-text text-[9px] font-bold flex-shrink-0`}>
                     {platform.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     {post.title && (
-                      <p className="text-xs text-white font-medium truncate">{post.title}</p>
+                      <p className="text-xs text-theme-text font-medium truncate">{post.title}</p>
                     )}
                     {post.authorHandle && (
-                      <span className="text-[10px] text-white/60">@{post.authorHandle}</span>
+                      <span className="text-[10px] text-theme-text-secondary">@{post.authorHandle}</span>
                     )}
                     <a
                       href={post.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[10px] text-white/40 hover:text-white/60 truncate block"
+                      className="text-[10px] text-theme-text-muted hover:text-theme-text-secondary truncate block"
                     >
                       {post.url}
                     </a>
                   </div>
                   {post.views != null && (
-                    <div className="flex items-center gap-1 text-white/50 text-[10px] flex-shrink-0 bg-white/5 px-1.5 py-0.5 rounded">
+                    <div className="flex items-center gap-1 text-theme-text-muted text-[10px] flex-shrink-0 bg-theme-surface px-1.5 py-0.5 rounded">
                       <Eye size={10} />
                       <span>{post.views.toLocaleString()}</span>
                     </div>
@@ -355,7 +355,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
                   <button
                     onClick={() => handleDelete(post.id)}
                     disabled={deletingId === post.id}
-                    className="p-1 text-white/40 hover:text-red-400 transition-colors flex-shrink-0"
+                    className="p-1 text-theme-text-muted hover:text-red-400 transition-colors flex-shrink-0"
                   >
                     {deletingId === post.id ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -382,9 +382,9 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
         </div>
       ) : (
         !isAdding && (
-          <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
-            <p className="text-white/40 text-sm">No social posts added yet</p>
-            <p className="text-white/30 text-xs mt-1">Add links to posts about your event</p>
+          <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
+            <p className="text-theme-text-muted text-sm">No social posts added yet</p>
+            <p className="text-theme-text-faint text-xs mt-1">Add links to posts about your event</p>
           </div>
         )
       )}

@@ -100,7 +100,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
   const getStatusIcon = () => {
     switch (status) {
       case 'initiated':
-        return <Phone size={32} className="text-white/60" />;
+        return <Phone size={32} className="text-theme-text-secondary" />;
       case 'ringing':
         return <Phone size={32} className="text-[#fbbf24] animate-bounce" />;
       case 'in_progress':
@@ -111,7 +111,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
       case 'no_answer':
         return <PhoneOff size={32} className="text-[#ff393a]" />;
       default:
-        return <Phone size={32} className="text-white/60" />;
+        return <Phone size={32} className="text-theme-text-secondary" />;
     }
   };
 
@@ -147,7 +147,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
               ? 'bg-[#39d98a]/20'
               : isFailedCall
               ? 'bg-[#ff393a]/20'
-              : 'bg-white/10'
+              : 'bg-theme-surface-hover'
           }`}
         >
           {isActiveCall && status !== 'ringing' ? (
@@ -159,11 +159,11 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
       </div>
 
       {/* Status Message */}
-      <h3 className="text-xl font-bold text-white mb-2">{getStatusMessage()}</h3>
+      <h3 className="text-xl font-bold text-theme-text mb-2">{getStatusMessage()}</h3>
 
       {/* Elapsed Time */}
       {isActiveCall && (
-        <div className="flex items-center justify-center gap-2 text-white/60 mb-4">
+        <div className="flex items-center justify-center gap-2 text-theme-text-secondary mb-4">
           <Clock size={16} />
           <span>{formatTime(elapsedTime)}</span>
         </div>
@@ -179,12 +179,12 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
           />
           <div
             className={`w-3 h-3 rounded-full ${
-              status === 'ringing' ? 'bg-[#fbbf24] animate-pulse' : status === 'in_progress' ? 'bg-[#39d98a]' : 'bg-white/20'
+              status === 'ringing' ? 'bg-[#fbbf24] animate-pulse' : status === 'in_progress' ? 'bg-[#39d98a]' : 'bg-theme-surface-hover'
             }`}
           />
           <div
             className={`w-3 h-3 rounded-full ${
-              status === 'in_progress' ? 'bg-[#39d98a] animate-pulse' : 'bg-white/20'
+              status === 'in_progress' ? 'bg-[#39d98a] animate-pulse' : 'bg-theme-surface-hover'
             }`}
           />
         </div>
@@ -196,14 +196,14 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
           <h4 className="font-medium text-[#39d98a] mb-2">Order Details</h4>
           <div className="space-y-1 text-sm">
             {callData.confirmedTotal && (
-              <p className="text-white">
-                <span className="text-white/60">Total:</span>{' '}
+              <p className="text-theme-text">
+                <span className="text-theme-text-secondary">Total:</span>{' '}
                 ${(callData.confirmedTotal / 100).toFixed(2)}
               </p>
             )}
             {callData.estimatedTime && (
-              <p className="text-white">
-                <span className="text-white/60">Ready:</span> {callData.estimatedTime}
+              <p className="text-theme-text">
+                <span className="text-theme-text-secondary">Ready:</span> {callData.estimatedTime}
               </p>
             )}
           </div>
@@ -212,9 +212,9 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
       {/* Summary */}
       {callData?.summary && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 text-left">
-          <h4 className="font-medium text-white mb-2">Summary</h4>
-          <p className="text-white/70 text-sm">{callData.summary}</p>
+        <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-6 text-left">
+          <h4 className="font-medium text-theme-text mb-2">Summary</h4>
+          <p className="text-theme-text-secondary text-sm">{callData.summary}</p>
         </div>
       )}
 
@@ -228,7 +228,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
       {/* Failed Call Actions */}
       {isFailedCall && (
         <div className="space-y-3">
-          <p className="text-white/60 text-sm mb-4">
+          <p className="text-theme-text-secondary text-sm mb-4">
             {status === 'no_answer'
               ? 'The pizzeria did not answer. They may be busy or closed.'
               : 'There was a problem with the call. Please try again.'}
@@ -251,7 +251,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
       {isActiveCall && (
         <button
           onClick={onCancel}
-          className="text-white/50 hover:text-white text-sm underline"
+          className="text-theme-text-muted hover:text-theme-text text-sm underline"
         >
           Cancel
         </button>

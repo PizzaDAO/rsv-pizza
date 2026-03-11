@@ -6,6 +6,8 @@ import { getEventBySlug, PublicEvent, getPerformers } from '../lib/api';
 import { Performer, Song, Playlist, MusicPlatform, PerformerType } from '../types';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { CornerLinks } from '../components/CornerLinks';
+import { useTheme } from '../contexts/ThemeContext';
 import { PlatformIcon } from '../components/music/SongCard';
 
 // Type icons
@@ -106,9 +108,11 @@ export function DJPage() {
     loadData();
   }, [inviteCode]);
 
+  const { themeClass, backgroundStyle } = useTheme();
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${themeClass}`} style={backgroundStyle}>
         <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
       </div>
     );
@@ -116,11 +120,11 @@ export function DJPage() {
 
   if (error || !event) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${themeClass}`} style={backgroundStyle}>
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Page Not Found</h1>
-          <p className="text-white/60 mb-6">{error}</p>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Page Not Found</h1>
+          <p className="text-theme-text-secondary mb-6">{error}</p>
           <Link to="/" className="btn-primary inline-block">
             Go to Home
           </Link>
@@ -163,7 +167,7 @@ export function DJPage() {
   const hasContent = sortedPerformers.length > 0 || songs.length > 0 || playlists.length > 0;
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
       <Helmet>
         <title>DJ Info - {event.name} | RSV.Pizza</title>
         <meta name="robots" content="noindex" />
@@ -177,8 +181,8 @@ export function DJPage() {
           <div className="flex items-center gap-3 mb-4">
             <Music size={24} className="text-[#ff393a]" />
             <div>
-              <p className="text-sm text-white/50 uppercase tracking-wider font-medium">DJ / Music Info</p>
-              <h1 className="text-2xl font-bold text-white" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+              <p className="text-sm text-theme-text-muted uppercase tracking-wider font-medium">DJ / Music Info</p>
+              <h1 className="text-2xl font-bold text-theme-text" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
             </div>
           </div>
 
@@ -187,8 +191,8 @@ export function DJPage() {
             <div className="flex items-start gap-3 mb-3">
               <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-white font-medium">{formattedDate}</p>
-                <p className="text-white/60 text-sm">
+                <p className="text-theme-text font-medium">{formattedDate}</p>
+                <p className="text-theme-text-secondary text-sm">
                   {formattedTime}
                   {formattedEndTime && ` - ${formattedEndTime}`}
                 </p>
@@ -202,9 +206,9 @@ export function DJPage() {
               <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-0.5" />
               <div>
                 {event.venueName && (
-                  <p className="text-white font-medium">{event.venueName}</p>
+                  <p className="text-theme-text font-medium">{event.venueName}</p>
                 )}
-                <p className={event.venueName ? 'text-white/60 text-sm' : 'text-white font-medium'}>{event.address}</p>
+                <p className={event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'}>{event.address}</p>
               </div>
             </div>
           )}
@@ -212,9 +216,9 @@ export function DJPage() {
 
         {!hasContent && (
           <div className="card p-8 text-center">
-            <Music size={48} className="mx-auto mb-4 text-white/20" />
-            <p className="text-white/50 text-lg">No music information available yet</p>
-            <p className="text-white/30 text-sm mt-2">The host hasn't added any performers, songs, or playlists</p>
+            <Music size={48} className="mx-auto mb-4 text-theme-text-faint" />
+            <p className="text-theme-text-muted text-lg">No music information available yet</p>
+            <p className="text-theme-text-faint text-sm mt-2">The host hasn't added any performers, songs, or playlists</p>
           </div>
         )}
 
@@ -223,14 +227,14 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Mic2 size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-white">Lineup</h2>
+              <h2 className="text-lg font-semibold text-theme-text">Lineup</h2>
             </div>
 
             <div className="space-y-3">
               {sortedPerformers.map((performer) => (
                 <div
                   key={performer.id}
-                  className="bg-white/5 border border-white/10 rounded-xl p-4"
+                  className="bg-theme-surface border border-theme-stroke rounded-xl p-4"
                 >
                   <div className="flex items-start gap-3">
                     {/* Type Icon */}
@@ -238,13 +242,13 @@ export function DJPage() {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-medium text-lg">{performer.name}</h3>
+                      <h3 className="text-theme-text font-medium text-lg">{performer.name}</h3>
 
-                      <div className="flex items-center gap-2 text-sm text-white/60 mt-1">
+                      <div className="flex items-center gap-2 text-sm text-theme-text-secondary mt-1">
                         <span>{typeLabels[performer.type]}</span>
                         {performer.genre && (
                           <>
-                            <span className="text-white/30">|</span>
+                            <span className="text-theme-text-faint">|</span>
                             <span>{performer.genre}</span>
                           </>
                         )}
@@ -252,10 +256,10 @@ export function DJPage() {
 
                       {/* Time Info */}
                       {(performer.setTime || performer.setDuration) && (
-                        <div className="flex items-center gap-2 text-sm text-white/70 mt-2">
-                          <Clock size={14} className="text-white/40" />
+                        <div className="flex items-center gap-2 text-sm text-theme-text-secondary mt-2">
+                          <Clock size={14} className="text-theme-text-muted" />
                           {performer.setTime && <span>{formatTime(performer.setTime)}</span>}
-                          {performer.setTime && performer.setDuration && <span className="text-white/30">-</span>}
+                          {performer.setTime && performer.setDuration && <span className="text-theme-text-faint">-</span>}
                           {performer.setDuration && <span>{formatDuration(performer.setDuration)} set</span>}
                         </div>
                       )}
@@ -279,7 +283,7 @@ export function DJPage() {
                             href={`https://instagram.com/${performer.instagram.replace('@', '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors"
+                            className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                           >
                             <Instagram size={14} />
                             <span>{performer.instagram.startsWith('@') ? performer.instagram : `@${performer.instagram}`}</span>
@@ -294,7 +298,7 @@ export function DJPage() {
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors"
+                            className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                           >
                             <ExternalLink size={14} />
                             <span>SoundCloud</span>
@@ -304,7 +308,7 @@ export function DJPage() {
 
                       {/* Notes */}
                       {performer.notes && (
-                        <p className="text-sm text-white/50 mt-2 italic">{performer.notes}</p>
+                        <p className="text-sm text-theme-text-muted mt-2 italic">{performer.notes}</p>
                       )}
                     </div>
                   </div>
@@ -319,28 +323,28 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Disc3 size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-white">Requested Songs</h2>
+              <h2 className="text-lg font-semibold text-theme-text">Requested Songs</h2>
             </div>
 
             <div className="space-y-2">
               {songs.map((song) => (
                 <div
                   key={song.id}
-                  className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center gap-3"
+                  className="bg-theme-surface border border-theme-stroke rounded-xl p-3 flex items-center gap-3"
                 >
                   <div className="flex-shrink-0">
                     <PlatformIcon platform={song.platform} size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium text-sm truncate">{song.title}</p>
-                    <p className="text-white/60 text-xs truncate">{song.artist}</p>
+                    <p className="text-theme-text font-medium text-sm truncate">{song.title}</p>
+                    <p className="text-theme-text-secondary text-xs truncate">{song.artist}</p>
                   </div>
                   {song.url && (
                     <a
                       href={song.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-colors flex-shrink-0"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover rounded-lg text-sm text-theme-text-secondary hover:text-theme-text transition-colors flex-shrink-0"
                     >
                       <ExternalLink size={14} />
                       <span className="hidden sm:inline">{platformLabels[song.platform]}</span>
@@ -357,7 +361,7 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <ListMusic size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-white">Playlists</h2>
+              <h2 className="text-lg font-semibold text-theme-text">Playlists</h2>
             </div>
 
             <div className="space-y-2">
@@ -367,20 +371,20 @@ export function DJPage() {
                   href={playlist.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/[0.07] transition-colors"
+                  className="block bg-theme-surface border border-theme-stroke rounded-xl p-4 hover:bg-theme-surface-hover transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0">
                       <PlatformIcon platform={playlist.platform} size={22} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate">{playlist.name}</p>
-                      <p className="text-white/50 text-sm">{platformLabels[playlist.platform]}</p>
+                      <p className="text-theme-text font-medium truncate">{playlist.name}</p>
+                      <p className="text-theme-text-muted text-sm">{platformLabels[playlist.platform]}</p>
                       {playlist.description && (
-                        <p className="text-white/40 text-sm mt-1 line-clamp-2">{playlist.description}</p>
+                        <p className="text-theme-text-muted text-sm mt-1 line-clamp-2">{playlist.description}</p>
                       )}
                     </div>
-                    <ExternalLink size={18} className="text-white/40 flex-shrink-0" />
+                    <ExternalLink size={18} className="text-theme-text-muted flex-shrink-0" />
                   </div>
                 </a>
               ))}
@@ -392,7 +396,7 @@ export function DJPage() {
         <div className="text-center py-4">
           <Link
             to={`/${event.customUrl || event.inviteCode}`}
-            className="text-white/40 hover:text-white/60 text-sm transition-colors"
+            className="text-theme-text-muted hover:text-theme-text-secondary text-sm transition-colors"
           >
             View Event Page
           </Link>
@@ -400,6 +404,7 @@ export function DJPage() {
 
         <Footer className="mt-4 pb-2" />
       </div>
+      <CornerLinks />
     </div>
   );
 }

@@ -260,11 +260,11 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     <>
       {/* Header */}
       <div className="mb-3">
-        <h3 className={embedded ? "text-sm font-semibold text-white/70 uppercase tracking-wider mb-1" : "text-xl font-bold text-white flex items-center gap-2 mb-1"}>
+        <h3 className={embedded ? "text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-1" : "text-xl font-bold text-theme-text flex items-center gap-2 mb-1"}>
           {!embedded && <MapPin size={20} />}
           Pizzeria Selection
         </h3>
-        <p className="text-xs text-white/50">
+        <p className="text-xs text-theme-text-muted">
           Choose up to 3 pizzerias for guests to rank when they RSVP
         </p>
       </div>
@@ -272,7 +272,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {/* Selected Pizzerias */}
       {selectedPizzerias.length > 0 && (
         <div className="space-y-2 mb-3">
-          <p className="text-xs text-white/60 font-medium">Selected ({selectedPizzerias.length}/3):</p>
+          <p className="text-xs text-theme-text-secondary font-medium">Selected ({selectedPizzerias.length}/3):</p>
           {sortedSelectedPizzerias.map((pizzeria, index) => {
             const scores = pizzeriaScores.get(pizzeria.id);
             const hasVotes = scores && scores.total > 0;
@@ -287,7 +287,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
             return (
               <div
                 key={pizzeria.id}
-                className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border ${
+                className={`flex items-center justify-between p-3 bg-theme-surface rounded-xl border ${
                   rank ? rank.border : 'border-[#ff393a]/30'
                 }`}
               >
@@ -301,14 +301,14 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                       <MapPin className="w-5 h-5 text-[#ff393a]" />
                     )}
                     {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
-                      <span className="text-xs text-white/40">
+                      <span className="text-xs text-theme-text-muted">
                         {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                       </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                      <p className="text-theme-text font-medium truncate">{pizzeria.name}</p>
                       {pizzeria.rating && (
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
                           <Star size={12} className="fill-yellow-400" />
@@ -323,12 +323,12 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                       )}
                     </div>
                     {pizzeria.address && (
-                      <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                      <p className="text-theme-text-muted text-xs truncate">{pizzeria.address}</p>
                     )}
                     {hasVotes && scores && (
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-emerald-400 font-medium">{scores.total} pts</span>
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-theme-text-muted">
                           {scores.first > 0 && `${scores.first}\u00d7 1st`}
                           {scores.first > 0 && scores.second > 0 && ' \u00b7 '}
                           {scores.second > 0 && `${scores.second}\u00d7 2nd`}
@@ -354,7 +354,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                         {pizzeria.phone && (
                           <a
                             href={`tel:${pizzeria.phone}`}
-                            className="text-white/50 hover:text-white text-xs flex items-center gap-1"
+                            className="text-theme-text-muted hover:text-theme-text text-xs flex items-center gap-1"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Phone size={10} />
@@ -393,7 +393,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {/* Guest Suggestions */}
       {guestSuggestions.length > 0 && (
         <div className="space-y-2 mb-3">
-          <p className="text-xs text-white/60 font-medium flex items-center gap-1.5">
+          <p className="text-xs text-theme-text-secondary font-medium flex items-center gap-1.5">
             <Users size={12} />
             Guest suggestions:
           </p>
@@ -405,7 +405,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 type="button"
                 onClick={() => selectPizzeria(suggestion.pizzeria)}
                 disabled={selectedPizzerias.length >= 3}
-                className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                className="w-full flex items-center justify-between p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover hover:border-theme-stroke-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
@@ -413,7 +413,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-white font-medium truncate">{suggestion.pizzeria.name}</p>
+                      <p className="text-theme-text font-medium truncate">{suggestion.pizzeria.name}</p>
                       {suggestion.pizzeria.rating && (
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
                           <Star size={12} className="fill-yellow-400" />
@@ -424,20 +424,20 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                         {suggestion.count} {suggestion.count === 1 ? 'vote' : 'votes'}
                       </span>
                       {venueLocation && suggestion.pizzeria.location && suggestion.pizzeria.location.lat !== 0 && (
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-theme-text-muted">
                           {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, suggestion.pizzeria.location.lat, suggestion.pizzeria.location.lng))}
                         </span>
                       )}
                     </div>
                     {suggestion.pizzeria.address && (
-                      <p className="text-white/50 text-xs truncate">{suggestion.pizzeria.address}</p>
+                      <p className="text-theme-text-muted text-xs truncate">{suggestion.pizzeria.address}</p>
                     )}
-                    <p className="text-white/30 text-xs truncate mt-0.5">
+                    <p className="text-theme-text-faint text-xs truncate mt-0.5">
                       Suggested by {suggestion.suggestedBy.join(', ')}
                     </p>
                   </div>
                 </div>
-                <Plus size={18} className="text-white/40 flex-shrink-0" />
+                <Plus size={18} className="text-theme-text-muted flex-shrink-0" />
               </button>
             ))}
         </div>
@@ -446,12 +446,12 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {/* Nearby Pizzerias (only show unselected ones) */}
       {party.address && (
         <div className="space-y-2 mb-3">
-          <p className="text-xs text-white/60 font-medium">
+          <p className="text-xs text-theme-text-secondary font-medium">
             {loadingPizzerias ? 'Searching nearby...' : 'Nearby pizzerias:'}
           </p>
           {loadingPizzerias && (
             <div className="flex items-center justify-center py-4">
-              <Loader2 size={20} className="animate-spin text-white/50" />
+              <Loader2 size={20} className="animate-spin text-theme-text-muted" />
             </div>
           )}
           {!loadingPizzerias && nearbyPizzerias
@@ -463,15 +463,15 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 type="button"
                 onClick={() => selectPizzeria(pizzeria)}
                 disabled={selectedPizzerias.length >= 3}
-                className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                className="w-full flex items-center justify-between p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover hover:border-theme-stroke-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-white/60" />
+                  <div className="w-10 h-10 rounded-full bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-theme-text-secondary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-white font-medium truncate">{pizzeria.name}</p>
+                      <p className="text-theme-text font-medium truncate">{pizzeria.name}</p>
                       {pizzeria.rating && (
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
                           <Star size={12} className="fill-yellow-400" />
@@ -479,19 +479,19 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                         </span>
                       )}
                       {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-theme-text-muted">
                           {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                         </span>
                       )}
                     </div>
-                    <p className="text-white/50 text-xs truncate">{pizzeria.address}</p>
+                    <p className="text-theme-text-muted text-xs truncate">{pizzeria.address}</p>
                   </div>
                 </div>
-                <Plus size={18} className="text-white/40 flex-shrink-0" />
+                <Plus size={18} className="text-theme-text-muted flex-shrink-0" />
               </button>
             ))}
           {!loadingPizzerias && nearbyPizzerias.length === 0 && party.address && (
-            <p className="text-white/40 text-sm py-2">No pizzerias found nearby</p>
+            <p className="text-theme-text-muted text-sm py-2">No pizzerias found nearby</p>
           )}
         </div>
       )}
@@ -521,10 +521,10 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {/* Add Custom Pizzeria Modal */}
       {showAddPizzeriaModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-sm" onClick={resetModal}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Add Pizzeria</h2>
-              <button onClick={resetModal} className="text-white/50 hover:text-white transition-colors">
+              <h2 className="text-lg font-semibold text-theme-text">Add Pizzeria</h2>
+              <button onClick={resetModal} className="text-theme-text-muted hover:text-theme-text transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -539,7 +539,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 <button
                   type="button"
                   onClick={() => setManualMode(true)}
-                  className="text-sm text-white/50 hover:text-white/80 transition-colors"
+                  className="text-sm text-theme-text-muted hover:text-theme-text transition-colors"
                 >
                   Can't find it? Enter manually
                 </button>
@@ -549,25 +549,25 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
             {/* Selected Place Preview */}
             {selectedPlace && (
               <div className="space-y-3">
-                <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-white font-semibold">{selectedPlace.name}</p>
+                    <p className="text-theme-text font-semibold">{selectedPlace.name}</p>
                     {selectedPlace.rating && (
                       <span className="flex items-center gap-1 text-xs text-yellow-400">
                         <Star size={12} className="fill-yellow-400" />
                         {selectedPlace.rating.toFixed(1)}
                         {selectedPlace.reviewCount && (
-                          <span className="text-white/40">({selectedPlace.reviewCount})</span>
+                          <span className="text-theme-text-muted">({selectedPlace.reviewCount})</span>
                         )}
                       </span>
                     )}
                   </div>
                   {selectedPlace.address && (
-                    <p className="text-white/50 text-xs">{selectedPlace.address}</p>
+                    <p className="text-theme-text-muted text-xs">{selectedPlace.address}</p>
                   )}
                   <div className="flex items-center gap-3 mt-2">
                     {selectedPlace.phone && (
-                      <span className="text-white/40 text-xs flex items-center gap-1">
+                      <span className="text-theme-text-muted text-xs flex items-center gap-1">
                         <Phone size={10} />
                         {selectedPlace.phone}
                       </span>
@@ -584,7 +584,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                       </a>
                     )}
                     {selectedPlace.priceLevel && (
-                      <span className="text-white/40 text-xs">
+                      <span className="text-theme-text-muted text-xs">
                         {'$'.repeat(selectedPlace.priceLevel)}
                       </span>
                     )}
@@ -595,7 +595,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                   <button
                     type="button"
                     onClick={() => setSelectedPlace(null)}
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                    className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
                   >
                     Back
                   </button>
@@ -653,7 +653,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                   <button
                     type="button"
                     onClick={() => setManualMode(false)}
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                    className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
                   >
                     Back
                   </button>
@@ -687,13 +687,13 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       {/* AI Call Complete Modal */}
       {orderComplete && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
             <div className="text-center mb-4">
               <div className="w-16 h-16 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center mx-auto mb-4">
                 <Phone size={32} className="text-[#8b5cf6]" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-1">AI Call Placed</h2>
-              <p className="text-white/60 text-sm">
+              <h2 className="text-2xl font-bold text-theme-text mb-1">AI Call Placed</h2>
+              <p className="text-theme-text-secondary text-sm">
                 Calling {orderComplete.pizzeriaName}
               </p>
             </div>

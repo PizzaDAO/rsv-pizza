@@ -77,8 +77,8 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   if (loading) {
     return (
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-        <div className="flex items-center justify-center gap-2 text-white/60">
+      <div className="card p-6">
+        <div className="flex items-center justify-center gap-2 text-theme-text-secondary">
           <Loader2 size={20} className="animate-spin" />
           <span>Loading kit status...</span>
         </div>
@@ -88,7 +88,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   if (error) {
     return (
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+      <div className="card p-6">
         <div className="flex items-center justify-center gap-2 text-red-400">
           <AlertCircle size={20} />
           <span>{error}</span>
@@ -125,14 +125,14 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   return (
     <>
-      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+      <div className="card overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-lg">
-              <Package size={20} className="text-white/60" />
+            <div className="p-2 bg-theme-surface-hover rounded-lg">
+              <Package size={20} className="text-theme-text-secondary" />
             </div>
-            <span className="font-medium text-white">Party Kit</span>
+            <span className="font-medium text-theme-text">Party Kit</span>
           </div>
         </div>
 
@@ -143,15 +143,15 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
               <Gift size={32} className="text-[#ff393a]" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-white mb-1">
+              <h3 className="font-semibold text-theme-text mb-1">
                 Get Your Free Party Kit
               </h3>
-              <p className="text-sm text-white/60 mb-4">
+              <p className="text-sm text-theme-text-secondary mb-4">
                 Request a party kit with stickers, tablecloths, flyers, and more to make your pizza party amazing!
               </p>
 
               {kitDeadline && (
-                <p className={`text-xs mb-3 ${isDeadlinePassed ? 'text-red-400' : 'text-white/50'}`}>
+                <p className={`text-xs mb-3 ${isDeadlinePassed ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {isDeadlinePassed
                     ? 'Deadline has passed'
                     : `Request by ${new Date(kitDeadline).toLocaleDateString()}`

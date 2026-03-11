@@ -170,8 +170,8 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
               onClick={() => setActivePlatform(platform)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                 isActive
-                  ? 'bg-white/15 text-white border border-white/20'
-                  : 'bg-white/5 text-white/50 hover:text-white/70 hover:bg-white/10 border border-transparent'
+                  ? 'bg-theme-surface-hover text-theme-text border border-theme-stroke-hover'
+                  : 'bg-theme-surface text-theme-text-muted hover:text-theme-text-secondary hover:bg-theme-surface-hover border border-transparent'
               }`}
             >
               {getPlatformIcon(platform, 14)}
@@ -186,7 +186,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
 
       {/* Event Image Preview */}
       {party.eventImageUrl && (
-        <div className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
+        <div className="rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface">
           <div className="relative">
             <img
               src={party.eventImageUrl}
@@ -196,13 +196,13 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             <button
               type="button"
               onClick={handleDownloadImage}
-              className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 hover:bg-black/90 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors backdrop-blur-sm"
+              className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 hover:bg-black/90 text-theme-text text-xs font-medium px-3 py-1.5 rounded-lg transition-colors backdrop-blur-sm"
             >
               <Download size={14} />
               Download Image
             </button>
           </div>
-          <div className="px-3 py-2 flex items-center gap-2 text-white/40 text-xs">
+          <div className="px-3 py-2 flex items-center gap-2 text-theme-text-muted text-xs">
             <Image size={12} />
             Attach this image to your post for best engagement
           </div>
@@ -215,15 +215,15 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
           {threadPosts.map((post, idx) => (
             <div key={idx}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-white/50 font-medium">{THREAD_LABELS[idx]}</span>
+                <span className="text-xs text-theme-text-muted font-medium">{THREAD_LABELS[idx]}</span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs ${post.length > 280 ? 'text-red-400' : 'text-white/40'}`}>
+                  <span className={`text-xs ${post.length > 280 ? 'text-red-400' : 'text-theme-text-muted'}`}>
                     {post.length} / 280
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopyThread(idx)}
-                    className="text-xs text-white/40 hover:text-white/60 transition-colors flex items-center gap-1"
+                    className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors flex items-center gap-1"
                   >
                     {copiedIdx === idx ? (
                       <><Check size={10} className="text-green-400" /> Copied</>
@@ -262,11 +262,11 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             <button
               type="button"
               onClick={regeneratePost}
-              className="text-xs text-white/40 hover:text-white/60 transition-colors"
+              className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
             >
               Regenerate
             </button>
-            <span className={`text-xs ${isOverLimit ? 'text-red-400' : 'text-white/40'}`}>
+            <span className={`text-xs ${isOverLimit ? 'text-red-400' : 'text-theme-text-muted'}`}>
               {charCount} / {config.charLimit}
             </span>
           </div>
@@ -279,7 +279,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
           <button
             type="button"
             onClick={regeneratePost}
-            className="text-xs text-white/40 hover:text-white/60 transition-colors"
+            className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
           >
             Regenerate thread
           </button>
@@ -291,7 +291,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
         <button
           type="button"
           onClick={() => handleCopy()}
-          className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+          className="flex-1 flex items-center justify-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           {copied ? (
             <>

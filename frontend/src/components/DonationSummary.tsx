@@ -64,14 +64,14 @@ export const DonationSummary: React.FC = () => {
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-theme-text flex items-center gap-2">
           <DollarSign size={20} className="text-[#ff393a]" />
           Donations
         </h3>
         {donations.length > 0 && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-white/60 hover:text-white flex items-center gap-1 text-sm"
+            className="text-theme-text-secondary hover:text-theme-text flex items-center gap-1 text-sm"
           >
             {expanded ? 'Hide' : 'Show'} Details
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -81,8 +81,8 @@ export const DonationSummary: React.FC = () => {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+          <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-1">
             <DollarSign size={14} />
             Total Raised
           </div>
@@ -90,12 +90,12 @@ export const DonationSummary: React.FC = () => {
             {summary ? formatAmount(summary.totalAmount) : '$0.00'}
           </div>
         </div>
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+        <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
+          <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-1">
             <Users size={14} />
             Donors
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-theme-text">
             {summary?.totalCount || 0}
           </div>
         </div>
@@ -105,21 +105,21 @@ export const DonationSummary: React.FC = () => {
       {party.donationGoal && goalProgress !== null && (
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-white/60 flex items-center gap-1">
+            <span className="text-theme-text-secondary flex items-center gap-1">
               <Target size={14} />
               Goal Progress
             </span>
-            <span className="text-white font-medium">
+            <span className="text-theme-text font-medium">
               {summary ? formatAmount(summary.totalAmount) : '$0'} / ${party.donationGoal}
             </span>
           </div>
-          <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-3 bg-theme-surface-hover rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-[#ff393a] to-[#ff6b6b] transition-all duration-500"
               style={{ width: `${goalProgress}%` }}
             />
           </div>
-          <div className="text-right text-xs text-white/50 mt-1">
+          <div className="text-right text-xs text-theme-text-muted mt-1">
             {goalProgress.toFixed(0)}% of goal
           </div>
         </div>
@@ -127,16 +127,16 @@ export const DonationSummary: React.FC = () => {
 
       {/* Donations List */}
       {expanded && donations.length > 0 && (
-        <div className="border-t border-white/10 pt-4 mt-4">
+        <div className="border-t border-theme-stroke pt-4 mt-4">
           <div className="space-y-3 max-h-64 overflow-y-auto">
             {donations.map((donation) => (
               <div
                 key={donation.id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10"
+                className="flex items-center justify-between p-3 bg-theme-surface rounded-xl border border-theme-stroke"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium truncate">
+                    <span className="text-theme-text font-medium truncate">
                       {donation.isAnonymous ? 'Anonymous' : donation.donorName || 'Guest'}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -156,10 +156,10 @@ export const DonationSummary: React.FC = () => {
                     )}
                   </div>
                   {donation.message && (
-                    <p className="text-white/50 text-sm truncate mt-0.5">"{donation.message}"</p>
+                    <p className="text-theme-text-muted text-sm truncate mt-0.5">"{donation.message}"</p>
                   )}
                   <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-white/40 text-xs">
+                    <p className="text-theme-text-muted text-xs">
                       {formatDate(donation.createdAt)}
                     </p>
                     {donation.txHash && donation.chainId && (
@@ -189,7 +189,7 @@ export const DonationSummary: React.FC = () => {
 
       {/* Empty State */}
       {donations.length === 0 && (
-        <div className="text-center py-6 text-white/50">
+        <div className="text-center py-6 text-theme-text-muted">
           <DollarSign size={32} className="mx-auto mb-2 opacity-50" />
           <p>No donations yet</p>
           <p className="text-sm">Share your event link to start receiving donations</p>

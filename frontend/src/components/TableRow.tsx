@@ -83,7 +83,7 @@ export const TableRow: React.FC<TableRowProps> = ({
       const combinedLabel = `½ ${leftLabel} / ½ ${rightLabel}`;
 
       return (
-        <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+        <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
           {/* Quantity */}
           <span className="text-[#ff393a] font-bold text-sm flex-shrink-0 w-8 text-center">
             {quantity}x
@@ -92,7 +92,7 @@ export const TableRow: React.FC<TableRowProps> = ({
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-white">{combinedLabel}</span>
+              <span className="font-semibold text-theme-text">{combinedLabel}</span>
             </div>
             <div className="flex flex-wrap gap-1 mt-1">
               {pizzaRec.dietaryRestrictions.map(r => (
@@ -100,7 +100,7 @@ export const TableRow: React.FC<TableRowProps> = ({
                   {r}
                 </span>
               ))}
-              <span className="text-white/50 text-xs">
+              <span className="text-theme-text-muted text-xs">
                 {pizzaRec.size.diameter}" {pizzaRec.style.name}
               </span>
             </div>
@@ -111,16 +111,16 @@ export const TableRow: React.FC<TableRowProps> = ({
             {pizzaRec.guests && pizzaRec.guests.length > 0 ? (
               <>
                 {pizzaRec.guests.slice(0, 4).map((g, i) => (
-                  <span key={g.id || i} className="px-1.5 py-0.5 bg-white/10 text-white/70 text-[10px] rounded">
+                  <span key={g.id || i} className="px-1.5 py-0.5 bg-theme-surface-hover text-theme-text-secondary text-[10px] rounded">
                     {g.name.split(' ')[0]}
                   </span>
                 ))}
                 {pizzaRec.guests.length > 4 && (
-                  <span className="text-white/50 text-[10px]">+{pizzaRec.guests.length - 4}</span>
+                  <span className="text-theme-text-muted text-[10px]">+{pizzaRec.guests.length - 4}</span>
                 )}
               </>
             ) : (
-              <span className="text-white/50 text-xs">
+              <span className="text-theme-text-muted text-xs">
                 {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
               </span>
             )}
@@ -130,13 +130,13 @@ export const TableRow: React.FC<TableRowProps> = ({
     }
 
     return (
-      <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+      <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
         {/* Quantity - with edit controls if editable */}
         {editable && onQuantityChange ? (
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => onQuantityChange(pizzaRec.id, Math.max(0, quantity - 1))}
-              className="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text transition-colors"
             >
               <Minus size={12} />
             </button>
@@ -145,7 +145,7 @@ export const TableRow: React.FC<TableRowProps> = ({
             </span>
             <button
               onClick={() => onQuantityChange(pizzaRec.id, quantity + 1)}
-              className="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text transition-colors"
             >
               <Plus size={12} />
             </button>
@@ -159,7 +159,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white">{label}</span>
+            <span className="font-semibold text-theme-text">{label}</span>
             <span className="text-base" title={pizzaRec.toppings.map(t => t.name).join(', ')}>
               {toppingEmojis}
             </span>
@@ -170,11 +170,11 @@ export const TableRow: React.FC<TableRowProps> = ({
                 {r}
               </span>
             ))}
-            <span className="text-white/50 text-xs">
+            <span className="text-theme-text-muted text-xs">
               {pizzaRec.size.diameter}" {pizzaRec.style.name}
             </span>
             {pizzaRec.isForNonRespondents && (
-              <span className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[10px] rounded">
+              <span className="px-1.5 py-0.5 bg-theme-surface-hover text-theme-text-secondary text-[10px] rounded">
                 For non-respondents
               </span>
             )}
@@ -186,16 +186,16 @@ export const TableRow: React.FC<TableRowProps> = ({
           {pizzaRec.guests && pizzaRec.guests.length > 0 ? (
             <>
               {pizzaRec.guests.slice(0, 4).map((g, i) => (
-                <span key={g.id || i} className="px-1.5 py-0.5 bg-white/10 text-white/70 text-[10px] rounded">
+                <span key={g.id || i} className="px-1.5 py-0.5 bg-theme-surface-hover text-theme-text-secondary text-[10px] rounded">
                   {g.name.split(' ')[0]}
                 </span>
               ))}
               {pizzaRec.guests.length > 4 && (
-                <span className="text-white/50 text-[10px]">+{pizzaRec.guests.length - 4}</span>
+                <span className="text-theme-text-muted text-[10px]">+{pizzaRec.guests.length - 4}</span>
               )}
             </>
           ) : (
-            <span className="text-white/50 text-xs">
+            <span className="text-theme-text-muted text-xs">
               {pizzaRec.guestCount} {pizzaRec.guestCount === 1 ? 'guest' : 'guests'}
             </span>
           )}
@@ -205,7 +205,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         {editable && onRemovePizza && (
           <button
             onClick={() => onRemovePizza(pizzaRec.id)}
-            className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+            className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
             aria-label="Remove pizza"
           >
             <Trash2 size={14} />
@@ -218,7 +218,7 @@ export const TableRow: React.FC<TableRowProps> = ({
   // Beverage variant
   if (variant === 'beverage' && beverageRec) {
     return (
-      <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+      <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
         {/* Quantity */}
         <span className={`font-bold text-sm flex-shrink-0 w-8 text-center ${beverageRec.isForNonRespondents ? 'text-[#6b7280]' : 'text-blue-500'}`}>
           {beverageRec.quantity}x
@@ -226,12 +226,12 @@ export const TableRow: React.FC<TableRowProps> = ({
 
         {/* Content */}
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-white">{beverageRec.beverage.name}</span>
-          <span className="text-white/50 text-xs">
+          <span className="font-semibold text-theme-text">{beverageRec.beverage.name}</span>
+          <span className="text-theme-text-muted text-xs">
             ({beverageRec.guestCount} {beverageRec.guestCount === 1 ? 'guest' : 'guests'})
           </span>
           {beverageRec.isForNonRespondents && (
-            <span className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[10px] rounded">
+            <span className="px-1.5 py-0.5 bg-theme-surface-hover text-theme-text-secondary text-[10px] rounded">
               For non-respondents
             </span>
           )}
@@ -246,22 +246,22 @@ export const TableRow: React.FC<TableRowProps> = ({
   // Waitlist variant
   if (variant === 'waitlist') {
     return (
-      <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+      <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
         {/* Position badge */}
         <div className="w-8 h-8 rounded-full bg-[#ffc107]/20 border border-[#ffc107]/30 flex items-center justify-center text-[#ffc107] text-sm font-bold flex-shrink-0">
           #{guest.waitlistPosition || '?'}
         </div>
 
         {/* Avatar */}
-        <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-white text-sm font-medium flex-shrink-0`}>
+        <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-theme-text text-sm font-medium flex-shrink-0`}>
           {guest.name.charAt(0).toUpperCase()}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-white">{guest.name}</span>
+          <span className="font-semibold text-theme-text">{guest.name}</span>
           {guest.email && (
-            <span className="text-white/50 text-sm truncate">{guest.email}</span>
+            <span className="text-theme-text-muted text-sm truncate">{guest.email}</span>
           )}
         </div>
 
@@ -280,7 +280,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         {onRemove && (
           <button
             onClick={() => guest.id && onRemove(guest.id)}
-            className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+            className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
             aria-label="Remove guest"
           >
             <Trash2 size={14} />
@@ -291,9 +291,9 @@ export const TableRow: React.FC<TableRowProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-3 py-3 group hover:bg-white/5 -mx-2 px-2 rounded-lg transition-colors">
+    <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
       {/* Avatar */}
-      <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-white text-sm font-medium flex-shrink-0`}>
+      <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-theme-text text-sm font-medium flex-shrink-0`}>
         {guest.name.charAt(0).toUpperCase()}
       </div>
 
@@ -301,14 +301,14 @@ export const TableRow: React.FC<TableRowProps> = ({
       {variant === 'basic' ? (
         // Basic variant: Name & Email
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-white">{guest.name}</span>
+          <span className="font-semibold text-theme-text">{guest.name}</span>
           {guest.email && (
-            <ClickableEmail email={guest.email} className="text-white/50 text-sm truncate" />
+            <ClickableEmail email={guest.email} className="text-theme-text-muted text-sm truncate" />
           )}
           {guest.roles && guest.roles.length > 0 && (
             <div className="flex gap-1">
               {guest.roles.map(role => (
-                <span key={role} className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[10px] rounded">
+                <span key={role} className="px-1.5 py-0.5 bg-theme-surface-hover text-theme-text-secondary text-[10px] rounded">
                   {role}
                 </span>
               ))}
@@ -318,7 +318,7 @@ export const TableRow: React.FC<TableRowProps> = ({
       ) : (
         // Requests variant: Name on left, Preferences on right
         <>
-          <span className="font-semibold text-white flex-shrink-0">{guest.name}</span>
+          <span className="font-semibold text-theme-text flex-shrink-0">{guest.name}</span>
           <div className="flex-1 min-w-0 flex flex-wrap gap-1 justify-end">
             {guest.dietaryRestrictions.map(restriction => (
               <span key={restriction} className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] rounded border border-purple-500/30">
@@ -397,7 +397,7 @@ export const TableRow: React.FC<TableRowProps> = ({
           className={`p-1.5 rounded transition-colors flex-shrink-0 ${
             isNotable
               ? 'text-yellow-400 hover:bg-yellow-400/10'
-              : 'text-white/0 group-hover:text-white/30 hover:!text-yellow-400 hover:!bg-yellow-400/10'
+              : 'text-transparent group-hover:text-theme-text-faint hover:!text-yellow-400 hover:!bg-yellow-400/10'
           }`}
           title={isNotable ? 'Remove from industry RSVPs' : 'Mark as industry RSVP'}
         >
@@ -423,7 +423,7 @@ export const TableRow: React.FC<TableRowProps> = ({
           <button
             onClick={() => guest.id && onCheckIn(guest.id)}
             disabled={isCheckingIn}
-            className="flex items-center gap-1 text-white/50 hover:text-green-400 hover:bg-green-500/10 px-2 py-1 rounded transition-colors text-xs flex-shrink-0 disabled:opacity-50"
+            className="flex items-center gap-1 text-theme-text-muted hover:text-green-400 hover:bg-green-500/10 px-2 py-1 rounded transition-colors text-xs flex-shrink-0 disabled:opacity-50"
             title="Check in guest"
           >
             {isCheckingIn ? (
@@ -438,7 +438,7 @@ export const TableRow: React.FC<TableRowProps> = ({
 
       {/* Date - only for basic variant */}
       {variant === 'basic' && guest.submittedAt && (
-        <span className="text-white/40 text-sm hidden sm:block flex-shrink-0">
+        <span className="text-theme-text-muted text-sm hidden sm:block flex-shrink-0">
           {format(new Date(guest.submittedAt), 'MMM d, h:mm a')}
         </span>
       )}
@@ -447,7 +447,7 @@ export const TableRow: React.FC<TableRowProps> = ({
       {onRemove && (
         <button
           onClick={() => guest.id && onRemove(guest.id)}
-          className="p-1.5 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+          className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
           aria-label="Remove guest"
         >
           <Trash2 size={14} />

@@ -113,7 +113,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        className="absolute top-4 right-4 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
       >
         <X size={24} />
       </button>
@@ -125,7 +125,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             e.stopPropagation();
             navigatePrev();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
         >
           <ChevronLeft size={32} />
         </button>
@@ -137,7 +137,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             e.stopPropagation();
             navigateNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
         >
           <ChevronRight size={32} />
         </button>
@@ -158,15 +158,15 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
         </div>
 
         {/* Info Panel */}
-        <div className="w-full md:w-80 bg-[#1a1a2e] p-4 md:p-6 md:ml-4 rounded-lg md:rounded-l-none overflow-y-auto">
+        <div className="w-full md:w-80 bg-theme-header p-4 md:p-6 md:ml-4 rounded-lg md:rounded-l-none overflow-y-auto">
           {/* Uploader Info */}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
               <User size={20} className="text-[#ff393a]" />
             </div>
             <div>
-              <p className="text-white font-medium">{uploaderDisplayName}</p>
-              <p className="text-white/50 text-sm flex items-center gap-1">
+              <p className="text-theme-text font-medium">{uploaderDisplayName}</p>
+              <p className="text-theme-text-muted text-sm flex items-center gap-1">
                 <Calendar size={12} />
                 {formatDate(photo.createdAt)}
               </p>
@@ -227,7 +227,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                   value={captionValue}
                   onChange={(e) => setCaptionValue(e.target.value)}
                   placeholder="Add a caption..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
                   rows={3}
                   autoFocus
                 />
@@ -243,7 +243,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                       setCaptionValue(photo.caption || '');
                       setEditingCaption(false);
                     }}
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white text-sm font-medium py-1.5 rounded-lg transition-colors"
+                    className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text text-sm font-medium py-1.5 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -252,11 +252,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             ) : (
               <div>
                 {photo.caption ? (
-                  <p className="text-white/80">{photo.caption}</p>
+                  <p className="text-theme-text">{photo.caption}</p>
                 ) : isHost ? (
                   <button
                     onClick={() => setEditingCaption(true)}
-                    className="text-white/40 hover:text-white/60 text-sm"
+                    className="text-theme-text-muted hover:text-theme-text-secondary text-sm"
                   >
                     Add a caption...
                   </button>
@@ -264,7 +264,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                 {isHost && photo.caption && (
                   <button
                     onClick={() => setEditingCaption(true)}
-                    className="text-white/40 hover:text-white/60 text-xs mt-1"
+                    className="text-theme-text-muted hover:text-theme-text-secondary text-xs mt-1"
                   >
                     Edit caption
                   </button>
@@ -276,7 +276,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           {/* Tags */}
           {photo.tags.length > 0 && (
             <div className="mb-4">
-              <div className="flex items-center gap-1.5 text-white/60 text-sm mb-2">
+              <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm mb-2">
                 <Tag size={14} />
                 <span>Tags</span>
               </div>
@@ -284,7 +284,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                 {photo.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="bg-white/10 text-white/80 text-xs px-2 py-1 rounded-full"
+                    className="bg-theme-surface-hover text-theme-text text-xs px-2 py-1 rounded-full"
                   >
                     #{tag}
                   </span>
@@ -294,10 +294,10 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           )}
 
           {/* Actions */}
-          <div className="space-y-2 border-t border-white/10 pt-4">
+          <div className="space-y-2 border-t border-theme-stroke pt-4">
             <button
               onClick={handleDownload}
-              className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors"
             >
               <Download size={18} />
               Download
@@ -310,7 +310,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                   className={`w-full flex items-center justify-center gap-2 font-medium py-2.5 rounded-lg transition-colors ${
                     photo.starred
                       ? 'bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400/30'
-                      : 'bg-white/10 hover:bg-white/20 text-white'
+                      : 'bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text'
                   }`}
                 >
                   <Star size={18} className={photo.starred ? 'fill-current' : ''} />
@@ -329,7 +329,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           </div>
 
           {/* Photo Counter */}
-          <p className="text-center text-white/40 text-sm mt-4">
+          <p className="text-center text-theme-text-muted text-sm mt-4">
             {currentIndex + 1} of {photos.length}
           </p>
         </div>
@@ -339,17 +339,17 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60 p-4">
           <div
-            className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-sm w-full"
+            className="bg-theme-header border border-theme-stroke rounded-2xl p-6 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-white mb-3">Delete Photo?</h3>
-            <p className="text-white/60 mb-6">
+            <h3 className="text-lg font-semibold text-theme-text mb-3">Delete Photo?</h3>
+            <p className="text-theme-text-secondary mb-6">
               This action cannot be undone. The photo will be permanently removed.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors"
+                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors"
               >
                 Cancel
               </button>

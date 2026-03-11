@@ -148,7 +148,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+        <Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" />
       </div>
     );
   }
@@ -159,9 +159,9 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin size={20} className="text-[#ff393a]" />
-          <h2 className="text-lg font-semibold text-white">Venue Options</h2>
+          <h2 className="text-lg font-semibold text-theme-text">Venue Options</h2>
           {venues.length > 0 && (
-            <span className="text-sm text-white/40">({venues.length})</span>
+            <span className="text-sm text-theme-text-muted">({venues.length})</span>
           )}
         </div>
         <button
@@ -177,12 +177,12 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       {/* Venue List */}
       {venues.length === 0 ? (
         <div className="card p-8 text-center">
-          <MapPin size={32} className="mx-auto mb-3 text-white/20" />
-          <p className="text-white/60 mb-4">No venue options yet</p>
+          <MapPin size={32} className="mx-auto mb-3 text-theme-text-faint" />
+          <p className="text-theme-text-secondary mb-4">No venue options yet</p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={18} />
             Add Your First Venue
@@ -202,12 +202,12 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                 className={`card overflow-hidden transition-all ${
                   venue.isSelected
                     ? 'ring-2 ring-[#ff393a] border-[#ff393a]/50'
-                    : 'border-white/10'
+                    : 'border-theme-stroke'
                 }`}
               >
                 {/* Main Row */}
                 <div
-                  className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-theme-surface transition-colors"
                   onClick={() => toggleExpanded(venue.id)}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -223,21 +223,21 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           {statusInfo.label}
                         </span>
                       </div>
-                      <h3 className="font-medium text-white truncate">{venue.name}</h3>
+                      <h3 className="font-medium text-theme-text truncate">{venue.name}</h3>
                       {venue.address && (
-                        <p className="text-sm text-white/60 truncate">{venue.address}</p>
+                        <p className="text-sm text-theme-text-secondary truncate">{venue.address}</p>
                       )}
 
                       {/* Quick Stats */}
                       <div className="flex items-center gap-4 mt-2 text-xs">
                         {venue.capacity && (
-                          <span className="flex items-center gap-1 text-white/50">
+                          <span className="flex items-center gap-1 text-theme-text-muted">
                             <Users size={12} />
                             {venue.capacity}
                           </span>
                         )}
                         {venue.cost && (
-                          <span className="flex items-center gap-1 text-white/50">
+                          <span className="flex items-center gap-1 text-theme-text-muted">
                             <DollarSign size={12} />
                             {formatCost(venue.cost)}
                           </span>
@@ -255,7 +255,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           </a>
                         )}
                         {venue.photos && venue.photos.length > 0 && (
-                          <span className="flex items-center gap-1 text-white/50">
+                          <span className="flex items-center gap-1 text-theme-text-muted">
                             <Camera size={12} />
                             {venue.photos.length}
                           </span>
@@ -264,7 +264,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     </div>
 
                     {/* Expand/Collapse Icon */}
-                    <div className="flex-shrink-0 text-white/40">
+                    <div className="flex-shrink-0 text-theme-text-muted">
                       {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
                   </div>
@@ -272,11 +272,11 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="border-t border-white/10 p-4 bg-white/5 space-y-4">
+                  <div className="border-t border-theme-stroke p-4 bg-theme-surface space-y-4">
                     {/* Organization */}
                     {venue.organization && (
-                      <div className="flex items-center gap-2 text-sm text-white/70">
-                        <Building2 size={14} className="text-white/40" />
+                      <div className="flex items-center gap-2 text-sm text-theme-text-secondary">
+                        <Building2 size={14} className="text-theme-text-muted" />
                         {venue.organization}
                       </div>
                     )}
@@ -284,17 +284,17 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     {/* Point Person */}
                     {venue.pointPerson && (
                       <div className="text-sm">
-                        <span className="text-white/40">Point Person: </span>
-                        <span className="text-white/80">{venue.pointPerson}</span>
+                        <span className="text-theme-text-muted">Point Person: </span>
+                        <span className="text-theme-text">{venue.pointPerson}</span>
                       </div>
                     )}
 
                     {/* Contact Info */}
                     {hasContactInfo && (
                       <div className="space-y-1">
-                        <p className="text-xs text-white/40">Venue Contact</p>
+                        <p className="text-xs text-theme-text-muted">Venue Contact</p>
                         {venue.contactName && (
-                          <p className="text-sm text-white/80">{venue.contactName}</p>
+                          <p className="text-sm text-theme-text">{venue.contactName}</p>
                         )}
                         {venue.contactEmail && (
                           <a
@@ -308,7 +308,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                         {venue.contactPhone && (
                           <a
                             href={`tel:${venue.contactPhone}`}
-                            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
+                            className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text"
                           >
                             <Phone size={12} />
                             {venue.contactPhone}
@@ -326,7 +326,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                               <ThumbsUp size={10} />
                               Pros
                             </p>
-                            <p className="text-white/70 whitespace-pre-wrap text-xs">{venue.pros}</p>
+                            <p className="text-theme-text-secondary whitespace-pre-wrap text-xs">{venue.pros}</p>
                           </div>
                         )}
                         {venue.cons && (
@@ -335,7 +335,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                               <ThumbsDown size={10} />
                               Cons
                             </p>
-                            <p className="text-white/70 whitespace-pre-wrap text-xs">{venue.cons}</p>
+                            <p className="text-theme-text-secondary whitespace-pre-wrap text-xs">{venue.cons}</p>
                           </div>
                         )}
                       </div>
@@ -344,15 +344,15 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     {/* Notes */}
                     {venue.notes && (
                       <div className="text-sm">
-                        <p className="text-xs text-white/40 mb-1">Notes</p>
-                        <p className="text-white/70 whitespace-pre-wrap">{venue.notes}</p>
+                        <p className="text-xs text-theme-text-muted mb-1">Notes</p>
+                        <p className="text-theme-text-secondary whitespace-pre-wrap">{venue.notes}</p>
                       </div>
                     )}
 
                     {/* Photos */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs text-white/40 flex items-center gap-1">
+                        <p className="text-xs text-theme-text-muted flex items-center gap-1">
                           <Camera size={12} />
                           Photos {venue.photos && venue.photos.length > 0 && `(${venue.photos.length})`}
                         </p>
@@ -373,7 +373,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                    <div className="flex items-center gap-2 pt-2 border-t border-theme-stroke">
                       {!venue.isSelected ? (
                         <button
                           type="button"
@@ -393,7 +393,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           type="button"
                           onClick={() => handleDeselect(venue.id)}
                           disabled={isLoading}
-                          className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                          className="flex items-center gap-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
                         >
                           {isLoading ? (
                             <Loader2 size={14} className="animate-spin" />
@@ -405,7 +405,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                       <button
                         type="button"
                         onClick={() => setEditingVenue(venue)}
-                        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
+                        className="flex items-center gap-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
                       >
                         <Pencil size={14} />
                         Edit

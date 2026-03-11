@@ -113,7 +113,7 @@ export const PizzaOrderSummary: React.FC = () => {
     return (
       <div className="flex items-center gap-1">
         <Star size={12} className="text-yellow-400 fill-yellow-400" />
-        <span className="text-white text-xs font-medium">{rating.toFixed(1)}</span>
+        <span className="text-theme-text text-xs font-medium">{rating.toFixed(1)}</span>
       </div>
     );
   };
@@ -366,23 +366,23 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
           className="w-full flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-white">Recommended Order</h2>
+            <h2 className="text-xl font-bold text-theme-text">Recommended Order</h2>
             {summaryText && !isExpanded && (
-              <span className="text-sm text-white/60">: {summaryText}</span>
+              <span className="text-sm text-theme-text-secondary">: {summaryText}</span>
             )}
           </div>
           {isExpanded ? (
-            <ChevronUp className="text-white/60" size={20} />
+            <ChevronUp className="text-theme-text-secondary" size={20} />
           ) : (
-            <ChevronDown className="text-white/60" size={20} />
+            <ChevronDown className="text-theme-text-secondary" size={20} />
           )}
         </button>
 
         {isExpanded && recommendations.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-white/5 rounded-xl border border-dashed border-white/20 mt-4">
-            <ClipboardList size={48} className="text-white/30 mb-4" />
-            <h3 className="text-lg font-medium text-white/80">No Recommendations Yet</h3>
-            <p className="text-white/50 mt-2 text-sm">
+          <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-theme-surface rounded-xl border border-dashed border-theme-stroke-hover mt-4">
+            <ClipboardList size={48} className="text-theme-text-faint mb-4" />
+            <h3 className="text-lg font-medium text-theme-text">No Recommendations Yet</h3>
+            <p className="text-theme-text-muted mt-2 text-sm">
               Add guests and generate recommendations to see your optimized pizza order here.
             </p>
           </div>
@@ -391,11 +391,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
         {isExpanded && recommendations.length > 0 && (
           <>
             {/* Pizzeria Selection - MOVED TO TOP */}
-            <div className="mt-4 mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+            <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
               {!hasSearched || pizzerias.length === 0 ? (
                 // Show search form if no results yet
                 <div className="space-y-3">
-                  <h3 className="font-medium text-white text-sm mb-3">1. Select a Pizzeria</h3>
+                  <h3 className="font-medium text-theme-text text-sm mb-3">1. Select a Pizzeria</h3>
 
                   <button
                     onClick={handleUseCurrentLocation}
@@ -410,10 +410,10 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     Use My Location
                   </button>
 
-                  <div className="flex items-center gap-2 text-white/40">
-                    <div className="flex-1 h-px bg-white/10" />
+                  <div className="flex items-center gap-2 text-theme-text-muted">
+                    <div className="flex-1 h-px bg-theme-surface-hover" />
                     <span className="text-xs">or</span>
-                    <div className="flex-1 h-px bg-white/10" />
+                    <div className="flex-1 h-px bg-theme-surface-hover" />
                   </div>
 
                   <form onSubmit={handleAddressSearch} className="flex gap-2">
@@ -441,7 +441,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 // Show top pizzerias
                 <div className="space-y-2">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white text-sm">1. Select a Pizzeria</h3>
+                    <h3 className="font-medium text-theme-text text-sm">1. Select a Pizzeria</h3>
                     <button
                       onClick={() => setShowPizzeriaSearch(true)}
                       className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
@@ -458,20 +458,20 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     return (
                       <div
                         key={pizzeria.id}
-                        className="p-3 bg-white/5 border border-white/10 rounded-lg hover:border-[#ff393a]/50 transition-colors"
+                        className="p-3 bg-theme-surface border border-theme-stroke rounded-lg hover:border-[#ff393a]/50 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-white text-sm truncate">{pizzeria.name}</h4>
+                              <h4 className="font-medium text-theme-text text-sm truncate">{pizzeria.name}</h4>
                               <div className="flex items-center gap-1">
                                 {renderStars(pizzeria.rating)}
                                 {pizzeria.reviewCount !== undefined && (
-                                  <span className="text-xs text-white/50">({pizzeria.reviewCount})</span>
+                                  <span className="text-xs text-theme-text-muted">({pizzeria.reviewCount})</span>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-white/50">
+                            <div className="flex items-center gap-2 mt-1 text-xs text-theme-text-muted">
                               {pizzeria.distance && (
                                 <span>{formatDistance(pizzeria.distance)}</span>
                               )}
@@ -487,7 +487,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                             primaryOption.provider === 'phone' && pizzeria.phone ? (
                               <a
                                 href={`tel:${pizzeria.phone}`}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-theme-text bg-theme-surface-hover hover:bg-theme-surface-hover"
                               >
                                 <Phone size={12} className="md:hidden" />
                                 <span className="md:hidden">Call</span>
@@ -496,7 +496,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                             ) : supportsDirectOrdering(primaryOption.provider) ? (
                               <button
                                 onClick={() => handleInlineSelectPizzeria(pizzeria, primaryOption)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white"
+                                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-theme-text"
                                 style={{ backgroundColor: getProviderColor(primaryOption.provider) }}
                               >
                                 <ShoppingCart size={12} />
@@ -507,7 +507,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                                 href={primaryOption.deepLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/20"
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-theme-text bg-theme-surface-hover hover:bg-theme-surface-hover"
                               >
                                 <ExternalLink size={12} />
                                 Order
@@ -520,10 +520,10 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   })}
 
                   {/* Test Mode Section */}
-                  <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="mt-3 pt-3 border-t border-theme-stroke">
                     <button
                       onClick={() => setShowTestMode(!showTestMode)}
-                      className="flex items-center gap-2 text-xs text-white/50 hover:text-white/70"
+                      className="flex items-center gap-2 text-xs text-theme-text-muted hover:text-theme-text-secondary"
                     >
                       <Phone size={12} />
                       Test AI Call with Custom Number
@@ -538,19 +538,19 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                           value={testPizzeriaName}
                           onChange={(e) => setTestPizzeriaName(e.target.value)}
                           placeholder="Pizzeria name (optional)"
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                          className="w-full px-3 py-2 bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text placeholder-white/30"
                         />
                         <input
                           type="tel"
                           value={testPhone}
                           onChange={(e) => setTestPhone(e.target.value)}
                           placeholder="Phone number (e.g., +1-555-123-4567)"
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm text-white placeholder-white/30"
+                          className="w-full px-3 py-2 bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text placeholder-white/30"
                         />
                         <button
                           onClick={handleTestAICall}
                           disabled={!testPhone.trim()}
-                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-theme-text text-sm font-medium rounded transition-colors"
                         >
                           Start Test AI Call
                         </button>
@@ -568,7 +568,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 <button
                   onClick={() => setIsEditMode(!isEditMode)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    isEditMode ? 'bg-[#ff393a] text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                    isEditMode ? 'bg-[#ff393a] text-white' : 'bg-theme-surface-hover text-theme-text-secondary hover:text-white hover:bg-theme-surface-hover'
                   }`}
                 >
                   <Pencil size={12} />
@@ -576,33 +576,33 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 </button>
               </div>
               <div className="space-y-2 text-sm">
-                <p className="text-white/80">
-                  <span className="text-white/60">Total pizzas:</span>{' '}
-                  <span className="font-semibold text-white text-base">{totalPizzas}</span>
+                <p className="text-theme-text">
+                  <span className="text-theme-text-secondary">Total pizzas:</span>{' '}
+                  <span className="font-semibold text-theme-text text-base">{totalPizzas}</span>
                 </p>
                 {waveRecommendations.length > 1 && (
                   <>
                     {waveRecommendations.map((waveRec) => (
-                      <p key={waveRec.wave.id} className="text-white/80 pl-3 border-l-2 border-white/20">
-                        <span className="text-white/60">{waveRec.wave.label}:</span>{' '}
-                        <span className="font-semibold text-white">{waveRec.totalPizzas} pizza{waveRec.totalPizzas !== 1 ? 's' : ''}</span>
-                        <span className="text-white/50"> at {format(waveRec.wave.arrivalTime, 'h:mm a')}</span>
+                      <p key={waveRec.wave.id} className="text-theme-text pl-3 border-l-2 border-theme-stroke-hover">
+                        <span className="text-theme-text-secondary">{waveRec.wave.label}:</span>{' '}
+                        <span className="font-semibold text-theme-text">{waveRec.totalPizzas} pizza{waveRec.totalPizzas !== 1 ? 's' : ''}</span>
+                        <span className="text-theme-text-muted"> at {format(waveRec.wave.arrivalTime, 'h:mm a')}</span>
                       </p>
                     ))}
                   </>
                 )}
                 {beverageRecommendations.length > 0 && (
                   <>
-                    <p className="text-white/80 pt-1 border-t border-white/10 mt-2">
-                      <span className="text-white/60">Total drinks:</span>{' '}
-                      <span className="font-semibold text-white text-base">
+                    <p className="text-theme-text pt-1 border-t border-theme-stroke mt-2">
+                      <span className="text-theme-text-secondary">Total drinks:</span>{' '}
+                      <span className="font-semibold text-theme-text text-base">
                         {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                       </span>
                     </p>
                     {beverageRecommendations.map((rec) => (
-                      <p key={rec.id} className="text-white/80 pl-3 border-l-2 border-blue-500/30">
-                        <span className="font-semibold text-white">{rec.quantity}x</span>{' '}
-                        <span className="text-white/80">{rec.beverage.name}</span>
+                      <p key={rec.id} className="text-theme-text pl-3 border-l-2 border-blue-500/30">
+                        <span className="font-semibold text-theme-text">{rec.quantity}x</span>{' '}
+                        <span className="text-theme-text">{rec.beverage.name}</span>
                       </p>
                     ))}
                   </>
@@ -616,16 +616,16 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 {waveRecommendations.map((waveRec, waveIndex) => (
                   <div
                     key={waveRec.wave.id}
-                    className="border border-white/20 rounded-xl p-4 bg-white/5"
+                    className="border border-theme-stroke-hover rounded-xl p-4 bg-theme-surface"
                   >
                     {/* Wave Header */}
-                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-theme-stroke">
                       <div>
-                        <h3 className="font-semibold text-white flex items-center gap-2">
+                        <h3 className="font-semibold text-theme-text flex items-center gap-2">
                           <Clock size={16} />
                           {waveRec.wave.label}
                         </h3>
-                        <p className="text-sm text-white/60 mt-1">
+                        <p className="text-sm text-theme-text-secondary mt-1">
                           Arrive at {format(waveRec.wave.arrivalTime, 'h:mm a')} •{' '}
                           {waveRec.totalPizzas} pizza{waveRec.totalPizzas !== 1 ? 's' : ''} for ~{waveRec.wave.guestAllocation} guest{waveRec.wave.guestAllocation !== 1 ? 's' : ''}
                         </p>
@@ -640,7 +640,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     </div>
 
                     {/* Pizza List */}
-                    <div className="divide-y divide-white/10">
+                    <div className="divide-y divide-theme-stroke">
                       {waveRec.pizzas
                         .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                         .map((pizza, pizzaIndex) => (
@@ -658,14 +658,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       Beverage Order (Order Once)
                     </h3>
                     <div className="space-y-1 text-sm mb-3">
-                      <p className="text-white/80">
-                        <span className="text-white/60">Total beverages:</span>{' '}
-                        <span className="font-semibold text-white text-base">
+                      <p className="text-theme-text">
+                        <span className="text-theme-text-secondary">Total beverages:</span>{' '}
+                        <span className="font-semibold text-theme-text text-base">
                           {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                         </span>
                       </p>
                     </div>
-                    <div className="divide-y divide-white/10">
+                    <div className="divide-y divide-theme-stroke">
                       {beverageRecommendations.map(rec => (
                         <TableRow key={rec.id} beverageRec={rec} variant="beverage" />
                       ))}
@@ -685,7 +685,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             ) : (
               // Single wave display (row-based)
               <>
-                <div className="divide-y divide-white/10 mb-4">
+                <div className="divide-y divide-theme-stroke mb-4">
                   {[...recommendations]
                     .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
                     .map((pizza, index) => (
@@ -701,14 +701,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       Beverage Order
                     </h3>
                     <div className="space-y-1 text-sm mb-3">
-                      <p className="text-white/80">
-                        <span className="text-white/60">Total beverages:</span>{' '}
-                        <span className="font-semibold text-white text-base">
+                      <p className="text-theme-text">
+                        <span className="text-theme-text-secondary">Total beverages:</span>{' '}
+                        <span className="font-semibold text-theme-text text-base">
                           {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                         </span>
                       </p>
                     </div>
-                    <div className="divide-y divide-white/10">
+                    <div className="divide-y divide-theme-stroke">
                       {beverageRecommendations.map(rec => (
                         <TableRow key={rec.id} beverageRec={rec} variant="beverage" />
                       ))}
@@ -753,9 +753,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
             {/* Expandable Call Script */}
             {showCallScript && (
-              <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-white text-sm">Phone Order Script</h3>
+                  <h3 className="font-medium text-theme-text text-sm">Phone Order Script</h3>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generateCallScript());
@@ -767,14 +767,14 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     Copy script
                   </button>
                 </div>
-                <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
+                <pre className="text-xs text-theme-text-secondary whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
                   {generateCallScript()}
                 </pre>
               </div>
             )}
 
             {/* Guest Requests - embedded */}
-            <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="mt-4 pt-4 border-t border-theme-stroke">
               <GuestPreferencesList embedded />
             </div>
           </>
@@ -788,7 +788,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             <div className="flex justify-end mb-2">
               <button
                 onClick={() => setShowPizzeriaSearch(false)}
-                className="p-2 text-white/50 hover:text-white bg-white/10 rounded-full"
+                className="p-2 text-theme-text-muted hover:text-theme-text bg-theme-surface-hover rounded-full"
               >
                 <X size={20} />
               </button>
@@ -798,7 +798,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               partyAddress={party?.address}
               initialPizzerias={pizzerias}
               initialSearchAddress={searchAddress}
-              className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6"
+              className="bg-theme-header border border-theme-stroke rounded-2xl p-6"
               initialShowAll={true}
             />
           </div>
@@ -820,15 +820,15 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       {/* Order Complete Modal */}
       {orderComplete && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
             {orderComplete.isAiCall ? (
               <>
                 <div className="text-center mb-4">
                   <div className="w-16 h-16 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center mx-auto mb-4">
                     <Phone size={32} className="text-[#8b5cf6]" />
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-1">AI Call Placed</h2>
-                  <p className="text-white/60 text-sm">
+                  <h2 className="text-2xl font-bold text-theme-text mb-1">AI Call Placed</h2>
+                  <p className="text-theme-text-secondary text-sm">
                     {orderComplete.pizzeriaName ? `Calling ${orderComplete.pizzeriaName}` : 'Your order call is in progress'}
                   </p>
                 </div>
@@ -850,8 +850,8 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
                   <Check size={32} className="text-[#39d98a]" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Order Created!</h2>
-                <p className="text-white/60 mb-6">
+                <h2 className="text-2xl font-bold text-theme-text mb-2">Order Created!</h2>
+                <p className="text-theme-text-secondary mb-6">
                   Your order has been submitted successfully.
                 </p>
 
@@ -866,7 +866,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     Complete Payment
                   </a>
                 ) : (
-                  <p className="text-sm text-white/50 mb-4">
+                  <p className="text-sm text-theme-text-muted mb-4">
                     Order ID: {orderComplete.orderId}
                   </p>
                 )}

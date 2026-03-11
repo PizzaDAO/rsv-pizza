@@ -319,17 +319,17 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'payment') {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-white">Add Payment Method</h2>
-              <p className="text-sm text-white/60 mt-1">
+              <h2 className="text-xl font-bold text-theme-text">Add Payment Method</h2>
+              <p className="text-sm text-theme-text-secondary mt-1">
                 Your card will be charged after the order is confirmed
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-white/50 hover:text-white p-1"
+              className="text-theme-text-muted hover:text-theme-text p-1"
             >
               <X size={24} />
             </button>
@@ -350,40 +350,40 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'confirm') {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-white">Confirm Order</h2>
-              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+              <h2 className="text-xl font-bold text-theme-text">Confirm Order</h2>
+              <p className="text-sm text-theme-text-secondary mt-1">{pizzeria.name}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white/50 hover:text-white p-1"
+              className="text-theme-text-muted hover:text-theme-text p-1"
             >
               <X size={24} />
             </button>
           </div>
 
           {/* Order Summary */}
-          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-            <h3 className="font-medium text-white mb-3">Order Summary</h3>
+          <div className="mb-6 p-4 bg-theme-surface rounded-xl border border-theme-stroke">
+            <h3 className="font-medium text-theme-text mb-3">Order Summary</h3>
             <div className="space-y-2">
               {orderItems.map((item, index) => (
                 <div key={index} className="flex justify-between text-sm">
-                  <span className="text-white/80">
+                  <span className="text-theme-text">
                     {item.quantity}x {item.size} {item.name}
                   </span>
                 </div>
               ))}
             </div>
-            <div className="border-t border-white/10 mt-3 pt-3">
+            <div className="border-t border-theme-stroke mt-3 pt-3">
               <div className="flex justify-between text-sm">
-                <span className="text-white/60">Total pizzas:</span>
-                <span className="text-white font-medium">{totalPizzas}</span>
+                <span className="text-theme-text-secondary">Total pizzas:</span>
+                <span className="text-theme-text font-medium">{totalPizzas}</span>
               </div>
               <div className="flex justify-between text-sm mt-1">
-                <span className="text-white/60">Estimated total:</span>
-                <span className="text-white font-medium">{formatCurrency(estimatedTotal)}</span>
+                <span className="text-theme-text-secondary">Estimated total:</span>
+                <span className="text-theme-text font-medium">{formatCurrency(estimatedTotal)}</span>
               </div>
             </div>
           </div>
@@ -393,8 +393,8 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <div className="flex items-center gap-3">
               <CreditCard size={20} className="text-[#8b5cf6]" />
               <div>
-                <p className="text-white font-medium">Card on file</p>
-                <p className="text-white/60 text-sm">
+                <p className="text-theme-text font-medium">Card on file</p>
+                <p className="text-theme-text-secondary text-sm">
                   Your card will be pre-authorized for {formatCurrency(estimatedTotal)}
                 </p>
               </div>
@@ -402,9 +402,9 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           </div>
 
           {/* How it works */}
-          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-            <h4 className="font-medium text-white mb-2">How it works</h4>
-            <ol className="space-y-2 text-sm text-white/70">
+          <div className="mb-6 p-4 bg-theme-surface rounded-xl border border-theme-stroke">
+            <h4 className="font-medium text-theme-text mb-2">How it works</h4>
+            <ol className="space-y-2 text-sm text-theme-text-secondary">
               <li className="flex items-start gap-2">
                 <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">1</span>
                 <span>AI calls the pizzeria and places your order</span>
@@ -469,15 +469,15 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'calling' && aiPhoneCallId) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-white">AI Phone Order</h2>
-              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+              <h2 className="text-xl font-bold text-theme-text">AI Phone Order</h2>
+              <p className="text-sm text-theme-text-secondary mt-1">{pizzeria.name}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white/50 hover:text-white p-1"
+              className="text-theme-text-muted hover:text-theme-text p-1"
             >
               <X size={24} />
             </button>
@@ -499,15 +499,15 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   if (step === 'complete' && callData) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-white">Order Complete</h2>
-              <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+              <h2 className="text-xl font-bold text-theme-text">Order Complete</h2>
+              <p className="text-sm text-theme-text-secondary mt-1">{pizzeria.name}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white/50 hover:text-white p-1"
+              className="text-theme-text-muted hover:text-theme-text p-1"
             >
               <X size={24} />
             </button>
@@ -518,33 +518,33 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-[#39d98a]" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Order Confirmed!</h3>
-            <p className="text-white/60">
+            <h3 className="text-xl font-bold text-theme-text mb-2">Order Confirmed!</h3>
+            <p className="text-theme-text-secondary">
               Your order has been placed with {pizzeria.name}
             </p>
           </div>
 
           {/* Order Details */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
-            <h4 className="font-medium text-white mb-3">Order Details</h4>
+          <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-4">
+            <h4 className="font-medium text-theme-text mb-3">Order Details</h4>
             <div className="space-y-2 text-sm">
               {callData.confirmedTotal && (
                 <div className="flex justify-between">
-                  <span className="text-white/60">Total:</span>
-                  <span className="text-white font-medium">
+                  <span className="text-theme-text-secondary">Total:</span>
+                  <span className="text-theme-text font-medium">
                     ${(callData.confirmedTotal / 100).toFixed(2)}
                   </span>
                 </div>
               )}
               {callData.estimatedTime && (
                 <div className="flex justify-between">
-                  <span className="text-white/60">Ready:</span>
-                  <span className="text-white font-medium">{callData.estimatedTime}</span>
+                  <span className="text-theme-text-secondary">Ready:</span>
+                  <span className="text-theme-text font-medium">{callData.estimatedTime}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-white/60">Pickup/Delivery:</span>
-                <span className="text-white font-medium capitalize">{fulfillmentType.toLowerCase()}</span>
+                <span className="text-theme-text-secondary">Pickup/Delivery:</span>
+                <span className="text-theme-text font-medium capitalize">{fulfillmentType.toLowerCase()}</span>
               </div>
             </div>
           </div>
@@ -582,42 +582,42 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   // Render details step (main form)
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold text-white">Complete Your Order</h2>
-            <p className="text-sm text-white/60 mt-1">{pizzeria.name}</p>
+            <h2 className="text-xl font-bold text-theme-text">Complete Your Order</h2>
+            <p className="text-sm text-theme-text-secondary mt-1">{pizzeria.name}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-white/50 hover:text-white p-1"
+            className="text-theme-text-muted hover:text-theme-text p-1"
           >
             <X size={24} />
           </button>
         </div>
 
         {/* Order Summary */}
-        <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-          <h3 className="font-medium text-white mb-3">Order Summary</h3>
+        <div className="mb-6 p-4 bg-theme-surface rounded-xl border border-theme-stroke">
+          <h3 className="font-medium text-theme-text mb-3">Order Summary</h3>
           <div className="space-y-2">
             {orderItems.map((item, index) => (
               <div key={index} className="flex justify-between text-sm">
-                <span className="text-white/80">
+                <span className="text-theme-text">
                   {item.quantity}x {item.size} {item.name}
                 </span>
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 mt-3 pt-3">
+          <div className="border-t border-theme-stroke mt-3 pt-3">
             <div className="flex justify-between text-sm">
-              <span className="text-white/60">Total pizzas:</span>
-              <span className="text-white font-medium">{totalPizzas}</span>
+              <span className="text-theme-text-secondary">Total pizzas:</span>
+              <span className="text-theme-text font-medium">{totalPizzas}</span>
             </div>
             {isAIPhoneOrder && (
               <div className="flex justify-between text-sm mt-1">
-                <span className="text-white/60">Estimated total:</span>
-                <span className="text-white font-medium">~{formatCurrency(estimatedTotal)}</span>
+                <span className="text-theme-text-secondary">Estimated total:</span>
+                <span className="text-theme-text font-medium">~{formatCurrency(estimatedTotal)}</span>
               </div>
             )}
           </div>
@@ -625,14 +625,14 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
         {/* Fulfillment Type */}
         <div className="mb-6">
-          <p className="text-sm font-medium text-white/80 mb-2">Fulfillment Type</p>
+          <p className="text-sm font-medium text-theme-text mb-2">Fulfillment Type</p>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setFulfillmentType('PICKUP')}
               className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${fulfillmentType === 'PICKUP'
                   ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
-                  : 'border-white/10 text-white/60 hover:border-white/20'
+                  : 'border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
                 }`}
             >
               <Store size={18} />
@@ -643,7 +643,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               onClick={() => setFulfillmentType('DELIVERY')}
               className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${fulfillmentType === 'DELIVERY'
                   ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
-                  : 'border-white/10 text-white/60 hover:border-white/20'
+                  : 'border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
                 }`}
             >
               <Truck size={18} />
@@ -696,7 +696,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         {/* Payment Option for AI Orders */}
         {isAIPhoneOrder && (
           <div className="mb-6">
-            <p className="text-sm font-medium text-white/80 mb-2">
+            <p className="text-sm font-medium text-theme-text mb-2">
               <DollarSign size={14} className="inline mr-1" />
               Payment Method
             </p>
@@ -706,13 +706,13 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
                 onClick={() => setPayWithCard(false)}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${!payWithCard
                     ? 'border-[#ff393a] bg-[#ff393a]/10 text-white'
-                    : 'border-white/10 text-white/60 hover:border-white/20'
+                    : 'border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
                   }`}
               >
                 <Store size={18} />
                 <div className="text-left">
                   <p className="font-medium">Pay at pickup</p>
-                  <p className="text-xs text-white/50">Pay when you collect your order</p>
+                  <p className="text-xs text-theme-text-muted">Pay when you collect your order</p>
                 </div>
               </button>
               <button
@@ -720,13 +720,13 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
                 onClick={() => setPayWithCard(true)}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${payWithCard
                     ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-white'
-                    : 'border-white/10 text-white/60 hover:border-white/20'
+                    : 'border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
                   }`}
               >
                 <CreditCard size={18} />
                 <div className="text-left flex-1">
                   <p className="font-medium">Pay with card</p>
-                  <p className="text-xs text-white/50">AI pays over phone with secure virtual card</p>
+                  <p className="text-xs text-theme-text-muted">AI pays over phone with secure virtual card</p>
                 </div>
                 {hasPaymentMethod && (
                   <Check size={16} className="text-[#39d98a]" />

@@ -62,8 +62,8 @@ export function CustomUrlInput({
   return (
     <div>
       <div className="relative flex items-center">
-        <LinkIcon size={20} className="absolute left-3 text-white/40 pointer-events-none" />
-        <span className="absolute left-12 text-white/60 pointer-events-none font-mono text-sm">rsv.pizza/</span>
+        <LinkIcon size={20} className="absolute left-3 text-theme-text-muted pointer-events-none" />
+        <span className="absolute left-12 text-theme-text-secondary pointer-events-none font-mono text-sm">rsv.pizza/</span>
         <input
           type="text"
           value={value}
@@ -79,7 +79,7 @@ export function CustomUrlInput({
         {/* Status indicator */}
         <div className="absolute right-3 flex items-center">
           {validating && (
-            <Loader2 size={16} className="animate-spin text-white/40" />
+            <Loader2 size={16} className="animate-spin text-theme-text-muted" />
           )}
           {!validating && isValid === true && value.trim() && (
             <Check size={16} className="text-green-500" />

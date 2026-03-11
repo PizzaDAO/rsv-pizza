@@ -52,7 +52,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
   };
 
   return (
-    <div className="group flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors">
+    <div className="group flex items-center gap-3 p-3 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors">
       {/* Checkbox */}
       <Checkbox
         checked={completed}
@@ -69,8 +69,8 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
             onClick={item.linkTab ? handleNameClick : undefined}
             className={`text-sm font-medium truncate ${
               completed
-                ? 'text-white/40 line-through'
-                : 'text-white'
+                ? 'text-theme-text-muted line-through'
+                : 'text-theme-text'
             } ${item.linkTab ? 'cursor-pointer hover:text-[#ff393a] transition-colors' : ''}`}
           >
             {item.name}
@@ -78,7 +78,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
           {item.linkTab && (
             <button
               onClick={handleNameClick}
-              className="text-white/30 hover:text-white/60 flex-shrink-0 transition-colors"
+              className="text-theme-text-faint hover:text-theme-text-secondary flex-shrink-0 transition-colors"
               title={`Go to ${item.linkTab}`}
             >
               <ExternalLink size={12} />
@@ -95,7 +95,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
         {dueDateStr && (
           <div className="flex items-center gap-1 mt-0.5">
             {overdue && <AlertCircle size={10} className="text-red-400" />}
-            <span className={`text-xs ${overdue ? 'text-red-400 font-medium' : 'text-white/40'}`}>
+            <span className={`text-xs ${overdue ? 'text-red-400 font-medium' : 'text-theme-text-muted'}`}>
               Due {dueDateStr}
             </span>
           </div>
@@ -106,7 +106,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
       {!item.isDefault && (
         <button
           onClick={() => onDelete(item.id)}
-          className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100"
+          className="p-1.5 rounded-lg text-theme-text-faint hover:text-red-400 hover:bg-theme-surface-hover transition-all opacity-0 group-hover:opacity-100"
           title="Delete task"
         >
           <Trash2 size={14} />

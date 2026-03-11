@@ -74,11 +74,11 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as VenuePhotoCategory)}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/70"
+          className="text-xs bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-theme-text-secondary"
           style={{ colorScheme: 'dark' }}
         >
           {CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value} className="bg-[#1a1a2e]">
+            <option key={cat.value} value={cat.value} className="bg-theme-header">
               {cat.label}
             </option>
           ))}
@@ -89,7 +89,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
         >
           {uploading ? (
             <>

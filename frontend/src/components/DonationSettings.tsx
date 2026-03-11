@@ -133,12 +133,12 @@ export const DonationSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Enable Donations Toggle */}
-      <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+      <div className="flex items-center justify-between p-4 bg-theme-surface rounded-xl border border-theme-stroke">
         <div className="flex items-center gap-3">
           <DollarSign size={20} className="text-[#ff393a]" />
           <div>
-            <p className="text-white font-medium">Accept Donations</p>
-            <p className="text-white/50 text-sm">Allow guests to contribute to your event</p>
+            <p className="text-theme-text font-medium">Accept Donations</p>
+            <p className="text-theme-text-muted text-sm">Allow guests to contribute to your event</p>
           </div>
         </div>
 {savingField === 'donationEnabled' ? (
@@ -217,18 +217,18 @@ export const DonationSettings: React.FC = () => {
 
           {/* Suggested Amounts */}
           <div>
-            <p className="text-sm font-medium text-white/80 mb-2">Suggested Amounts</p>
+            <p className="text-sm font-medium text-theme-text mb-2">Suggested Amounts</p>
             <div className="flex flex-wrap gap-2 mb-2">
               {suggestedAmounts.map((amount) => (
                 <div
                   key={amount}
                   className="flex items-center gap-1 px-3 py-1.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-lg"
                 >
-                  <span className="text-white text-sm font-medium">{formatAmount(amount)}</span>
+                  <span className="text-theme-text text-sm font-medium">{formatAmount(amount)}</span>
                   <button
                     type="button"
                     onClick={() => removeSuggestedAmount(amount)}
-                    className="text-white/50 hover:text-white ml-1"
+                    className="text-theme-text-muted hover:text-theme-text ml-1"
                   >
                     <X size={14} />
                   </button>

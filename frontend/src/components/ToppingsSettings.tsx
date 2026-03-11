@@ -62,7 +62,7 @@ export const ToppingsSettings: React.FC = () => {
     <div className="card p-6">
       <div className="flex items-center gap-2 mb-4">
         <Pizza size={20} className="text-[#ff393a]" />
-        <h2 className="text-xl font-bold text-white">Toppings</h2>
+        <h2 className="text-xl font-bold text-theme-text">Toppings</h2>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
@@ -82,7 +82,7 @@ export const ToppingsSettings: React.FC = () => {
             <button
               type="button"
               onClick={() => removeCustomTopping(index)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-secondary hover:text-theme-text"
             >
               <X size={14} />
             </button>

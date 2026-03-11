@@ -155,14 +155,14 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const completeCount = files.filter(f => f.status === 'complete').length;
 
   return (
-    <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6">
+    <div className="bg-theme-header border border-theme-stroke rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Upload Photos</h2>
+        <h2 className="text-lg font-semibold text-theme-text">Upload Photos</h2>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
+            className="text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <X size={20} />
           </button>
@@ -178,7 +178,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
           dragging
             ? 'border-[#ff393a] bg-[#ff393a]/10'
-            : 'border-white/20 hover:border-[#ff393a]/50 hover:bg-white/5'
+            : 'border-theme-stroke-hover hover:border-[#ff393a]/50 hover:bg-theme-surface'
         }`}
       >
         <input
@@ -189,10 +189,10 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
           className="hidden"
         />
-        <Upload className="w-10 h-10 text-white/40 mx-auto mb-3" />
-        <p className="text-white/60 mb-1">Drag and drop photos here</p>
-        <p className="text-white/40 text-sm">or click to select files</p>
-        <p className="text-white/30 text-xs mt-2">Max 10MB per photo. JPEG, PNG, WebP, GIF</p>
+        <Upload className="w-10 h-10 text-theme-text-muted mx-auto mb-3" />
+        <p className="text-theme-text-secondary mb-1">Drag and drop photos here</p>
+        <p className="text-theme-text-muted text-sm">or click to select files</p>
+        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo. JPEG, PNG, WebP, GIF</p>
       </div>
 
       {/* Caption Input */}
@@ -203,7 +203,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Add a caption (optional)"
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+            className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-4 py-2 text-theme-text placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
         </div>
       )}
@@ -214,7 +214,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           {files.map((file, index) => (
             <div
               key={index}
-              className="relative aspect-square rounded-lg overflow-hidden bg-white/5"
+              className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface"
             >
               <img
                 src={file.preview}
@@ -225,14 +225,14 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
               {/* Status Overlay */}
               {file.status === 'uploading' && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  <Loader2 className="w-8 h-8 text-theme-text animate-spin" />
                 </div>
               )}
 
               {file.status === 'complete' && (
                 <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
                   <div className="bg-green-500 rounded-full p-2">
-                    <Check className="w-6 h-6 text-white" />
+                    <Check className="w-6 h-6 text-theme-text" />
                   </div>
                 </div>
               )}
@@ -252,7 +252,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
                   }}
                   className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 rounded-full p-1 transition-colors"
                 >
-                  <X size={16} className="text-white" />
+                  <X size={16} className="text-theme-text" />
                 </button>
               )}
             </div>

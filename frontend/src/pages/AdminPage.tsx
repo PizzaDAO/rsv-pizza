@@ -174,9 +174,9 @@ export function AdminPage() {
 
   if (loading) {
     return (
-      <Layout className="gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      <Layout>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-white/40" />
+          <Loader2 size={32} className="animate-spin text-theme-text-muted" />
         </div>
       </Layout>
     );
@@ -184,11 +184,11 @@ export function AdminPage() {
 
   if (!isAdminUser || error) {
     return (
-      <Layout className="gpp-theme" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+      <Layout>
         <div className="min-h-screen flex flex-col items-center justify-center px-4">
           <Shield size={48} className="text-red-400/60 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-          <p className="text-white/50 text-center max-w-md">
+          <p className="text-theme-text-muted text-center max-w-md">
             {error || 'You do not have admin access. Please log in with an admin account.'}
           </p>
         </div>
@@ -197,7 +197,7 @@ export function AdminPage() {
   }
 
   return (
-    <Layout className="gpp-theme relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' }}>
+    <Layout className="relative overflow-hidden">
       {/* Floating deco */}
       <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
       <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />
@@ -218,14 +218,14 @@ export function AdminPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Admin Panel</h1>
-              <p className="text-sm text-white/40">Manage admins and underbosses</p>
+              <p className="text-sm text-theme-text-muted">Manage admins and underbosses</p>
             </div>
           </div>
 
           {/* Admin Management */}
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Shield size={18} className="text-white/60" />
+              <Shield size={18} className="text-theme-text-secondary" />
               Admins ({admins.length})
             </h2>
 
@@ -242,7 +242,7 @@ export function AdminPage() {
             )}
 
             {isSuperAdmin && (
-              <form onSubmit={handleAddAdmin} className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+              <form onSubmit={handleAddAdmin} className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-4">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1">
                     <IconInput
@@ -266,7 +266,7 @@ export function AdminPage() {
                   <button
                     type="submit"
                     disabled={addingAdmin || !newEmail.trim()}
-                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+                    className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     {addingAdmin ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
                     Add Admin
@@ -275,10 +275,10 @@ export function AdminPage() {
               </form>
             )}
 
-            <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+            <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-white/40 text-left">
+                  <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
                     <th className="px-4 py-3 font-medium">Email</th>
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium">Role</th>
@@ -288,9 +288,9 @@ export function AdminPage() {
                 </thead>
                 <tbody>
                   {admins.map((admin) => (
-                    <tr key={admin.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3 text-white/80">{admin.email}</td>
-                      <td className="px-4 py-3 text-white/60">{admin.name || '-'}</td>
+                    <tr key={admin.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
+                      <td className="px-4 py-3 text-theme-text">{admin.email}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">{admin.name || '-'}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -302,7 +302,7 @@ export function AdminPage() {
                           {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-white/40">
+                      <td className="px-4 py-3 text-theme-text-muted">
                         {new Date(admin.createdAt).toLocaleDateString()}
                       </td>
                       {isSuperAdmin && (
@@ -322,7 +322,7 @@ export function AdminPage() {
                   ))}
                   {admins.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-white/30">
+                      <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
                         No admins found
                       </td>
                     </tr>
@@ -335,7 +335,7 @@ export function AdminPage() {
           {/* Underboss Management */}
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Globe size={18} className="text-white/60" />
+              <Globe size={18} className="text-theme-text-secondary" />
               Underbosses ({underbosses.length})
             </h2>
 
@@ -351,7 +351,7 @@ export function AdminPage() {
               </div>
             )}
 
-            <form onSubmit={handleAddUnderboss} className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+            <form onSubmit={handleAddUnderboss} className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-4">
               <div className="flex flex-col sm:flex-row gap-3 mb-3">
                 <div className="flex-1">
                   <IconInput
@@ -375,10 +375,10 @@ export function AdminPage() {
                 </div>
               </div>
               <div className="mb-3">
-                <p className="text-sm text-white/60 mb-2">Regions</p>
+                <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {GPP_REGIONS.map(r => (
-                    <label key={r.id} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                    <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">
                       <input
                         type="checkbox"
                         checked={ubRegions.includes(r.id)}
@@ -389,7 +389,7 @@ export function AdminPage() {
                             setUbRegions(prev => prev.filter(id => id !== r.id));
                           }
                         }}
-                        className="rounded border-white/20 bg-white/5"
+                        className="rounded border-theme-stroke-hover bg-theme-surface"
                       />
                       {r.label}
                     </label>
@@ -399,17 +399,17 @@ export function AdminPage() {
               <button
                 type="submit"
                 disabled={addingUb || !ubName.trim() || !ubEmail.trim() || ubRegions.length === 0}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
               >
                 {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
                 Add Underboss
               </button>
             </form>
 
-            <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+            <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-white/40 text-left">
+                  <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium">Email</th>
                     <th className="px-4 py-3 font-medium">Regions</th>
@@ -419,10 +419,10 @@ export function AdminPage() {
                 </thead>
                 <tbody>
                   {underbosses.map((ub) => (
-                    <tr key={ub.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3 text-white/80">{ub.name}</td>
-                      <td className="px-4 py-3 text-white/60">{ub.email}</td>
-                      <td className="px-4 py-3 text-white/60">
+                    <tr key={ub.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
+                      <td className="px-4 py-3 text-theme-text">{ub.name}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">{ub.email}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">
                         {editingUbId === ub.id ? (
                           <div>
                             <div className="flex flex-wrap gap-1.5 mb-2">
@@ -440,7 +440,7 @@ export function AdminPage() {
                                   className={`px-2 py-0.5 rounded text-xs transition-colors ${
                                     editRegions.includes(r.id)
                                       ? 'bg-red-500/20 text-red-500 border border-red-500/30 font-medium'
-                                      : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
+                                      : 'bg-theme-surface text-theme-text-muted border border-theme-stroke hover:bg-theme-surface-hover'
                                   }`}
                                 >
                                   {r.label}
@@ -458,7 +458,7 @@ export function AdminPage() {
                               </button>
                               <button
                                 onClick={() => setEditingUbId(null)}
-                                className="text-white/40 hover:text-white/60 p-1"
+                                className="text-theme-text-muted hover:text-theme-text-secondary p-1"
                                 title="Cancel"
                               >
                                 <X size={14} />
@@ -468,7 +468,7 @@ export function AdminPage() {
                         ) : (
                           <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => startEditRegions(ub)}>
                             <span>{(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}</span>
-                            <Pencil size={12} className="text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" />
+                            <Pencil size={12} className="text-theme-text-faint group-hover:text-theme-text-muted transition-colors flex-shrink-0" />
                           </div>
                         )}
                       </td>
@@ -488,7 +488,7 @@ export function AdminPage() {
                           {ub.isActive && (
                             <button
                               onClick={() => handleDeactivate(ub.id, ub.name)}
-                              className="text-white/40 hover:text-red-400 transition-colors p-1"
+                              className="text-theme-text-muted hover:text-red-400 transition-colors p-1"
                               title="Deactivate"
                             >
                               <Trash2 size={16} />
@@ -500,7 +500,7 @@ export function AdminPage() {
                   ))}
                   {underbosses.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-white/30">
+                      <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
                         No underbosses yet
                       </td>
                     </tr>

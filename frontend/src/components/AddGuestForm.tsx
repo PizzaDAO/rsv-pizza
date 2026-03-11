@@ -84,11 +84,11 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
   return (
     <div className="card p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">Add Guest</h2>
+        <h2 className="text-xl font-bold text-theme-text">Add Guest</h2>
         {onClose ? (
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
+            className="text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
@@ -116,7 +116,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
           />
 
           <div>
-            <h3 className="text-sm font-medium text-white/60 mb-2">
+            <h3 className="text-sm font-medium text-theme-text-secondary mb-2">
               Dietary Restrictions
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -134,7 +134,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-white/60 mb-3">
+            <h3 className="text-sm font-medium text-theme-text-secondary mb-3">
               Topping Preferences
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -149,7 +149,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                         ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                         : isDisliked
                         ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                        : 'bg-white/5 border-white/10'
+                        : 'bg-theme-surface border-theme-stroke'
                     }`}
                   >
                     <button
@@ -160,10 +160,10 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                       <ThumbsUp
                         size={12}
                         className={`transition-all ${
-                          isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                          isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                         }`}
                       />
-                      <span className="text-white text-xs">{topping.name}</span>
+                      <span className="text-theme-text text-xs">{topping.name}</span>
                     </button>
                     <button
                       type="button"
@@ -173,7 +173,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                       <ThumbsDown
                         size={12}
                         className={`transition-all ${
-                          isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                          isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                         }`}
                       />
                     </button>
@@ -186,7 +186,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
           {/* Beverage Preferences - Only show if party has beverages configured */}
           {party?.availableBeverages && party.availableBeverages.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-white/60 mb-3">
+              <h3 className="text-sm font-medium text-theme-text-secondary mb-3">
                 Beverage Preferences
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -203,7 +203,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                             ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                             : isDisliked
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-white/5 border-white/10'
+                            : 'bg-theme-surface border-theme-stroke'
                         }`}
                       >
                         <button
@@ -214,10 +214,10 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                           <ThumbsUp
                             size={12}
                             className={`transition-all ${
-                              isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                              isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                             }`}
                           />
-                          <span className="text-white text-xs">{beverage.name}</span>
+                          <span className="text-theme-text text-xs">{beverage.name}</span>
                         </button>
                         <button
                           type="button"
@@ -227,7 +227,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                           <ThumbsDown
                             size={12}
                             className={`transition-all ${
-                              isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                              isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                             }`}
                           />
                         </button>

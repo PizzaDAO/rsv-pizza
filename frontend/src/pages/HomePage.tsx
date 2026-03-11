@@ -51,7 +51,7 @@ export function HomePage() {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 size={32} className="animate-spin text-white/60" />
+          <Loader2 size={32} className="animate-spin text-theme-text-secondary" />
         </div>
       </Layout>
     );
@@ -63,20 +63,20 @@ export function HomePage() {
       <Layout>
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Your Events</h1>
-            <p className="text-white/60">Events you're hosting or attending</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Your Events</h1>
+            <p className="text-theme-text-secondary">Events you're hosting or attending</p>
           </div>
 
           {/* Upcoming/Past Toggle + Create Party Button */}
           <div className="flex items-center justify-between mb-6">
-            <div className="inline-flex bg-white/5 border border-white/10 rounded-xl p-1">
+            <div className="inline-flex bg-theme-surface border border-theme-stroke rounded-xl p-1">
               <button
                 type="button"
                 onClick={() => setEventFilter('upcoming')}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   eventFilter === 'upcoming'
                     ? 'bg-white text-black'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-theme-text-secondary hover:text-theme-text'
                 }`}
               >
                 Upcoming
@@ -87,7 +87,7 @@ export function HomePage() {
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   eventFilter === 'past'
                     ? 'bg-white text-black'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-theme-text-secondary hover:text-theme-text'
                 }`}
               >
                 Past
@@ -104,7 +104,7 @@ export function HomePage() {
 
           {partiesLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={32} className="animate-spin text-white/60" />
+              <Loader2 size={32} className="animate-spin text-theme-text-secondary" />
             </div>
           ) : (
             <div className="space-y-3 mb-8">
@@ -121,7 +121,7 @@ export function HomePage() {
 
                 if (filteredParties.length === 0) {
                   return (
-                    <div className="text-center py-8 text-white/50">
+                    <div className="text-center py-8 text-theme-text-muted">
                       No {eventFilter} events
                     </div>
                   );
@@ -131,7 +131,7 @@ export function HomePage() {
                 <Link
                   key={party.id}
                   to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/${party.invite_code}`}
-                  className="block card p-4 hover:bg-white/10 transition-colors"
+                  className="block card p-4 hover:bg-theme-surface-hover transition-colors"
                 >
                   <div className="flex items-start gap-4">
                     {/* Event Image or Placeholder */}
@@ -142,14 +142,14 @@ export function HomePage() {
                         className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#ff393a]/20 to-[#ff5a5b]/20 border border-white/10 flex items-center justify-center flex-shrink-0">
-                        <Calendar size={24} className="text-white/40" />
+                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#ff393a]/20 to-[#ff5a5b]/20 border border-theme-stroke flex items-center justify-center flex-shrink-0">
+                        <Calendar size={24} className="text-theme-text-muted" />
                       </div>
                     )}
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-white truncate">{party.name}</h3>
+                        <h3 className="font-semibold text-theme-text truncate">{party.name}</h3>
                         {party.userRole === 'host' && (
                           <span className="flex items-center gap-1 px-2 py-0.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-full text-xs text-[#ff393a] flex-shrink-0">
                             <Crown size={10} />
@@ -158,11 +158,11 @@ export function HomePage() {
                         )}
                       </div>
 
-                      <p className="text-sm text-white/60 mb-1">
+                      <p className="text-sm text-theme-text-secondary mb-1">
                         {formatPartyDate(party.date)}
                       </p>
 
-                      <div className="flex items-center gap-4 text-xs text-white/50">
+                      <div className="flex items-center gap-4 text-xs text-theme-text-muted">
                         {party.address && (
                           <span className="flex items-center gap-1 truncate">
                             <MapPin size={12} />
@@ -197,7 +197,7 @@ export function HomePage() {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-white/50 text-sm">
+          <p className="text-theme-text-muted text-sm">
             Already created a party?{' '}
             <a href="/parties" className="text-[#ff393a] hover:text-[#ff5a5b] underline">
               View all test events

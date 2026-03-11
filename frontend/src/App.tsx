@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
@@ -24,6 +25,7 @@ function App() {
   return (
     <HelmetProvider>
       <AuthProvider>
+        <ThemeProvider theme="gpp">
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -48,6 +50,7 @@ function App() {
             <Route path="/:slug" element={<EventPage />} />
           </Routes>
         </BrowserRouter>
+        </ThemeProvider>
       </AuthProvider>
     </HelmetProvider>
   );

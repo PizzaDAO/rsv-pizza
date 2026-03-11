@@ -123,7 +123,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
     return (
       <div className="card p-8 text-center">
         <AlertCircle className="w-12 h-12 text-[#ff393a] mx-auto mb-4" />
-        <p className="text-white/60 mb-4">{error}</p>
+        <p className="text-theme-text-secondary mb-4">{error}</p>
         <button
           onClick={loadChecklist}
           className="btn-secondary inline-flex items-center gap-2"
@@ -145,8 +145,8 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-white">Event Checklist</h2>
-            <p className="text-xs text-white/40 mt-0.5">
+            <h2 className="text-lg font-semibold text-theme-text">Event Checklist</h2>
+            <p className="text-xs text-theme-text-muted mt-0.5">
               {completedCount} of {totalCount} tasks complete
             </p>
           </div>
@@ -160,7 +160,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-white/10 rounded-full h-2.5">
+        <div className="w-full bg-theme-surface-hover rounded-full h-2.5">
           <div
             className="h-2.5 rounded-full transition-all duration-500"
             style={{
@@ -169,14 +169,14 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
             }}
           />
         </div>
-        <p className="text-right text-xs text-white/40 mt-1">{progressPct}%</p>
+        <p className="text-right text-xs text-theme-text-muted mt-1">{progressPct}%</p>
       </div>
 
       {/* Items List */}
       <div className="card p-6">
         {data.items.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-white/40 mb-4">No tasks yet</p>
+            <p className="text-theme-text-muted mb-4">No tasks yet</p>
             <button
               onClick={() => setShowForm(true)}
               className="btn-secondary inline-flex items-center gap-2"
@@ -213,9 +213,9 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(null)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white mb-3">Delete Task?</h2>
-            <p className="text-white/60 mb-6">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-theme-text mb-3">Delete Task?</h2>
+            <p className="text-theme-text-secondary mb-6">
               This will permanently delete this task. This action cannot be undone.
             </p>
             <div className="flex gap-3">

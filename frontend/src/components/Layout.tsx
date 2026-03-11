@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { CornerLinks } from './CornerLinks';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,8 +11,12 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, className = '', style }) => {
+  const { themeClass, backgroundStyle } = useTheme();
   return (
-    <div className={`min-h-screen flex flex-col ${className}`} style={style}>
+    <div
+      className={`min-h-screen flex flex-col ${themeClass} ${className}`}
+      style={{ ...backgroundStyle, ...style }}
+    >
       <Header />
 
       {/* Main content */}
@@ -19,7 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, className = '', style 
         {children}
       </main>
 
-      <Footer className="border-t border-white/10" />
+      <Footer className="border-t border-theme-stroke" />
 
       <CornerLinks />
     </div>

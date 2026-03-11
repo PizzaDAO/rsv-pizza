@@ -123,15 +123,15 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5"
+        className="bg-theme-header border border-theme-stroke rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-theme-text">
             {isEditing ? 'Edit Performer' : 'Add Performer'}
           </h2>
-          <button onClick={onClose} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+          <button onClick={onClose} className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -143,7 +143,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
             <select
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value as PerformerType)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
             >
               {performerTypes.map((type) => (
                 <option key={type.value} value={type.value}>{type.icon} {type.label}</option>
@@ -152,7 +152,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
             <select
               value={formData.status}
               onChange={(e) => handleChange('status', e.target.value as PerformerStatus)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
             >
               {statusOptions.map((status) => (
                 <option key={status.value} value={status.value}>{status.label}</option>
@@ -175,14 +175,14 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full flex items-center justify-between p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm"
+            className="w-full flex items-center justify-between p-2 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors text-sm"
           >
-            <span className="text-white/70">Contact & Payment Details</span>
-            {showAdvanced ? <ChevronUp size={18} className="text-white/60" /> : <ChevronDown size={18} className="text-white/60" />}
+            <span className="text-theme-text-secondary">Contact & Payment Details</span>
+            {showAdvanced ? <ChevronUp size={18} className="text-theme-text-secondary" /> : <ChevronDown size={18} className="text-theme-text-secondary" />}
           </button>
 
           {showAdvanced && (
-            <div className="space-y-3 border-l-2 border-white/10 pl-4">
+            <div className="space-y-3 border-l-2 border-theme-stroke pl-4">
               <IconInput icon={UserCircle} type="text" value={formData.contactName} onChange={(e) => handleChange('contactName', e.target.value)} placeholder="Real name or booking contact" />
               <div className="grid grid-cols-2 gap-3">
                 <IconInput icon={Mail} type="email" value={formData.contactEmail} onChange={(e) => handleChange('contactEmail', e.target.value)} placeholder="contact@email.com" />
@@ -199,7 +199,7 @@ export const PerformerForm: React.FC<PerformerFormProps> = ({
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm">
               Cancel
             </button>
             <button type="submit" disabled={saving || !formData.name.trim()} className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">

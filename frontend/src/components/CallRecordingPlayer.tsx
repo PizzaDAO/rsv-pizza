@@ -41,10 +41,10 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#8b5cf6] rounded-full animate-pulse" />
           </div>
           <div className="flex-1">
-            <p className="text-white font-medium text-sm">
+            <p className="text-theme-text font-medium text-sm">
               Dialing{pizzeriaName ? ` ${pizzeriaName}` : ''}...
             </p>
-            <p className="text-white/50 text-xs">Waiting for the call to connect</p>
+            <p className="text-theme-text-muted text-xs">Waiting for the call to connect</p>
           </div>
           <Loader2 size={18} className="text-[#8b5cf6] animate-spin" />
         </div>
@@ -62,10 +62,10 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#39d98a] rounded-full animate-pulse" />
           </div>
           <div className="flex-1">
-            <p className="text-white font-medium text-sm">
+            <p className="text-theme-text font-medium text-sm">
               AI is on the phone{pizzeriaName ? ` with ${pizzeriaName}` : ''}
             </p>
-            <p className="text-white/50 text-xs">
+            <p className="text-theme-text-muted text-xs">
               {formatTime(elapsed)} elapsed
               {answeredBy !== 'unknown' && ` \u00b7 Answered by ${answeredBy}`}
             </p>
@@ -80,16 +80,16 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
 
         {/* Live transcript preview */}
         {transcript && (
-          <div className="mt-3 pt-3 border-t border-white/10">
+          <div className="mt-3 pt-3 border-t border-theme-stroke">
             <button
               onClick={() => setShowTranscript(!showTranscript)}
-              className="flex items-center gap-1 text-xs text-white/50 hover:text-white/70 transition-colors"
+              className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
             >
               {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               Live transcript
             </button>
             {showTranscript && (
-              <pre className="mt-2 text-xs text-white/60 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-40 overflow-y-auto">
+              <pre className="mt-2 text-xs text-theme-text-secondary whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-40 overflow-y-auto">
                 {transcript}
               </pre>
             )}
@@ -106,21 +106,21 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
         <div className="flex items-center gap-3">
           <PhoneOff size={20} className="text-[#ff393a]" />
           <div className="flex-1">
-            <p className="text-white font-medium text-sm">Call failed</p>
-            <p className="text-white/50 text-xs">{error || 'The call could not be completed'}</p>
+            <p className="text-theme-text font-medium text-sm">Call failed</p>
+            <p className="text-theme-text-muted text-xs">{error || 'The call could not be completed'}</p>
           </div>
         </div>
         {transcript && (
-          <div className="mt-3 pt-3 border-t border-white/10">
+          <div className="mt-3 pt-3 border-t border-theme-stroke">
             <button
               onClick={() => setShowTranscript(!showTranscript)}
-              className="flex items-center gap-1 text-xs text-white/50 hover:text-white/70 transition-colors"
+              className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
             >
               {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               Transcript
             </button>
             {showTranscript && (
-              <pre className="mt-2 text-xs text-white/60 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-40 overflow-y-auto">
+              <pre className="mt-2 text-xs text-theme-text-secondary whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-40 overflow-y-auto">
                 {transcript}
               </pre>
             )}
@@ -137,10 +137,10 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
         <div className="flex items-center gap-3 mb-3">
           <Phone size={20} className="text-[#39d98a]" />
           <div className="flex-1">
-            <p className="text-white font-medium text-sm">
+            <p className="text-theme-text font-medium text-sm">
               Call completed{pizzeriaName ? ` with ${pizzeriaName}` : ''}
             </p>
-            <p className="text-white/50 text-xs">
+            <p className="text-theme-text-muted text-xs">
               {callLength ? `${callLength.toFixed(1)} min` : 'Duration unknown'}
               {answeredBy !== 'unknown' && ` \u00b7 Answered by ${answeredBy}`}
             </p>
@@ -160,16 +160,16 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
 
         {/* Transcript */}
         {transcript && (
-          <div className="mt-3 pt-3 border-t border-white/10">
+          <div className="mt-3 pt-3 border-t border-theme-stroke">
             <button
               onClick={() => setShowTranscript(!showTranscript)}
-              className="flex items-center gap-1 text-xs text-white/50 hover:text-white/70 transition-colors"
+              className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
             >
               {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               View transcript
             </button>
             {showTranscript && (
-              <pre className="mt-2 text-xs text-white/60 whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-60 overflow-y-auto">
+              <pre className="mt-2 text-xs text-theme-text-secondary whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg max-h-60 overflow-y-auto">
                 {transcript}
               </pre>
             )}
@@ -182,12 +182,12 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
   // Unknown / loading state
   if (error && !isPolling) {
     return (
-      <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+      <div className="p-4 bg-theme-surface border border-theme-stroke rounded-xl">
         <div className="flex items-center gap-3">
-          <AlertCircle size={20} className="text-white/40" />
+          <AlertCircle size={20} className="text-theme-text-muted" />
           <div>
-            <p className="text-white/60 text-sm">Unable to load call status</p>
-            <p className="text-white/40 text-xs">{error}</p>
+            <p className="text-theme-text-secondary text-sm">Unable to load call status</p>
+            <p className="text-theme-text-muted text-xs">{error}</p>
           </div>
         </div>
       </div>
@@ -195,10 +195,10 @@ export const CallRecordingPlayer: React.FC<CallRecordingPlayerProps> = ({ callId
   }
 
   return (
-    <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+    <div className="p-4 bg-theme-surface border border-theme-stroke rounded-xl">
       <div className="flex items-center gap-3">
-        <Loader2 size={18} className="text-white/40 animate-spin" />
-        <p className="text-white/50 text-sm">Loading call status...</p>
+        <Loader2 size={18} className="text-theme-text-muted animate-spin" />
+        <p className="text-theme-text-muted text-sm">Loading call status...</p>
       </div>
     </div>
   );

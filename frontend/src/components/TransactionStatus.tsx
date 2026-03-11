@@ -31,8 +31,8 @@ export const TransactionStatus: React.FC<TransactionStatusProps> = ({
           <Loader2 className="w-8 h-8 text-[#627eea] animate-spin" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-white mb-1">Confirm in Wallet</h3>
-          <p className="text-white/50 text-sm">
+          <h3 className="text-lg font-bold text-theme-text mb-1">Confirm in Wallet</h3>
+          <p className="text-theme-text-muted text-sm">
             Please confirm the transaction in your wallet
           </p>
         </div>
@@ -47,8 +47,8 @@ export const TransactionStatus: React.FC<TransactionStatusProps> = ({
           <Loader2 className="w-8 h-8 text-yellow-400 animate-spin" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-white mb-1">Transaction Pending</h3>
-          <p className="text-white/50 text-sm">
+          <h3 className="text-lg font-bold text-theme-text mb-1">Transaction Pending</h3>
+          <p className="text-theme-text-muted text-sm">
             Waiting for on-chain confirmation...
           </p>
         </div>
@@ -74,8 +74,8 @@ export const TransactionStatus: React.FC<TransactionStatusProps> = ({
           <Check className="w-8 h-8 text-[#39d98a]" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-white mb-1">Thank You!</h3>
-          <p className="text-white/50 text-sm">
+          <h3 className="text-xl font-bold text-theme-text mb-1">Thank You!</h3>
+          <p className="text-theme-text-muted text-sm">
             Your donation of {amount} {tokenSymbol} has been sent.
           </p>
         </div>
@@ -108,8 +108,8 @@ export const TransactionStatus: React.FC<TransactionStatusProps> = ({
           <AlertCircle className="w-8 h-8 text-[#ff393a]" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-white mb-1">Transaction Failed</h3>
-          <p className="text-white/50 text-sm max-w-xs mx-auto">
+          <h3 className="text-lg font-bold text-theme-text mb-1">Transaction Failed</h3>
+          <p className="text-theme-text-muted text-sm max-w-xs mx-auto">
             {error || 'Something went wrong. Please try again.'}
           </p>
         </div>

@@ -116,7 +116,7 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 text-xs text-white/50 hover:text-white/70 transition-colors"
+        className="flex items-center gap-2 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -128,15 +128,15 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-1 w-80 bg-[#1a1a1a] border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full right-0 mt-1 w-80 bg-theme-card border border-theme-stroke-hover rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Search Input */}
-          <div className="p-3 border-b border-white/10">
+          <div className="p-3 border-b border-theme-stroke">
             <input
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search for a timezone"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#4285f4]"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#4285f4]"
               autoFocus
             />
           </div>
@@ -146,7 +146,7 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
             {/* Popular Timezones */}
             {filteredPopular.length > 0 && (
               <div>
-                <div className="px-3 py-2 text-xs font-medium text-white/40 bg-white/5">
+                <div className="px-3 py-2 text-xs font-medium text-theme-text-muted bg-theme-surface">
                   Popular Timezones
                 </div>
                 {filteredPopular.map((tz) => {
@@ -160,11 +160,11 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
                       className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
                         isSelected
                           ? 'bg-[#4285f4] text-white'
-                          : 'text-white/80 hover:bg-white/10'
+                          : 'text-theme-text hover:bg-theme-surface-hover'
                       }`}
                     >
                       <span>{city}</span>
-                      <span className="text-xs text-white/50">{offset}</span>
+                      <span className="text-xs text-theme-text-muted">{offset}</span>
                     </button>
                   );
                 })}
@@ -174,7 +174,7 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
             {/* All Timezones */}
             {filteredAll.length > 0 && (
               <div>
-                <div className="px-3 py-2 text-xs font-medium text-white/40 bg-white/5 sticky top-0">
+                <div className="px-3 py-2 text-xs font-medium text-theme-text-muted bg-theme-surface sticky top-0">
                   All Timezones
                 </div>
                 {filteredAll.map((tz) => {
@@ -188,11 +188,11 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
                       className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
                         isSelected
                           ? 'bg-[#4285f4] text-white'
-                          : 'text-white/80 hover:bg-white/10'
+                          : 'text-theme-text hover:bg-theme-surface-hover'
                       }`}
                     >
                       <span>{city}</span>
-                      <span className="text-xs text-white/50">{offset}</span>
+                      <span className="text-xs text-theme-text-muted">{offset}</span>
                     </button>
                   );
                 })}
@@ -200,7 +200,7 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
             )}
 
             {filteredPopular.length === 0 && filteredAll.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-white/50">
+              <div className="px-4 py-8 text-center text-sm text-theme-text-muted">
                 No timezones found
               </div>
             )}

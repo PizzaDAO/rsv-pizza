@@ -17,12 +17,12 @@ export function ProgressIndicator({ done, label, size = 'sm' }: ProgressIndicato
         className={`${sizeClasses} rounded-full flex items-center justify-center ${
           done
             ? 'bg-green-500/20 text-green-400'
-            : 'bg-white/5 text-white/20'
+            : 'bg-theme-surface text-theme-text-faint'
         }`}
       >
         {done ? <Check size={iconSize} /> : <X size={iconSize} />}
       </div>
-      <span className={`text-xs ${done ? 'text-white/60' : 'text-white/30'}`}>
+      <span className={`text-xs ${done ? 'text-theme-text-secondary' : 'text-theme-text-faint'}`}>
         {label}
       </span>
     </div>

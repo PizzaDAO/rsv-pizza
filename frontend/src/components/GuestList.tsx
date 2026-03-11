@@ -89,9 +89,9 @@ export const GuestList: React.FC = () => {
   if (guests.length === 0) {
     return (
       <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
-        <UserRoundX size={48} className="text-white/30 mb-4" />
-        <h3 className="text-xl font-medium text-white/80">No Guests Yet</h3>
-        <p className="text-white/50 mt-2">
+        <UserRoundX size={48} className="text-theme-text-faint mb-4" />
+        <h3 className="text-xl font-medium text-theme-text">No Guests Yet</h3>
+        <p className="text-theme-text-muted mt-2">
           Share your event link to start receiving RSVPs.
         </p>
       </div>
@@ -153,8 +153,8 @@ export const GuestList: React.FC = () => {
       <div className="card p-6">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
-            <Users size={20} className="text-white/60" />
-            <h2 className="text-xl font-bold text-white">Guests</h2>
+            <Users size={20} className="text-theme-text-secondary" />
+            <h2 className="text-xl font-bold text-theme-text">Guests</h2>
             <span className="bg-[#39d98a]/20 text-[#39d98a] text-sm font-medium px-3 py-1 rounded-full border border-[#39d98a]/30">
               {confirmedGuests.length}
               {party?.maxGuests && ` / ${party.maxGuests}`}
@@ -168,7 +168,7 @@ export const GuestList: React.FC = () => {
           </div>
           <button
             onClick={exportCSV}
-            className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <Download size={14} />
             Export CSV
@@ -186,7 +186,7 @@ export const GuestList: React.FC = () => {
         </div>
 
         {searchQuery.trim() && (
-          <p className="text-sm text-white/50 mb-3">
+          <p className="text-sm text-theme-text-muted mb-3">
             Showing {filteredGuests.length} of {guests.length} guests
           </p>
         )}
@@ -194,14 +194,14 @@ export const GuestList: React.FC = () => {
         {confirmedGuests.length === 0 ? (
           searchQuery.trim() ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Search size={36} className="text-white/20 mb-3" />
-              <p className="text-white/50">No guests match "{searchQuery}"</p>
+              <Search size={36} className="text-theme-text-faint mb-3" />
+              <p className="text-theme-text-muted">No guests match "{searchQuery}"</p>
             </div>
           ) : (
-            <p className="text-white/50 text-sm py-4">No confirmed guests yet.</p>
+            <p className="text-theme-text-muted text-sm py-4">No confirmed guests yet.</p>
           )
         ) : (
-          <div className="divide-y divide-white/10">
+          <div className="divide-y divide-theme-stroke">
             {confirmedGuests.map(guest => (
               <TableRow
                 key={guest.id}
@@ -227,15 +227,15 @@ export const GuestList: React.FC = () => {
         <div className="card p-6">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
-              <Clock size={20} className="text-white/60" />
-              <h2 className="text-xl font-bold text-white">Waitlist</h2>
+              <Clock size={20} className="text-theme-text-secondary" />
+              <h2 className="text-xl font-bold text-theme-text">Waitlist</h2>
               <span className="bg-[#ffc107]/20 text-[#ffc107] text-sm font-medium px-3 py-1 rounded-full border border-[#ffc107]/30">
                 {waitlistedGuests.length}
               </span>
             </div>
           </div>
 
-          <div className="divide-y divide-white/10">
+          <div className="divide-y divide-theme-stroke">
             {waitlistedGuests.map(guest => (
               <TableRow
                 key={guest.id}

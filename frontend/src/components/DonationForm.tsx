@@ -114,8 +114,8 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
         <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
           <Check className="w-8 h-8 text-[#39d98a]" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">Thank You!</h3>
-        <p className="text-white/60">Your donation of ${(amount / 100).toFixed(2)} has been received.</p>
+        <h3 className="text-xl font-bold text-theme-text mb-2">Thank You!</h3>
+        <p className="text-theme-text-secondary">Your donation of ${(amount / 100).toFixed(2)} has been received.</p>
       </div>
     );
   }
@@ -266,7 +266,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         <button
           type="button"
           onClick={() => setPaymentMethod(null)}
-          className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors"
+          className="text-theme-text-secondary hover:text-theme-text text-sm flex items-center gap-1 transition-colors"
         >
           &larr; Back to payment options
         </button>
@@ -294,14 +294,14 @@ export const DonationForm: React.FC<DonationFormProps> = ({
             <button
               type="button"
               onClick={() => setPaymentMethod('stripe')}
-              className="w-full p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-4"
+              className="w-full p-4 rounded-xl border border-theme-stroke bg-theme-surface hover:bg-theme-surface-hover transition-all flex items-center gap-4"
             >
               <div className="w-12 h-12 bg-[#635bff]/20 rounded-full flex items-center justify-center border border-[#635bff]/30">
                 <CreditCard size={24} className="text-[#635bff]" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-white font-medium">Pay with Card or Wallet</p>
-                <p className="text-white/50 text-sm">Credit/debit card, Apple Pay, Google Pay & more</p>
+                <p className="text-theme-text font-medium">Pay with Card or Wallet</p>
+                <p className="text-theme-text-muted text-sm">Credit/debit card, Apple Pay, Google Pay & more</p>
               </div>
             </button>
 
@@ -309,7 +309,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
             <button
               type="button"
               onClick={() => setPaymentMethod('crypto')}
-              className="w-full p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-4"
+              className="w-full p-4 rounded-xl border border-theme-stroke bg-theme-surface hover:bg-theme-surface-hover transition-all flex items-center gap-4"
             >
               <div className="w-12 h-12 bg-[#627eea]/20 rounded-full flex items-center justify-center border border-[#627eea]/30">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#627eea]">
@@ -318,8 +318,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 </svg>
               </div>
               <div className="flex-1 text-left">
-                <p className="text-white font-medium">Crypto</p>
-                <p className="text-white/50 text-sm">ETH, USDC, or other tokens</p>
+                <p className="text-theme-text font-medium">Crypto</p>
+                <p className="text-theme-text-muted text-sm">ETH, USDC, or other tokens</p>
               </div>
             </button>
         </div>
@@ -344,7 +344,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
         <button
           type="button"
           onClick={() => setPaymentMethod(null)}
-          className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors"
+          className="text-theme-text-secondary hover:text-theme-text text-sm flex items-center gap-1 transition-colors"
         >
           &larr; Back to payment options
         </button>
@@ -360,7 +360,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 className={`p-3 rounded-xl border transition-all text-lg font-bold ${
                   selectedAmount === amount
                     ? 'bg-[#ff393a] border-[#ff393a] text-white'
-                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                    : 'bg-theme-surface border-theme-stroke text-theme-text hover:bg-theme-surface-hover'
                 }`}
               >
                 ${(amount / 100).toFixed(0)}

@@ -159,12 +159,12 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     <div className="relative">
       <MapPin
         size={18}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10"
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none z-10"
       />
       {loading && (
         <Loader2
           size={16}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 animate-spin z-10"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin z-10"
         />
       )}
       <input

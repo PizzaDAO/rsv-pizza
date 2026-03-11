@@ -54,11 +54,11 @@ export const LineupOverview: React.FC<LineupOverviewProps> = ({ performers }) =>
   }
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">{'\uD83C\uDFB5'}</span>
-        <h3 className="text-white font-medium">Music Lineup</h3>
+        <h3 className="text-theme-text font-medium">Music Lineup</h3>
       </div>
 
       {/* Timeline */}
@@ -73,9 +73,9 @@ export const LineupOverview: React.FC<LineupOverviewProps> = ({ performers }) =>
             {/* Time */}
             <div className="w-20 flex-shrink-0">
               {performer.setTime ? (
-                <span className="text-sm text-white/70">{formatTime(performer.setTime)}</span>
+                <span className="text-sm text-theme-text-secondary">{formatTime(performer.setTime)}</span>
               ) : (
-                <span className="text-sm text-white/40 flex items-center gap-1">
+                <span className="text-sm text-theme-text-muted flex items-center gap-1">
                   <Clock size={12} />
                   TBD
                 </span>
@@ -86,11 +86,11 @@ export const LineupOverview: React.FC<LineupOverviewProps> = ({ performers }) =>
             <span className="text-lg flex-shrink-0">{typeIcons[performer.type]}</span>
 
             {/* Name */}
-            <span className="text-white flex-1 truncate">{performer.name}</span>
+            <span className="text-theme-text flex-1 truncate">{performer.name}</span>
 
             {/* Genre */}
             {performer.genre && (
-              <span className="text-sm text-white/50 hidden sm:block">({performer.genre})</span>
+              <span className="text-sm text-theme-text-muted hidden sm:block">({performer.genre})</span>
             )}
           </div>
         ))}
@@ -98,10 +98,10 @@ export const LineupOverview: React.FC<LineupOverviewProps> = ({ performers }) =>
 
       {/* Budget Summary */}
       {totalBudget > 0 && (
-        <div className="flex items-center justify-between pt-3 border-t border-white/10">
+        <div className="flex items-center justify-between pt-3 border-t border-theme-stroke">
           <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1 text-white/70">
-              <DollarSign size={14} className="text-white/40" />
+            <div className="flex items-center gap-1 text-theme-text-secondary">
+              <DollarSign size={14} className="text-theme-text-muted" />
               <span>Budget: {formatFee(totalBudget)}</span>
             </div>
             <div className="flex items-center gap-1 text-green-400">

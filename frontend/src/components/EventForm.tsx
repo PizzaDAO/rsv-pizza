@@ -295,30 +295,30 @@ export function EventForm() {
         <button
           type="button"
           onClick={() => setShowDateTimeModal(true)}
-          className="md:hidden w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+          className="md:hidden w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center gap-3">
-            <Play size={18} className="text-white/40 flex-shrink-0" />
+            <Play size={18} className="text-theme-text-muted flex-shrink-0" />
             {startDate && startTime && endDate && endTime ? (
               <div>
-                <div className="text-white font-medium">
+                <div className="text-theme-text font-medium">
                   {formatDateDisplay(startDate, timezone)}
                 </div>
-                <div className="text-white/60 text-sm mt-1">
+                <div className="text-theme-text-secondary text-sm mt-1">
                   {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                 </div>
               </div>
             ) : (
               <div>
-                <span className="text-white/60">Thursday, January 15</span>
-                <div className="text-white/40 text-sm mt-1">2:00 PM – 3:00 PM EST</div>
+                <span className="text-theme-text-secondary">Thursday, January 15</span>
+                <div className="text-theme-text-muted text-sm mt-1">2:00 PM – 3:00 PM EST</div>
               </div>
             )}
           </div>
         </button>
 
         {/* Desktop: Inline Date/Time Picker */}
-        <div className="hidden md:block bg-white/5 border border-white/10 rounded-xl p-4">
+        <div className="hidden md:block bg-theme-surface border border-theme-stroke rounded-xl p-4">
           <div className="flex items-start gap-4">
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-3">
@@ -327,7 +327,7 @@ export function EventForm() {
                   onClick={() => startDateInputRef.current?.showPicker?.()}
                 >
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <Play size={21} className="text-white/40" />
+                    <Play size={21} className="text-theme-text-muted" />
                   </div>
                   <input
                     ref={startDateInputRef}
@@ -337,7 +337,7 @@ export function EventForm() {
                       setStartDate(e.target.value);
                       if (!endDate) setEndDate(e.target.value);
                     }}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-theme-text text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
@@ -354,14 +354,14 @@ export function EventForm() {
                   onClick={() => endDateInputRef.current?.showPicker?.()}
                 >
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <SquareIcon size={17} className="text-white/40" />
+                    <SquareIcon size={17} className="text-theme-text-muted" />
                   </div>
                   <input
                     ref={endDateInputRef}
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-transparent border-none text-white text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-theme-text text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
@@ -381,7 +381,7 @@ export function EventForm() {
         </div>
 
         <div className="relative">
-          <FileText size={18} className="absolute left-4 top-[14px] text-white/40 pointer-events-none" />
+          <FileText size={18} className="absolute left-4 top-[14px] text-theme-text-muted pointer-events-none" />
           <textarea
             value={eventDescription}
             onChange={(e) => setEventDescription(e.target.value)}
@@ -399,7 +399,7 @@ export function EventForm() {
                 <img
                   src={imagePreview}
                   alt="Event flyer preview"
-                  className="w-full h-auto rounded-xl border-2 border-white/20"
+                  className="w-full h-auto rounded-xl border-2 border-theme-stroke-hover"
                 />
                 <button
                   type="button"
@@ -422,25 +422,25 @@ export function EventForm() {
               />
               <label
                 htmlFor="eventImage"
-                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-theme-stroke-hover rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-theme-surface hover:bg-theme-surface-hover ${
                   eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <Upload className="w-8 h-8 text-white/40 mb-2" />
-                <span className="text-sm text-white/60">Click to upload square image</span>
-                <span className="text-xs text-white/40 mt-1">Max 5MB - 1:1 aspect ratio</span>
+                <Upload className="w-8 h-8 text-theme-text-muted mb-2" />
+                <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
+                <span className="text-xs text-theme-text-muted mt-1">Max 5MB - 1:1 aspect ratio</span>
               </label>
             </div>
           )}
 
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-white/10"></div>
-            <span className="text-xs text-white/40">OR</span>
-            <div className="flex-1 h-px bg-white/10"></div>
+            <div className="flex-1 h-px bg-theme-surface-hover"></div>
+            <span className="text-xs text-theme-text-muted">OR</span>
+            <div className="flex-1 h-px bg-theme-surface-hover"></div>
           </div>
 
           <div className="relative">
-            <Image size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+            <Image size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
             <input
               type="url"
               value={eventImageUrl}
@@ -466,21 +466,21 @@ export function EventForm() {
         <button
           type="button"
           onClick={() => setShowOptionalFields(!showOptionalFields)}
-          className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+          className="w-full flex items-center justify-between p-4 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors"
         >
-          <span className="text-sm font-medium text-white/80">
+          <span className="text-sm font-medium text-theme-text">
             Options
           </span>
           {showOptionalFields ? (
-            <ChevronUp size={18} className="text-white/60" />
+            <ChevronUp size={18} className="text-theme-text-secondary" />
           ) : (
-            <ChevronDown size={18} className="text-white/60" />
+            <ChevronDown size={18} className="text-theme-text-secondary" />
           )}
         </button>
 
         {/* Collapsible Options */}
         {showOptionalFields && (
-          <div className="space-y-3 border-l-2 border-white/10 pl-4">
+          <div className="space-y-3 border-l-2 border-theme-stroke pl-4">
             <div>
               <button
                 type="button"
@@ -490,9 +490,9 @@ export function EventForm() {
                 {requireApproval ? (
                   <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
                 ) : (
-                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                  <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-white/80">Require Approval</span>
+                <span className="text-sm font-medium text-theme-text">Require Approval</span>
               </button>
             </div>
 
@@ -505,9 +505,9 @@ export function EventForm() {
                 {limitGuests ? (
                   <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
                 ) : (
-                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                  <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-white/80">Limit Guests</span>
+                <span className="text-sm font-medium text-theme-text">Limit Guests</span>
               </button>
             </div>
 
@@ -520,15 +520,15 @@ export function EventForm() {
                 {hideGuests ? (
                   <CheckSquare2 size={18} className="text-[#ff393a] flex-shrink-0" />
                 ) : (
-                  <SquareIcon size={18} className="text-white/40 flex-shrink-0" />
+                  <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-white/80">Hide Guests</span>
+                <span className="text-sm font-medium text-theme-text">Hide Guests</span>
               </button>
             </div>
 
             {limitGuests && (
               <div className="relative">
-                <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <Users size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
                 <input
                   type="number"
                   min="1"
@@ -541,7 +541,7 @@ export function EventForm() {
             )}
 
             <div className="relative">
-              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
               <input
                 type="password"
                 value={partyPassword}
@@ -581,12 +581,12 @@ export function EventForm() {
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Play size={18} className="text-white/40 flex-shrink-0" />
+                <Play size={18} className="text-theme-text-muted flex-shrink-0" />
                 <input
                   type="date"
                   value={startDate}
@@ -595,36 +595,36 @@ export function EventForm() {
                     if (!endDate) setEndDate(e.target.value);
                   }}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
                   placeholder="12:00 PM"
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
               <div className="flex items-center gap-2">
-                <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
+                <SquareIcon size={16} className="text-theme-text-muted flex-shrink-0" />
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
                   placeholder="1:00 PM"
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-theme-stroke">
                 <TimezonePickerInput
                   value={timezone}
                   onChange={setTimezone}

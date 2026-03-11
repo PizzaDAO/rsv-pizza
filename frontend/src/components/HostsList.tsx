@@ -83,7 +83,7 @@ export const HostsList: React.FC<HostsListProps> = ({
   return (
     <div>
       {showTitle && (
-        <h3 className="text-sm font-semibold text-white/60 mb-3">Hosted By</h3>
+        <h3 className="text-sm font-semibold text-theme-text-secondary mb-3">Hosted By</h3>
       )}
 
       <div className="space-y-3">
@@ -101,7 +101,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <p className={`text-white font-medium ${config.text} flex-1`}>{displayHostName}</p>
+            <p className={`text-theme-text font-medium ${config.text} flex-1`}>{displayHostName}</p>
             {showSocialLinks && hostHasSocials && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 {hostProfile.website && (
@@ -109,7 +109,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={hostProfile.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -119,7 +119,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://twitter.com/${hostProfile.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -129,7 +129,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://instagram.com/${hostProfile.instagram}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Instagram size={config.socialIcon} />
                   </a>
@@ -139,7 +139,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://youtube.com/@${hostProfile.youtube}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Youtube size={config.socialIcon} />
                   </a>
@@ -149,7 +149,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://tiktok.com/@${hostProfile.tiktok}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <TikTokIcon size={config.socialIcon} />
                   </a>
@@ -159,7 +159,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://linkedin.com/in/${hostProfile.linkedin}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Linkedin size={config.socialIcon} />
                   </a>
@@ -183,7 +183,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                 <User className={`${config.icon} text-[#ff393a]`} />
               </div>
             )}
-            <p className={`text-white font-medium ${config.text} flex-1`}>{coHost.name}</p>
+            <p className={`text-theme-text font-medium ${config.text} flex-1`}>{coHost.name}</p>
             {showSocialLinks && (coHost.website || coHost.twitter || coHost.instagram) && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 {coHost.website && (
@@ -191,7 +191,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={coHost.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -201,7 +201,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://twitter.com/${coHost.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -211,7 +211,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://instagram.com/${coHost.instagram}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-theme-text-muted hover:text-theme-text transition-colors"
                   >
                     <Instagram size={config.socialIcon} />
                   </a>
@@ -262,7 +262,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
               className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative"
               style={{ zIndex: 10, marginLeft: '-8px' }}
             >
-              <User className="w-4 h-4 text-white" />
+              <User className="w-4 h-4 text-theme-text" />
             </div>
           )
         )}
@@ -277,7 +277,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black">
-                <User className="w-4 h-4 text-white" />
+                <User className="w-4 h-4 text-theme-text" />
               </div>
             )}
           </div>
@@ -286,7 +286,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
 
       {/* Host text */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white">
+        <p className="text-sm text-theme-text">
           Hosted by <span className="font-medium">{displayHostName}</span>
           {visibleCoHosts.length > 0 && (
             <> & {visibleCoHosts.length} other{visibleCoHosts.length > 1 ? 's' : ''}</>

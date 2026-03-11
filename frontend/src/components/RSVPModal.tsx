@@ -478,34 +478,34 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
             {getSuccessIconComponent()}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-theme-text mb-2">
             {getSuccessTitle()}
           </h1>
           {alreadyRegistered && !wasUpdated && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               This email has already been used to RSVP to this event.
             </p>
           )}
           {wasUpdated && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               Your preferences have been saved.
             </p>
           )}
           {waitlisted && !wasUpdated && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               This event is currently at capacity, but you're #{waitlistPosition} on the waitlist!
               We'll notify you if a spot opens up.
             </p>
           )}
           {pendingApproval && !alreadyRegistered && !waitlisted && (
-            <p className="text-white/60 mb-4">
+            <p className="text-theme-text-secondary mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
           {ethereumAddress.trim() && event.eventImageUrl && (
-            <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="mt-4 pt-4 border-t border-theme-stroke">
               {mintStatus === 'minting' && (
-                <div className="flex items-center gap-2 text-white/60 justify-center">
+                <div className="flex items-center gap-2 text-theme-text-secondary justify-center">
                   <Loader2 size={16} className="animate-spin" />
                   <span>Minting your NFT...</span>
                 </div>
@@ -520,7 +520,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       href={getNFTViewUrl((event.nftChain || 'base') as NFTChain, mintResult.tokenId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-white/60 hover:text-white underline"
+                      className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                     >
                       View on OpenSea
                     </a>
@@ -529,7 +529,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       href={`${getChainConfig((event.nftChain || 'base') as NFTChain).explorerUrl}/tx/${mintResult.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-white/60 hover:text-white underline"
+                      className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                     >
                       View Transaction
                     </a>
@@ -546,12 +546,12 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <>
               <button
                 onClick={() => setShowDonation(true)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-white/80"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 hover:bg-theme-surface-hover transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-theme-text"
               >
                 <Heart size={18} className="text-[#ff393a]" />
                 Donate
               </button>
-              <p className="text-white/60 text-sm text-center mt-1">
+              <p className="text-theme-text-secondary text-sm text-center mt-1">
                 {event.donationRecipient ? (
                   <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
                 ) : `Buy Pizza for ${event.name}`}
@@ -604,7 +604,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           >
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+            className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
@@ -612,8 +612,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           <div className="flex items-center gap-3 mb-6">
             <Pizza className="w-10 h-10 text-[#ff393a]" />
             <div>
-              <h1 className="text-2xl font-bold text-white">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
-              <p className="text-sm text-white/60">Step 1 of 2</p>
+              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
+              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
             </div>
           </div>
 
@@ -659,7 +659,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                   <button
                     type="button"
                     onClick={() => { setEthereumAddress(''); setWalletValidation('idle'); }}
-                    className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
+                    className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
                   >
                     <X size={14} />
                     <span className="hidden sm:inline">Clear</span>
@@ -670,7 +670,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       <button
                         type="button"
                         onClick={show}
-                        className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
+                        className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
                       >
                         <Wallet size={14} />
                         <span className="hidden sm:inline">Connect</span>
@@ -685,7 +685,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
+              <label className="block text-sm font-medium text-theme-text mb-2">
                 What do you do?
               </label>
               <div className="flex flex-wrap gap-2">
@@ -696,7 +696,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     onClick={() => toggleRole(role)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${roles.includes(role)
                         ? 'bg-[#ff393a] text-white'
-                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                       }`}
                   >
                     {role}
@@ -708,14 +708,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <button
               type="button"
               onClick={() => setMailingListOptIn(!mailingListOptIn)}
-              className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors cursor-pointer w-full"
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
             >
               {mailingListOptIn ? (
                 <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
               ) : (
-                <Square size={20} className="text-white/40 flex-shrink-0" />
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
-              <span className="text-sm text-white/80">
+              <span className="text-sm text-theme-text">
                 Want to join the mailing list?
               </span>
             </button>
@@ -753,7 +753,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       >
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
         >
           <X size={24} />
         </button>
@@ -761,14 +761,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         <div className="flex items-center gap-3 mb-6">
           <Pizza className="w-10 h-10 text-[#ff393a]" />
           <div>
-            <h1 className="text-2xl font-bold text-white">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
-            <p className="text-sm text-white/60">Step 2 of 2</p>
+            <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
+            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-3">
+            <label className="block text-sm font-medium text-theme-text mb-3">
               Diet
             </label>
             <div className="flex flex-wrap gap-2">
@@ -779,7 +779,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                   onClick={() => toggleDietary(option)}
                   className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
                       ? 'bg-[#ff393a] text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                     }`}
                 >
                   {option}
@@ -789,7 +789,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-3">
+            <label className="block text-sm font-medium text-theme-text mb-3">
               Toppings
             </label>
             <div className="flex flex-wrap gap-2">
@@ -804,7 +804,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                         ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                         : isDisliked
                           ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                          : 'bg-white/5 border-white/10'
+                          : 'bg-theme-surface border-theme-stroke'
                       }`}
                   >
                     <button
@@ -814,10 +814,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     >
                       <ThumbsUp
                         size={12}
-                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                           }`}
                       />
-                      <span className="text-white text-xs">{topping.name}</span>
+                      <span className="text-theme-text text-xs">{topping.name}</span>
                     </button>
                     <button
                       type="button"
@@ -826,7 +826,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                     >
                       <ThumbsDown
                         size={12}
-                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                           }`}
                       />
                     </button>
@@ -838,7 +838,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
           {availableBeverages.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
+              <label className="block text-sm font-medium text-theme-text mb-3">
                 Drink Preferences
               </label>
               <div className="flex flex-wrap gap-2">
@@ -853,7 +853,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                           ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                           : isDisliked
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-white/5 border-white/10'
+                            : 'bg-theme-surface border-theme-stroke'
                         }`}
                     >
                       <button
@@ -863,10 +863,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       >
                         <ThumbsUp
                           size={12}
-                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-white/20'
+                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                             }`}
                         />
-                        <span className="text-white text-xs">{drink.name}</span>
+                        <span className="text-theme-text text-xs">{drink.name}</span>
                       </button>
                       <button
                         type="button"
@@ -875,7 +875,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       >
                         <ThumbsDown
                           size={12}
-                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-white/20'
+                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
                             }`}
                         />
                       </button>
@@ -888,12 +888,12 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
           {nearbyPizzerias.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-3">
-                Favorite Pizzerias <span className="text-white/50 font-normal">(click to rank 1-3)</span>
+              <label className="block text-sm font-medium text-theme-text mb-3">
+                Favorite Pizzerias <span className="text-theme-text-muted font-normal">(click to rank 1-3)</span>
               </label>
               {loadingPizzerias ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-white/40" />
+                  <Loader2 size={20} className="animate-spin text-theme-text-muted" />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -908,19 +908,19 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                         onClick={() => handlePizzeriaClick(pizzeria.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${rank
                             ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            : 'bg-theme-surface border-theme-stroke hover:bg-theme-surface-hover'
                           }`}
                       >
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${rank
                             ? 'bg-[#ff393a] text-white'
-                            : 'bg-white/10 text-white/30'
+                            : 'bg-theme-surface-hover text-theme-text-faint'
                           }`}>
                           {rank || '—'}
                         </div>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-white truncate">{pizzeria.name}</span>
+                            <span className="font-medium text-theme-text truncate">{pizzeria.name}</span>
                             {pizzeria.rating && (
                               <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
                                 <Star size={10} className="fill-yellow-400" />
@@ -928,12 +928,12 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                               </span>
                             )}
                             {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs text-theme-text-muted">
                                 {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-white/50">
+                          <div className="flex items-center gap-1 text-xs text-theme-text-muted">
                             <MapPin size={10} />
                             <span className="truncate">{pizzeria.address}</span>
                           </div>
@@ -948,7 +948,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               <button
                 type="button"
                 onClick={() => setShowSuggestModal(true)}
-                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-white/20 text-white/50 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm"
+                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-theme-stroke-hover text-theme-text-muted hover:text-theme-text hover:border-theme-stroke-hover hover:bg-theme-surface transition-all text-sm"
               >
                 <Plus size={14} />
                 Suggest a Pizzeria
@@ -958,13 +958,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
           {/* Suggest Pizzeria Sub-Modal */}
           {showSuggestModal && (
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-white">Suggest a pizzeria</p>
+                <p className="text-sm font-medium text-theme-text">Suggest a pizzeria</p>
                 <button
                   type="button"
                   onClick={() => setShowSuggestModal(false)}
-                  className="text-white/40 hover:text-white"
+                  className="text-theme-text-muted hover:text-theme-text"
                 >
                   <X size={16} />
                 </button>
@@ -987,16 +987,16 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <button
               type="button"
               onClick={() => setSaveToProfile(!saveToProfile)}
-              className="flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+              className="flex items-center gap-3 w-full p-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors"
             >
               {saveToProfile ? (
                 <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
               ) : (
-                <Square size={20} className="text-white/40 flex-shrink-0" />
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
               <div className="text-left">
-                <span className="text-sm font-medium text-white">Save to profile</span>
-                <p className="text-xs text-white/50">Remember my preferences for future events</p>
+                <span className="text-sm font-medium text-theme-text">Save to profile</span>
+                <p className="text-xs text-theme-text-muted">Remember my preferences for future events</p>
               </div>
             </button>
           )}

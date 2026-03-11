@@ -208,9 +208,9 @@ export const PartyHeader: React.FC = () => {
             {/* Content */}
             <div className="flex-1 flex flex-col justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-white text-lg">{party.name}</h3>
+                <h3 className="font-semibold text-theme-text text-lg">{party.name}</h3>
                 {party.date && (
-                  <p className="text-sm text-white/70 mb-1 flex items-center gap-1.5">
+                  <p className="text-sm text-theme-text-secondary mb-1 flex items-center gap-1.5">
                     <Calendar size={14} className="flex-shrink-0" />
                     <span>
                       {new Date(party.date).toLocaleDateString('en-US', {
@@ -230,7 +230,7 @@ export const PartyHeader: React.FC = () => {
                     </span>
                   </p>
                 )}
-                <p className="text-sm text-white/50">
+                <p className="text-sm text-theme-text-muted">
                   {party.hostName && `Hosted by ${party.hostName} • `}
                   {party.maxGuests ? (
                     <span>
@@ -272,12 +272,12 @@ export const PartyHeader: React.FC = () => {
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                <PartyPopper className="w-5 h-5 text-white/50" />
+              <div className="w-10 h-10 rounded-full bg-theme-surface-hover flex items-center justify-center">
+                <PartyPopper className="w-5 h-5 text-theme-text-muted" />
               </div>
               <div>
-                <h3 className="font-semibold text-white/80">No Party Created</h3>
-                <p className="text-sm text-white/50">
+                <h3 className="font-semibold text-theme-text">No Party Created</h3>
+                <p className="text-sm text-theme-text-muted">
                   Create a party to generate a shareable invite link for guests
                 </p>
               </div>
@@ -298,10 +298,10 @@ export const PartyHeader: React.FC = () => {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="card p-6 w-full max-w-md my-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Create Pizza Party</h2>
+              <h2 className="text-xl font-bold text-theme-text">Create Pizza Party</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-white/50 hover:text-white"
+                className="text-theme-text-muted hover:text-theme-text"
               >
                 <X size={24} />
               </button>
@@ -309,7 +309,7 @@ export const PartyHeader: React.FC = () => {
 
             <form onSubmit={handleCreate} className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="block text-sm font-medium text-theme-text mb-2">
                   Party Name *
                 </label>
                 <input
@@ -326,7 +326,7 @@ export const PartyHeader: React.FC = () => {
               {/* Date and Duration on same line */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
+                  <label className="block text-sm font-medium text-theme-text mb-2">
                     Party Date
                   </label>
                   <IconInput
@@ -338,7 +338,7 @@ export const PartyHeader: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
+                  <label className="block text-sm font-medium text-theme-text mb-2">
                     Duration (hrs)
                   </label>
                   <input
@@ -355,7 +355,7 @@ export const PartyHeader: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="block text-sm font-medium text-theme-text mb-2">
                   <Users size={14} className="inline mr-1" />
                   Expected Guests *
                 </label>
@@ -368,7 +368,7 @@ export const PartyHeader: React.FC = () => {
                   className="w-full"
                   required
                 />
-                <p className="text-xs text-white/50 mt-1">
+                <p className="text-xs text-theme-text-muted mt-1">
                   Total people attending (we'll calculate extra pizza for those who don't RSVP)
                 </p>
               </div>
@@ -377,23 +377,23 @@ export const PartyHeader: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowOptionalFields(!showOptionalFields)}
-                className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-3 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors"
               >
-                <span className="text-sm font-medium text-white/80">
+                <span className="text-sm font-medium text-theme-text">
                   Optional Details
                 </span>
                 {showOptionalFields ? (
-                  <ChevronUp size={18} className="text-white/60" />
+                  <ChevronUp size={18} className="text-theme-text-secondary" />
                 ) : (
-                  <ChevronDown size={18} className="text-white/60" />
+                  <ChevronDown size={18} className="text-theme-text-secondary" />
                 )}
               </button>
 
               {/* Collapsible Optional Fields */}
               {showOptionalFields && (
-                <div className="space-y-3 border-l-2 border-white/10 pl-4">
+                <div className="space-y-3 border-l-2 border-theme-stroke pl-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <User size={14} className="inline mr-1" />
                       Host Name
                     </label>
@@ -407,7 +407,7 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <MapPin size={14} className="inline mr-1" />
                       Party Address
                     </label>
@@ -418,13 +418,13 @@ export const PartyHeader: React.FC = () => {
                       placeholder="e.g., 123 Main St, New York, NY"
                       className="w-full"
                     />
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-theme-text-muted mt-1">
                       Used to find nearby pizzerias for ordering
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <Lock size={14} className="inline mr-1" />
                       Event Password
                     </label>
@@ -435,13 +435,13 @@ export const PartyHeader: React.FC = () => {
                       placeholder="Password to protect event page"
                       className="w-full"
                     />
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-theme-text-muted mt-1">
                       Guests will need this password to view event details
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <Image size={14} className="inline mr-1" />
                       Square Image
                     </label>
@@ -463,16 +463,16 @@ export const PartyHeader: React.FC = () => {
                         placeholder="https://example.com/image.jpg"
                         className="w-full"
                       />
-                      <p className="text-xs text-white/50 mt-1">
+                      <p className="text-xs text-theme-text-muted mt-1">
                         Enter an image URL, or upload a file below
                       </p>
                     </div>
 
                     {/* Divider */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 h-px bg-white/10"></div>
-                      <span className="text-xs text-white/40">OR</span>
-                      <div className="flex-1 h-px bg-white/10"></div>
+                      <div className="flex-1 h-px bg-theme-surface-hover"></div>
+                      <span className="text-xs text-theme-text-muted">OR</span>
+                      <div className="flex-1 h-px bg-theme-surface-hover"></div>
                     </div>
 
                     {/* File Upload */}
@@ -482,7 +482,7 @@ export const PartyHeader: React.FC = () => {
                           <img
                             src={imagePreview}
                             alt="Event flyer preview"
-                            className="w-full h-auto rounded-xl border-2 border-white/20"
+                            className="w-full h-auto rounded-xl border-2 border-theme-stroke-hover"
                           />
                           <button
                             type="button"
@@ -505,12 +505,12 @@ export const PartyHeader: React.FC = () => {
                         />
                         <label
                           htmlFor="eventImage"
-                          className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10 ${eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                          className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-theme-stroke-hover rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-theme-surface hover:bg-theme-surface-hover ${eventImageUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                         >
-                          <Upload className="w-8 h-8 text-white/40 mb-2" />
-                          <span className="text-sm text-white/60">Click to upload square image</span>
-                          <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                          <Upload className="w-8 h-8 text-theme-text-muted mb-2" />
+                          <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
+                          <span className="text-xs text-theme-text-muted mt-1">Max 5MB • 1:1 aspect ratio</span>
                         </label>
                       </div>
                     )}
@@ -521,7 +521,7 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <FileText size={14} className="inline mr-1" />
                       Event Description (Optional)
                     </label>
@@ -532,13 +532,13 @@ export const PartyHeader: React.FC = () => {
                       className="w-full"
                       rows={3}
                     />
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-theme-text-muted mt-1">
                       Describe your event for the event page
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
+                    <label className="block text-sm font-medium text-theme-text mb-2">
                       <LinkIcon size={14} className="inline mr-1" />
                       Custom URL
                     </label>
@@ -552,7 +552,7 @@ export const PartyHeader: React.FC = () => {
                       minLength={3}
                       maxLength={50}
                     />
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-theme-text-muted mt-1">
                       Your event will be at: /{customUrl || 'custom-url'}
                     </p>
                   </div>
@@ -593,19 +593,19 @@ export const PartyHeader: React.FC = () => {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Share Invite Link</h2>
+              <h2 className="text-xl font-bold text-theme-text">Share Invite Link</h2>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="text-white/50 hover:text-white"
+                className="text-theme-text-muted hover:text-theme-text"
               >
                 <X size={24} />
               </button>
             </div>
 
             {/* Link Preview Card */}
-            <div className="mb-6 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-              <div className="p-3 border-b border-white/10">
-                <p className="text-xs text-white/40 font-mono truncate">{eventLink}</p>
+            <div className="mb-6 bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+              <div className="p-3 border-b border-theme-stroke">
+                <p className="text-xs text-theme-text-muted font-mono truncate">{eventLink}</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-0">
                 {/* Event Image */}
@@ -625,14 +625,14 @@ export const PartyHeader: React.FC = () => {
 
                 {/* Event Info */}
                 <div className="flex-1 p-4">
-                  <p className="text-xs text-white/40 mb-1">RSV.Pizza</p>
-                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{party.name}</h3>
+                  <p className="text-xs text-theme-text-muted mb-1">RSV.Pizza</p>
+                  <h3 className="text-lg font-bold text-theme-text mb-2 line-clamp-2">{party.name}</h3>
                   {party.description && (
-                    <p className="text-sm text-white/60 line-clamp-3 mb-3">
+                    <p className="text-sm text-theme-text-secondary line-clamp-3 mb-3">
                       {party.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-white/50">
+                  <div className="flex items-center gap-2 text-xs text-theme-text-muted">
                     <PartyPopper size={14} />
                     <span>RSVP</span>
                   </div>
@@ -643,10 +643,10 @@ export const PartyHeader: React.FC = () => {
             <div className="space-y-3 mb-6">
               {/* Event Page Link */}
               <div>
-                <p className="text-white/60 mb-2 text-sm font-medium">
+                <p className="text-theme-text-secondary mb-2 text-sm font-medium">
                   Event Page Link (share event details):
                 </p>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="bg-theme-surface border border-theme-stroke rounded-xl p-3">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 overflow-hidden">
                       <code className="text-sm text-[#ffb347] break-all">{eventLink}</code>
@@ -655,7 +655,7 @@ export const PartyHeader: React.FC = () => {
                       onClick={() => handleCopyLink('event')}
                       className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'event'
                           ? 'bg-[#39d98a] text-white'
-                          : 'bg-white/10 text-white hover:bg-white/20'
+                          : 'bg-theme-surface-hover text-theme-text hover:bg-theme-surface-hover'
                         }`}
                     >
                       {copied === 'event' ? <Check size={20} /> : <Copy size={20} />}
@@ -666,10 +666,10 @@ export const PartyHeader: React.FC = () => {
 
               {/* Guest Link */}
               <div>
-                <p className="text-white/60 mb-2 text-sm font-medium">
+                <p className="text-theme-text-secondary mb-2 text-sm font-medium">
                   Guest RSVP Link (direct to RSVP form):
                 </p>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="bg-theme-surface border border-theme-stroke rounded-xl p-3">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 overflow-hidden">
                       <code className="text-sm text-[#ff393a] break-all">{inviteLink}</code>
@@ -678,7 +678,7 @@ export const PartyHeader: React.FC = () => {
                       onClick={() => handleCopyLink('guest')}
                       className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'guest'
                           ? 'bg-[#39d98a] text-white'
-                          : 'bg-white/10 text-white hover:bg-white/20'
+                          : 'bg-theme-surface-hover text-theme-text hover:bg-theme-surface-hover'
                         }`}
                     >
                       {copied === 'guest' ? <Check size={20} /> : <Copy size={20} />}
@@ -689,10 +689,10 @@ export const PartyHeader: React.FC = () => {
 
               {/* Host Link */}
               <div>
-                <p className="text-white/60 mb-2 text-sm font-medium">
+                <p className="text-theme-text-secondary mb-2 text-sm font-medium">
                   Host Dashboard Link (bookmark this):
                 </p>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="bg-theme-surface border border-theme-stroke rounded-xl p-3">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 overflow-hidden">
                       <code className="text-sm text-[#39d98a] break-all">{hostLink}</code>
@@ -701,7 +701,7 @@ export const PartyHeader: React.FC = () => {
                       onClick={() => handleCopyLink('host')}
                       className={`flex-shrink-0 p-2 rounded-lg transition-all ${copied === 'host'
                           ? 'bg-[#39d98a] text-white'
-                          : 'bg-white/10 text-white hover:bg-white/20'
+                          : 'bg-theme-surface-hover text-theme-text hover:bg-theme-surface-hover'
                         }`}
                     >
                       {copied === 'host' ? <Check size={20} /> : <Copy size={20} />}

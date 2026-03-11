@@ -23,7 +23,7 @@ function formatDate(dateStr: string | null): string {
 }
 
 function KitBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-xs text-white/20">--</span>;
+  if (!status) return <span className="text-xs text-theme-text-faint">--</span>;
 
   const colors: Record<string, string> = {
     pending: 'bg-yellow-500/20 text-yellow-400',
@@ -34,7 +34,7 @@ function KitBadge({ status }: { status: string | null }) {
   };
 
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || 'bg-white/10 text-white/40'}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || 'bg-theme-surface-hover text-theme-text-muted'}`}>
       {status}
     </span>
   );
@@ -46,27 +46,27 @@ export function EventRow({ event, showRegion }: EventRowProps) {
     : null;
 
   return (
-    <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+    <tr className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
       {/* Event name + date */}
       <td className="py-3 px-3">
         <div className="flex items-start gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white truncate">{event.name}</span>
+              <span className="text-sm font-medium text-theme-text truncate">{event.name}</span>
               {eventUrl && (
                 <a
                   href={eventUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/20 hover:text-white/60 transition-colors shrink-0"
+                  className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0"
                 >
                   <ExternalLink size={12} />
                 </a>
               )}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Calendar size={10} className="text-white/30" />
-              <span className="text-xs text-white/40">{formatDate(event.date)}</span>
+              <Calendar size={10} className="text-theme-text-faint" />
+              <span className="text-xs text-theme-text-muted">{formatDate(event.date)}</span>
             </div>
           </div>
         </div>
@@ -75,7 +75,7 @@ export function EventRow({ event, showRegion }: EventRowProps) {
       {/* Region (optional) */}
       {showRegion && (
         <td className="py-3 px-3">
-          <span className="text-xs text-white/50">
+          <span className="text-xs text-theme-text-muted">
             {GPP_REGIONS.find((r) => r.id === event.region)?.label || event.region || '\u2014'}
           </span>
         </td>
@@ -83,9 +83,9 @@ export function EventRow({ event, showRegion }: EventRowProps) {
 
       {/* Host */}
       <td className="py-3 px-3">
-        <span className="text-xs text-white/60">{event.host.name || 'Unknown'}</span>
+        <span className="text-xs text-theme-text-secondary">{event.host.name || 'Unknown'}</span>
         {event.host.email && (
-          <div className="text-xs text-white/30 truncate max-w-[150px]">{event.host.email}</div>
+          <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
         )}
       </td>
 
@@ -94,13 +94,13 @@ export function EventRow({ event, showRegion }: EventRowProps) {
         <div className="flex items-center gap-1.5">
           {event.venueName || event.address ? (
             <>
-              <MapPin size={10} className="text-white/30 shrink-0" />
-              <span className="text-xs text-white/50 truncate max-w-[180px]">
+              <MapPin size={10} className="text-theme-text-faint shrink-0" />
+              <span className="text-xs text-theme-text-muted truncate max-w-[180px]">
                 {event.venueName || event.address}
               </span>
             </>
           ) : (
-            <span className="text-xs text-white/20">No venue</span>
+            <span className="text-xs text-theme-text-faint">No venue</span>
           )}
         </div>
       </td>
@@ -108,8 +108,8 @@ export function EventRow({ event, showRegion }: EventRowProps) {
       {/* RSVPs */}
       <td className="py-3 px-3 text-center">
         <div className="flex items-center justify-center gap-1">
-          <Users size={12} className="text-white/30" />
-          <span className="text-sm text-white/70">{event.guestCount}</span>
+          <Users size={12} className="text-theme-text-faint" />
+          <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
         </div>
         {event.checkedInCount > 0 && (
           <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
@@ -119,8 +119,8 @@ export function EventRow({ event, showRegion }: EventRowProps) {
       {/* Photos */}
       <td className="py-3 px-3 text-center">
         <div className="flex items-center justify-center gap-1">
-          <Camera size={12} className="text-white/30" />
-          <span className="text-xs text-white/50">{event.photoCount}</span>
+          <Camera size={12} className="text-theme-text-faint" />
+          <span className="text-xs text-theme-text-muted">{event.photoCount}</span>
         </div>
       </td>
 

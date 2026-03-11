@@ -212,7 +212,7 @@ export function GPPLandingPage() {
           <title>Event Created! | Global Pizza Party</title>
         </Helmet>
 
-        <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
+        <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -345,7 +345,7 @@ export function GPPLandingPage() {
       </Helmet>
 
       {/* ─── LIGHT HEADER ─── */}
-      <header className="border-b border-black/10 bg-white/40 backdrop-blur-sm">
+      <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -491,7 +491,7 @@ export function GPPLandingPage() {
                   ref={buttonRef}
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold text-theme-text rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-60"
                   style={{ background: C.red }}
                   onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = C.redHover; }}
                   onMouseLeave={e => { e.currentTarget.style.background = C.red; }}

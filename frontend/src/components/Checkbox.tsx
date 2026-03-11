@@ -17,7 +17,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   label,
   size = 18,
   disabled = false,
-  labelClassName = 'text-sm text-white/80',
+  labelClassName = 'text-sm text-theme-text',
   children
 }) => {
   return (
@@ -29,7 +29,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       {checked ? (
         <CheckSquare2 size={size} className="text-[#ff393a] flex-shrink-0" />
       ) : (
-        <SquareIcon size={size} className="text-white/40 flex-shrink-0" />
+        <SquareIcon size={size} className="text-theme-text-muted flex-shrink-0" />
       )}
       <span className={labelClassName}>{label}</span>
       {children}

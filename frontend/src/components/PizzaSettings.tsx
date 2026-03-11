@@ -16,7 +16,7 @@ export const PizzaSettings: React.FC = () => {
     <div className="card p-6">
       <div className="flex items-center space-x-2 mb-4">
         <Settings size={24} className="text-[#ff393a]" />
-        <h2 className="text-xl font-bold text-white">Pizza Style</h2>
+        <h2 className="text-xl font-bold text-theme-text">Pizza Style</h2>
       </div>
 
       <div>
@@ -29,11 +29,11 @@ export const PizzaSettings: React.FC = () => {
                 value={style.id}
                 checked={pizzaSettings.style.id === style.id}
                 onChange={() => handleStyleChange(style.id)}
-                className="w-4 h-4 text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0 mt-1"
+                className="w-4 h-4 text-[#ff393a] bg-theme-surface-hover border-theme-stroke-hover focus:ring-[#ff393a] focus:ring-offset-0 mt-1"
               />
               <div className="flex-1">
-                <div className="font-medium text-white/90 group-hover:text-white">{style.name}</div>
-                <div className="text-sm text-white/40">{style.description}</div>
+                <div className="font-medium text-theme-text group-hover:text-theme-text">{style.name}</div>
+                <div className="text-sm text-theme-text-muted">{style.description}</div>
               </div>
             </label>
           ))}

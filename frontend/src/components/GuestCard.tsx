@@ -20,11 +20,11 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
   };
 
   return (
-    <div className="border border-white/10 rounded-lg p-3 bg-white/5 hover:bg-white/[0.07] hover:border-white/15 transition-all group">
+    <div className="border border-theme-stroke rounded-lg p-3 bg-theme-surface hover:bg-theme-surface-hover hover:border-theme-stroke transition-all group">
       <div className="flex justify-between items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white text-sm">{guest.name}</span>
+            <span className="font-semibold text-theme-text text-sm">{guest.name}</span>
             {guest.dietaryRestrictions.map(restriction => (
               <span key={restriction} className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] rounded border border-purple-500/30">
                 {restriction}
@@ -74,7 +74,7 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
         </div>
         <button
           onClick={() => guest.id && removeGuest(guest.id)}
-          className="p-1 text-white/30 hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+          className="p-1 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
           aria-label="Remove guest"
         >
           <Trash2 size={14} />

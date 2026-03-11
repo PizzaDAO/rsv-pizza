@@ -82,8 +82,8 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <div className="flex items-center gap-2 text-white/60">
+      <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
+        <div className="flex items-center gap-2 text-theme-text-secondary">
           <FileText size={16} />
           <span>Loading transcript...</span>
         </div>
@@ -102,51 +102,51 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
   if (!data) return null;
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between p-4 hover:bg-theme-surface transition-colors"
       >
         <div className="flex items-center gap-3">
           <FileText size={18} className="text-[#8b5cf6]" />
-          <span className="font-medium text-white">Call Transcript</span>
+          <span className="font-medium text-theme-text">Call Transcript</span>
           {data.callDuration && (
-            <span className="text-white/50 text-sm flex items-center gap-1">
+            <span className="text-theme-text-muted text-sm flex items-center gap-1">
               <Clock size={12} />
               {formatDuration(data.callDuration)}
             </span>
           )}
         </div>
         {expanded ? (
-          <ChevronUp size={18} className="text-white/50" />
+          <ChevronUp size={18} className="text-theme-text-muted" />
         ) : (
-          <ChevronDown size={18} className="text-white/50" />
+          <ChevronDown size={18} className="text-theme-text-muted" />
         )}
       </button>
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="border-t border-white/10 p-4 space-y-4">
+        <div className="border-t border-theme-stroke p-4 space-y-4">
           {/* Audio Player */}
           {data.recordingUrl && (
-            <div className="bg-white/5 rounded-lg p-3">
+            <div className="bg-theme-surface rounded-lg p-3">
               <div className="flex items-center gap-3">
                 <button
                   onClick={toggleAudio}
                   className="w-10 h-10 rounded-full bg-[#8b5cf6] flex items-center justify-center hover:bg-[#7c3aed] transition-colors"
                 >
                   {isPlaying ? (
-                    <Pause size={18} className="text-white" />
+                    <Pause size={18} className="text-theme-text" />
                   ) : (
-                    <Play size={18} className="text-white ml-0.5" />
+                    <Play size={18} className="text-theme-text ml-0.5" />
                   )}
                 </button>
                 <div className="flex-1">
-                  <p className="text-white text-sm font-medium">Call Recording</p>
-                  <p className="text-white/50 text-xs">{formatDuration(data.callDuration)}</p>
+                  <p className="text-theme-text text-sm font-medium">Call Recording</p>
+                  <p className="text-theme-text-muted text-xs">{formatDuration(data.callDuration)}</p>
                 </div>
-                <Volume2 size={18} className="text-white/50" />
+                <Volume2 size={18} className="text-theme-text-muted" />
               </div>
               <audio
                 ref={audioRef}
@@ -160,19 +160,19 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
           {/* Summary */}
           {data.summary && (
             <div>
-              <h4 className="text-white/60 text-xs uppercase tracking-wide mb-2">Summary</h4>
-              <p className="text-white text-sm">{data.summary}</p>
+              <h4 className="text-theme-text-secondary text-xs uppercase tracking-wide mb-2">Summary</h4>
+              <p className="text-theme-text text-sm">{data.summary}</p>
             </div>
           )}
 
           {/* Full Transcript */}
           {data.transcript && (
             <div>
-              <h4 className="text-white/60 text-xs uppercase tracking-wide mb-2">
+              <h4 className="text-theme-text-secondary text-xs uppercase tracking-wide mb-2">
                 Full Transcript
               </h4>
               <div className="bg-black/30 rounded-lg p-3 max-h-64 overflow-y-auto">
-                <pre className="text-white/80 text-sm whitespace-pre-wrap font-sans">
+                <pre className="text-theme-text text-sm whitespace-pre-wrap font-sans">
                   {data.transcript}
                 </pre>
               </div>
@@ -180,7 +180,7 @@ export const CallTranscript: React.FC<CallTranscriptProps> = ({
           )}
 
           {!data.transcript && !data.summary && (
-            <p className="text-white/50 text-sm text-center py-4">
+            <p className="text-theme-text-muted text-sm text-center py-4">
               No transcript available for this call.
             </p>
           )}

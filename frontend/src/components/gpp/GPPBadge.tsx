@@ -15,8 +15,8 @@ export function GPPBadge({ variant = 'small', className = '' }: GPPBadgeProps) {
             <Globe className="w-5 h-5 text-[#ff6b35]" />
           </div>
           <div>
-            <div className="font-semibold text-white">Global Pizza Party</div>
-            <div className="text-sm text-white/60">Part of the worldwide celebration</div>
+            <div className="font-semibold text-theme-text">Global Pizza Party</div>
+            <div className="text-sm text-theme-text-secondary">Part of the worldwide celebration</div>
           </div>
         </div>
       </div>

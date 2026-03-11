@@ -124,10 +124,10 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
 
   if (sponsors.length === 0) {
     return (
-      <div className="card p-8 bg-[#1a1a2e] border-white/10 text-center">
-        <Building2 size={48} className="mx-auto text-white/20 mb-4" />
-        <h3 className="text-lg font-medium text-white mb-2">No sponsors yet</h3>
-        <p className="text-white/60 text-sm">
+      <div className="card p-8 bg-theme-header border-theme-stroke text-center">
+        <Building2 size={48} className="mx-auto text-theme-text-faint mb-4" />
+        <h3 className="text-lg font-medium text-theme-text mb-2">No sponsors yet</h3>
+        <p className="text-theme-text-secondary text-sm">
           Add your first sponsor to start tracking your fundraising pipeline.
         </p>
       </div>
@@ -135,14 +135,14 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
   }
 
   return (
-    <div className="card bg-[#1a1a2e] border-white/10 overflow-hidden">
+    <div className="card bg-theme-header border-theme-stroke overflow-hidden">
       {/* Filter Row */}
-      <div className="p-3 border-b border-white/10 flex items-center gap-2">
-        <span className="text-sm text-white/60">Filter:</span>
+      <div className="p-3 border-b border-theme-stroke flex items-center gap-2">
+        <span className="text-sm text-theme-text-secondary">Filter:</span>
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as SponsorStatus | 'all')}
-          className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+          className="bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-sm text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
         >
           <option value="all">All ({sponsors.length})</option>
           {Object.entries(STATUS_CONFIG).map(([status, config]) => {
@@ -155,7 +155,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
             );
           })}
         </select>
-        <span className="text-sm text-white/40 ml-auto">
+        <span className="text-sm text-theme-text-muted ml-auto">
           {filteredAndSortedSponsors.length} sponsor{filteredAndSortedSponsors.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -164,11 +164,11 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/10">
+            <tr className="border-b border-theme-stroke">
               <th className="text-left p-3">
                 <button
                   onClick={() => handleSort('status')}
-                  className="flex items-center gap-1 text-xs text-white/60 hover:text-white font-medium uppercase tracking-wider"
+                  className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
                   Status <SortIcon field="status" />
                 </button>
@@ -176,39 +176,39 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
               <th className="text-left p-3">
                 <button
                   onClick={() => handleSort('name')}
-                  className="flex items-center gap-1 text-xs text-white/60 hover:text-white font-medium uppercase tracking-wider"
+                  className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
                   Sponsor <SortIcon field="name" />
                 </button>
               </th>
               <th className="text-left p-3 hidden md:table-cell">
-                <span className="text-xs text-white/60 font-medium uppercase tracking-wider">
+                <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
                   Contact
                 </span>
               </th>
               <th className="text-left p-3">
                 <button
                   onClick={() => handleSort('amount')}
-                  className="flex items-center gap-1 text-xs text-white/60 hover:text-white font-medium uppercase tracking-wider"
+                  className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
                   Amount <SortIcon field="amount" />
                 </button>
               </th>
               <th className="text-left p-3 hidden lg:table-cell">
-                <span className="text-xs text-white/60 font-medium uppercase tracking-wider">
+                <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
                   Type
                 </span>
               </th>
               <th className="text-left p-3 hidden lg:table-cell">
                 <button
                   onClick={() => handleSort('lastContactedAt')}
-                  className="flex items-center gap-1 text-xs text-white/60 hover:text-white font-medium uppercase tracking-wider"
+                  className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
                   Last Contact <SortIcon field="lastContactedAt" />
                 </button>
               </th>
               <th className="text-right p-3">
-                <span className="text-xs text-white/60 font-medium uppercase tracking-wider">
+                <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
                   Actions
                 </span>
               </th>
@@ -220,7 +220,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
               return (
                 <tr
                   key={sponsor.id}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                  className="border-b border-theme-stroke hover:bg-theme-surface transition-colors"
                 >
                   {/* Status */}
                   <td className="p-3">
@@ -243,23 +243,23 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                       )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1">
-                          <span className="text-white font-medium truncate">{sponsor.name}</span>
+                          <span className="text-theme-text font-medium truncate">{sponsor.name}</span>
                           {sponsor.website && (
                             <a
                               href={sponsor.website}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-white/40 hover:text-white/60"
+                              className="text-theme-text-muted hover:text-theme-text-secondary"
                             >
                               <ExternalLink size={12} />
                             </a>
                           )}
                         </div>
                         {sponsor.organization && (
-                          <div className="text-xs text-white/50 truncate">{sponsor.organization}</div>
+                          <div className="text-xs text-theme-text-muted truncate">{sponsor.organization}</div>
                         )}
                         {sponsor.pointPerson && (
-                          <div className="flex items-center gap-1 text-xs text-white/40 mt-0.5">
+                          <div className="flex items-center gap-1 text-xs text-theme-text-muted mt-0.5">
                             <User size={10} />
                             {sponsor.pointPerson}
                           </div>
@@ -272,13 +272,13 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                   <td className="p-3 hidden md:table-cell">
                     <div className="space-y-1">
                       {sponsor.contactName && (
-                        <div className="text-sm text-white/80">{sponsor.contactName}</div>
+                        <div className="text-sm text-theme-text">{sponsor.contactName}</div>
                       )}
                       <div className="flex items-center gap-2">
                         {sponsor.contactEmail && (
                           <a
                             href={`mailto:${sponsor.contactEmail}`}
-                            className="text-white/40 hover:text-white/60"
+                            className="text-theme-text-muted hover:text-theme-text-secondary"
                             title={sponsor.contactEmail}
                           >
                             <Mail size={14} />
@@ -287,7 +287,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                         {sponsor.contactPhone && (
                           <a
                             href={`tel:${sponsor.contactPhone}`}
-                            className="text-white/40 hover:text-white/60"
+                            className="text-theme-text-muted hover:text-theme-text-secondary"
                             title={sponsor.contactPhone}
                           >
                             <Phone size={14} />
@@ -299,21 +299,21 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
 
                   {/* Amount */}
                   <td className="p-3">
-                    <div className="text-white font-medium">
+                    <div className="text-theme-text font-medium">
                       {formatCurrency(sponsor.amount)}
                     </div>
                   </td>
 
                   {/* Type */}
                   <td className="p-3 hidden lg:table-cell">
-                    <span className="text-sm text-white/60 capitalize">
+                    <span className="text-sm text-theme-text-secondary capitalize">
                       {sponsor.sponsorshipType === 'cash' ? 'Funds' : (sponsor.sponsorshipType?.replace('-', ' ') || '-')}
                     </span>
                   </td>
 
                   {/* Last Contacted */}
                   <td className="p-3 hidden lg:table-cell">
-                    <div className="flex items-center gap-1 text-sm text-white/60">
+                    <div className="flex items-center gap-1 text-sm text-theme-text-secondary">
                       <Calendar size={14} />
                       {formatDate(sponsor.lastContactedAt)}
                     </div>
@@ -324,7 +324,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => onEdit(sponsor)}
-                        className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-colors"
+                        className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded transition-colors"
                         title="Edit"
                       >
                         <Edit2 size={16} />
@@ -334,7 +334,7 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                         className={`p-1.5 rounded transition-colors ${
                           deleteConfirm === sponsor.id
                             ? 'bg-red-500/20 text-red-400'
-                            : 'text-white/40 hover:text-red-400 hover:bg-red-500/10'
+                            : 'text-theme-text-muted hover:text-red-400 hover:bg-red-500/10'
                         }`}
                         title={deleteConfirm === sponsor.id ? 'Click again to confirm' : 'Delete'}
                       >

@@ -58,7 +58,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="p-2 text-white/60 hover:text-white transition-colors"
+            className="p-2 text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <X size={24} />
           </button>
@@ -66,7 +66,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       )}
 
       {/* Header with event info */}
-      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+      <div className="card p-6">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Event image */}
           {report.eventImageUrl && (
@@ -79,10 +79,10 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
             </div>
           )}
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-white mb-3">{report.name}</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-3">{report.name}</h1>
 
             {report.date && (
-              <div className="flex items-center gap-2 text-white/60 text-sm mb-2">
+              <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-2">
                 <Calendar size={16} />
                 <span>
                   {new Date(report.date).toLocaleDateString('en-US', {
@@ -96,17 +96,17 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
             )}
 
             {report.venueName && (
-              <div className="flex items-center gap-2 text-white/60 text-sm mb-2">
+              <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-2">
                 <MapPin size={16} />
                 <span>{report.venueName}{report.address ? ` - ${report.address}` : ''}</span>
               </div>
             )}
 
             {report.flyerArtist && (
-              <p className="text-white/40 text-xs mt-2">
+              <p className="text-theme-text-muted text-xs mt-2">
                 Flyer by{' '}
                 {report.flyerArtistUrl ? (
-                  <a href={report.flyerArtistUrl} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white underline">
+                  <a href={report.flyerArtistUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-secondary hover:text-theme-text underline">
                     {report.flyerArtist}
                   </a>
                 ) : (
@@ -116,7 +116,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
             )}
 
             {(report.host?.name || (report.coHosts && report.coHosts.length > 0)) && (
-              <p className="text-white/40 text-xs mt-1">
+              <p className="text-theme-text-muted text-xs mt-1">
                 Hosted by{' '}
                 {[
                   ...(report.host?.name ? [{ name: report.host.name }] : []),
@@ -127,11 +127,11 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
                   return (
                     <span key={i}>
                       {link ? (
-                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white underline">
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-theme-text-secondary hover:text-theme-text underline">
                           {person.name}
                         </a>
                       ) : (
-                        <span className="text-white/60">{person.name}</span>
+                        <span className="text-theme-text-secondary">{person.name}</span>
                       )}
                       {i < arr.length - 1 ? ', ' : ''}
                     </span>
@@ -145,16 +145,16 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Recap */}
       {report.reportRecap && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-3">Event Recap</h2>
-          <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">{report.reportRecap}</p>
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-theme-text mb-3">Event Recap</h2>
+          <p className="text-theme-text text-sm leading-relaxed whitespace-pre-wrap">{report.reportRecap}</p>
         </div>
       )}
 
       {/* Media */}
       {(report.reportPhotosUrl || report.featuredPhotos.length > 0) && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-4">Media</h2>
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-theme-text mb-4">Media</h2>
           {report.featuredPhotos.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
               {report.featuredPhotos.map((photo, i) => (
@@ -177,11 +177,11 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
               href={report.reportPhotosUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-theme-surface-hover rounded-lg hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
             >
               <Eye size={16} />
               Raw Photos / Video
-              <ExternalLink size={14} className="text-white/40" />
+              <ExternalLink size={14} className="text-theme-text-muted" />
             </a>
           )}
         </div>
@@ -199,8 +199,8 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Stats */}
       {hasKPIs && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-4">Stats</h2>
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-theme-text mb-4">Stats</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {visibleStats.map((stat) => (
               <KPICard
@@ -220,8 +220,8 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Industry RSVPs */}
       {report.notableAttendees.length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <h2 className="text-lg font-semibold text-white mb-3">Industry RSVPs</h2>
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-theme-text mb-3">Industry RSVPs</h2>
           <div className="flex flex-wrap gap-2">
             {groupAttendeesByOrg(report.notableAttendees).map((group) => (
               <ReportOrgCard key={group.domain || '_independent'} group={group} />
@@ -232,14 +232,14 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
       {/* Role Breakdown */}
       {Object.keys(report.stats.roleBreakdown).length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <div className="card p-6">
           <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
         </div>
       )}
 
       {/* Social Posts */}
       {report.socialPosts.length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <div className="card p-6">
           <SocialPostsList
             posts={report.socialPosts}
             onAdd={async () => {}}
@@ -265,25 +265,25 @@ interface KPICardProps {
 
 function KPICard({ label, value, icon: Icon, color, url, onAction, actionIcon: ActionIcon }: KPICardProps) {
   const content = (
-    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+    <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
       <div className="flex items-center gap-2 mb-2">
         <Icon size={16} className={color} />
-        <span className="text-xs text-white/60 flex-1">{label}</span>
+        <span className="text-xs text-theme-text-secondary flex-1">{label}</span>
         {onAction && ActionIcon && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction(); }}
-            className="p-1 rounded hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+            className="p-1 rounded hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
             title={`Download ${label}`}
           >
             <ActionIcon size={14} />
           </button>
         )}
       </div>
-      <div className="text-2xl font-bold text-white">
+      <div className="text-2xl font-bold text-theme-text">
         {value.toLocaleString()}
       </div>
       {url && (
-        <span className="text-xs text-white/40 hover:text-white/60 underline mt-1 block truncate">
+        <span className="text-xs text-theme-text-muted hover:text-theme-text-secondary underline mt-1 block truncate">
           View post
         </span>
       )}
@@ -334,10 +334,10 @@ function ReportOrgFavicon({ domain, size = 20 }: { domain: string; size?: number
   if (failed) {
     return (
       <div
-        className="rounded bg-white/10 flex items-center justify-center flex-shrink-0"
+        className="rounded bg-theme-surface-hover flex items-center justify-center flex-shrink-0"
         style={{ width: size, height: size }}
       >
-        <span className="text-[10px] font-bold text-white/60 uppercase">{domain.charAt(0)}</span>
+        <span className="text-[10px] font-bold text-theme-text-secondary uppercase">{domain.charAt(0)}</span>
       </div>
     );
   }
@@ -388,14 +388,14 @@ function PhotoLightbox({
       {/* Close */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-2 text-white/60 hover:text-white transition-colors z-10"
+        className="absolute top-4 right-4 p-2 text-theme-text-secondary hover:text-theme-text transition-colors z-10"
       >
         <X size={24} />
       </button>
 
       {/* Counter */}
       {photos.length > 1 && (
-        <div className="absolute top-4 left-4 text-sm text-white/50 z-10">
+        <div className="absolute top-4 left-4 text-sm text-theme-text-muted z-10">
           {index + 1} / {photos.length}
         </div>
       )}
@@ -404,7 +404,7 @@ function PhotoLightbox({
       {hasPrev && (
         <button
           onClick={(e) => { e.stopPropagation(); onNavigate(index - 1); }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/40 hover:text-white transition-colors z-10"
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-theme-text-muted hover:text-theme-text transition-colors z-10"
         >
           <ChevronLeft size={32} />
         </button>
@@ -421,7 +421,7 @@ function PhotoLightbox({
       {/* Caption */}
       {photo.caption && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/70 rounded-lg text-sm text-white/80 max-w-lg text-center"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/70 rounded-lg text-sm text-theme-text max-w-lg text-center"
           onClick={(e) => e.stopPropagation()}
         >
           {photo.caption}
@@ -432,7 +432,7 @@ function PhotoLightbox({
       {hasNext && (
         <button
           onClick={(e) => { e.stopPropagation(); onNavigate(index + 1); }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/40 hover:text-white transition-colors z-10"
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-theme-text-muted hover:text-theme-text transition-colors z-10"
         >
           <ChevronRight size={32} />
         </button>
@@ -445,7 +445,7 @@ function ReportOrgCard({ group }: { group: { domain: string | null; attendees: N
   const { domain, attendees } = group;
 
   return (
-    <div className="inline-flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
+    <div className="inline-flex items-center gap-2 bg-theme-surface rounded-lg px-3 py-2 border border-theme-stroke">
       {domain ? (
         <>
           <ReportOrgFavicon domain={domain} size={16} />
@@ -453,19 +453,19 @@ function ReportOrgCard({ group }: { group: { domain: string | null; attendees: N
             href={`https://${domain}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-white/70 hover:text-white transition-colors"
+            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             {domain}
           </a>
           {attendees.length > 1 && (
-            <span className="text-xs text-white/40">({attendees.length})</span>
+            <span className="text-xs text-theme-text-muted">({attendees.length})</span>
           )}
         </>
       ) : (
         <>
-          <Building2 size={14} className="text-white/40" />
+          <Building2 size={14} className="text-theme-text-muted" />
           {attendees.map((a) => (
-            <span key={a.id} className="text-sm text-white/70">{a.name}</span>
+            <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
           ))}
         </>
       )}

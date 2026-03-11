@@ -38,7 +38,7 @@ export const BeverageSettings: React.FC = () => {
     <div className="card p-6">
       <div className="flex items-center gap-2 mb-4">
         <Beer size={20} className="text-[#ff393a]" />
-        <h2 className="text-xl font-bold text-white">Drinks</h2>
+        <h2 className="text-xl font-bold text-theme-text">Drinks</h2>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
@@ -61,7 +61,7 @@ export const BeverageSettings: React.FC = () => {
             <button
               type="button"
               onClick={() => removeCustomBeverage(index)}
-              className="text-white/40 hover:text-white ml-auto"
+              className="text-theme-text-muted hover:text-theme-text ml-auto"
             >
               <X size={14} />
             </button>

@@ -70,20 +70,20 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
     <div className="card p-6">
       <div className="flex items-center gap-2 mb-6">
         <Pizza size={24} className="text-[#ff393a]" />
-        <h2 className="text-xl font-bold text-white">Pizza Options</h2>
+        <h2 className="text-xl font-bold text-theme-text">Pizza Options</h2>
       </div>
 
       {/* First Section (e.g., Pizzeria Selection) */}
       {firstSection && (
         <>
           {firstSection}
-          <div className="border-t border-white/10 my-6" />
+          <div className="border-t border-theme-stroke my-6" />
         </>
       )}
 
       {/* Pizza Style Section */}
       <div className="mb-6">
-        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Style</h3>
+        <h3 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">Style</h3>
         <div className="space-y-2">
           {pizzaStyles.map(style => (
             <label key={style.id} className="flex items-start space-x-3 cursor-pointer group">
@@ -93,11 +93,11 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
                 value={style.id}
                 checked={pizzaSettings.style.id === style.id}
                 onChange={() => handleStyleChange(style.id)}
-                className="w-4 h-4 text-[#ff393a] bg-white/10 border-white/20 focus:ring-[#ff393a] focus:ring-offset-0 mt-1"
+                className="w-4 h-4 text-[#ff393a] bg-theme-surface-hover border-theme-stroke-hover focus:ring-[#ff393a] focus:ring-offset-0 mt-1"
               />
               <div className="flex-1">
-                <div className="font-medium text-white/90 group-hover:text-white">{style.name}</div>
-                <div className="text-sm text-white/40">{style.description}</div>
+                <div className="font-medium text-theme-text group-hover:text-theme-text">{style.name}</div>
+                <div className="text-sm text-theme-text-muted">{style.description}</div>
               </div>
             </label>
           ))}
@@ -105,11 +105,11 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
       </div>
 
       {/* Divider */}
-      <div className="border-t border-white/10 my-6" />
+      <div className="border-t border-theme-stroke my-6" />
 
       {/* Toppings Section */}
       <div>
-        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">Available Toppings</h3>
+        <h3 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">Available Toppings</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
           {availableToppings.map(topping => (
             <Checkbox
@@ -130,7 +130,7 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
               <button
                 type="button"
                 onClick={() => removeCustomTopping(index)}
-                className="text-white/40 hover:text-white ml-auto"
+                className="text-theme-text-muted hover:text-theme-text ml-auto"
               >
                 <X size={14} />
               </button>

@@ -730,7 +730,7 @@ export const EventDetailsTab: React.FC = () => {
   };
 
   if (!party) {
-    return <div className="card p-6 text-white/60">No party loaded</div>;
+    return <div className="card p-6 text-theme-text-secondary">No party loaded</div>;
   }
 
   return (
@@ -788,24 +788,24 @@ export const EventDetailsTab: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowDateTimeModal(true)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+          className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Calendar size={18} className="text-white/40 flex-shrink-0" />
+              <Calendar size={18} className="text-theme-text-muted flex-shrink-0" />
               {startDate && startTime && endDate && endTime ? (
                 <div>
-                  <div className="text-white font-medium">
+                  <div className="text-theme-text font-medium">
                     {formatDateDisplay(startDate, timezone)}
                   </div>
-                  <div className="text-white/60 text-sm mt-1">
+                  <div className="text-theme-text-secondary text-sm mt-1">
                     {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <span className="text-white/60">No date set</span>
-                  <div className="text-white/40 text-sm mt-1">Click to set event time</div>
+                  <span className="text-theme-text-secondary">No date set</span>
+                  <div className="text-theme-text-muted text-sm mt-1">Click to set event time</div>
                 </div>
               )}
             </div>
@@ -816,15 +816,15 @@ export const EventDetailsTab: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowDescriptionModal(true)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+          className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <FileText size={18} className="text-white/40 flex-shrink-0" />
+              <FileText size={18} className="text-theme-text-muted flex-shrink-0" />
               {description ? (
-                <p className="text-white line-clamp-2">{description}</p>
+                <p className="text-theme-text line-clamp-2">{description}</p>
               ) : (
-                <span className="text-white/60">Add Description</span>
+                <span className="text-theme-text-secondary">Add Description</span>
               )}
             </div>
           </div>
@@ -834,24 +834,24 @@ export const EventDetailsTab: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowImageModal(true)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:bg-white/10 transition-colors"
+          className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <ImageIcon size={18} className="text-white/40 flex-shrink-0" />
+              <ImageIcon size={18} className="text-theme-text-muted flex-shrink-0" />
               {imagePreview ? (
                 <div className="flex items-center gap-3">
                   <img
                     src={imagePreview}
                     alt="Event flyer preview"
-                    className="w-12 h-12 rounded-lg object-cover border border-white/20"
+                    className="w-12 h-12 rounded-lg object-cover border border-theme-stroke-hover"
                   />
-                  <span className="text-white font-medium">Event Image</span>
+                  <span className="text-theme-text font-medium">Event Image</span>
                 </div>
               ) : (
                 <div>
-                  <span className="text-white/60">No image set</span>
-                  <div className="text-white/40 text-sm mt-1">Click to add event image</div>
+                  <span className="text-theme-text-secondary">No image set</span>
+                  <div className="text-theme-text-muted text-sm mt-1">Click to add event image</div>
                 </div>
               )}
             </div>
@@ -866,22 +866,22 @@ export const EventDetailsTab: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowOptionalFields(!showOptionalFields)}
-            className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+            className="w-full flex items-center justify-between p-4 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors"
           >
-            <span className="text-sm font-medium text-white/80">Options</span>
+            <span className="text-sm font-medium text-theme-text">Options</span>
             {showOptionalFields ? (
-              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
             ) : (
-              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             )}
           </button>
 
           {showOptionalFields && (
-            <div className="space-y-3 border-l-2 border-white/10 pl-4 mt-3">
+            <div className="space-y-3 border-l-2 border-theme-stroke pl-4 mt-3">
               <Checkbox
                 checked={requireApproval}
                 onChange={() => {
@@ -1018,7 +1018,7 @@ export const EventDetailsTab: React.FC = () => {
                       className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                         nftChain === chain
                           ? 'bg-[#ff393a] text-white'
-                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
                       }`}
                     >
                       {chain === 'base' ? 'Base' : 'Monad'}
@@ -1036,7 +1036,7 @@ export const EventDetailsTab: React.FC = () => {
         {/* Hosts Section */}
         <div>
           <div className="mb-3">
-            <label className="block text-sm font-medium text-white/80">
+            <label className="block text-sm font-medium text-theme-text">
               <User size={16} className="inline mr-2" />
               Hosts
             </label>
@@ -1046,14 +1046,14 @@ export const EventDetailsTab: React.FC = () => {
           <div className="space-y-2 mb-3">
             {/* Main Host (display only - name comes from user account) */}
             {hostName && (
-              <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
+              <div className="flex items-center justify-between p-3 bg-theme-surface rounded-xl border border-[#ff393a]/30 transition-all">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
                     <User className="w-5 h-5 text-[#ff393a]" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-white font-medium">{hostName}</p>
+                      <p className="text-theme-text font-medium">{hostName}</p>
                       <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
                     </div>
                   </div>
@@ -1069,11 +1069,11 @@ export const EventDetailsTab: React.FC = () => {
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
+                className={`flex items-center justify-between p-3 bg-theme-surface rounded-xl border border-theme-stroke transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
                   }`}
               >
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60">
+                  <div className="cursor-grab active:cursor-grabbing text-theme-text-faint hover:text-theme-text-secondary">
                     <GripVertical size={18} />
                   </div>
                   {coHost.avatar_url ? (
@@ -1084,25 +1084,25 @@ export const EventDetailsTab: React.FC = () => {
                     </div>
                   )}
                   <div className="flex-1">
-                    <p className="text-white font-medium">{coHost.name}</p>
+                    <p className="text-theme-text font-medium">{coHost.name}</p>
                     {coHost.email && (
-                      <p className="text-white/50 text-xs">{coHost.email}</p>
+                      <p className="text-theme-text-muted text-xs">{coHost.email}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
                       {coHost.website && (
-                        <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                        <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-theme-text-muted hover:text-theme-text" onClick={(e) => e.stopPropagation()}>
                           <Globe size={14} />
                         </a>
                       )}
                       {coHost.twitter && (
-                        <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                        <a href={`https://twitter.com/${coHost.twitter}`} target="_blank" rel="noopener noreferrer" className="text-theme-text-muted hover:text-theme-text" onClick={(e) => e.stopPropagation()}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                           </svg>
                         </a>
                       )}
                       {coHost.instagram && (
-                        <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                        <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-theme-text-muted hover:text-theme-text" onClick={(e) => e.stopPropagation()}>
                           <Instagram size={14} />
                         </a>
                       )}
@@ -1115,19 +1115,19 @@ export const EventDetailsTab: React.FC = () => {
                     onChange={() => toggleCoHostShowOnEvent(coHost.id)}
                     label="Show"
                     size={16}
-                    labelClassName="text-xs font-medium text-white/60"
+                    labelClassName="text-xs font-medium text-theme-text-secondary"
                   />
                   <Checkbox
                     checked={coHost.canEdit === true}
                     onChange={() => toggleCoHostCanEdit(coHost.id)}
                     label="Editor"
                     size={16}
-                    labelClassName="text-xs font-medium text-white/60"
+                    labelClassName="text-xs font-medium text-theme-text-secondary"
                   />
                   <button
                     type="button"
                     onClick={() => startEditingHost(coHost)}
-                    className="text-white/50 hover:text-white text-sm font-medium"
+                    className="text-theme-text-muted hover:text-theme-text text-sm font-medium"
                   >
                     Edit
                   </button>
@@ -1176,9 +1176,9 @@ export const EventDetailsTab: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-white mb-3">Cancel Event?</h2>
-            <p className="text-white/60 mb-6">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-theme-text mb-3">Cancel Event?</h2>
+            <p className="text-theme-text-secondary mb-6">
               This will permanently delete this event and all guest responses. This action cannot be undone.
             </p>
             <div className="flex gap-3">
@@ -1214,13 +1214,13 @@ export const EventDetailsTab: React.FC = () => {
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Event Time</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
 
             <div className="space-y-3">
               {/* Start */}
               <div className="flex items-center gap-2">
-                <Play size={18} className="text-white/40 flex-shrink-0" />
+                <Play size={18} className="text-theme-text-muted flex-shrink-0" />
                 <input
                   type="date"
                   value={startDate}
@@ -1229,38 +1229,38 @@ export const EventDetailsTab: React.FC = () => {
                     if (!endDate) setEndDate(e.target.value);
                   }}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
                   placeholder="12:00 PM"
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
               {/* End */}
               <div className="flex items-center gap-2">
-                <SquareIcon size={16} className="text-white/40 flex-shrink-0" />
+                <SquareIcon size={16} className="text-theme-text-muted flex-shrink-0" />
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
                   placeholder="1:00 PM"
-                  className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
               {/* Timezone */}
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-theme-stroke">
                 <TimezonePickerInput
                   value={timezone}
                   onChange={setTimezone}
@@ -1294,8 +1294,8 @@ export const EventDetailsTab: React.FC = () => {
       {/* Image Modal */}
       {showImageModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowImageModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Event Image</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Event Image</h2>
 
             <div className="space-y-4">
               {/* Current Image Preview */}
@@ -1304,7 +1304,7 @@ export const EventDetailsTab: React.FC = () => {
                   <img
                     src={imagePreview}
                     alt="Event flyer preview"
-                    className="w-full h-auto rounded-xl border-2 border-white/20"
+                    className="w-full h-auto rounded-xl border-2 border-theme-stroke-hover"
                   />
                   <button
                     type="button"
@@ -1328,27 +1328,27 @@ export const EventDetailsTab: React.FC = () => {
                   />
                   <label
                     htmlFor="eventImageModal"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-white/5 hover:bg-white/10"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-theme-stroke-hover rounded-xl cursor-pointer hover:border-[#ff393a]/50 transition-colors bg-theme-surface hover:bg-theme-surface-hover"
                   >
-                    <svg className="w-8 h-8 text-white/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-8 h-8 text-theme-text-muted mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <span className="text-sm text-white/60">Click to upload square image</span>
-                    <span className="text-xs text-white/40 mt-1">Max 5MB • 1:1 aspect ratio</span>
+                    <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
+                    <span className="text-xs text-theme-text-muted mt-1">Max 5MB • 1:1 aspect ratio</span>
                   </label>
                 </div>
               )}
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-white/10"></div>
-                <span className="text-xs text-white/40">OR</span>
-                <div className="flex-1 h-px bg-white/10"></div>
+                <div className="flex-1 h-px bg-theme-surface-hover"></div>
+                <span className="text-xs text-theme-text-muted">OR</span>
+                <div className="flex-1 h-px bg-theme-surface-hover"></div>
               </div>
 
               {/* Image URL Input */}
               <div className="relative">
-                <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                <ImageIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
                 <input
                   type="url"
                   value={eventImageUrl}
@@ -1357,7 +1357,7 @@ export const EventDetailsTab: React.FC = () => {
                     setImagePreview(e.target.value);
                   }}
                   placeholder="Square Image URL"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] !pl-10"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] !pl-10"
                 />
               </div>
 
@@ -1392,8 +1392,8 @@ export const EventDetailsTab: React.FC = () => {
       {/* Host Edit Modal */}
       {editingHostId && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={cancelEditingHost}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">
               {editingHostId === 'main-host' ? 'Edit Primary Host' : 'Edit Host'}
             </h2>
 
@@ -1403,7 +1403,7 @@ export const EventDetailsTab: React.FC = () => {
                 value={editHostName}
                 onChange={(e) => setEditHostName(e.target.value)}
                 placeholder="Name *"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               {editingHostId !== 'main-host' && (
@@ -1413,7 +1413,7 @@ export const EventDetailsTab: React.FC = () => {
                     value={editHostEmail}
                     onChange={(e) => setEditHostEmail(e.target.value)}
                     placeholder="Email (required to edit event)"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                   />
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1422,14 +1422,14 @@ export const EventDetailsTab: React.FC = () => {
                       value={editHostWebsite}
                       onChange={(e) => setEditHostWebsite(e.target.value)}
                       placeholder="Website"
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
                     <input
                       type="url"
                       value={editHostAvatarUrl}
                       onChange={(e) => setEditHostAvatarUrl(e.target.value)}
                       placeholder="Avatar URL"
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
                   </div>
 
@@ -1446,14 +1446,14 @@ export const EventDetailsTab: React.FC = () => {
                         }
                       }}
                       placeholder="Twitter (no @)"
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
                     <input
                       type="text"
                       value={editHostInstagram}
                       onChange={(e) => setEditHostInstagram(e.target.value)}
                       placeholder="Instagram (no @)"
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                     />
                   </div>
                 </>
@@ -1469,7 +1469,7 @@ export const EventDetailsTab: React.FC = () => {
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
-                <span className="text-xs text-white/40">Avatar preview</span>
+                <span className="text-xs text-theme-text-muted">Avatar preview</span>
               </div>
             )}
 
@@ -1477,7 +1477,7 @@ export const EventDetailsTab: React.FC = () => {
               <button
                 type="button"
                 onClick={cancelEditingHost}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 Cancel
               </button>
@@ -1497,8 +1497,8 @@ export const EventDetailsTab: React.FC = () => {
       {/* Add Host Modal */}
       {showAddHostModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddHostModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Add Host</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Add Host</h2>
 
             <div className="space-y-3">
               <input
@@ -1506,7 +1506,7 @@ export const EventDetailsTab: React.FC = () => {
                 value={newCoHostName}
                 onChange={(e) => setNewCoHostName(e.target.value)}
                 placeholder="Name *"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <input
@@ -1514,7 +1514,7 @@ export const EventDetailsTab: React.FC = () => {
                 value={newCoHostEmail}
                 onChange={(e) => setNewCoHostEmail(e.target.value)}
                 placeholder="Email (required to edit event)"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -1523,14 +1523,14 @@ export const EventDetailsTab: React.FC = () => {
                   value={newCoHostWebsite}
                   onChange={(e) => setNewCoHostWebsite(e.target.value)}
                   placeholder="Website"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="url"
                   value={newCoHostAvatarUrl}
                   onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
                   placeholder="Avatar URL"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
@@ -1547,14 +1547,14 @@ export const EventDetailsTab: React.FC = () => {
                     }
                   }}
                   placeholder="Twitter (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
                 <input
                   type="text"
                   value={newCoHostInstagram}
                   onChange={(e) => setNewCoHostInstagram(e.target.value)}
                   placeholder="Instagram (no @)"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
             </div>
@@ -1568,7 +1568,7 @@ export const EventDetailsTab: React.FC = () => {
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
-                <span className="text-xs text-white/40">Avatar preview</span>
+                <span className="text-xs text-theme-text-muted">Avatar preview</span>
               </div>
             )}
 
@@ -1576,7 +1576,7 @@ export const EventDetailsTab: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddHostModal(false)}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 Cancel
               </button>
@@ -1597,14 +1597,14 @@ export const EventDetailsTab: React.FC = () => {
       {/* Description Modal */}
       {showDescriptionModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
-          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-white mb-4">Description</h2>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">Description</h2>
 
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your event..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
               autoFocus
             />
 

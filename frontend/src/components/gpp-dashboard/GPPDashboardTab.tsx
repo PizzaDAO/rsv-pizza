@@ -113,34 +113,34 @@ export const GPPDashboardTab: React.FC = () => {
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-white">{guests.length}</div>
-          <div className="text-xs text-white/50">RSVPs</div>
+          <div className="text-2xl font-bold text-theme-text">{guests.length}</div>
+          <div className="text-xs text-theme-text-muted">RSVPs</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-theme-text">
             {daysUntil !== null ? daysUntil : '—'}
           </div>
-          <div className="text-xs text-white/50">Days Until Event</div>
+          <div className="text-xs text-theme-text-muted">Days Until Event</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-theme-text">
             {guests.filter((g) => g.status === 'PENDING').length}
           </div>
-          <div className="text-xs text-white/50">Pending Approval</div>
+          <div className="text-xs text-theme-text-muted">Pending Approval</div>
         </div>
       </div>
 
       {/* Checklist progress */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Event Setup</h3>
-          <span className="text-sm text-white/50">
+          <h3 className="text-lg font-semibold text-theme-text">Event Setup</h3>
+          <span className="text-sm text-theme-text-muted">
             {completedCount} of {totalCount} complete
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full h-2 bg-white/10 rounded-full mb-6 overflow-hidden">
+        <div className="w-full h-2 bg-theme-surface-hover rounded-full mb-6 overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -152,7 +152,7 @@ export const GPPDashboardTab: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="w-5 h-5 animate-spin text-white/40" />
+            <Loader2 className="w-5 h-5 animate-spin text-theme-text-muted" />
           </div>
         ) : (
           <div className="space-y-1">
@@ -164,24 +164,24 @@ export const GPPDashboardTab: React.FC = () => {
                   key={item.label}
                   onClick={item.tab ? () => goToTab(item.tab!) : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
-                    item.tab ? 'hover:bg-white/5 cursor-pointer' : ''
+                    item.tab ? 'hover:bg-theme-surface cursor-pointer' : ''
                   }`}
                 >
                   {item.done ? (
                     <CheckCircle size={18} className="text-green-500 shrink-0" />
                   ) : (
-                    <Circle size={18} className="text-white/20 shrink-0" />
+                    <Circle size={18} className="text-theme-text-faint shrink-0" />
                   )}
-                  <Icon size={16} className={item.done ? 'text-white/40 shrink-0' : 'text-white/60 shrink-0'} />
+                  <Icon size={16} className={item.done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'} />
                   <span
                     className={`text-sm ${
-                      item.done ? 'text-white/40 line-through' : 'text-white'
+                      item.done ? 'text-theme-text-muted line-through' : 'text-theme-text'
                     }`}
                   >
                     {item.label}
                   </span>
                   {item.tab && (
-                    <span className="ml-auto text-xs text-white/20 group-hover:text-white/40 transition-colors">
+                    <span className="ml-auto text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors">
                       Go &rarr;
                     </span>
                   )}

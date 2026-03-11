@@ -60,13 +60,13 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
         >
           <X size={24} />
         </button>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Log In or Sign Up</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Log In or Sign Up</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">

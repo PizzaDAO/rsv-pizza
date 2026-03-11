@@ -36,7 +36,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
 
   return (
     <>
-      <div className="relative aspect-video bg-white/5 rounded-lg overflow-hidden">
+      <div className="relative aspect-video bg-theme-surface rounded-lg overflow-hidden">
         <img
           src={photos[current].url}
           alt={photos[current].caption || photos[current].fileName}
@@ -50,7 +50,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
               <button
                 type="button"
                 onClick={() => setCurrent(current - 1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-theme-text p-1 rounded-full"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -59,7 +59,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
               <button
                 type="button"
                 onClick={() => setCurrent(current + 1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-theme-text p-1 rounded-full"
               >
                 <ChevronRight size={16} />
               </button>
@@ -71,7 +71,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
                   type="button"
                   onClick={() => setCurrent(i)}
                   className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    i === current ? 'bg-white' : 'bg-white/40'
+                    i === current ? 'bg-white' : 'bg-theme-surface-hover'
                   }`}
                 />
               ))}
@@ -81,7 +81,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
 
         {photos[current].caption && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6">
-            <p className="text-xs text-white/90">{photos[current].caption}</p>
+            <p className="text-xs text-theme-text">{photos[current].caption}</p>
           </div>
         )}
       </div>
@@ -95,7 +95,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
           <button
             type="button"
             onClick={() => setLightbox(false)}
-            className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+            className="absolute top-4 right-4 text-theme-text-secondary hover:text-theme-text z-10"
           >
             <X size={24} />
           </button>
@@ -107,7 +107,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
                 e.stopPropagation();
                 setCurrent(current - 1);
               }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
             >
               <ChevronLeft size={24} />
             </button>
@@ -120,7 +120,7 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
                 e.stopPropagation();
                 setCurrent(current + 1);
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text bg-black/30 hover:bg-black/50 p-2 rounded-full z-10"
             >
               <ChevronRight size={24} />
             </button>
@@ -136,9 +136,9 @@ const PhotoCarousel: React.FC<{ photos: VenuePhoto[] }> = ({ photos }) => {
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
             {photos[current].caption && (
-              <p className="text-white/80 text-sm mt-3 text-center">{photos[current].caption}</p>
+              <p className="text-theme-text text-sm mt-3 text-center">{photos[current].caption}</p>
             )}
-            <p className="text-white/40 text-xs mt-1">{current + 1} of {photos.length}</p>
+            <p className="text-theme-text-muted text-xs mt-1">{current + 1} of {photos.length}</p>
           </div>
         </div>
       )}
@@ -152,7 +152,7 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
 
   return (
     <div className={`card overflow-hidden ${
-      venue.isSelected ? 'ring-2 ring-[#ff393a] border-[#ff393a]/50' : 'border-white/10'
+      venue.isSelected ? 'ring-2 ring-[#ff393a] border-[#ff393a]/50' : 'border-theme-stroke'
     }`}>
       {/* Photo carousel */}
       {venue.photos && venue.photos.length > 0 && (
@@ -175,9 +175,9 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
               {statusInfo.label}
             </span>
           </div>
-          <h3 className="font-semibold text-white text-lg">{venue.name}</h3>
+          <h3 className="font-semibold text-theme-text text-lg">{venue.name}</h3>
           {venue.address && (
-            <p className="text-sm text-white/60 flex items-center gap-1 mt-0.5">
+            <p className="text-sm text-theme-text-secondary flex items-center gap-1 mt-0.5">
               <MapPin size={12} />
               {venue.address}
             </p>
@@ -187,13 +187,13 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
         {/* Quick stats */}
         <div className="flex items-center gap-4 text-sm">
           {venue.capacity && (
-            <span className="flex items-center gap-1 text-white/60">
+            <span className="flex items-center gap-1 text-theme-text-secondary">
               <Users size={14} />
               {venue.capacity} capacity
             </span>
           )}
           {venue.cost != null && (
-            <span className="flex items-center gap-1 text-white/60">
+            <span className="flex items-center gap-1 text-theme-text-secondary">
               <DollarSign size={14} />
               {formatCost(venue.cost)}
             </span>
@@ -220,7 +220,7 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
                   <ThumbsUp size={12} />
                   Pros
                 </p>
-                <p className="text-sm text-white/70 whitespace-pre-wrap">{venue.pros}</p>
+                <p className="text-sm text-theme-text-secondary whitespace-pre-wrap">{venue.pros}</p>
               </div>
             )}
             {venue.cons && (
@@ -229,7 +229,7 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
                   <ThumbsDown size={12} />
                   Cons
                 </p>
-                <p className="text-sm text-white/70 whitespace-pre-wrap">{venue.cons}</p>
+                <p className="text-sm text-theme-text-secondary whitespace-pre-wrap">{venue.cons}</p>
               </div>
             )}
           </div>
@@ -238,8 +238,8 @@ const VenueCard: React.FC<{ venue: Venue }> = ({ venue }) => {
         {/* Notes */}
         {venue.notes && (
           <div className="text-sm">
-            <p className="text-xs text-white/40 mb-1">Notes</p>
-            <p className="text-white/60 whitespace-pre-wrap">{venue.notes}</p>
+            <p className="text-xs text-theme-text-muted mb-1">Notes</p>
+            <p className="text-theme-text-secondary whitespace-pre-wrap">{venue.notes}</p>
           </div>
         )}
       </div>
@@ -252,13 +252,13 @@ export const VenueReportPreview: React.FC<VenueReportPreviewProps> = ({ report }
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-theme-text">
           {report.title || `Venue Report: ${report.partyName}`}
         </h1>
         {report.notes && (
-          <p className="text-white/60 max-w-2xl mx-auto whitespace-pre-wrap">{report.notes}</p>
+          <p className="text-theme-text-secondary max-w-2xl mx-auto whitespace-pre-wrap">{report.notes}</p>
         )}
-        <p className="text-xs text-white/30">
+        <p className="text-xs text-theme-text-faint">
           {report.venues.length} venue{report.venues.length !== 1 ? 's' : ''} compared
         </p>
       </div>
@@ -273,8 +273,8 @@ export const VenueReportPreview: React.FC<VenueReportPreviewProps> = ({ report }
       {/* No venues message */}
       {report.venues.length === 0 && (
         <div className="card p-8 text-center">
-          <Building2 size={32} className="mx-auto mb-3 text-white/20" />
-          <p className="text-white/60">No venues to display.</p>
+          <Building2 size={32} className="mx-auto mb-3 text-theme-text-faint" />
+          <p className="text-theme-text-secondary">No venues to display.</p>
         </div>
       )}
     </div>

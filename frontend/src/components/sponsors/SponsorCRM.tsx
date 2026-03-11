@@ -125,9 +125,9 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="card p-8 bg-[#1a1a2e] border-white/10">
+        <div className="card p-8 bg-theme-header border-theme-stroke">
           <div className="flex items-center justify-center">
-            <RefreshCw className="w-6 h-6 animate-spin text-white/40" />
+            <RefreshCw className="w-6 h-6 animate-spin text-theme-text-muted" />
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   if (error) {
     return (
       <div className="space-y-4">
-        <div className="card p-6 bg-[#1a1a2e] border-white/10">
+        <div className="card p-6 bg-theme-header border-theme-stroke">
           <div className="text-center">
             <p className="text-red-400 mb-4">{error}</p>
             <button
@@ -156,7 +156,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Sponsor CRM</h2>
+        <h2 className="text-lg font-semibold text-theme-text">Sponsor CRM</h2>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"

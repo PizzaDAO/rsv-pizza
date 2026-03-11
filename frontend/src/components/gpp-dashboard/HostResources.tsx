@@ -34,7 +34,7 @@ const resources = [
 
 export const HostResources: React.FC = () => (
   <div>
-    <h3 className="text-lg font-semibold text-white mb-4">Host Resources</h3>
+    <h3 className="text-lg font-semibold text-theme-text mb-4">Host Resources</h3>
     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
       {resources.map((r) => {
         const Icon = r.icon;
@@ -53,11 +53,11 @@ export const HostResources: React.FC = () => (
               <Icon size={20} style={{ color: r.color }} />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 text-white font-medium text-sm mb-1">
+              <div className="flex items-center gap-1.5 text-theme-text font-medium text-sm mb-1">
                 {r.title}
-                <ExternalLink size={12} className="text-white/30 group-hover:text-white/60 transition-colors" />
+                <ExternalLink size={12} className="text-theme-text-faint group-hover:text-theme-text-secondary transition-colors" />
               </div>
-              <p className="text-xs text-white/50">{r.description}</p>
+              <p className="text-xs text-theme-text-muted">{r.description}</p>
             </div>
           </a>
         );
