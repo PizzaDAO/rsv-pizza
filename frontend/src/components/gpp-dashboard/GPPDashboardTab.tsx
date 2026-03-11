@@ -5,6 +5,8 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist } from '../../lib/api';
 import { AutoCompleteStates } from '../../types';
 import { HostResources } from './HostResources';
+import { Drawer } from '../Drawer';
+import { HostsManager } from '../HostsManager';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -12,6 +14,8 @@ export const GPPDashboardTab: React.FC = () => {
   const { party, guests } = usePizza();
   const [autoStates, setAutoStates] = useState<AutoCompleteStates | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showHostsDrawer, setShowHostsDrawer] = useState(false);
+  const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -51,8 +55,9 @@ export const GPPDashboardTab: React.FC = () => {
       },
       {
         label: 'Build a Team',
-        done: false,
-        tab: 'details',
+        done: coHostCount > 0,
+        tab: null,
+        onClick: () => setShowHostsDrawer(true),
         icon: Users,
       },
       {
@@ -92,7 +97,7 @@ export const GPPDashboardTab: React.FC = () => {
         icon: Rocket,
       },
     ];
-  }, [party, autoStates]);
+  }, [party, autoStates, coHostCount]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;
@@ -158,13 +163,14 @@ export const GPPDashboardTab: React.FC = () => {
           <div className="space-y-1">
             {checklist.map((item) => {
               const Icon = item.icon;
-              const Wrapper = item.tab ? 'button' : 'div';
+              const clickable = item.tab || item.onClick;
+              const Wrapper = clickable ? 'button' : 'div';
               return (
                 <Wrapper
                   key={item.label}
-                  onClick={item.tab ? () => goToTab(item.tab!) : undefined}
+                  onClick={clickable ? (item.onClick || (() => goToTab(item.tab!))) : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
-                    item.tab ? 'hover:bg-white/5 cursor-pointer' : ''
+                    clickable ? 'hover:bg-white/5 cursor-pointer' : ''
                   }`}
                 >
                   {item.done ? (
@@ -180,7 +186,7 @@ export const GPPDashboardTab: React.FC = () => {
                   >
                     {item.label}
                   </span>
-                  {item.tab && (
+                  {clickable && (
                     <span className="ml-auto text-xs text-white/20 group-hover:text-white/40 transition-colors">
                       Go &rarr;
                     </span>
@@ -194,6 +200,16 @@ export const GPPDashboardTab: React.FC = () => {
 
       {/* Host Resources */}
       <HostResources />
+
+      {/* Hosts Drawer */}
+      <Drawer open={showHostsDrawer} onClose={() => setShowHostsDrawer(false)} title="Build a Team">
+        <HostsManager
+          partyId={party.id}
+          hostName={party.hostName || ''}
+          initialCoHosts={party.coHosts || []}
+          onCoHostsChange={(coHosts) => setCoHostCount(coHosts.length)}
+        />
+      </Drawer>
     </div>
   );
 };
