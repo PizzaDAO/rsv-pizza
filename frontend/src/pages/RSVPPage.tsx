@@ -12,6 +12,7 @@ import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 import { uuid } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
+import { useConfetti } from '../hooks/useConfetti';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -33,6 +34,7 @@ export function RSVPPage() {
 
   const isGPP = party?.event_type === 'gpp';
   const { themeClass: gppClass, backgroundStyle: themeBackgroundStyle } = useTheme();
+  const { fire: fireConfetti, fireFromCenter, ConfettiOverlay } = useConfetti();
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -301,6 +303,7 @@ export function RSVPPage() {
         setGuestId(result.guest?.id || null);
 
         // Go directly to success - donation is handled on step 2
+        if (isGPP) fireFromCenter();
         setSubmitted(true);
       } else {
         setError('Failed to submit. Please try again.');
@@ -378,7 +381,7 @@ export function RSVPPage() {
   // Password protection UI
   if (!isAuthenticated && party?.has_password) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
         <div className="card p-8 max-w-md w-full">
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
@@ -431,7 +434,7 @@ export function RSVPPage() {
     };
 
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
         <div className="card p-8 max-w-md text-center">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
             {alreadyRegistered ? (
@@ -469,7 +472,7 @@ export function RSVPPage() {
   // Step 1 - Personal Info
   if (step === 1) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
         <div className="card p-8 max-w-lg w-full relative">
           {/* Close button */}
           <button
@@ -915,6 +918,7 @@ export function RSVPPage() {
           </div>
         </form>
       </div>
+      {ConfettiOverlay}
     </div>
   );
 }

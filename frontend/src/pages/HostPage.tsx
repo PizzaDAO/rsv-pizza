@@ -14,7 +14,6 @@ import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
-import { Checkbox } from '../components/Checkbox';
 import { updateParty } from '../lib/supabase';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
@@ -46,7 +45,6 @@ function HostPageContent() {
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
-  const [photoModerationEnabled, setPhotoModerationEnabled] = useState(false);
 
   const canEdit = useMemo(() => {
     if (!party || !user) return false;
@@ -60,12 +58,6 @@ function HostPageContent() {
     }
     return false;
   }, [party, user]);
-
-  useEffect(() => {
-    if (party) {
-      setPhotoModerationEnabled(party.photoModeration || false);
-    }
-  }, [party]);
 
   useEffect(() => {
     if (!authLoading && !partyLoading && party && !canEdit) {
@@ -344,29 +336,12 @@ function HostPageContent() {
 
               {activeTab === 'photos' && party && (
                 <div className="card p-6 space-y-4">
-                  <Checkbox
-                    checked={photoModerationEnabled}
-                    onChange={async () => {
-                      const newValue = !photoModerationEnabled;
-                      setPhotoModerationEnabled(newValue);
-                      const success = await updateParty(party.id, { photo_moderation: newValue });
-                      if (!success) {
-                        setPhotoModerationEnabled(!newValue);
-                      }
-                    }}
-                    label="Require Photo Approval"
-                  />
-                  {photoModerationEnabled && (
-                    <p className="text-xs text-theme-text-muted -mt-2 ml-8">
-                      Guest photos must be approved by a host before appearing in the gallery.
-                    </p>
-                  )}
                   <PhotoGallery
                     partyId={party.id}
                     isHost={true}
                     uploaderName={user?.name || undefined}
                     uploaderEmail={user?.email}
-                    photoModeration={photoModerationEnabled}
+                    photoModeration={true}
                   />
                 </div>
               )}

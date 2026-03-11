@@ -25,6 +25,7 @@ import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
+import { useConfetti } from '../hooks/useConfetti';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -55,6 +56,7 @@ export function EventPage() {
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
   const [verifyingTweet, setVerifyingTweet] = useState(false);
+  const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
 
   useEffect(() => {
     async function loadEvent() {
@@ -427,7 +429,11 @@ export function EventPage() {
   const { themeClass, backgroundStyle } = useTheme();
 
   return (
-    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+    <div
+      className={`min-h-screen ${themeClass}`}
+      style={backgroundStyle}
+      onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}
+    >
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>
@@ -809,7 +815,13 @@ export function EventPage() {
                 {/* RSVP Button */}
                 <div className="pt-4">
                   <button
-                    onClick={handleRSVP}
+                    onClick={(e) => {
+                      if (isGPP) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                      }
+                      handleRSVP();
+                    }}
                     className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
@@ -967,7 +979,7 @@ export function EventPage() {
                       <PhotoGallery
                         partyId={event.id}
                         isHost={false}
-                        photoModeration={event.photoModeration}
+                        photoModeration={true}
                         uploaderName={existingGuestData?.name || user?.name || undefined}
                         uploaderEmail={existingGuestData?.email || user?.email}
                         guestId={existingGuestData?.id}
@@ -1025,6 +1037,8 @@ export function EventPage() {
         isOpen={showPizzaDAO}
         onClose={() => setShowPizzaDAO(false)}
       />
+
+      {ConfettiOverlay}
     </div>
   );
 }

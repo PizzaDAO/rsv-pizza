@@ -6,6 +6,7 @@ import { CornerLinks } from '../components/CornerLinks';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfetti } from '../hooks/useConfetti';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -36,6 +37,7 @@ export function GPPLandingPage() {
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
   const cityDataRef = useRef<CityData | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const { fire: fireClickConfetti, ConfettiOverlay } = useConfetti();
 
   // OTP state
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
@@ -203,7 +205,9 @@ export function GPPLandingPage() {
       <div
         className="min-h-screen"
         style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
+        onClick={(e) => fireClickConfetti(e.clientX, e.clientY)}
       >
+        {ConfettiOverlay}
         <Helmet>
           <title>Event Created! | Global Pizza Party</title>
         </Helmet>
@@ -319,7 +323,9 @@ export function GPPLandingPage() {
     <div
       className="min-h-screen relative overflow-hidden"
       style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}
+      onClick={(e) => fireClickConfetti(e.clientX, e.clientY)}
     >
+      {ConfettiOverlay}
       {/* ─── Decorative pizza vectors ─── */}
       <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, animation: 'drift-right 14s ease-in-out infinite' }} />
       <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, animation: 'drift-left 12s ease-in-out infinite' }} />
