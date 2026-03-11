@@ -94,7 +94,7 @@ export function WinnerPicker() {
 
   if (!party || guests.length === 0) {
     return (
-      <div className="bg-theme-surface border border-theme-stroke rounded-xl p-6">
+      <div className="card p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center">
             <Trophy className="w-5 h-5 text-[#ff393a]" />
@@ -114,7 +114,7 @@ export function WinnerPicker() {
   }
 
   return (
-    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-center justify-between mb-4">

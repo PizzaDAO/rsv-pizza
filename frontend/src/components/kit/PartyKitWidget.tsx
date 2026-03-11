@@ -77,7 +77,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   if (loading) {
     return (
-      <div className="bg-theme-surface border border-theme-stroke rounded-xl p-6">
+      <div className="card p-6">
         <div className="flex items-center justify-center gap-2 text-theme-text-secondary">
           <Loader2 size={20} className="animate-spin" />
           <span>Loading kit status...</span>
@@ -88,7 +88,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   if (error) {
     return (
-      <div className="bg-theme-surface border border-theme-stroke rounded-xl p-6">
+      <div className="card p-6">
         <div className="flex items-center justify-center gap-2 text-red-400">
           <AlertCircle size={20} />
           <span>{error}</span>
@@ -125,7 +125,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
 
   return (
     <>
-      <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+      <div className="card overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <div className="flex items-center gap-3">

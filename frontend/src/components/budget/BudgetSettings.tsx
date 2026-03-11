@@ -29,7 +29,7 @@ export const BudgetSettings: React.FC<BudgetSettingsProps> = ({
   };
 
   return (
-    <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
+    <div className="card p-4">
       <h3 className="text-sm font-medium text-theme-text mb-3">Budget Settings</h3>
 
       <div className="space-y-3">

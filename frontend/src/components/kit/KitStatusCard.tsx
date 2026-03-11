@@ -56,7 +56,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
   };
 
   return (
-    <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
         <div className="flex items-center gap-3">
