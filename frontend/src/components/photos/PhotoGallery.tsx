@@ -234,8 +234,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Filter */}
-          <div className="flex items-center bg-white/5 rounded-lg p-1">
+          {/* Filter - only show when there are photos */}
+          {stats && stats.totalPhotos > 0 && <div className="flex items-center bg-white/5 rounded-lg p-1">
             <button
               onClick={() => setFilter('all')}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -272,7 +272,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 Pending ({stats.pendingPhotos})
               </button>
             )}
-          </div>
+          </div>}
 
           {/* Upload Button */}
           <button
