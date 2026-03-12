@@ -39,8 +39,8 @@ const DEFAULT_CHECKLIST_ITEMS = [
   {
     name: 'Build a Team',
     dueDate: null,
-    isAuto: false,
-    autoRule: null,
+    isAuto: true,
+    autoRule: 'team_built',
     linkTab: 'details',
     sortOrder: 2,
     isDefault: true,
@@ -133,7 +133,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     // 2. venue_added: party.venue_name is set OR venues table has an entry with isSelected
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { venueName: true },
+      select: { venueName: true, coHosts: true, userId: true, region: true, user: { select: { email: true, name: true } } },
     });
     const selectedVenue = await prisma.venue.findFirst({
       where: { partyId, isSelected: true },
@@ -145,11 +145,53 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       where: { partyId },
     });
 
+    // 4. team_built: has co-hosts beyond PizzaDAO, the host, and their region's underboss
+    const coHosts = Array.isArray(party?.coHosts) ? party.coHosts as Array<{ name?: string; email?: string }> : [];
+
+    // Get underboss emails for this party's region
+    let underbossEmails: string[] = [];
+    if (party?.region) {
+      const underbosses = await prisma.underboss.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { region: party.region },
+            { regions: { has: party.region } },
+          ],
+        },
+        select: { email: true },
+      });
+      underbossEmails = underbosses.map(u => u.email.toLowerCase());
+    }
+
+    const hostEmail = party?.user?.email?.toLowerCase() || '';
+    const hostName = party?.user?.name?.toLowerCase() || '';
+
+    const realCoHosts = coHosts.filter(h => {
+      const email = (h.email || '').toLowerCase();
+      const name = (h.name || '').toLowerCase();
+
+      // Exclude PizzaDAO
+      if (name === 'pizzadao' || email === 'hello@rarepizzas.com') return false;
+
+      // Exclude the host themselves
+      if (hostEmail && email === hostEmail) return false;
+      if (hostName && name === hostName && !email) return false;
+
+      // Exclude underbosses
+      if (email && underbossEmails.includes(email)) return false;
+
+      return true;
+    });
+
+    const teamBuilt = realCoHosts.length > 0;
+
     const autoCompleteStates = {
       event_created: true,
       party_kit_submitted: !!partyKit,
       venue_added: !!(party?.venueName) || !!selectedVenue,
       budget_submitted: budgetItemCount > 0,
+      team_built: teamBuilt,
     };
 
     // Check if defaults have been seeded with current version
