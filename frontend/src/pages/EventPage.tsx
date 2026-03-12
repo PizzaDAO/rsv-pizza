@@ -58,15 +58,24 @@ export function EventPage() {
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
 
-  // Sticky RSVP button on mobile: show when inline button scrolls out of view
+  // Sticky RSVP button on mobile: show only after user scrolls past the inline button
   const mobileRsvpRef = useRef<HTMLButtonElement>(null);
+  const hasBeenVisible = useRef(false);
   const [showStickyRsvp, setShowStickyRsvp] = useState(false);
 
   useEffect(() => {
     const el = mobileRsvpRef.current;
     if (!el) return;
+    hasBeenVisible.current = false;
     const observer = new IntersectionObserver(
-      ([entry]) => setShowStickyRsvp(!entry.isIntersecting),
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          hasBeenVisible.current = true;
+          setShowStickyRsvp(false);
+        } else if (hasBeenVisible.current) {
+          setShowStickyRsvp(true);
+        }
+      },
       { threshold: 0 }
     );
     observer.observe(el);
