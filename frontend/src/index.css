@@ -491,12 +491,12 @@ body.modal-open {
 
 /* Corner links */
 .gpp-theme .corner-link {
-  background: #2563eb !important;
-  border-color: #1d4ed8 !important;
+  background: #87CEEB !important;
+  border-color: #7AC4E0 !important;
 }
 .gpp-theme .corner-link:hover {
-  background: #1d4ed8 !important;
-  border-color: #1e40af !important;
+  background: #7AC4E0 !important;
+  border-color: #6DBAD6 !important;
 }
 .gpp-theme .corner-link svg {
   color: #fff !important;
