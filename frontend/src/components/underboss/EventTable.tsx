@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
+import { EventCard } from './EventCard';
 import { GPP_REGIONS } from '../../types';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 
@@ -33,8 +34,8 @@ function countProgress(event: UnderbossEvent): number {
   ].filter(Boolean).length;
 }
 
-// Three-state filter button: neutral -> include -> exclude -> neutral
-function ThumbsFilter({
+// Three-state topping-style filter pill
+function FilterPill({
   label,
   state,
   onToggle,
@@ -44,29 +45,35 @@ function ThumbsFilter({
   onToggle: (newState: 'neutral' | 'include' | 'exclude') => void;
 }) {
   return (
-    <div className="flex items-center gap-1">
-      <span className="text-xs text-theme-text-muted mr-0.5">{label}</span>
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+        state === 'include'
+          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+          : state === 'exclude'
+            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+            : 'bg-theme-surface border-theme-stroke'
+      }`}
+    >
       <button
         onClick={() => onToggle(state === 'include' ? 'neutral' : 'include')}
-        className={`p-1 rounded-md transition-all ${
-          state === 'include'
-            ? 'bg-[#39d98a]/20 text-[#39d98a] ring-1 ring-[#39d98a]/40'
-            : 'text-theme-text-faint hover:text-theme-text-muted'
-        }`}
+        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
         title={`Must have ${label}`}
       >
-        <ThumbsUp size={12} />
+        <ThumbsUp
+          size={12}
+          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+        />
+        <span className="text-theme-text text-xs">{label}</span>
       </button>
       <button
         onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
-        className={`p-1 rounded-md transition-all ${
-          state === 'exclude'
-            ? 'bg-[#ff393a]/20 text-[#ff393a] ring-1 ring-[#ff393a]/40'
-            : 'text-theme-text-faint hover:text-theme-text-muted'
-        }`}
+        className="p-0.5 hover:opacity-70 transition-opacity"
         title={`Must NOT have ${label}`}
       >
-        <ThumbsDown size={12} />
+        <ThumbsDown
+          size={12}
+          className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+        />
       </button>
     </div>
   );
@@ -76,7 +83,6 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [kitFilter, setKitFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
 
   // Three-state progress filters: includes (must have) and excludes (must NOT have)
@@ -90,10 +96,8 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
   }
 
   function setFilterState(key: string, newState: 'neutral' | 'include' | 'exclude') {
-    // Remove from both lists first
     setProgressIncludes((prev) => prev.filter((k) => k !== key));
     setProgressExcludes((prev) => prev.filter((k) => k !== key));
-    // Then add to appropriate list
     if (newState === 'include') {
       setProgressIncludes((prev) => [...prev, key]);
     } else if (newState === 'exclude') {
@@ -114,15 +118,6 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
           e.address?.toLowerCase().includes(q) ||
           e.venueName?.toLowerCase().includes(q)
       );
-    }
-
-    // Kit status filter
-    if (kitFilter !== 'all') {
-      if (kitFilter === 'none') {
-        result = result.filter((e) => !e.kitStatus);
-      } else {
-        result = result.filter((e) => e.kitStatus === kitFilter);
-      }
     }
 
     // Progress includes (AND logic — event must have ALL included progress items)
@@ -167,7 +162,7 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
     });
 
     return result;
-  }, [events, search, sortField, sortDir, kitFilter, progressIncludes, progressExcludes, regionFilter, showRegion]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -195,11 +190,11 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
     );
   }
 
-  const hasActiveFilters = kitFilter !== 'all' || progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
+  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
 
   return (
     <div className="space-y-3">
-      {/* Search — uses IconInput component */}
+      {/* Search */}
       <div className="max-w-sm">
         <IconInput
           icon={Search}
@@ -212,26 +207,10 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
         />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Kit Status dropdown */}
-        <select
-          value={kitFilter}
-          onChange={(e) => setKitFilter(e.target.value)}
-          className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
-        >
-          <option value="all">Kit: All</option>
-          <option value="pending">Kit: Pending</option>
-          <option value="approved">Kit: Approved</option>
-          <option value="shipped">Kit: Shipped</option>
-          <option value="delivered">Kit: Delivered</option>
-          <option value="declined">Kit: Declined</option>
-          <option value="none">Kit: No Kit</option>
-        </select>
-
-        {/* Progress filter: thumbs up/down selectors */}
+      {/* Filters — topping-style pills */}
+      <div className="flex flex-wrap items-center gap-2">
         {PROGRESS_FILTER_KEYS.map(({ key, label }) => (
-          <ThumbsFilter
+          <FilterPill
             key={key}
             label={label}
             state={getFilterState(key)}
@@ -257,7 +236,6 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
         {hasActiveFilters && (
           <button
             onClick={() => {
-              setKitFilter('all');
               setProgressIncludes([]);
               setProgressExcludes([]);
               setRegionFilter('all');
@@ -269,8 +247,21 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
         )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-theme-stroke">
+      {/* Mobile: card list */}
+      <div className="md:hidden space-y-3">
+        {filteredEvents.length === 0 ? (
+          <div className="py-12 text-center text-theme-text-faint text-sm">
+            {search ? 'No events match your search' : 'No events in this region yet'}
+          </div>
+        ) : (
+          filteredEvents.map((event) => (
+            <EventCard key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} />
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-theme-stroke">
         <table className="w-full">
           <thead>
             <tr className="border-b border-theme-stroke bg-theme-surface">
