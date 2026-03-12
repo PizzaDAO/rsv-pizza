@@ -603,6 +603,13 @@ export const EventDetailsTab: React.FC = () => {
                     {formatTimeDisplay(startTime)} — {formatTimeDisplay(endTime)} {formatTimezoneDisplay(timezone)}
                   </div>
                 </div>
+              ) : startDate ? (
+                <div>
+                  <div className="text-theme-text font-medium">
+                    {formatDateDisplay(startDate, timezone)}
+                  </div>
+                  <div className="text-theme-text-muted text-sm mt-1">Time TBD — Click to set event time</div>
+                </div>
               ) : (
                 <div>
                   <span className="text-theme-text-secondary">No date set</span>
@@ -915,8 +922,9 @@ export const EventDetailsTab: React.FC = () => {
                     setStartDate(e.target.value);
                     if (!endDate) setEndDate(e.target.value);
                   }}
-                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  disabled={party?.eventType === 'gpp'}
+                  onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
+                  className={`flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
@@ -934,8 +942,9 @@ export const EventDetailsTab: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                  className="flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
+                  disabled={party?.eventType === 'gpp'}
+                  onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
+                  className={`flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   style={{ colorScheme: 'dark' }}
                 />
                 <TimePickerInput
