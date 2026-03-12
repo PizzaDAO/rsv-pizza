@@ -18,28 +18,14 @@ interface ShippingAddressAutocompleteProps {
   disabled?: boolean;
 }
 
-// Map country codes to display names
+// Map common country codes to display names used in the form
 const COUNTRY_MAP: Record<string, string> = {
   'US': 'USA',
-  'CA': 'Canada',
-  'MX': 'Mexico',
   'GB': 'United Kingdom',
-  'AU': 'Australia',
-  'DE': 'Germany',
-  'FR': 'France',
-  'IT': 'Italy',
-  'ES': 'Spain',
-  'NL': 'Netherlands',
-  'BE': 'Belgium',
-  'CH': 'Switzerland',
-  'AT': 'Austria',
-  'PT': 'Portugal',
-  'IE': 'Ireland',
-  'NZ': 'New Zealand',
-  'JP': 'Japan',
   'KR': 'South Korea',
-  'SG': 'Singapore',
-  'HK': 'Hong Kong',
+  'KP': 'North Korea',
+  'AE': 'United Arab Emirates',
+  'CZ': 'Czech Republic',
 };
 
 export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompleteProps> = ({

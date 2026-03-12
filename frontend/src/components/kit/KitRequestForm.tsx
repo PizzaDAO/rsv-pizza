@@ -12,29 +12,40 @@ interface KitRequestFormProps {
   kitDeadline?: string | null;
 }
 
-// Country options
-const COUNTRIES = [
-  'USA',
-  'Canada',
-  'Mexico',
-  'United Kingdom',
-  'Australia',
-  'Germany',
-  'France',
-  'Italy',
-  'Spain',
-  'Netherlands',
-  'Belgium',
-  'Switzerland',
-  'Austria',
-  'Portugal',
-  'Ireland',
-  'New Zealand',
-  'Japan',
-  'South Korea',
-  'Singapore',
-  'Hong Kong',
-  'Other',
+// Country options — full list, sorted alphabetically with common ones first
+const COMMON_COUNTRIES = [
+  'USA', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'France', 'Italy', 'Spain',
+  'Netherlands', 'Mexico', 'Brazil', 'Japan', 'South Korea', 'India', 'Singapore',
+];
+
+const ALL_COUNTRIES = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina',
+  'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados',
+  'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
+  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde',
+  'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China',
+  'Colombia', 'Comoros', 'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
+  'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador',
+  'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea',
+  'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hong Kong', 'Hungary', 'Iceland', 'India',
+  'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Ivory Coast', 'Jamaica', 'Japan',
+  'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia',
+  'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+  'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
+  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia',
+  'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands',
+  'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+  'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+  'Philippines', 'Poland', 'Portugal', 'Puerto Rico', 'Qatar', 'Romania', 'Russia', 'Rwanda',
+  'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa',
+  'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles',
+  'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia',
+  'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
+  'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste',
+  'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'USA', 'Uruguay', 'Uzbekistan',
+  'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
 ];
 
 export const KitRequestForm: React.FC<KitRequestFormProps> = ({
@@ -87,7 +98,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
     setError(null);
 
     // Validate required fields
-    if (!recipientName.trim() || !addressLine1.trim() || !city.trim() || !postalCode.trim()) {
+    if (!recipientName.trim() || !addressLine1.trim() || !city.trim() || !postalCode.trim() || !country.trim()) {
       setError('Please fill in all required fields');
       return;
     }
@@ -256,18 +267,27 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                   disabled={isDeadlinePassed}
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
                 />
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  disabled={isDeadlinePassed}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c} value={c} className="bg-theme-header">
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <input
+                    type="text"
+                    list="country-list"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="Country *"
+                    disabled={isDeadlinePassed}
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
+                  />
+                  <datalist id="country-list">
+                    <option value="" disabled>— Common —</option>
+                    {COMMON_COUNTRIES.map((c) => (
+                      <option key={`common-${c}`} value={c} />
+                    ))}
+                    <option value="" disabled>— All Countries —</option>
+                    {ALL_COUNTRIES.filter(c => !COMMON_COUNTRIES.includes(c)).map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </>
               </div>
 
               <input
