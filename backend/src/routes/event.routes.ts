@@ -158,17 +158,32 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       return rest;
     });
 
-    // Build host profile from user data
-    const hostProfile = party.user ? {
-      name: party.user.name || null,
-      avatar_url: party.user.profilePictureUrl || null,
-      website: party.user.website || null,
-      twitter: party.user.twitter || null,
-      instagram: party.user.instagram || null,
-      youtube: party.user.youtube || null,
-      tiktok: party.user.tiktok || null,
-      linkedin: party.user.linkedin || null,
-    } : null;
+    // Build host profile from user data (or PizzaDAO co-host for GPP events)
+    let hostProfile;
+    if (party.eventType === 'gpp') {
+      const pizzaCoHost = sanitizedCoHosts.find((h: any) => h.name === 'PizzaDAO');
+      hostProfile = {
+        name: 'PizzaDAO',
+        avatar_url: pizzaCoHost?.avatar_url || null,
+        website: pizzaCoHost?.website || 'https://pizzadao.org',
+        twitter: pizzaCoHost?.twitter || 'pizza_dao',
+        instagram: pizzaCoHost?.instagram || 'pizza_dao',
+        youtube: null,
+        tiktok: null,
+        linkedin: null,
+      };
+    } else {
+      hostProfile = party.user ? {
+        name: party.user.name || null,
+        avatar_url: party.user.profilePictureUrl || null,
+        website: party.user.website || null,
+        twitter: party.user.twitter || null,
+        instagram: party.user.instagram || null,
+        youtube: party.user.youtube || null,
+        tiktok: party.user.tiktok || null,
+        linkedin: party.user.linkedin || null,
+      } : null;
+    }
 
     res.json({
       event: {
