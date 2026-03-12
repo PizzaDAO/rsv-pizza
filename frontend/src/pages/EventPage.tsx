@@ -71,7 +71,7 @@ export function EventPage() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [event]);
+  }, [event, isAuthenticated]);
 
   useEffect(() => {
     async function loadEvent() {
