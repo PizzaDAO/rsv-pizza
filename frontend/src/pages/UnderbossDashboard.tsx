@@ -248,11 +248,11 @@ export function UnderbossDashboard() {
   return (
     <div className={`min-h-screen ${themeClass} relative overflow-hidden`} style={backgroundStyle}>
       {/* Floating deco */}
-      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '35%', left: '1%', width: 100, opacity: 0.4, animation: 'drift-right 16s ease-in-out infinite' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '55%', right: '1%', width: 120, opacity: 0.4, animation: 'drift-left 13s ease-in-out infinite' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '80%', left: '3%', width: 90, opacity: 0.35, animation: 'drift-right 11s ease-in-out infinite' }} />
+      <img src="/gpp-cloud-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
+      <img src="/gpp-cloud-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />
+      <img src="/gpp-cloud-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '35%', left: '1%', width: 100, opacity: 0.4, animation: 'drift-right 16s ease-in-out infinite' }} />
+      <img src="/gpp-cloud-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '55%', right: '1%', width: 120, opacity: 0.4, animation: 'drift-left 13s ease-in-out infinite' }} />
+      <img src="/gpp-cloud-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '80%', left: '3%', width: 90, opacity: 0.35, animation: 'drift-right 11s ease-in-out infinite' }} />
 
       <Helmet>
         <title>{regionLabel} Dashboard | GPP Underboss</title>

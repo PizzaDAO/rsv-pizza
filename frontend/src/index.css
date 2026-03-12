@@ -622,6 +622,16 @@ body.gpp-theme-active .pac-item-query {
   50% { transform: translateX(-50px); }
   100% { transform: translateX(0); }
 }
+
+/* GPP Cloud animations (slower, subtler than page-specific drift) */
+@keyframes cloud-drift-right {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(40px); }
+}
+@keyframes cloud-drift-left {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-40px); }
+}
 /* Drawer slide-in animation */
 @keyframes slide-in-right {
   from { transform: translateX(100%); }

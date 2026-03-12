@@ -12,6 +12,7 @@ import { getDonationStats } from '../lib/api';
 import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
 import { uuid } from '../lib/utils';
 // GPP theme applied conditionally — gppClass + body class via useEffect
+import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
 
 export function RSVPPage() {
@@ -390,6 +391,7 @@ export function RSVPPage() {
   if (!isAuthenticated && party?.has_password) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
+        {isGPP && <GPPClouds />}
         <div className="card p-8 max-w-md w-full">
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
@@ -443,6 +445,7 @@ export function RSVPPage() {
 
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
+        {isGPP && <GPPClouds />}
         <div className="card p-8 max-w-md text-center">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
             {alreadyRegistered ? (
@@ -481,6 +484,7 @@ export function RSVPPage() {
   if (step === 1) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
+        {isGPP && <GPPClouds />}
         <div className="card p-8 max-w-lg w-full relative">
           {/* Close button */}
           <button
@@ -589,6 +593,7 @@ export function RSVPPage() {
   // Step 2 - Pizza Preferences
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+      {isGPP && <GPPClouds />}
       <div className="card p-8 max-w-2xl w-full relative">
         {/* Close button */}
         <button
