@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2 } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist } from '../../lib/api';
 import { AutoCompleteStates } from '../../types';
@@ -15,6 +15,7 @@ export const GPPDashboardTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [hostsExpanded, setHostsExpanded] = useState(false);
   const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -147,9 +148,20 @@ export const GPPDashboardTab: React.FC = () => {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-theme-text">Event Setup</h3>
-          <span className="text-sm text-theme-text-muted">
-            {completedCount} of {totalCount} complete
-          </span>
+          <div className="flex items-center gap-3">
+            {completedCount > 0 && (
+              <button
+                onClick={() => setShowCompleted(prev => !prev)}
+                className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+              >
+                {showCompleted ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showCompleted ? 'Hide' : 'Show'} completed
+              </button>
+            )}
+            <span className="text-sm text-theme-text-muted">
+              {completedCount}/{totalCount}
+            </span>
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -169,7 +181,7 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-1">
-            {checklist.map((item) => {
+            {checklist.filter(item => showCompleted || !item.done).map((item) => {
               const Icon = item.icon;
               const clickable = item.tab || item.onClick;
               const Wrapper = clickable ? 'button' : 'div';
