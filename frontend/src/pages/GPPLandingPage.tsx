@@ -127,6 +127,12 @@ export function GPPLandingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!cityDataRef.current) {
+      setError('Please select a city from the dropdown suggestions.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
