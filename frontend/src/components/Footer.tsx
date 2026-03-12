@@ -9,7 +9,7 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
     <footer className={`py-6 ${className}`}>
       <div className="flex flex-col items-center gap-1">
         <a
-          href="https://pizzadao.xyz/join"
+          href="https://pizzadao.org"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:opacity-80 transition-opacity"
