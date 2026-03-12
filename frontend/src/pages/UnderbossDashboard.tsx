@@ -365,7 +365,7 @@ export function UnderbossDashboard() {
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             Events ({filteredData.events.length})
           </h2>
-          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} />
+          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} />
         </section>
         </div>
       </main>

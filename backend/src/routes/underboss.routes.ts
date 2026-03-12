@@ -422,6 +422,52 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
 });
 
 // ============================================
+// Bulk action routes (underboss auth)
+// ============================================
+
+// PATCH /api/underboss/events/bulk-approve - Bulk approve/unapprove events
+router.patch('/events/bulk-approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyIds, approved } = req.body;
+
+    if (!Array.isArray(partyIds) || partyIds.length === 0) {
+      throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await prisma.party.updateMany({
+      where: { id: { in: partyIds } },
+      data: { underbossApproved: approved },
+    });
+
+    res.json({ updated: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/underboss/events/bulk-delete - Bulk delete events
+router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyIds } = req.body;
+
+    if (!Array.isArray(partyIds) || partyIds.length === 0) {
+      throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await prisma.party.deleteMany({
+      where: { id: { in: partyIds } },
+    });
+
+    res.json({ deleted: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
 // Event PATCH routes (underboss auth)
 // ============================================
 
