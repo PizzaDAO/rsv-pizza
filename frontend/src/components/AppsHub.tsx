@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Beer,
   Store,
-  Bot,
-  Coins,
   Handshake,
   MapPin,
   Music,
@@ -15,7 +12,6 @@ import {
   Calculator,
   Package,
   Megaphone,
-  ListOrdered,
   ListChecks,
   Printer,
   UtensilsCrossed,
@@ -48,36 +44,12 @@ interface AppItem {
 const apps: AppItem[] = [
   // Live features
   {
-    id: 'beverages',
-    name: 'Beverages',
-    description: 'Track beverage preferences and recommendations',
-    icon: Beer,
-    status: 'live',
-    tab: 'pizza',
-  },
-  {
     id: 'pizzeria-selection',
-    name: 'Pizzeria Selection',
-    description: 'Find and select nearby pizzerias',
+    name: 'Pizza & Drinks',
+    description: 'Find and select nearby pizzerias for food and drinks',
     icon: Store,
     status: 'live',
     tab: 'pizza',
-  },
-  {
-    id: 'ai-phone-ordering',
-    name: 'AI Phone Ordering',
-    description: 'Call pizzerias with AI to place orders',
-    icon: Bot,
-    status: 'live',
-    tab: 'pizza',
-  },
-  {
-    id: 'nft-minting',
-    name: 'NFT Minting',
-    description: 'Attendance NFTs on Base and Monad',
-    icon: Coins,
-    status: 'live',
-    tab: 'details',
   },
 
   // Previously preview, now live
@@ -161,15 +133,6 @@ const apps: AppItem[] = [
     status: 'live',
     tab: 'promo',
   },
-  {
-    id: 'waitlist',
-    name: 'Waitlist',
-    description: 'Waitlist management for sold-out events',
-    icon: ListOrdered,
-    status: 'live',
-    tab: 'guests',
-  },
-
   {
     id: 'checklist',
     name: 'Checklist',
