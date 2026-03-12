@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
@@ -57,6 +57,21 @@ export function EventPage() {
   const [tweetError, setTweetError] = useState<string | null>(null);
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
+
+  // Sticky RSVP button on mobile: show when inline button scrolls out of view
+  const mobileRsvpRef = useRef<HTMLButtonElement>(null);
+  const [showStickyRsvp, setShowStickyRsvp] = useState(false);
+
+  useEffect(() => {
+    const el = mobileRsvpRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyRsvp(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [event]);
 
   useEffect(() => {
     async function loadEvent() {
@@ -807,6 +822,7 @@ export function EventPage() {
                       </p>
                     </div>
                     <button
+                      ref={mobileRsvpRef}
                       onClick={(e) => {
                         if (isGPP) {
                           const rect = e.currentTarget.getBoundingClientRect();
@@ -1051,6 +1067,25 @@ export function EventPage() {
               onSkip={() => setShowDonationModal(false)}
             />
           </div>
+        </div>
+      )}
+
+      {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}
+      {showStickyRsvp && (
+        <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-theme-card/95 backdrop-blur-sm border-b border-theme-stroke px-4 py-2.5">
+          <button
+            onClick={(e) => {
+              if (isGPP) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+              }
+              handleRSVP();
+            }}
+            className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+          >
+            <Pizza size={16} />
+            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+          </button>
         </div>
       )}
 
