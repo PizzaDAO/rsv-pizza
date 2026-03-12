@@ -151,6 +151,11 @@ model Party {
   // Region (for underboss dashboard)
   region  String?
 
+  // Underboss dashboard fields
+  hostStatus        String?  @map("host_status")
+  underbossApproved Boolean  @default(false) @map("underboss_approved")
+  hostTags          Json     @default("[]") @map("host_tags")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

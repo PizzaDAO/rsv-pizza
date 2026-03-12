@@ -10,7 +10,7 @@ import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 // GPP theme applied directly — Underboss dashboard is always GPP
 import { GPP_REGIONS } from '../types';
-import type { UnderbossDashboardData, UnderbossStats } from '../types';
+import type { UnderbossDashboardData, UnderbossStats, UnderbossEvent } from '../types';
 
 function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
   const totalEvents = events.length;
@@ -171,6 +171,19 @@ export function UnderbossDashboard() {
   const selectAllRegions = () => {
     setSelectedRegions([...availableRegions]);
   };
+
+  // Handle optimistic event updates from EventRow (host status, approval, tags)
+  const handleEventUpdate = useCallback((eventId: string, updates: Partial<UnderbossEvent>) => {
+    setAllData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        events: prev.events.map((e) =>
+          e.id === eventId ? { ...e, ...updates } : e
+        ),
+      };
+    });
+  }, []);
 
   // Not logged in
   if (!authLoading && !user) {
@@ -352,7 +365,7 @@ export function UnderbossDashboard() {
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             Events ({filteredData.events.length})
           </h2>
-          <EventTable events={filteredData.events} showRegion={showRegionColumn} />
+          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} />
         </section>
         </div>
       </main>

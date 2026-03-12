@@ -2168,6 +2168,39 @@ export async function fetchUnderbossDashboard(
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
 }
 
+// Update host status on an event (underboss auth)
+export async function updateHostStatus(
+  partyId: string,
+  hostStatus: 'new' | 'alum' | 'pro' | null
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/host-status`, {
+    method: 'PATCH',
+    body: { hostStatus },
+  });
+}
+
+// Toggle underboss approval on an event (underboss auth)
+export async function updateUnderbossApproval(
+  partyId: string,
+  approved: boolean
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/approve`, {
+    method: 'PATCH',
+    body: { approved },
+  });
+}
+
+// Update host tags on an event (underboss auth)
+export async function updateHostTags(
+  partyId: string,
+  tags: string[]
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/tags`, {
+    method: 'PATCH',
+    body: { tags },
+  });
+}
+
 // ============================================
 // Venue Photo API functions
 // ============================================

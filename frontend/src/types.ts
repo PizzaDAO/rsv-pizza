@@ -926,13 +926,18 @@ export const GPP_REGIONS: { id: GPPRegion; label: string }[] = [
   { id: 'oceania', label: 'Oceania' },
 ];
 
+export type HostStatus = 'new' | 'alum' | 'pro';
+
 export interface UnderbossEventProgress {
+  hasCreatedEvent: boolean;
+  hasPartyKit: boolean;
+  hasCoHosts: boolean;
   hasVenue: boolean;
   hasBudget: boolean;
-  hasPartyKit: boolean;
-  hasEventImage: boolean;
-  hasDate: boolean;
-  hasAddress: boolean;
+  hasSponsors: boolean;
+  hasPrepared: boolean;
+  hasSocialPosts: boolean;
+  hasThrown: boolean;
 }
 
 export interface UnderbossEvent {
@@ -953,6 +958,9 @@ export interface UnderbossEvent {
   kitStatus: string | null;
   fundraisingGoal: number | null;
   totalSponsored: number;
+  hostStatus: HostStatus | null;
+  underbossApproved: boolean;
+  hostTags: string[];
   createdAt: string;
 }
 

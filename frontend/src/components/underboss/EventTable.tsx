@@ -1,30 +1,105 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { GPP_REGIONS } from '../../types';
-import type { UnderbossEvent } from '../../types';
+import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 
 interface EventTableProps {
   events: UnderbossEvent[];
   showRegion?: boolean;
+  onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
 type SortDir = 'asc' | 'desc';
 
+// Filterable progress keys (skip "Event" always-true and "Prep" always-false)
+const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }[] = [
+  { key: 'hasPartyKit', label: 'Kit' },
+  { key: 'hasCoHosts', label: 'Team' },
+  { key: 'hasVenue', label: 'Venue' },
+  { key: 'hasBudget', label: 'Budget' },
+  { key: 'hasSponsors', label: 'Partners' },
+  { key: 'hasSocialPosts', label: 'Social' },
+  { key: 'hasThrown', label: 'Thrown' },
+];
+
 function countProgress(event: UnderbossEvent): number {
   const p = event.progress;
-  return [p.hasVenue, p.hasBudget, p.hasPartyKit, p.hasEventImage, p.hasDate, p.hasAddress]
-    .filter(Boolean).length;
+  return [
+    p.hasCreatedEvent, p.hasPartyKit, p.hasCoHosts, p.hasVenue,
+    p.hasBudget, p.hasSponsors, p.hasPrepared, p.hasSocialPosts, p.hasThrown,
+  ].filter(Boolean).length;
 }
 
-export function EventTable({ events, showRegion }: EventTableProps) {
+// Three-state filter button: neutral -> include -> exclude -> neutral
+function ThumbsFilter({
+  label,
+  state,
+  onToggle,
+}: {
+  label: string;
+  state: 'neutral' | 'include' | 'exclude';
+  onToggle: (newState: 'neutral' | 'include' | 'exclude') => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-xs text-theme-text-muted mr-0.5">{label}</span>
+      <button
+        onClick={() => onToggle(state === 'include' ? 'neutral' : 'include')}
+        className={`p-1 rounded-md transition-all ${
+          state === 'include'
+            ? 'bg-[#39d98a]/20 text-[#39d98a] ring-1 ring-[#39d98a]/40'
+            : 'text-theme-text-faint hover:text-theme-text-muted'
+        }`}
+        title={`Must have ${label}`}
+      >
+        <ThumbsUp size={12} />
+      </button>
+      <button
+        onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
+        className={`p-1 rounded-md transition-all ${
+          state === 'exclude'
+            ? 'bg-[#ff393a]/20 text-[#ff393a] ring-1 ring-[#ff393a]/40'
+            : 'text-theme-text-faint hover:text-theme-text-muted'
+        }`}
+        title={`Must NOT have ${label}`}
+      >
+        <ThumbsDown size={12} />
+      </button>
+    </div>
+  );
+}
+
+export function EventTable({ events, showRegion, onEventUpdate }: EventTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [kitFilter, setKitFilter] = useState<string>('all');
-  const [progressFilters, setProgressFilters] = useState<string[]>([]);
   const [regionFilter, setRegionFilter] = useState<string>('all');
+
+  // Three-state progress filters: includes (must have) and excludes (must NOT have)
+  const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
+  const [progressExcludes, setProgressExcludes] = useState<string[]>([]);
+
+  function getFilterState(key: string): 'neutral' | 'include' | 'exclude' {
+    if (progressIncludes.includes(key)) return 'include';
+    if (progressExcludes.includes(key)) return 'exclude';
+    return 'neutral';
+  }
+
+  function setFilterState(key: string, newState: 'neutral' | 'include' | 'exclude') {
+    // Remove from both lists first
+    setProgressIncludes((prev) => prev.filter((k) => k !== key));
+    setProgressExcludes((prev) => prev.filter((k) => k !== key));
+    // Then add to appropriate list
+    if (newState === 'include') {
+      setProgressIncludes((prev) => [...prev, key]);
+    } else if (newState === 'exclude') {
+      setProgressExcludes((prev) => [...prev, key]);
+    }
+  }
 
   const filteredEvents = useMemo(() => {
     let result = events;
@@ -50,10 +125,17 @@ export function EventTable({ events, showRegion }: EventTableProps) {
       }
     }
 
-    // Progress filters (AND logic — event must have ALL selected progress items)
-    if (progressFilters.length > 0) {
+    // Progress includes (AND logic — event must have ALL included progress items)
+    if (progressIncludes.length > 0) {
       result = result.filter((e) =>
-        progressFilters.every((key) => e.progress[key as keyof typeof e.progress])
+        progressIncludes.every((key) => e.progress[key as keyof typeof e.progress])
+      );
+    }
+
+    // Progress excludes (AND logic — event must NOT have ANY excluded progress items)
+    if (progressExcludes.length > 0) {
+      result = result.filter((e) =>
+        progressExcludes.every((key) => !e.progress[key as keyof typeof e.progress])
       );
     }
 
@@ -85,7 +167,7 @@ export function EventTable({ events, showRegion }: EventTableProps) {
     });
 
     return result;
-  }, [events, search, sortField, sortDir, kitFilter, progressFilters, regionFilter, showRegion]);
+  }, [events, search, sortField, sortDir, kitFilter, progressIncludes, progressExcludes, regionFilter, showRegion]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -113,17 +195,20 @@ export function EventTable({ events, showRegion }: EventTableProps) {
     );
   }
 
+  const hasActiveFilters = kitFilter !== 'all' || progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
+
   return (
     <div className="space-y-3">
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-faint" />
-        <input
+      {/* Search — uses IconInput component */}
+      <div className="max-w-sm">
+        <IconInput
+          icon={Search}
+          iconSize={14}
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
           placeholder="Search events, hosts, venues..."
-          className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-9 pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+          className="bg-theme-surface border border-theme-stroke rounded-lg pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
         />
       </div>
 
@@ -144,36 +229,17 @@ export function EventTable({ events, showRegion }: EventTableProps) {
           <option value="none">Kit: No Kit</option>
         </select>
 
-        {/* Progress filter checkboxes */}
-        {(['hasVenue', 'hasBudget', 'hasPartyKit', 'hasEventImage', 'hasDate'] as const).map((key) => {
-          const labels: Record<string, string> = {
-            hasVenue: 'Venue',
-            hasBudget: 'Budget',
-            hasPartyKit: 'Kit',
-            hasEventImage: 'Image',
-            hasDate: 'Date',
-          };
-          const isActive = progressFilters.includes(key);
-          return (
-            <button
-              key={key}
-              onClick={() => {
-                setProgressFilters((prev) =>
-                  prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]
-                );
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-red-500/20 text-red-500 border border-red-500/30'
-                  : 'bg-theme-surface text-theme-text-muted border border-theme-stroke hover:text-theme-text-secondary'
-              }`}
-            >
-              {labels[key]}
-            </button>
-          );
-        })}
+        {/* Progress filter: thumbs up/down selectors */}
+        {PROGRESS_FILTER_KEYS.map(({ key, label }) => (
+          <ThumbsFilter
+            key={key}
+            label={label}
+            state={getFilterState(key)}
+            onToggle={(newState) => setFilterState(key, newState)}
+          />
+        ))}
 
-        {/* Region filter — only when showRegion */}
+        {/* Region filter -- only when showRegion */}
         {showRegion && (
           <select
             value={regionFilter}
@@ -188,11 +254,12 @@ export function EventTable({ events, showRegion }: EventTableProps) {
         )}
 
         {/* Clear filters link */}
-        {(kitFilter !== 'all' || progressFilters.length > 0 || regionFilter !== 'all') && (
+        {hasActiveFilters && (
           <button
             onClick={() => {
               setKitFilter('all');
-              setProgressFilters([]);
+              setProgressIncludes([]);
+              setProgressExcludes([]);
               setRegionFilter('all');
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
@@ -207,6 +274,9 @@ export function EventTable({ events, showRegion }: EventTableProps) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-theme-stroke bg-theme-surface">
+              <th className="py-2 px-3 text-center w-8">
+                <span className="text-xs text-theme-text-faint uppercase tracking-wider" title="Approved">OK</span>
+              </th>
               <SortHeader field="name">Event</SortHeader>
               {showRegion && (
                 <th className="py-2 px-3 text-left">
@@ -232,13 +302,13 @@ export function EventTable({ events, showRegion }: EventTableProps) {
           <tbody>
             {filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={showRegion ? 8 : 7} className="py-12 text-center text-theme-text-faint text-sm">
+                <td colSpan={showRegion ? 9 : 8} className="py-12 text-center text-theme-text-faint text-sm">
                   {search ? 'No events match your search' : 'No events in this region yet'}
                 </td>
               </tr>
             ) : (
               filteredEvents.map((event) => (
-                <EventRow key={event.id} event={event} showRegion={showRegion} />
+                <EventRow key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} />
               ))
             )}
           </tbody>
