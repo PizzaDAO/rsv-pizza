@@ -740,7 +740,7 @@ export function EventPage() {
                             }
                             handleRSVP();
                           }}
-                          className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5 shrink-0"
+                          className="btn-primary flex items-center justify-center gap-2 text-sm py-2.5 flex-1"
                         >
                           <Pizza size={16} />
                           {userHasRSVPd ? "Edit RSVP" : "RSVP"}
@@ -814,7 +814,7 @@ export function EventPage() {
                         }
                         handleRSVP();
                       }}
-                      className="btn-primary flex items-center gap-2 text-sm px-4 py-2 shrink-0"
+                      className="btn-primary flex items-center justify-center gap-2 text-sm py-2 flex-1"
                     >
                       <Pizza size={16} />
                       {userHasRSVPd ? "Edit RSVP" : "RSVP"}
