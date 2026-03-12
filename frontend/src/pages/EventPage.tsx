@@ -718,11 +718,11 @@ export function EventPage() {
                 {/* Desktop: Date, Location, and Map Thumbnail */}
                 <div className="hidden md:flex items-start gap-4">
                   <div className="flex-1 space-y-3">
-                    {/* Date & Time */}
+                    {/* Date & Time + RSVP button */}
                     {event.date && (
                       <div className="flex items-start gap-3">
                         <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
-                        <div>
+                        <div className="flex-1">
                           <p className="text-lg font-medium text-theme-text">
                             {formattedDate}
                           </p>
@@ -732,6 +732,19 @@ export function EventPage() {
                             {timezoneAbbr && ` ${timezoneAbbr}`}
                           </p>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            if (isGPP) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                            }
+                            handleRSVP();
+                          }}
+                          className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5 shrink-0"
+                        >
+                          <Pizza size={16} />
+                          {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                        </button>
                       </div>
                     )}
 
@@ -779,11 +792,11 @@ export function EventPage() {
                   )}
                 </div>
 
-                {/* Mobile: Date & Time */}
+                {/* Mobile: Date & Time + RSVP button */}
                 {event.date && (
                   <div className="md:hidden flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-lg font-medium text-theme-text">
                         {formattedDate}
                       </p>
@@ -793,6 +806,19 @@ export function EventPage() {
                         {timezoneAbbr && ` ${timezoneAbbr}`}
                       </p>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        if (isGPP) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }
+                        handleRSVP();
+                      }}
+                      className="btn-primary flex items-center gap-2 text-sm px-4 py-2 shrink-0"
+                    >
+                      <Pizza size={16} />
+                      {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                    </button>
                   </div>
                 )}
 
@@ -814,27 +840,29 @@ export function EventPage() {
                   </a>
                 )}
 
-                {/* RSVP Button */}
-                <div className="pt-4">
-                  <button
-                    onClick={(e) => {
-                      if (isGPP) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                      }
-                      handleRSVP();
-                    }}
-                    className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
-                  >
-                    <Pizza size={20} />
-                    {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-                  </button>
-                  {event.rsvpClosedAt && (
-                    <p className="text-center text-theme-text-muted text-sm mt-3">
-                      RSVPs are closed for this event
-                    </p>
-                  )}
-                </div>
+                {/* RSVP button fallback when no date */}
+                {!event.date && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={(e) => {
+                        if (isGPP) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }
+                        handleRSVP();
+                      }}
+                      className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5"
+                    >
+                      <Pizza size={16} />
+                      {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                    </button>
+                  </div>
+                )}
+                {event.rsvpClosedAt && (
+                  <p className="text-theme-text-muted text-sm">
+                    RSVPs are closed for this event
+                  </p>
+                )}
 
                 {/* Guest Count - Mobile */}
                 {!event.hideGuests && (
