@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
 import { CornerLinks } from '../components/CornerLinks';
+import { GPPClouds } from '../components/GPPClouds';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -332,15 +333,8 @@ export function GPPLandingPage() {
       onClick={(e) => fireClickConfetti(e.clientX, e.clientY)}
     >
       {ConfettiOverlay}
-      {/* ─── Decorative pizza vectors ─── */}
-      <img src="/gpp-cloud-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '8%', right: '-4%', width: 300, animation: 'drift-right 14s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '3%', left: '-2%', width: 160, animation: 'drift-left 12s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '22%', left: '6%', width: 100, animation: 'drift-right 16s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '48%', left: '-5%', width: 260, scaleX: -1, animation: 'drift-left 13s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '42%', right: '3%', width: 130, animation: 'drift-right 10s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '65%', right: '8%', width: 110, animation: 'drift-left 15s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-2.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '75%', left: '2%', width: 90, animation: 'drift-right 11s ease-in-out infinite' }} />
-      <img src="/gpp-cloud-3.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '88%', right: '-2%', width: 140, animation: 'drift-left 17s ease-in-out infinite' }} />
+      {/* ─── Decorative clouds (shared component) ─── */}
+      <GPPClouds />
 
       <Helmet>
         <title>Host a Global Pizza Party | RSV.Pizza</title>
@@ -629,18 +623,6 @@ export function GPPLandingPage() {
 
       {/* ─── SCOPED LIGHT-THEME OVERRIDES ─── */}
       <style>{`
-        /* Drifting animation for decorative pizza vectors */
-        @keyframes drift-right {
-          0% { transform: translateX(0); }
-          50% { transform: translateX(50px); }
-          100% { transform: translateX(0); }
-        }
-        @keyframes drift-left {
-          0% { transform: translateX(0); }
-          50% { transform: translateX(-50px); }
-          100% { transform: translateX(0); }
-        }
-
         /* Confetti burst animation */
         @keyframes confetti-fly {
           0% {
