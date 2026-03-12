@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { GPP_REGIONS } from '../../types';
-import { updateHostStatus, updateUnderbossApproval, updateHostTags } from '../../lib/api';
+import { updateHostStatus, updateHostTags } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface EventCardProps {
   event: UnderbossEvent;
   showRegion?: boolean;
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): { text: string; isPast: boolean } {
@@ -216,45 +218,35 @@ function HostTagsPills({
   );
 }
 
-export function EventCard({ event, showRegion, onEventUpdate }: EventCardProps) {
+export function EventCard({ event, showRegion, onEventUpdate, isSelected, onToggleSelect }: EventCardProps) {
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
-  const [approved, setApproved] = useState(event.underbossApproved);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
 
   const eventUrl = event.customUrl ? `https://rsv.pizza/${event.customUrl}` : null;
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
 
-  async function toggleApproval() {
-    const newVal = !approved;
-    setApproved(newVal);
-    onEventUpdate?.(event.id, { underbossApproved: newVal });
-    try {
-      await updateUnderbossApproval(event.id, newVal);
-    } catch {
-      setApproved(!newVal);
-      onEventUpdate?.(event.id, { underbossApproved: !newVal });
-    }
-  }
-
   return (
     <div className="rounded-lg p-4 bg-theme-surface border border-theme-stroke transition-colors">
-      {/* Top row: approval + event name + link */}
+      {/* Top row: selection checkbox + event name + link */}
       <div className="flex items-start gap-3">
         <button
-          onClick={toggleApproval}
+          onClick={() => onToggleSelect?.(event.id)}
           className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${
-            approved
-              ? 'bg-green-500/20 border-green-500/40 text-green-400'
+            isSelected
+              ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
               : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
           }`}
-          title={approved ? 'Approved' : 'Not approved'}
+          title="Select event"
         >
           <Check size={12} />
         </button>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            {event.underbossApproved && (
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+            )}
             <span className="text-sm font-medium text-theme-text truncate">{event.name}</span>
             {eventUrl && (
               <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0">
