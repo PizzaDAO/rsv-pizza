@@ -50,7 +50,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    const hostName = party.user?.name || null;
+    const hostName = party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null);
 
     // Count confirmed guests (CONFIRMED or PENDING status)
     const confirmedCount = party.guests.filter(

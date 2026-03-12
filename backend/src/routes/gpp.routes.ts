@@ -284,15 +284,15 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         coHosts: [
           {
             id: crypto.randomUUID(),
-            name: normalizedHostName,
-            email: normalizedEmail,
+            name: 'PizzaDAO',
+            email: 'hello@rarepizzas.com',
             showOnEvent: true
           },
           {
             id: crypto.randomUUID(),
-            name: 'PizzaDAO',
-            email: 'hello@rarepizzas.com',
-            showOnEvent: true
+            name: normalizedHostName,
+            email: normalizedEmail,
+            showOnEvent: false
           }
         ],
         userId: user.id,
@@ -430,7 +430,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     res.json({
       events: events.map(event => ({
         ...event,
-        hostName: event.user?.name || null,
+        hostName: 'PizzaDAO',
         guestCount: event._count.guests,
         user: undefined,
         _count: undefined,

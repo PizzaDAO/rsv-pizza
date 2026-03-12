@@ -208,7 +208,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         photosEnabled: party.photosEnabled,
         photosPublic: party.photosPublic,
         hasPassword: !!party.password,
-        hostName: party.user?.name || null,
+        hostName: party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         hostProfile,
         guestCount: party._count.guests,
         userId: party.userId,

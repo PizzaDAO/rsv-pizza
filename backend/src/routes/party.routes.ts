@@ -104,7 +104,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Map to include hostName from user for backwards compatibility
     const partiesWithHost = parties.map(party => ({
       ...party,
-      hostName: party.user?.name || null,
+      hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
       user: undefined, // Remove user object from response
     }));
 
@@ -213,7 +213,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     res.status(201).json({
       party: {
         ...party,
-        hostName: party.user?.name || null,
+        hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
       }
     });
@@ -263,7 +263,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       party: {
         ...party,
         coHosts: enrichedCoHosts,
-        hostName: party.user?.name || null,
+        hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
       }
     });
@@ -359,7 +359,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     res.json({
       party: {
         ...party,
-        hostName: party.user?.name || null,
+        hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
       }
     });
