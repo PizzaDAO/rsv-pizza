@@ -491,12 +491,18 @@ body.modal-open {
 
 /* Corner links */
 .gpp-theme .corner-link {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  background: #2563eb !important;
+  border-color: #1d4ed8 !important;
 }
 .gpp-theme .corner-link:hover {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: #E52828 !important;
+  background: #1d4ed8 !important;
+  border-color: #1e40af !important;
+}
+.gpp-theme .corner-link svg {
+  color: #fff !important;
+}
+.gpp-theme .corner-link img {
+  filter: brightness(10) !important;
 }
 
 /* Google Maps Autocomplete light mode */
