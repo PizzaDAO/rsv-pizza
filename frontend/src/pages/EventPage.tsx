@@ -12,6 +12,7 @@ import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { CornerLinks } from '../components/CornerLinks';
+import { GPPClouds } from '../components/GPPClouds';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { RSVPModal } from '../components/RSVPModal';
@@ -436,6 +437,7 @@ export function EventPage() {
       style={backgroundStyle}
       onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}
     >
+      {isGPP && <GPPClouds />}
       <Helmet>
         {/* Primary Meta Tags */}
         <title>{metaTitle} | RSV.Pizza</title>
