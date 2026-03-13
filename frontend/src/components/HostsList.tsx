@@ -247,7 +247,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
   return (
     <div className="flex items-center gap-3">
       {/* Overlapping avatars */}
-      <div className="flex items-center flex-shrink-0" style={{ marginLeft: '8px' }}>
+      <div className="flex items-center" style={{ marginLeft: '8px' }}>
         {/* Primary host avatar */}
         {displayHostName && (
           hostProfile?.avatar_url ? (
