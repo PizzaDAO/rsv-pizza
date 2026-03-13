@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Search, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { VenueCreateData } from '../../lib/api';
@@ -303,7 +304,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
         className="bg-theme-header border border-theme-stroke rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
@@ -545,6 +546,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
