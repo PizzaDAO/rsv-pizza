@@ -58,22 +58,23 @@ export function EventPage() {
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
 
-  // Sticky RSVP button on mobile: show only after user scrolls past the inline button
+  // Sticky RSVP button on mobile: show when the inline button is scrolled above the viewport
   const mobileRsvpRef = useRef<HTMLButtonElement>(null);
-  const hasBeenVisible = useRef(false);
   const [showStickyRsvp, setShowStickyRsvp] = useState(false);
 
   useEffect(() => {
     const el = mobileRsvpRef.current;
     if (!el) return;
-    hasBeenVisible.current = false;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          hasBeenVisible.current = true;
+          // Button is visible in the viewport — hide sticky
           setShowStickyRsvp(false);
-        } else if (hasBeenVisible.current) {
-          setShowStickyRsvp(true);
+        } else {
+          // Button is not visible — only show sticky if button is ABOVE viewport
+          // (i.e. user scrolled past it), not when it's still below the fold
+          const isAboveViewport = entry.boundingClientRect.bottom < 0;
+          setShowStickyRsvp(isAboveViewport);
         }
       },
       { threshold: 0 }
