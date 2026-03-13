@@ -67,7 +67,25 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
           return;
         }
 
-        // Create script tag
+        // Check if another component already added the script tag
+        const existingScript = document.querySelector(
+          'script[src*="maps.googleapis.com/maps/api/js"]'
+        );
+
+        if (existingScript) {
+          // Script tag exists but hasn't finished loading yet — wait for it
+          const waitForMaps = () => {
+            if (window.google?.maps?.places) {
+              initAutocomplete();
+            } else {
+              setTimeout(waitForMaps, 100);
+            }
+          };
+          waitForMaps();
+          return;
+        }
+
+        // No script tag exists — create one
         const script = document.createElement('script');
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
         script.async = true;
@@ -105,21 +123,29 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
       let streetNumber = '';
       let route = '';
 
+      // Use individual if statements (not else-if) so each component type
+      // is checked independently — prevents skipping country when a
+      // component carries multiple types
       for (const component of place.address_components) {
         const types = component.types;
 
         if (types.includes('street_number')) {
           streetNumber = component.long_name;
-        } else if (types.includes('route')) {
+        }
+        if (types.includes('route')) {
           route = component.long_name;
-        } else if (types.includes('locality') || types.includes('postal_town')) {
+        }
+        if (types.includes('locality') || types.includes('postal_town')) {
           components.city = component.long_name;
-        } else if (types.includes('administrative_area_level_1')) {
+        }
+        if (types.includes('administrative_area_level_1')) {
           components.state = component.short_name;
-        } else if (types.includes('postal_code')) {
+        }
+        if (types.includes('postal_code')) {
           components.postalCode = component.long_name;
-        } else if (types.includes('country')) {
-          // Map country code to display name
+        }
+        if (types.includes('country')) {
+          // Map country code to display name matching the form's country list
           const countryCode = component.short_name;
           components.country = COUNTRY_MAP[countryCode] || component.long_name;
         }
