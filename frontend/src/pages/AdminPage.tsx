@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Layout } from '../components/Layout';
+import { Header } from '../components/Header';
+import { Footer } from '../components/Footer';
+import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe,
+  Mail, User, Globe, Check, X, Pencil,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -12,7 +14,9 @@ import {
 } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin } from '../types';
-import { Check, X, Pencil } from 'lucide-react';
+
+const themeClass = 'gpp-theme';
+const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
 
 export function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -42,6 +46,12 @@ export function AdminPage() {
   const [savingRegions, setSavingRegions] = useState(false);
 
   const isSuperAdmin = currentRole === 'super_admin';
+
+  // Set body class for elements outside React tree
+  useEffect(() => {
+    document.body.classList.add('gpp-theme-active');
+    return () => { document.body.classList.remove('gpp-theme-active'); };
+  }, []);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -174,44 +184,44 @@ export function AdminPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+        <Header />
+        <div className="flex items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-theme-text-muted" />
         </div>
-      </Layout>
+        <Footer />
+      </div>
     );
   }
 
   if (!isAdminUser || error) {
     return (
-      <Layout>
-        <div className="min-h-screen flex flex-col items-center justify-center px-4">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+        <Header />
+        <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-red-400/60 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
           <p className="text-theme-text-muted text-center max-w-md">
             {error || 'You do not have admin access. Please log in with an admin account.'}
           </p>
         </div>
-      </Layout>
+        <Footer />
+      </div>
     );
   }
 
   return (
-    <Layout className="relative overflow-hidden">
-      {/* Floating deco */}
-      <img src="/gpp-deco-1.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '5%', right: '-4%', width: 280, opacity: 0.5, animation: 'drift-right 14s ease-in-out infinite' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '2%', left: '-2%', width: 150, opacity: 0.5, animation: 'drift-left 12s ease-in-out infinite' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '40%', left: '2%', width: 100, opacity: 0.4, animation: 'drift-right 16s ease-in-out infinite' }} />
-      <img src="/gpp-deco-2.png" alt="" className="absolute pointer-events-none select-none hidden md:block" style={{ top: '60%', right: '1%', width: 120, opacity: 0.4, animation: 'drift-left 13s ease-in-out infinite' }} />
-      <img src="/gpp-deco-3.png" alt="" className="absolute pointer-events-none select-none" style={{ top: '80%', left: '4%', width: 90, opacity: 0.35, animation: 'drift-right 11s ease-in-out infinite' }} />
+    <div className={`min-h-screen ${themeClass} relative overflow-hidden`} style={backgroundStyle}>
+      <GPPClouds />
 
-      <div className="min-h-screen relative z-10">
-        <Helmet>
-          <title>Admin | RSV.Pizza</title>
-        </Helmet>
+      <Helmet>
+        <title>Admin | RSV.Pizza</title>
+      </Helmet>
 
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-          <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
+      <Header />
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+        <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
               <ShieldCheck size={20} className="text-red-500" />
@@ -509,9 +519,10 @@ export function AdminPage() {
               </table>
             </div>
           </section>
-          </div>
-        </main>
-      </div>
-    </Layout>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
   );
 }
