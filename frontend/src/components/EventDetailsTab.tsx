@@ -912,9 +912,12 @@ export const EventDetailsTab: React.FC = () => {
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
 
             <div className="space-y-3">
-              {/* Start */}
-              <div className="flex items-center gap-2">
-                <Play size={18} className="text-theme-text-muted flex-shrink-0" />
+              {/* Start Date */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Play size={14} className="text-theme-text-muted" />
+                  <span className="text-xs text-theme-text-muted">Start Date</span>
+                </div>
                 <input
                   type="date"
                   value={startDate}
@@ -924,34 +927,47 @@ export const EventDetailsTab: React.FC = () => {
                   }}
                   disabled={party?.eventType === 'gpp'}
                   onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
-                  className={`flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   style={{ colorScheme: 'dark' }}
                 />
+              </div>
+
+              {/* Start Time */}
+              <div>
+                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">Start Time</span>
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
                   placeholder="12:00 PM"
-                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
-              {/* End */}
-              <div className="flex items-center gap-2">
-                <SquareIcon size={16} className="text-theme-text-muted flex-shrink-0" />
+              {/* End Date */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <SquareIcon size={12} className="text-theme-text-muted" />
+                  <span className="text-xs text-theme-text-muted">End Date</span>
+                </div>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   disabled={party?.eventType === 'gpp'}
                   onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
-                  className={`flex-1 min-w-0 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   style={{ colorScheme: 'dark' }}
                 />
+              </div>
+
+              {/* End Time */}
+              <div>
+                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">End Time</span>
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
                   placeholder="1:00 PM"
-                  className="w-28 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
 
