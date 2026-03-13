@@ -70,7 +70,8 @@ export function EventPage() {
 
     let ticking = false;
     const check = () => {
-      setShowStickyRsvp(el.getBoundingClientRect().bottom < 0);
+      const rect = el.getBoundingClientRect();
+      setShowStickyRsvp(rect.top < 0);
       ticking = false;
     };
 
