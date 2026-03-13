@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
 import { IconInput } from './IconInput';
@@ -868,7 +869,7 @@ export const EventDetailsTab: React.FC = () => {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-theme-text mb-3">Cancel Event?</h2>
@@ -902,11 +903,12 @@ export const EventDetailsTab: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Mobile Date/Time Modal */}
-      {showDateTimeModal && (
+      {showDateTimeModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
@@ -984,11 +986,12 @@ export const EventDetailsTab: React.FC = () => {
               )}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Image Modal */}
-      {showImageModal && (
+      {showImageModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowImageModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Image</h2>
@@ -1082,11 +1085,12 @@ export const EventDetailsTab: React.FC = () => {
               )}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Description Modal */}
-      {showDescriptionModal && (
+      {showDescriptionModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Description</h2>
@@ -1118,7 +1122,8 @@ export const EventDetailsTab: React.FC = () => {
               )}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

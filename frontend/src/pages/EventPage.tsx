@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
@@ -508,7 +509,7 @@ export function EventPage() {
       <Header variant="transparent" />
 
       {/* Edit Password Prompt Modal */}
-      {showEditPasswordPrompt && (
+      {showEditPasswordPrompt && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-8 max-w-md w-full">
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
@@ -562,7 +563,8 @@ export function EventPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* RSVP Modal */}
@@ -1043,7 +1045,7 @@ export function EventPage() {
       </div>
 
       {/* Donation Modal */}
-      {showDonationModal && (
+      {showDonationModal && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setShowDonationModal(false)}
@@ -1056,7 +1058,8 @@ export function EventPage() {
               onSkip={() => setShowDonationModal(false)}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}

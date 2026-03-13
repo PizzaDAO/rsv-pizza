@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
@@ -519,7 +520,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* Add Custom Pizzeria Modal */}
-      {showAddPizzeriaModal && (
+      {showAddPizzeriaModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-sm" onClick={resetModal}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -670,7 +671,8 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* AI Order Checkout Modal */}
@@ -685,7 +687,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* AI Call Complete Modal */}
-      {orderComplete && (
+      {orderComplete && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
             <div className="text-center mb-4">
@@ -710,7 +712,8 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
               Close
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

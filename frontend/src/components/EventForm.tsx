@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { TimePickerInput } from './TimePickerInput';
 import { TimezonePickerInput } from './TimezonePickerInput';
@@ -579,7 +580,7 @@ export function EventForm() {
       </form>
 
       {/* Mobile Date/Time Modal */}
-      {showDateTimeModal && (
+      {showDateTimeModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
@@ -640,7 +641,8 @@ export function EventForm() {
               Done
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <LoginModal

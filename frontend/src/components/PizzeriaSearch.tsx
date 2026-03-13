@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Pizzeria, OrderingOption } from '../types';
 import {
   searchPizzerias,
@@ -278,7 +279,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
       )}
 
       {/* View All Modal */}
-      {showAllModal && (
+      {showAllModal && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
           onClick={() => setShowAllModal(false)}
@@ -303,7 +304,8 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
               {pizzerias.map((pizzeria) => renderPizzeriaCard(pizzeria, googleMapsApiKey, rankings.find(r => r.id === pizzeria.id)))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

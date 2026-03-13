@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
 import { Header } from '../components/Header';
@@ -373,7 +374,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Add Underboss Modal */}
-      {showAddUnderboss && (
+      {showAddUnderboss && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUnderboss(false)}>
           <div className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -461,7 +462,8 @@ export function UnderbossDashboard() {
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

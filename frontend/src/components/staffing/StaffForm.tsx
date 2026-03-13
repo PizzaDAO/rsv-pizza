@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, User, Mail, Phone, FileText, Briefcase, DollarSign, Clock } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Staff, StaffStatus } from '../../types';
@@ -115,7 +116,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
     (r) => r.toLowerCase().includes(role.toLowerCase()) && r.toLowerCase() !== role.toLowerCase()
   );
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
@@ -316,6 +317,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

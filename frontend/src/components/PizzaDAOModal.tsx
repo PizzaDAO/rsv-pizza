@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2 } from 'lucide-react';
 
 interface PizzaDAOModalProps {
@@ -32,7 +33,7 @@ export function PizzaDAOModal({ isOpen, onClose }: PizzaDAOModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
@@ -65,6 +66,7 @@ export function PizzaDAOModal({ isOpen, onClose }: PizzaDAOModalProps) {
           allow="autoplay"
         />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

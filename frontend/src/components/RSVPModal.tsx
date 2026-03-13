@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -466,7 +467,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       return <Check className="w-8 h-8 text-[#39d98a]" />;
     };
 
-    return (
+    return createPortal(
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
@@ -586,13 +587,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             Close
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // Step 1 - Personal Info
   if (step === 1) {
-    return (
+    return createPortal(
       <div
         className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
@@ -736,12 +738,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </form>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // Step 2 - Pizza Preferences
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onClick={handleClose}
@@ -1031,6 +1034,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

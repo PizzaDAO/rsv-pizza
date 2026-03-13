@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
@@ -338,7 +339,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: 
       )}
 
       {/* Delete confirmation modal */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
           <div className="bg-theme-card border border-theme-stroke rounded-xl p-6 max-w-sm mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-theme-text mb-2">Cancel Events?</h3>
@@ -366,7 +367,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: 
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Mobile: card list */}

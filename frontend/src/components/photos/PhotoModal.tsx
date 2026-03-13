@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Photo } from '../../types';
 
@@ -105,7 +106,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
 
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
       onClick={onClose}
@@ -363,6 +364,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
