@@ -58,29 +58,39 @@ export function EventPage() {
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
 
-  // Sticky RSVP button on mobile: show when the inline button is scrolled above the viewport
+  // Sticky RSVP button on mobile: show when inline button is scrolled above the viewport.
+  // Uses a scroll listener instead of IntersectionObserver because IO won't fire when an
+  // element moves between two non-intersecting states (below-fold to above-fold on fast scroll).
   const mobileRsvpRef = useRef<HTMLButtonElement>(null);
   const [showStickyRsvp, setShowStickyRsvp] = useState(false);
 
   useEffect(() => {
     const el = mobileRsvpRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          // Button is visible in the viewport — hide sticky
-          setShowStickyRsvp(false);
-        } else {
-          // Button is not visible — only show sticky if button is ABOVE viewport
-          // (i.e. user scrolled past it), not when it's still below the fold
-          const isAboveViewport = entry.boundingClientRect.bottom < 0;
-          setShowStickyRsvp(isAboveViewport);
-        }
-      },
-      { threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+
+    const checkButtonPosition = () => {
+      const rect = el.getBoundingClientRect();
+      // Show sticky bar only when the button has been scrolled above the viewport
+      setShowStickyRsvp(rect.bottom < 0);
+    };
+
+    // Use passive scroll listener with requestAnimationFrame for performance
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          checkButtonPosition();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Check initial position in case the page loaded already scrolled
+    checkButtonPosition();
+
+    return () => window.removeEventListener('scroll', onScroll);
   }, [event, isAuthenticated]);
 
   useEffect(() => {
