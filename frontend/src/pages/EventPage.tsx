@@ -69,20 +69,24 @@ export function EventPage() {
     const el = mobileRsvpRef.current;
     if (!el) return;
 
-    let rafId: number;
-    let lastState = false;
-
+    let ticking = false;
     const check = () => {
-      const shouldShow = el.getBoundingClientRect().bottom < 0;
-      if (shouldShow !== lastState) {
-        lastState = shouldShow;
-        setShowStickyRsvp(shouldShow);
-      }
-      rafId = requestAnimationFrame(check);
+      const rect = el.getBoundingClientRect();
+      setShowStickyRsvp(rect.top < 0);
+      ticking = false;
     };
 
-    rafId = requestAnimationFrame(check);
-    return () => cancelAnimationFrame(rafId);
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(check);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    check(); // initial check
+
+    return () => window.removeEventListener('scroll', onScroll);
   }, [event, isAuthenticated]);
 
   useEffect(() => {
