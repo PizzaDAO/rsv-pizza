@@ -68,29 +68,20 @@ export function EventPage() {
     const el = mobileRsvpRef.current;
     if (!el) return;
 
-    const checkButtonPosition = () => {
-      const rect = el.getBoundingClientRect();
-      // Show sticky bar only when the button has been scrolled above the viewport
-      setShowStickyRsvp(rect.bottom < 0);
-    };
+    let rafId: number;
+    let lastState = false;
 
-    // Use passive scroll listener with requestAnimationFrame for performance
-    let ticking = false;
-    const onScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          checkButtonPosition();
-          ticking = false;
-        });
-        ticking = true;
+    const check = () => {
+      const shouldShow = el.getBoundingClientRect().bottom < 0;
+      if (shouldShow !== lastState) {
+        lastState = shouldShow;
+        setShowStickyRsvp(shouldShow);
       }
+      rafId = requestAnimationFrame(check);
     };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    // Check initial position in case the page loaded already scrolled
-    checkButtonPosition();
-
-    return () => window.removeEventListener('scroll', onScroll);
+    rafId = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafId);
   }, [event, isAuthenticated]);
 
   useEffect(() => {
