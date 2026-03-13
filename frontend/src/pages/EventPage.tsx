@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
@@ -58,6 +58,32 @@ export function EventPage() {
   const [tweetError, setTweetError] = useState<string | null>(null);
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
+
+  // Sticky RSVP button on mobile: show when inline button is scrolled above the viewport.
+  // Uses a scroll listener instead of IntersectionObserver because IO won't fire when an
+  // element moves between two non-intersecting states (below-fold to above-fold on fast scroll).
+  const mobileRsvpRef = useRef<HTMLButtonElement>(null);
+  const [showStickyRsvp, setShowStickyRsvp] = useState(false);
+
+  useEffect(() => {
+    const el = mobileRsvpRef.current;
+    if (!el) return;
+
+    let rafId: number;
+    let lastState = false;
+
+    const check = () => {
+      const shouldShow = el.getBoundingClientRect().bottom < 0;
+      if (shouldShow !== lastState) {
+        lastState = shouldShow;
+        setShowStickyRsvp(shouldShow);
+      }
+      rafId = requestAnimationFrame(check);
+    };
+
+    rafId = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafId);
+  }, [event, isAuthenticated]);
 
   useEffect(() => {
     async function loadEvent() {
@@ -724,7 +750,7 @@ export function EventPage() {
                     {event.date && (
                       <div className="flex items-start gap-3">
                         <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
-                        <div>
+                        <div className="flex-1">
                           <p className="text-lg font-medium text-theme-text">
                             {formattedDate}
                           </p>
@@ -785,7 +811,7 @@ export function EventPage() {
                 {event.date && (
                   <div className="md:hidden flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-lg font-medium text-theme-text">
                         {formattedDate}
                       </p>
@@ -819,6 +845,7 @@ export function EventPage() {
                 {/* RSVP Button */}
                 <div className="pt-4">
                   <button
+                    ref={mobileRsvpRef}
                     onClick={(e) => {
                       if (isGPP) {
                         const rect = e.currentTarget.getBoundingClientRect();
@@ -826,17 +853,17 @@ export function EventPage() {
                       }
                       handleRSVP();
                     }}
-                    className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                    className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
                     <Pizza size={20} />
                     {userHasRSVPd ? "Edit RSVP" : "RSVP"}
                   </button>
-                  {event.rsvpClosedAt && (
-                    <p className="text-center text-theme-text-muted text-sm mt-3">
-                      RSVPs are closed for this event
-                    </p>
-                  )}
                 </div>
+                {event.rsvpClosedAt && (
+                  <p className="text-theme-text-muted text-sm">
+                    RSVPs are closed for this event
+                  </p>
+                )}
 
                 {/* Guest Count - Mobile */}
                 {!event.hideGuests && (
@@ -1025,6 +1052,25 @@ export function EventPage() {
               onSkip={() => setShowDonationModal(false)}
             />
           </div>
+        </div>
+      )}
+
+      {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}
+      {showStickyRsvp && (
+        <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-theme-card/95 backdrop-blur-sm border-b border-theme-stroke px-4 py-2.5">
+          <button
+            onClick={(e) => {
+              if (isGPP) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+              }
+              handleRSVP();
+            }}
+            className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+          >
+            <Pizza size={16} />
+            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+          </button>
         </div>
       )}
 
