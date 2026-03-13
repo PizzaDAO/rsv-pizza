@@ -81,16 +81,37 @@ async function requireUnderbossAuth(
 }
 
 // Helper: compute progress for an event (9 items matching GPP host dashboard)
-function computeProgress(party: any) {
+function computeProgress(party: any, underbossEmails: string[] = []) {
   const coHosts = Array.isArray(party.coHosts) ? party.coHosts : [];
   const sponsors = Array.isArray(party.sponsors) ? party.sponsors : [];
   const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
   const eventPassed = party.date ? new Date(party.date) < new Date() : false;
 
+  // Filter out system co-hosts (PizzaDAO, the host, underbosses)
+  const hostEmail = (party.user?.email || '').toLowerCase();
+  const hostName = (party.user?.name || '').toLowerCase();
+
+  const realCoHosts = coHosts.filter((h: any) => {
+    const email = (h.email || '').toLowerCase();
+    const name = (h.name || '').toLowerCase();
+
+    // Exclude PizzaDAO
+    if (name === 'pizzadao' || email === 'hello@rarepizzas.com') return false;
+
+    // Exclude the host themselves
+    if (hostEmail && email === hostEmail) return false;
+    if (hostName && name === hostName && !email) return false;
+
+    // Exclude underbosses
+    if (email && underbossEmails.includes(email)) return false;
+
+    return true;
+  });
+
   return {
     hasCreatedEvent: true,
     hasPartyKit: !!party.partyKit,
-    hasCoHosts: coHosts.length > 0,
+    hasCoHosts: realCoHosts.length > 0,
     hasVenue: !!(party.venueName || party.address),
     hasBudget: !!(party.budgetEnabled && party.budgetTotal),
     hasSponsors: sponsors.length > 0,
@@ -101,7 +122,7 @@ function computeProgress(party: any) {
 }
 
 // Helper: compute stats from events
-function computeStats(events: any[]) {
+function computeStats(events: any[], underbossEmails: string[] = []) {
   const totalEvents = events.length;
   let totalRsvps = 0;
   let totalApproved = 0;
@@ -116,7 +137,7 @@ function computeStats(events: any[]) {
     totalRsvps += guestCount;
     totalApproved += approvedCount;
 
-    const progress = computeProgress(event);
+    const progress = computeProgress(event, underbossEmails);
     if (progress.hasVenue) eventsWithVenue++;
     if (progress.hasBudget) eventsWithBudget++;
     if (progress.hasPartyKit) eventsWithKit++;
@@ -139,7 +160,7 @@ function computeStats(events: any[]) {
 }
 
 // Helper: format event for response
-function formatEvent(party: any) {
+function formatEvent(party: any, underbossEmails: string[] = []) {
   const guestCount = party._count?.guests || 0;
   const approvedCount = party.guests?.filter((g: any) => g.approved !== false).length || 0;
   const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
@@ -166,7 +187,7 @@ function formatEvent(party: any) {
       email: party.user?.email || null,
     },
     coHosts: party.coHosts || [],
-    progress: computeProgress(party),
+    progress: computeProgress(party, underbossEmails),
     guestCount,
     approvedCount,
     checkedInCount,
@@ -282,8 +303,15 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       orderBy: { date: 'asc' },
     });
 
-    const stats = computeStats(events);
-    const formattedEvents = events.map(formatEvent);
+    // Get all underboss emails for co-host filtering
+    const allUnderbosses = await prisma.underboss.findMany({
+      where: { isActive: true },
+      select: { email: true },
+    });
+    const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
+
+    const stats = computeStats(events, ubEmails);
+    const formattedEvents = events.map(e => formatEvent(e, ubEmails));
 
     res.json({
       region,
@@ -308,7 +336,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
-    const [events, total] = await Promise.all([
+    const [events, total, allUnderbosses] = await Promise.all([
       prisma.party.findMany({
         where: { region, eventType: 'gpp' },
         include: {
@@ -325,10 +353,15 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
         take: limit,
       }),
       prisma.party.count({ where: { region, eventType: 'gpp' } }),
+      prisma.underboss.findMany({
+        where: { isActive: true },
+        select: { email: true },
+      }),
     ]);
+    const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
 
     res.json({
-      events: events.map(formatEvent),
+      events: events.map(e => formatEvent(e, ubEmails)),
       pagination: {
         page,
         limit,
@@ -375,9 +408,16 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
       throw new AppError('Event not found', 404, 'NOT_FOUND');
     }
 
+    // Get underboss emails for co-host filtering
+    const allUnderbosses = await prisma.underboss.findMany({
+      where: { isActive: true },
+      select: { email: true },
+    });
+    const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
+
     res.json({
       event: {
-        ...formatEvent(party),
+        ...formatEvent(party, ubEmails),
         guests: party.guests,
         partyKit: party.partyKit,
         sponsors: party.sponsors,
@@ -402,20 +442,74 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
-    const events = await prisma.party.findMany({
-      where: { region, eventType: 'gpp' },
-      include: {
-        guests: {
-          select: { id: true, approved: true, checkedInAt: true },
+    const [events, allUnderbosses] = await Promise.all([
+      prisma.party.findMany({
+        where: { region, eventType: 'gpp' },
+        include: {
+          user: { select: { name: true, email: true } },
+          guests: {
+            select: { id: true, approved: true, checkedInAt: true },
+          },
+          partyKit: { select: { status: true } },
+          _count: { select: { guests: true, photos: true } },
         },
-        partyKit: { select: { status: true } },
-        _count: { select: { guests: true, photos: true } },
-      },
-    });
+      }),
+      prisma.underboss.findMany({
+        where: { isActive: true },
+        select: { email: true },
+      }),
+    ]);
+    const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
 
-    const stats = computeStats(events);
+    const stats = computeStats(events, ubEmails);
 
     res.json({ region, stats });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// Bulk action routes (underboss auth)
+// ============================================
+
+// PATCH /api/underboss/events/bulk-approve - Bulk approve/unapprove events
+router.patch('/events/bulk-approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyIds, approved } = req.body;
+
+    if (!Array.isArray(partyIds) || partyIds.length === 0) {
+      throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await prisma.party.updateMany({
+      where: { id: { in: partyIds } },
+      data: { underbossApproved: approved },
+    });
+
+    res.json({ updated: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/underboss/events/bulk-delete - Bulk delete events
+router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyIds } = req.body;
+
+    if (!Array.isArray(partyIds) || partyIds.length === 0) {
+      throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await prisma.party.deleteMany({
+      where: { id: { in: partyIds } },
+    });
+
+    res.json({ deleted: result.count });
   } catch (error) {
     next(error);
   }

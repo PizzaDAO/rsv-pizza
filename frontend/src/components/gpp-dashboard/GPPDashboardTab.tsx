@@ -57,7 +57,7 @@ export const GPPDashboardTab: React.FC = () => {
       },
       {
         label: 'Build a Team',
-        done: coHostCount > 0,
+        done: autoStates?.team_built ?? false,
         tab: null,
         onClick: () => setHostsExpanded(prev => !prev),
         icon: Users,

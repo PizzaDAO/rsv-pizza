@@ -2201,6 +2201,22 @@ export async function updateHostTags(
   });
 }
 
+// Bulk approve events (underboss auth)
+export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
+  await apiRequest('/api/underboss/events/bulk-approve', {
+    method: 'PATCH',
+    body: { partyIds, approved },
+  });
+}
+
+// Bulk delete events (underboss auth)
+export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
+  await apiRequest('/api/underboss/events/bulk-delete', {
+    method: 'DELETE',
+    body: { partyIds },
+  });
+}
+
 // ============================================
 // Venue Photo API functions
 // ============================================

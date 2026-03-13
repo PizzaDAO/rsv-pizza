@@ -895,6 +895,7 @@ export interface AutoCompleteStates {
   party_kit_submitted: boolean;
   venue_added: boolean;
   budget_submitted: boolean;
+  team_built?: boolean;
 }
 
 export interface ChecklistData {

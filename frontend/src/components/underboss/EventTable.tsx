@@ -1,15 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
 import { GPP_REGIONS } from '../../types';
+import { bulkApproveEvents, bulkDeleteEvents } from '../../lib/api';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 
 interface EventTableProps {
   events: UnderbossEvent[];
   showRegion?: boolean;
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
+  onBulkAction?: () => void;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
@@ -79,11 +81,17 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: EventTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Three-state progress filters: includes (must have) and excludes (must NOT have)
   const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
@@ -103,6 +111,15 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
     } else if (newState === 'exclude') {
       setProgressExcludes((prev) => [...prev, key]);
     }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   const filteredEvents = useMemo(() => {
@@ -163,6 +180,14 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
 
     return result;
   }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion]);
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filteredEvents.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEvents.map(e => e.id)));
+    }
+  }
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -247,6 +272,103 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+          <span className="text-sm text-theme-text-secondary font-medium">
+            {selectedIds.size} selected
+          </span>
+
+          {/* Action dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowActionDropdown(!showActionDropdown)}
+              disabled={bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theme-card border border-theme-stroke text-sm text-theme-text hover:bg-theme-surface-hover transition-colors disabled:opacity-50"
+            >
+              Actions <ChevronDown size={14} />
+            </button>
+            {showActionDropdown && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
+                <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[180px]">
+                  <button
+                    onClick={async () => {
+                      setShowActionDropdown(false);
+                      setBulkLoading(true);
+                      try {
+                        await bulkApproveEvents(Array.from(selectedIds), true);
+                        setSelectedIds(new Set());
+                        onBulkAction?.();
+                      } catch (err) { console.error('Bulk approve failed', err); }
+                      setBulkLoading(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowActionDropdown(false);
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                  >
+                    Cancel Event
+                  </button>
+                  <button
+                    disabled
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text-faint cursor-not-allowed"
+                    title="Coming soon"
+                  >
+                    Send Telegram (coming soon)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-theme-text-faint hover:text-theme-text-muted transition-colors"
+          >
+            Deselect all
+          </button>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-theme-card border border-theme-stroke rounded-xl p-6 max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-theme-text mb-2">Cancel Events?</h3>
+            <p className="text-sm text-theme-text-muted mb-4">
+              This will permanently delete {selectedIds.size} event{selectedIds.size > 1 ? 's' : ''}. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 text-sm text-theme-text-muted hover:text-theme-text transition-colors">
+                Keep Events
+              </button>
+              <button
+                onClick={async () => {
+                  setShowDeleteConfirm(false);
+                  setBulkLoading(true);
+                  try {
+                    await bulkDeleteEvents(Array.from(selectedIds));
+                    setSelectedIds(new Set());
+                    onBulkAction?.();
+                  } catch (err) { console.error('Bulk delete failed', err); }
+                  setBulkLoading(false);
+                }}
+                className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
+              >
+                Delete {selectedIds.size} Event{selectedIds.size > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile: card list */}
       <div className="md:hidden space-y-3">
         {filteredEvents.length === 0 ? (
@@ -255,7 +377,7 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
           </div>
         ) : (
           filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} />
+            <EventCard key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} isSelected={selectedIds.has(event.id)} onToggleSelect={toggleSelect} />
           ))
         )}
       </div>
@@ -266,7 +388,19 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
           <thead>
             <tr className="border-b border-theme-stroke bg-theme-surface">
               <th className="py-2 px-3 text-center w-8">
-                <span className="text-xs text-theme-text-faint uppercase tracking-wider" title="Approved">OK</span>
+                <button
+                  onClick={toggleSelectAll}
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                    selectedIds.size === filteredEvents.length && filteredEvents.length > 0
+                      ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
+                      : selectedIds.size > 0
+                        ? 'bg-[#ff393a]/10 border-[#ff393a]/30 text-[#ff393a]'
+                        : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
+                  }`}
+                  title="Select all"
+                >
+                  {selectedIds.size > 0 && <Check size={12} />}
+                </button>
               </th>
               <SortHeader field="name">Event</SortHeader>
               {showRegion && (
@@ -299,7 +433,7 @@ export function EventTable({ events, showRegion, onEventUpdate }: EventTableProp
               </tr>
             ) : (
               filteredEvents.map((event) => (
-                <EventRow key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} />
+                <EventRow key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} isSelected={selectedIds.has(event.id)} onToggleSelect={toggleSelect} />
               ))
             )}
           </tbody>
