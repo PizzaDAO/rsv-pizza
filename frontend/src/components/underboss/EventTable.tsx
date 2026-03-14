@@ -20,7 +20,6 @@ type SortDir = 'asc' | 'desc';
 
 // Filterable progress keys (skip "Event" always-true and "Prep" always-false)
 const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }[] = [
-  { key: 'hasPartyKit', label: 'Kit' },
   { key: 'hasCoHosts', label: 'Team' },
   { key: 'hasVenue', label: 'Venue' },
   { key: 'hasBudget', label: 'Budget' },
@@ -32,7 +31,7 @@ const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }
 function countProgress(event: UnderbossEvent): number {
   const p = event.progress;
   return [
-    p.hasCreatedEvent, p.hasPartyKit, p.hasCoHosts, p.hasVenue,
+    p.hasCreatedEvent, p.hasCoHosts, p.hasVenue,
     p.hasBudget, p.hasSponsors, p.hasPrepared, p.hasSocialPosts, p.hasThrown,
   ].filter(Boolean).length;
 }
@@ -420,16 +419,13 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: 
               <th className="py-2 px-3 text-center">
                 <span className="text-xs text-theme-text-faint uppercase tracking-wider">Photos</span>
               </th>
-              <th className="py-2 px-3 text-center">
-                <span className="text-xs text-theme-text-faint uppercase tracking-wider">Kit</span>
-              </th>
               <SortHeader field="progress">Progress</SortHeader>
             </tr>
           </thead>
           <tbody>
             {filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={showRegion ? 9 : 8} className="py-12 text-center text-theme-text-faint text-sm">
+                <td colSpan={showRegion ? 8 : 7} className="py-12 text-center text-theme-text-faint text-sm">
                   {search ? 'No events match your search' : 'No events in this region yet'}
                 </td>
               </tr>

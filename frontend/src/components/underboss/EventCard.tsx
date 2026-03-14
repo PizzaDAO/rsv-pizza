@@ -54,22 +54,6 @@ function formatFullDate(dateStr: string | null): string {
   }
 }
 
-function KitBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-xs text-theme-text-faint">--</span>;
-  const colors: Record<string, string> = {
-    pending: 'bg-yellow-500/20 text-yellow-400',
-    approved: 'bg-blue-500/20 text-blue-400',
-    shipped: 'bg-purple-500/20 text-purple-400',
-    delivered: 'bg-green-500/20 text-green-400',
-    declined: 'bg-red-500/20 text-red-400',
-  };
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || 'bg-theme-surface-hover text-theme-text-muted'}`}>
-      {status}
-    </span>
-  );
-}
-
 const HOST_STATUS_OPTIONS: { value: HostStatus | ''; label: string; color: string }[] = [
   { value: '', label: '--', color: '' },
   { value: 'new', label: 'new', color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' },
@@ -315,13 +299,11 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
           <Camera size={12} className="text-theme-text-faint" />
           <span className="text-xs text-theme-text-muted">{event.photoCount}</span>
         </div>
-        <KitBadge status={event.kitStatus} />
       </div>
 
       {/* Progress */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-theme-stroke">
         <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
-        <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
         <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
         <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
         <ProgressIndicator done={event.progress.hasBudget} label="Budget" />

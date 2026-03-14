@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MapPin, Wallet, Package, BarChart3, TrendingUp } from 'lucide-react';
+import { Users, MapPin, Wallet, BarChart3, TrendingUp } from 'lucide-react';
 import type { UnderbossStats } from '../../types';
 
 interface RegionStatsProps {
@@ -84,12 +84,6 @@ export function RegionStats({ stats }: RegionStatsProps) {
           value={stats.eventsWithBudget}
           color="bg-yellow-500/20 text-yellow-400"
         />
-        <StatCard
-          icon={Package}
-          label="With Kit"
-          value={stats.eventsWithKit}
-          color="bg-pink-500/20 text-pink-400"
-        />
       </div>
 
       {/* Completion rates */}
@@ -101,7 +95,6 @@ export function RegionStats({ stats }: RegionStatsProps) {
         <div className="space-y-3">
           <CompletionBar label="Venue" percent={stats.completionRate.venue} />
           <CompletionBar label="Budget" percent={stats.completionRate.budget} />
-          <CompletionBar label="Party Kit" percent={stats.completionRate.partyKit} />
         </div>
       </div>
     </div>

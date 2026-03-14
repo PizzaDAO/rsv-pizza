@@ -19,14 +19,12 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
   let totalApproved = 0;
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
-  let eventsWithKit = 0;
 
   for (const e of events) {
     totalRsvps += e.guestCount;
     totalApproved += e.approvedCount;
     if (e.progress.hasVenue) eventsWithVenue++;
     if (e.progress.hasBudget) eventsWithBudget++;
-    if (e.progress.hasPartyKit) eventsWithKit++;
   }
 
   return {
@@ -35,11 +33,9 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
-    eventsWithKit,
     completionRate: {
       venue: totalEvents > 0 ? Math.round((eventsWithVenue / totalEvents) * 100) : 0,
       budget: totalEvents > 0 ? Math.round((eventsWithBudget / totalEvents) * 100) : 0,
-      partyKit: totalEvents > 0 ? Math.round((eventsWithKit / totalEvents) * 100) : 0,
     },
     avgRsvpsPerEvent: totalEvents > 0 ? Math.round(totalRsvps / totalEvents) : 0,
   };
