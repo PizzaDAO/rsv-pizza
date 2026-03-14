@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { User, UserPlus, X, Globe, Instagram, GripVertical } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
@@ -302,7 +303,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       </button>
 
       {/* Host Edit Modal */}
-      {editingHostId && (
+      {editingHostId && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={cancelEditingHost}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Edit Host</h2>
@@ -397,11 +398,12 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Add Host Modal */}
-      {showAddHostModal && (
+      {showAddHostModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddHostModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Add Host</h2>
@@ -497,7 +499,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

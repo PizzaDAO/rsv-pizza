@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, AlertCircle, MapPin, Info, Gift, Package, Star, Check } from 'lucide-react';
 import { KIT_TIERS, PartyKit } from '../../types';
 import { KitRequestData } from '../../lib/api';
@@ -126,7 +127,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -349,6 +350,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
