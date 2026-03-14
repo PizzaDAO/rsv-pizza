@@ -157,16 +157,15 @@ export function UnderbossDashboard() {
   const toggleRegion = (regionId: string) => {
     setSelectedRegions((prev) => {
       if (prev.includes(regionId)) {
-        // Don't allow deselecting the last region
-        if (prev.length === 1) return prev;
         return prev.filter((r) => r !== regionId);
       }
       return [...prev, regionId];
     });
   };
 
-  const selectAllRegions = () => {
-    setSelectedRegions([...availableRegions]);
+  const toggleAllRegions = () => {
+    const allSelected = selectedRegions.length === availableRegions.length;
+    setSelectedRegions(allSelected ? [] : [...availableRegions]);
   };
 
   // Handle optimistic event updates from EventRow (host status, approval, tags)
@@ -284,7 +283,7 @@ export function UnderbossDashboard() {
                       <div className="absolute top-full left-0 mt-2 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-2 min-w-[240px]">
                         {/* Select All */}
                         <button
-                          onClick={selectAllRegions}
+                          onClick={toggleAllRegions}
                           className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
                             selectedRegions.length === availableRegions.length
                               ? 'text-red-500 font-medium'
