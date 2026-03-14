@@ -20,6 +20,7 @@ type SortDir = 'asc' | 'desc';
 
 // Filterable progress keys (skip "Event" always-true and "Prep" always-false)
 const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }[] = [
+  { key: 'hasPartyKit', label: 'Kit' },
   { key: 'hasCoHosts', label: 'Team' },
   { key: 'hasVenue', label: 'Venue' },
   { key: 'hasBudget', label: 'Budget' },
@@ -31,7 +32,7 @@ const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }
 function countProgress(event: UnderbossEvent): number {
   const p = event.progress;
   return [
-    p.hasCreatedEvent, p.hasCoHosts, p.hasVenue,
+    p.hasCreatedEvent, p.hasPartyKit, p.hasCoHosts, p.hasVenue,
     p.hasBudget, p.hasSponsors, p.hasPrepared, p.hasSocialPosts, p.hasThrown,
   ].filter(Boolean).length;
 }

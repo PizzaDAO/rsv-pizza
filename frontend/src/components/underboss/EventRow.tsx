@@ -361,6 +361,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
       <td className="py-3 px-3">
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
+          <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
           <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
           <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
           <ProgressIndicator done={event.progress.hasBudget} label="Budget" />

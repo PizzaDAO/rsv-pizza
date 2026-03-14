@@ -304,6 +304,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
       {/* Progress */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-theme-stroke">
         <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
+        <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
         <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
         <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
         <ProgressIndicator done={event.progress.hasBudget} label="Budget" />
