@@ -221,7 +221,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         : `https://rsv.pizza/${existingEvent.inviteCode}`;
 
       throw new AppError(
-        `A Global Pizza Party already exists for this city! Check it out: ${eventUrl}`,
+        `This city's Global Pizza Party has already been created! Visit the event page: ${eventUrl}`,
         409,
         'DUPLICATE_CITY'
       );

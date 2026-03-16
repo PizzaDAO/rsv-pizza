@@ -510,12 +510,6 @@ export function GPPLandingPage() {
                 </button>
               </form>
 
-              <p className="text-center text-sm mt-6" style={{ color: C.mutedText }}>
-                Already have an account?{' '}
-                <a href="/login" className="font-medium hover:underline" style={{ color: C.red }}>
-                  Sign in
-                </a>
-              </p>
             </div>
           </div>
         </div>
