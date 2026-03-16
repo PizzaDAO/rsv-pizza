@@ -524,7 +524,8 @@ export function RSVPPage() {
               required
             />
 
-            {/* Ethereum Address */}
+            {/* Ethereum Address - only show when NFT minting is enabled */}
+            {party?.nft_enabled && (
             <IconInput
               icon={Wallet}
               type="text"
@@ -532,6 +533,7 @@ export function RSVPPage() {
               onChange={(e) => setEthereumAddress(e.target.value)}
               placeholder="Wallet Address"
             />
+            )}
 
             {/* What do you do? */}
             <div>

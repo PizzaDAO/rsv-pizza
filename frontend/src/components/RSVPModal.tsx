@@ -333,8 +333,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         // Notify parent to refresh data
         onRSVPSuccess?.();
 
-        // Auto-mint NFT if wallet address provided and event has an image (idempotent — returns existing token if already minted)
-        if (ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
+        // Auto-mint NFT if NFT is enabled, wallet address provided, and event has an image (idempotent — returns existing token if already minted)
+        if (event.nftEnabled && ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
           setMintStatus('minting');
           try {
             const mintRes = await mintNFT({
@@ -503,7 +503,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
-          {ethereumAddress.trim() && event.eventImageUrl && (
+          {event.nftEnabled && ethereumAddress.trim() && event.eventImageUrl && (
             <div className="mt-4 pt-4 border-t border-theme-stroke">
               {mintStatus === 'minting' && (
                 <div className="flex items-center gap-2 text-theme-text-secondary justify-center">
@@ -639,6 +639,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               required
             />
 
+            {event.nftEnabled && (
             <div>
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
@@ -685,6 +686,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                 <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
               )}
             </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-theme-text mb-2">
