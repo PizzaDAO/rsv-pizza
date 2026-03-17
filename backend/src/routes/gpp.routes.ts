@@ -292,7 +292,8 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
             id: crypto.randomUUID(),
             name: normalizedHostName,
             email: normalizedEmail,
-            showOnEvent: false
+            showOnEvent: false,
+            canEdit: true
           }
         ],
         userId: user.id,
