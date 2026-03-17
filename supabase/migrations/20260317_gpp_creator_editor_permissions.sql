@@ -12,7 +12,7 @@ SET co_hosts = (
     ORDER BY idx
   )
   FROM jsonb_array_elements(p.co_hosts) WITH ORDINALITY AS arr(elem, idx)
-  JOIN users u ON u.id = p.user_id
+  JOIN "User" u ON u.id = p.user_id
 )
 WHERE p.event_type = 'gpp'
 AND p.co_hosts IS NOT NULL
