@@ -1,5 +1,6 @@
 import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaHalf } from '../types';
 import { availableToppings, pizzaSizes } from '../contexts/PizzaContext';
+import { DIETARY_TOPPING_EXCLUSIONS } from '../constants/options';
 
 // Style-specific serving adjustments
 // - Neapolitan: 1 pizza per 1.5 people (personal-sized, wood-fired)
@@ -151,13 +152,8 @@ function splitByToppingPreferences(guests: Guest[], maxPerPizza: number): Guest[
   return groups;
 }
 
-// Dietary restriction topping exclusions
-const DIETARY_EXCLUSIONS: Record<string, string[]> = {
-  'Vegetarian': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies'],
-  'Vegan': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies', 'extra-cheese'],
-  'Dairy-Free': ['extra-cheese'],
-  'Gluten-Free': [], // Handled at crust level, not toppings
-};
+// Dietary restriction topping exclusions (imported from shared constants)
+const DIETARY_EXCLUSIONS = DIETARY_TOPPING_EXCLUSIONS;
 
 // Generate optimal toppings for a group of guests
 function generateOptimalToppings(guests: Guest[]): Topping[] {

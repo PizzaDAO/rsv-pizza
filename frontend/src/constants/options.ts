@@ -89,3 +89,28 @@ export const PIZZA_SIZES: PizzaSize[] = [
   { diameter: 18, name: 'Extra Large', servings: 4 },
   { diameter: 20, name: 'Family', servings: 4.9 },
 ];
+
+// Dietary restriction → topping exclusions
+// Shared source of truth used by both the UI (to gray out toppings) and the pizza algorithm
+export const DIETARY_TOPPING_EXCLUSIONS: Record<string, string[]> = {
+  'Vegetarian': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies'],
+  'Vegan': ['pepperoni', 'sausage', 'bacon', 'ham', 'chicken', 'anchovies', 'extra-cheese'],
+  'Dairy-Free': ['extra-cheese'],
+  'Gluten-Free': [], // Handled at crust level, not toppings
+};
+
+/**
+ * Given a list of dietary restrictions, returns the set of topping IDs that are excluded.
+ */
+export function getExcludedToppingIds(dietaryRestrictions: string[]): Set<string> {
+  const excluded = new Set<string>();
+  for (const restriction of dietaryRestrictions) {
+    const exclusions = DIETARY_TOPPING_EXCLUSIONS[restriction];
+    if (exclusions) {
+      for (const id of exclusions) {
+        excluded.add(id);
+      }
+    }
+  }
+  return excluded;
+}
