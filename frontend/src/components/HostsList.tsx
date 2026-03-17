@@ -31,6 +31,7 @@ interface HostsListProps {
   size?: 'sm' | 'md' | 'lg';
   showTitle?: boolean;
   showSocialLinks?: boolean;
+  onLinkClick?: (url: string, linkLabel: string) => void;
 }
 
 // X (Twitter) icon component
@@ -54,6 +55,7 @@ export const HostsList: React.FC<HostsListProps> = ({
   size = 'md',
   showTitle = true,
   showSocialLinks = true,
+  onLinkClick,
 }) => {
   const displayHost = hostProfile?.name || hostName;
   const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false && h.name !== displayHost) || [];
@@ -110,6 +112,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(hostProfile.website!, `${displayHostName}_website`)}
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -120,6 +123,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://twitter.com/${hostProfile.twitter}`, `${displayHostName}_twitter`)}
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -130,6 +134,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://instagram.com/${hostProfile.instagram}`, `${displayHostName}_instagram`)}
                   >
                     <Instagram size={config.socialIcon} />
                   </a>
@@ -140,6 +145,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://youtube.com/@${hostProfile.youtube}`, `${displayHostName}_youtube`)}
                   >
                     <Youtube size={config.socialIcon} />
                   </a>
@@ -150,6 +156,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://tiktok.com/@${hostProfile.tiktok}`, `${displayHostName}_tiktok`)}
                   >
                     <TikTokIcon size={config.socialIcon} />
                   </a>
@@ -160,6 +167,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://linkedin.com/in/${hostProfile.linkedin}`, `${displayHostName}_linkedin`)}
                   >
                     <Linkedin size={config.socialIcon} />
                   </a>
@@ -192,6 +200,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(coHost.website!, `${coHost.name}_website`)}
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -202,6 +211,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://twitter.com/${coHost.twitter}`, `${coHost.name}_twitter`)}
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -212,6 +222,7 @@ export const HostsList: React.FC<HostsListProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    onClick={() => onLinkClick?.(`https://instagram.com/${coHost.instagram}`, `${coHost.name}_instagram`)}
                   >
                     <Instagram size={config.socialIcon} />
                   </a>

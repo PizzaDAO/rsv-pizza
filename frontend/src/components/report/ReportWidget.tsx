@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon, Lock } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { EventReport, Guest, PageViewStats as PageViewStatsType } from '../../types';
+import { EventReport, Guest, PageViewStats as PageViewStatsType, LinkClickStats as LinkClickStatsType } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
@@ -9,6 +9,7 @@ import { NotableAttendeesList } from './NotableAttendeesList';
 import { ReportPreview } from './ReportPreview';
 import { IconInput } from '../IconInput';
 import { PageViewStats } from './PageViewStats';
+import { LinkClickStats } from './LinkClickStats';
 import {
   getReport,
   updateReport,
@@ -19,6 +20,7 @@ import {
   addNotableAttendee,
   deleteNotableAttendee,
   getPageViewStats,
+  getLinkClickStats,
 } from '../../lib/api';
 
 interface ReportWidgetProps {
@@ -90,6 +92,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reportPassword, setReportPassword] = useState('');
   const [viewStats, setViewStats] = useState<PageViewStatsType | null>(null);
+  const [clickStats, setClickStats] = useState<LinkClickStatsType | null>(null);
 
   // Track pending changes for debounced save
   const pendingChanges = useRef<Record<string, any>>({});
@@ -135,6 +138,10 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     // Load page view stats in parallel (non-blocking)
     getPageViewStats(partyId).then(stats => {
       if (stats) setViewStats(stats);
+    });
+    // Load link click stats in parallel (non-blocking)
+    getLinkClickStats(partyId).then(stats => {
+      if (stats) setClickStats(stats);
     });
   }, [loadReport, partyId]);
 
@@ -514,6 +521,13 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       {viewStats && (
         <div className="card p-6">
           <PageViewStats stats={viewStats} />
+        </div>
+      )}
+
+      {/* Link Click Stats */}
+      {clickStats && (
+        <div className="card p-6">
+          <LinkClickStats stats={clickStats} />
         </div>
       )}
 

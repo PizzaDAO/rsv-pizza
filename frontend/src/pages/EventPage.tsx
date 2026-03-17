@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
 import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
@@ -632,7 +632,7 @@ export function EventPage() {
                   </button>
                   <p className="text-theme-text-secondary text-sm text-center mt-1">
                     {event.donationRecipient ? (
-                      <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+                      <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                     ) : `Buy Pizza for ${event.name}`}
                   </p>
                 </div>
@@ -645,6 +645,7 @@ export function EventPage() {
                   hostProfile={event.hostProfile}
                   coHosts={event.coHosts}
                   size="md"
+                  onLinkClick={slug ? (url, label) => trackLinkClick(slug, url, 'host_social', label) : undefined}
                 />
 
                 {/* Guest Count */}
@@ -900,7 +901,17 @@ export function EventPage() {
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
                           a: ({ node, ...props }) => (
-                            <a {...props} className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline" target="_blank" rel="noopener noreferrer" />
+                            <a
+                              {...props}
+                              className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => {
+                                if (slug && props.href) {
+                                  trackLinkClick(slug, props.href, 'description', typeof props.children === 'string' ? props.children : undefined);
+                                }
+                              }}
+                            />
                           ),
                           p: ({ node, ...props }) => (
                             <p {...props} className="mb-3 last:mb-0" />
@@ -987,7 +998,7 @@ export function EventPage() {
                     </button>
                     <p className="text-theme-text-secondary text-sm text-center mt-1">
                       {event.donationRecipient ? (
-                        <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+                        <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                       ) : `Supporting ${event.name}`}
                     </p>
                   </div>
@@ -1001,6 +1012,7 @@ export function EventPage() {
                     coHosts={event.coHosts}
                     size="lg"
                     showTitle={true}
+                    onLinkClick={slug ? (url, label) => trackLinkClick(slug, url, 'host_social', label) : undefined}
                   />
                 </div>
 

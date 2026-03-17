@@ -176,6 +176,7 @@ model Party {
   notableAttendees NotableAttendee[]
   aiPhoneCalls     AIPhoneCall[]
   pageViews        PageView[]
+  linkClicks       LinkClick[]
 
   @@map("parties")
 }
@@ -963,6 +964,29 @@ model PageView {
   @@index([partyId, viewedAt])
   @@index([partyId, visitorHash])
   @@map("page_views")
+}
+
+// ============================================
+// Link Click Tracking
+// ============================================
+
+model LinkClick {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  url         String
+  linkType    String   @map("link_type")
+  linkLabel   String?  @map("link_label")
+  visitorHash String?  @map("visitor_hash")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  clickedAt   DateTime @default(now()) @map("clicked_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([partyId, url])
+  @@index([partyId, clickedAt])
+  @@index([partyId, visitorHash])
+  @@map("link_clicks")
 }
 
 // ============================================
