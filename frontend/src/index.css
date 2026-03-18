@@ -341,8 +341,11 @@ body.modal-open {
 }
 
 /* ─── GPP Light Theme ─── */
-/* Applied via .gpp-theme class on page wrapper */
-.gpp-theme {
+/* Applied via .gpp-theme class on page wrapper.
+   body.gpp-theme-active is added by ThemeContext for elements portaled to <body>
+   (modals, drawers, etc.) that sit outside the .gpp-theme wrapper. */
+.gpp-theme,
+body.gpp-theme-active {
   /* Backgrounds */
   --bg-main: #B6E4F7;
   --bg-card: rgba(255, 255, 255, 0.92);
@@ -377,101 +380,103 @@ body.modal-open {
 }
 
 /* Cards */
-.gpp-theme .card {
+.gpp-theme .card,
+body.gpp-theme-active .card {
   background: rgba(255, 255, 255, 0.92) !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
   backdrop-filter: none !important;
 }
-.gpp-theme .card:hover {
+.gpp-theme .card:hover,
+body.gpp-theme-active .card:hover {
   border-color: rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Text color overrides */
-.gpp-theme .text-white { color: #1a1a1a !important; }
-.gpp-theme .text-white\/90 { color: #1a1a1a !important; }
-.gpp-theme .text-white\/80 { color: #333 !important; }
-.gpp-theme .text-white\/70 { color: #444 !important; }
-.gpp-theme .text-white\/60 { color: #555 !important; }
-.gpp-theme .text-white\/50 { color: #666 !important; }
-.gpp-theme .text-white\/40 { color: #777 !important; }
-.gpp-theme .text-white\/30 { color: #888 !important; }
-.gpp-theme .text-white\/20 { color: #999 !important; }
+.gpp-theme .text-white, body.gpp-theme-active .text-white { color: #1a1a1a !important; }
+.gpp-theme .text-white\/90, body.gpp-theme-active .text-white\/90 { color: #1a1a1a !important; }
+.gpp-theme .text-white\/80, body.gpp-theme-active .text-white\/80 { color: #333 !important; }
+.gpp-theme .text-white\/70, body.gpp-theme-active .text-white\/70 { color: #444 !important; }
+.gpp-theme .text-white\/60, body.gpp-theme-active .text-white\/60 { color: #555 !important; }
+.gpp-theme .text-white\/50, body.gpp-theme-active .text-white\/50 { color: #666 !important; }
+.gpp-theme .text-white\/40, body.gpp-theme-active .text-white\/40 { color: #777 !important; }
+.gpp-theme .text-white\/30, body.gpp-theme-active .text-white\/30 { color: #888 !important; }
+.gpp-theme .text-white\/20, body.gpp-theme-active .text-white\/20 { color: #999 !important; }
 
 /* Border overrides */
-.gpp-theme .border-white\/10 { border-color: rgba(0, 0, 0, 0.08) !important; }
-.gpp-theme .border-white\/20 { border-color: rgba(0, 0, 0, 0.12) !important; }
+.gpp-theme .border-white\/10, body.gpp-theme-active .border-white\/10 { border-color: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .border-white\/20, body.gpp-theme-active .border-white\/20 { border-color: rgba(0, 0, 0, 0.12) !important; }
 
 /* Background overrides */
-.gpp-theme .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
-.gpp-theme .bg-white\/6 { background: rgba(0, 0, 0, 0.03) !important; }
-.gpp-theme .bg-white\/10 { background: rgba(0, 0, 0, 0.05) !important; }
-.gpp-theme .bg-white\/20 { background: rgba(0, 0, 0, 0.08) !important; }
-.gpp-theme .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.05) !important; }
-.gpp-theme .hover\:bg-white\/10:hover { background: rgba(0, 0, 0, 0.08) !important; }
-.gpp-theme .hover\:bg-white\/20:hover { background: rgba(0, 0, 0, 0.12) !important; }
-.gpp-theme .hover\:text-white:hover { color: #1a1a1a !important; }
-.gpp-theme .hover\:text-white\/60:hover { color: #444 !important; }
+.gpp-theme .bg-white\/5, body.gpp-theme-active .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
+.gpp-theme .bg-white\/6, body.gpp-theme-active .bg-white\/6 { background: rgba(0, 0, 0, 0.03) !important; }
+.gpp-theme .bg-white\/10, body.gpp-theme-active .bg-white\/10 { background: rgba(0, 0, 0, 0.05) !important; }
+.gpp-theme .bg-white\/20, body.gpp-theme-active .bg-white\/20 { background: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .hover\:bg-white\/5:hover, body.gpp-theme-active .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.05) !important; }
+.gpp-theme .hover\:bg-white\/10:hover, body.gpp-theme-active .hover\:bg-white\/10:hover { background: rgba(0, 0, 0, 0.08) !important; }
+.gpp-theme .hover\:bg-white\/20:hover, body.gpp-theme-active .hover\:bg-white\/20:hover { background: rgba(0, 0, 0, 0.12) !important; }
+.gpp-theme .hover\:text-white:hover, body.gpp-theme-active .hover\:text-white:hover { color: #1a1a1a !important; }
+.gpp-theme .hover\:text-white\/60:hover, body.gpp-theme-active .hover\:text-white\/60:hover { color: #444 !important; }
 
 /* Inputs */
-.gpp-theme input[type="text"],
-.gpp-theme input[type="email"],
-.gpp-theme input[type="number"],
-.gpp-theme input[type="password"],
-.gpp-theme input[type="url"],
-.gpp-theme input[type="tel"],
-.gpp-theme input[type="time"],
-.gpp-theme input[type="date"],
-.gpp-theme input[type="datetime-local"],
-.gpp-theme input[type="search"],
-.gpp-theme textarea,
-.gpp-theme select {
+.gpp-theme input[type="text"], body.gpp-theme-active input[type="text"],
+.gpp-theme input[type="email"], body.gpp-theme-active input[type="email"],
+.gpp-theme input[type="number"], body.gpp-theme-active input[type="number"],
+.gpp-theme input[type="password"], body.gpp-theme-active input[type="password"],
+.gpp-theme input[type="url"], body.gpp-theme-active input[type="url"],
+.gpp-theme input[type="tel"], body.gpp-theme-active input[type="tel"],
+.gpp-theme input[type="time"], body.gpp-theme-active input[type="time"],
+.gpp-theme input[type="date"], body.gpp-theme-active input[type="date"],
+.gpp-theme input[type="datetime-local"], body.gpp-theme-active input[type="datetime-local"],
+.gpp-theme input[type="search"], body.gpp-theme-active input[type="search"],
+.gpp-theme textarea, body.gpp-theme-active textarea,
+.gpp-theme select, body.gpp-theme-active select {
   background: rgba(255, 255, 255, 0.85) !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   color: #1a1a1a !important;
 }
-.gpp-theme input:focus,
-.gpp-theme textarea:focus,
-.gpp-theme select:focus {
+.gpp-theme input:focus, body.gpp-theme-active input:focus,
+.gpp-theme textarea:focus, body.gpp-theme-active textarea:focus,
+.gpp-theme select:focus, body.gpp-theme-active select:focus {
   border-color: #E52828 !important;
   background: #fff !important;
 }
-.gpp-theme input::placeholder,
-.gpp-theme textarea::placeholder {
+.gpp-theme input::placeholder, body.gpp-theme-active input::placeholder,
+.gpp-theme textarea::placeholder, body.gpp-theme-active textarea::placeholder {
   color: #999 !important;
 }
-.gpp-theme input[type="time"],
-.gpp-theme input[type="date"],
-.gpp-theme input[type="datetime-local"] {
+.gpp-theme input[type="time"], body.gpp-theme-active input[type="time"],
+.gpp-theme input[type="date"], body.gpp-theme-active input[type="date"],
+.gpp-theme input[type="datetime-local"], body.gpp-theme-active input[type="datetime-local"] {
   color-scheme: light !important;
 }
-.gpp-theme select {
+.gpp-theme select, body.gpp-theme-active select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(0,0,0,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
   background-position: right 12px center !important;
 }
 
 /* Buttons */
-.gpp-theme .btn-secondary {
+.gpp-theme .btn-secondary, body.gpp-theme-active .btn-secondary {
   background: rgba(0, 0, 0, 0.05) !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   color: #1a1a1a !important;
 }
-.gpp-theme .btn-secondary:hover {
+.gpp-theme .btn-secondary:hover, body.gpp-theme-active .btn-secondary:hover {
   background: rgba(0, 0, 0, 0.08) !important;
   border-color: rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Chips */
-.gpp-theme .chip {
+.gpp-theme .chip, body.gpp-theme-active .chip {
   background: rgba(0, 0, 0, 0.05) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   color: #444 !important;
 }
-.gpp-theme .chip:hover {
+.gpp-theme .chip:hover, body.gpp-theme-active .chip:hover {
   background: rgba(0, 0, 0, 0.08) !important;
 }
-.gpp-theme .chip.active,
-.gpp-theme .chip.liked {
+.gpp-theme .chip.active, body.gpp-theme-active .chip.active,
+.gpp-theme .chip.liked, body.gpp-theme-active .chip.liked {
   color: white !important;
 }
 
@@ -484,10 +489,10 @@ body.modal-open {
 }
 
 /* Footer */
-.gpp-theme footer {
+.gpp-theme footer, body.gpp-theme-active footer {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
-.gpp-theme footer .text-white\/40 { color: #777 !important; }
+.gpp-theme footer .text-white\/40, body.gpp-theme-active footer .text-white\/40 { color: #777 !important; }
 
 /* Corner links */
 .gpp-theme .corner-link {
@@ -542,15 +547,15 @@ body.gpp-theme-active .pac-item-query {
 .gpp-theme .host-tabs button > .bg-theme-text { background: #E52828 !important; }
 
 /* Red buttons keep white text */
-.gpp-theme .btn-primary { color: white !important; }
-.gpp-theme .bg-\[\#ff393a\] { color: white !important; }
-.gpp-theme .bg-\[\#ff393a\] .text-white { color: white !important; }
-.gpp-theme .bg-red-500 { color: white !important; }
-.gpp-theme .bg-\[\#E52828\] { color: white !important; }
+.gpp-theme .btn-primary, body.gpp-theme-active .btn-primary { color: white !important; }
+.gpp-theme .bg-\[\#ff393a\], body.gpp-theme-active .bg-\[\#ff393a\] { color: white !important; }
+.gpp-theme .bg-\[\#ff393a\] .text-white, body.gpp-theme-active .bg-\[\#ff393a\] .text-white { color: white !important; }
+.gpp-theme .bg-red-500, body.gpp-theme-active .bg-red-500 { color: white !important; }
+.gpp-theme .bg-\[\#E52828\], body.gpp-theme-active .bg-\[\#E52828\] { color: white !important; }
 
 /* Modal — solid white card with shadow for contrast on light background */
-.gpp-theme .fixed.inset-0 .card,
-.gpp-theme .fixed.inset-0 .bg-theme-header {
+.gpp-theme .fixed.inset-0 .card, body.gpp-theme-active .fixed.inset-0 .card,
+.gpp-theme .fixed.inset-0 .bg-theme-header, body.gpp-theme-active .fixed.inset-0 .bg-theme-header {
   background: #fff !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
@@ -562,7 +567,7 @@ body.gpp-theme-active .pac-item-query {
 }
 
 /* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
-.gpp-theme .gpp-badge { display: none !important; }
+.gpp-theme .gpp-badge, body.gpp-theme-active .gpp-badge { display: none !important; }
 
 /* Round the bottom-right corner of the event image on desktop */
 .gpp-theme .card .aspect-square {

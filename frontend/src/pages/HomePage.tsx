@@ -61,6 +61,9 @@ export function HomePage() {
   if (user && (userParties.length > 0 || partiesLoading)) {
     return (
       <Layout>
+        <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
+          Planning a Global Pizza Party? Create it at rsv.pizza/gpp
+        </Link>
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-theme-text mb-2">Your Events</h1>
@@ -191,6 +194,9 @@ export function HomePage() {
   // Default: Show event creation form (for non-signed-in users or users with no parties)
   return (
     <Layout>
+      <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
+        Planning a Global Pizza Party? Create it at rsv.pizza/gpp
+      </Link>
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
           <EventForm />

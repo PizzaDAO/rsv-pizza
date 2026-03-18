@@ -116,7 +116,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
       />
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-32 bg-theme-card border border-theme-stroke-hover rounded-lg shadow-xl max-h-64 overflow-y-auto z-50">
+        <div className="absolute top-full left-0 mt-1 w-32 bg-theme-header border border-theme-stroke-hover rounded-lg shadow-xl max-h-64 overflow-y-auto z-50">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((time24) => {
               const time12 = format12Hour(time24);
