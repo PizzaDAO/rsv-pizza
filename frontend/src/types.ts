@@ -545,6 +545,19 @@ export interface PageViewStats {
   topReferrers: { referrer: string; count: number }[];
 }
 
+export interface LinkClickStats {
+  totalClicks: number;
+  uniqueClickers: number;
+  links: {
+    url: string;
+    linkType: string;
+    linkLabel: string | null;
+    totalClicks: number;
+    uniqueClicks: number;
+  }[];
+  dailyClicks: { date: string; total: number; unique: number }[];
+}
+
 export interface EventReport {
   // Event details
   id: string;

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1334,6 +1334,30 @@ export async function getPageViewStats(partyId: string): Promise<PageViewStats |
     });
   } catch (error) {
     console.error('Error fetching page view stats:', error);
+    return null;
+  }
+}
+
+// Track link click on event page (public, fire-and-forget)
+export function trackLinkClick(slug: string, url: string, linkType: string, linkLabel?: string): void {
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+  fetch(`${apiUrl}/api/events/${slug}/click`, {
+    method: 'POST',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, linkType, linkLabel: linkLabel || null }),
+  }).catch(() => {});
+}
+
+// Get link click stats (host only)
+export async function getLinkClickStats(partyId: string): Promise<LinkClickStats | null> {
+  try {
+    return await apiRequest<LinkClickStats>(`/api/parties/${partyId}/report/link-clicks`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching link click stats:', error);
     return null;
   }
 }

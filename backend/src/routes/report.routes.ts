@@ -530,6 +530,87 @@ router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: 
 });
 
 // =====================
+// Link Click Stats
+// =====================
+
+// GET /api/parties/:partyId/report/link-clicks - Get link click stats (host only)
+router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Total clicks
+    const totalClicks = await prisma.linkClick.count({
+      where: { partyId },
+    });
+
+    // Unique clickers (distinct visitor_hash)
+    const uniqueResult = await prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(DISTINCT visitor_hash) as count
+      FROM link_clicks
+      WHERE party_id = ${partyId}::uuid
+        AND visitor_hash IS NOT NULL
+    `;
+    const uniqueClickers = Number(uniqueResult[0]?.count || 0);
+
+    // Per-link breakdown
+    const linksResult = await prisma.$queryRaw<{ url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
+      SELECT
+        url,
+        link_type,
+        MAX(link_label) as link_label,
+        COUNT(*) as total_clicks,
+        COUNT(DISTINCT visitor_hash) as unique_clicks
+      FROM link_clicks
+      WHERE party_id = ${partyId}::uuid
+      GROUP BY url, link_type
+      ORDER BY total_clicks DESC
+      LIMIT 50
+    `;
+    const links = linksResult.map(row => ({
+      url: row.url,
+      linkType: row.link_type,
+      linkLabel: row.link_label,
+      totalClicks: Number(row.total_clicks),
+      uniqueClicks: Number(row.unique_clicks),
+    }));
+
+    // Daily clicks for last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dailyResult = await prisma.$queryRaw<{ date: string; total: bigint; unique: bigint }[]>`
+      SELECT
+        TO_CHAR(clicked_at::date, 'YYYY-MM-DD') as date,
+        COUNT(*) as total,
+        COUNT(DISTINCT visitor_hash) as unique
+      FROM link_clicks
+      WHERE party_id = ${partyId}::uuid
+        AND clicked_at >= ${thirtyDaysAgo}
+      GROUP BY clicked_at::date
+      ORDER BY clicked_at::date ASC
+    `;
+    const dailyClicks = dailyResult.map(row => ({
+      date: row.date,
+      total: Number(row.total),
+      unique: Number(row.unique),
+    }));
+
+    res.json({
+      totalClicks,
+      uniqueClickers,
+      links,
+      dailyClicks,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================
 // Social Posts CRUD
 // =====================
 

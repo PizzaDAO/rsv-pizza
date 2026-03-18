@@ -25,6 +25,7 @@ import budgetRoutes from './routes/budget.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
+import linkclickRoutes from './routes/linkclick.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
@@ -110,6 +111,7 @@ app.use('/api/parties', partyRoutes); // Party routes have global auth (must be 
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
+app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
