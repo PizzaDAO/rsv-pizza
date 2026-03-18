@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
 import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User, X } from 'lucide-react';
 import { IconInput } from './IconInput';
+import { getExcludedToppingIds } from '../constants/options';
 
 interface AddGuestFormProps {
   onClose?: () => void;
@@ -78,6 +79,16 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
     setDislikedBeverages(prev => prev.includes(beverageId) ? prev.filter(id => id !== beverageId) : [...prev, beverageId]);
   };
 
+  // Auto-deselect liked toppings that conflict with selected dietary restrictions
+  useEffect(() => {
+    const excluded = getExcludedToppingIds(dietaryRestrictions);
+    if (excluded.size > 0) {
+      setToppings(prev => prev.filter(id => !excluded.has(id)));
+    }
+  }, [dietaryRestrictions]);
+
+  const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
+
   // Modal mode: always show form, ignore isFormVisible
   const shouldShowForm = onClose ? true : isFormVisible;
 
@@ -141,11 +152,14 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
               {availableToppings.map(topping => {
                 const isLiked = toppings.includes(topping.id);
                 const isDisliked = dislikedToppings.includes(topping.id);
+                const isExcluded = excludedToppings.has(topping.id);
                 return (
                   <div
                     key={topping.id}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                      isLiked
+                      isExcluded
+                        ? 'opacity-40 cursor-not-allowed bg-theme-surface border-theme-stroke'
+                        : isLiked
                         ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
                         : isDisliked
                         ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
@@ -154,8 +168,9 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                   >
                     <button
                       type="button"
-                      onClick={() => handleToppingLike(topping.id)}
-                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                      onClick={() => !isExcluded && handleToppingLike(topping.id)}
+                      disabled={isExcluded}
+                      className={`flex items-center gap-1.5 flex-1 py-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
                     >
                       <ThumbsUp
                         size={12}
@@ -163,12 +178,13 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
                           isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                         }`}
                       />
-                      <span className="text-theme-text text-xs">{topping.name}</span>
+                      <span className={`text-xs ${isExcluded ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{topping.name}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleToppingDislike(topping.id)}
-                      className="p-0.5 hover:opacity-70 transition-opacity"
+                      onClick={() => !isExcluded && handleToppingDislike(topping.id)}
+                      disabled={isExcluded}
+                      className={`p-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
                     >
                       <ThumbsDown
                         size={12}

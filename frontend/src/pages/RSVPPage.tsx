@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
+import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { Pizzeria, DonationPublicStats } from '../types';
 import { IconInput } from '../components/IconInput';
@@ -108,6 +108,14 @@ export function RSVPPage() {
     }
     loadSavedPreferences();
   }, [user?.email, email, preferencesLoaded]);
+
+  // Auto-deselect liked toppings that conflict with selected dietary restrictions
+  useEffect(() => {
+    const excluded = getExcludedToppingIds(dietaryRestrictions);
+    if (excluded.size > 0) {
+      setLikedToppings(prev => prev.filter(id => !excluded.has(id)));
+    }
+  }, [dietaryRestrictions]);
 
   // Pre-fill email if user is logged in
   useEffect(() => {
@@ -593,6 +601,8 @@ export function RSVPPage() {
   }
 
   // Step 2 - Pizza Preferences
+  const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
+
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
       {isGPP && <GPPClouds />}
@@ -645,33 +655,38 @@ export function RSVPPage() {
               {TOPPINGS.filter(t => availableToppings.length === 0 || availableToppings.includes(t.id)).map((topping) => {
                 const isLiked = likedToppings.includes(topping.id);
                 const isDisliked = dislikedToppings.includes(topping.id);
+                const isExcluded = excludedToppings.has(topping.id);
 
                 return (
                   <div
                     key={topping.id}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
-                        ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                        : isDisliked
-                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                          : 'bg-theme-surface border-theme-stroke'
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isExcluded
+                        ? 'opacity-40 cursor-not-allowed bg-theme-surface border-theme-stroke'
+                        : isLiked
+                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                          : isDisliked
+                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                            : 'bg-theme-surface border-theme-stroke'
                       }`}
                   >
                     <button
                       type="button"
-                      onClick={() => handleToppingLike(topping.id)}
-                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                      onClick={() => !isExcluded && handleToppingLike(topping.id)}
+                      disabled={isExcluded}
+                      className={`flex items-center gap-1.5 flex-1 py-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
                     >
                       <ThumbsUp
                         size={12}
                         className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
                           }`}
                       />
-                      <span className="text-theme-text text-xs">{topping.name}</span>
+                      <span className={`text-xs ${isExcluded ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{topping.name}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleToppingDislike(topping.id)}
-                      className="p-0.5 hover:opacity-70 transition-opacity"
+                      onClick={() => !isExcluded && handleToppingDislike(topping.id)}
+                      disabled={isExcluded}
+                      className={`p-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
                     >
                       <ThumbsDown
                         size={12}
