@@ -532,8 +532,8 @@ export function RSVPPage() {
               required
             />
 
-            {/* Ethereum Address - only show when NFT minting is enabled */}
-            {party?.nft_enabled && (
+            {/* Ethereum Address - show when NFT minting is enabled OR for GPP events */}
+            {(party?.nft_enabled || party?.event_type === 'gpp') && (
             <IconInput
               icon={Wallet}
               type="text"

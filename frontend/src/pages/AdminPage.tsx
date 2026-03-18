@@ -11,6 +11,7 @@ import {
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
   fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
+  fetchGppNftSettings, updateGppNftSettings,
 } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin } from '../types';
@@ -45,6 +46,12 @@ export function AdminPage() {
   const [editRegions, setEditRegions] = useState<string[]>([]);
   const [savingRegions, setSavingRegions] = useState(false);
 
+  // GPP NFT state
+  const [gppNftEnabled, setGppNftEnabled] = useState(false);
+  const [gppNftChain, setGppNftChain] = useState('base');
+  const [savingNft, setSavingNft] = useState(false);
+  const [nftMessage, setNftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const isSuperAdmin = currentRole === 'super_admin';
 
   // Set body class for elements outside React tree
@@ -66,12 +73,15 @@ export function AdminPage() {
         setCurrentRole(me.role || '');
         setCurrentEmail(me.email || '');
 
-        const [adminList, ubList] = await Promise.all([
+        const [adminList, ubList, nftSettings] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
+          fetchGppNftSettings(),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
+        setGppNftEnabled(nftSettings.nftEnabled);
+        setGppNftChain(nftSettings.nftChain || 'base');
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
       } finally {
@@ -94,6 +104,26 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [ubMessage]);
+
+  useEffect(() => {
+    if (nftMessage) {
+      const t = setTimeout(() => setNftMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [nftMessage]);
+
+  async function handleSaveGppNft() {
+    setSavingNft(true);
+    setNftMessage(null);
+    try {
+      const result = await updateGppNftSettings({ nftEnabled: gppNftEnabled, nftChain: gppNftChain });
+      setNftMessage({ type: 'success', text: `Updated ${result.updatedCount} GPP events` });
+    } catch (err: any) {
+      setNftMessage({ type: 'error', text: err.message || 'Failed to update' });
+    } finally {
+      setSavingNft(false);
+    }
+  }
 
   async function handleAddAdmin(e: React.FormEvent) {
     e.preventDefault();
@@ -519,6 +549,63 @@ export function AdminPage() {
               </table>
             </div>
           </section>
+
+          {/* GPP NFT Settings — super admin only */}
+          {isSuperAdmin && (
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield size={20} className="text-theme-text-secondary" />
+                <h2 className="text-lg font-semibold text-theme-text">GPP NFT Settings</h2>
+              </div>
+
+              {nftMessage && (
+                <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  nftMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+                }`}>
+                  {nftMessage.text}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gppNftEnabled}
+                    onChange={(e) => setGppNftEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded accent-[#E52828]"
+                  />
+                  <span className="text-sm text-theme-text">Enable NFT minting for all GPP events</span>
+                </label>
+
+                {gppNftEnabled && (
+                  <div className="flex gap-2">
+                    {(['base', 'monad'] as const).map((chain) => (
+                      <button
+                        key={chain}
+                        type="button"
+                        onClick={() => setGppNftChain(chain)}
+                        className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          gppNftChain === chain
+                            ? 'bg-[#E52828] text-white'
+                            : 'bg-white/50 text-theme-text-secondary hover:bg-white/70 border border-theme-stroke'
+                        }`}
+                      >
+                        {chain === 'base' ? 'Base' : 'Monad'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSaveGppNft}
+                  disabled={savingNft}
+                  className="px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
+                >
+                  {savingNft ? 'Saving...' : 'Save GPP NFT Settings'}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </main>
 

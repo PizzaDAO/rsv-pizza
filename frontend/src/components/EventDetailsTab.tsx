@@ -799,41 +799,45 @@ export const EventDetailsTab: React.FC = () => {
                 }}
               />
 
-              {/* NFT Settings */}
-              <Checkbox
-                checked={nftEnabled}
-                onChange={() => {
-                  const newValue = !nftEnabled;
-                  setNftEnabled(newValue);
-                  if (newValue && !nftChain) {
-                    setNftChain('base');
-                    saveOptions({ nft_enabled: newValue, nft_chain: 'base' });
-                  } else {
-                    saveOptions({ nft_enabled: newValue });
-                  }
-                }}
-                label="Mint Attendance NFT"
-              />
-              {nftEnabled && (
-                <div className="flex gap-2">
-                  {(['base', 'monad'] as const).map((chain) => (
-                    <button
-                      key={chain}
-                      type="button"
-                      onClick={() => {
-                        setNftChain(chain);
-                        saveOptions({ nft_chain: chain });
-                      }}
-                      className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        nftChain === chain
-                          ? 'bg-[#ff393a] text-white'
-                          : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
-                      }`}
-                    >
-                      {chain === 'base' ? 'Base' : 'Monad'}
-                    </button>
-                  ))}
-                </div>
+              {/* NFT Settings — hidden for GPP events (managed from /admin) */}
+              {party?.eventType !== 'gpp' && (
+                <>
+                  <Checkbox
+                    checked={nftEnabled}
+                    onChange={() => {
+                      const newValue = !nftEnabled;
+                      setNftEnabled(newValue);
+                      if (newValue && !nftChain) {
+                        setNftChain('base');
+                        saveOptions({ nft_enabled: newValue, nft_chain: 'base' });
+                      } else {
+                        saveOptions({ nft_enabled: newValue });
+                      }
+                    }}
+                    label="Mint Attendance NFT"
+                  />
+                  {nftEnabled && (
+                    <div className="flex gap-2">
+                      {(['base', 'monad'] as const).map((chain) => (
+                        <button
+                          key={chain}
+                          type="button"
+                          onClick={() => {
+                            setNftChain(chain);
+                            saveOptions({ nft_chain: chain });
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                            nftChain === chain
+                              ? 'bg-[#ff393a] text-white'
+                              : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
+                          }`}
+                        >
+                          {chain === 'base' ? 'Base' : 'Monad'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

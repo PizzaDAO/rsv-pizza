@@ -2167,6 +2167,18 @@ export async function deactivateUnderboss(id: string): Promise<void> {
   await apiRequest(`/api/underboss/admin/${id}`, { method: 'DELETE' });
 }
 
+// GPP NFT Settings
+export async function fetchGppNftSettings(): Promise<{ nftEnabled: boolean; nftChain: string }> {
+  return apiRequest<{ nftEnabled: boolean; nftChain: string }>('/api/admin/gpp-nft');
+}
+
+export async function updateGppNftSettings(data: { nftEnabled: boolean; nftChain?: string }): Promise<{ updatedCount: number }> {
+  return apiRequest<{ updatedCount: number }>('/api/admin/gpp-nft', {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
 // ============================================
 // Underboss Dashboard API
 // ============================================

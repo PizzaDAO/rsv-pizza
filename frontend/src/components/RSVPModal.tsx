@@ -648,7 +648,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               required
             />
 
-            {event.nftEnabled && (
+            {(event.nftEnabled || event.eventType === 'gpp') && (
             <div>
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">

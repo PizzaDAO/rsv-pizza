@@ -166,4 +166,59 @@ router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: 
   }
 });
 
+// GET /api/admin/gpp-nft — Get current GPP NFT settings
+router.get('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Forbidden', 403, 'FORBIDDEN');
+    }
+
+    // Get a sample GPP event to read current settings
+    const sample = await prisma.party.findFirst({
+      where: { eventType: 'gpp' },
+      select: { nftEnabled: true, nftChain: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      nftEnabled: sample?.nftEnabled ?? false,
+      nftChain: sample?.nftChain ?? 'base',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/gpp-nft — Bulk update NFT settings for all GPP events
+router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can update GPP NFT settings', 403, 'FORBIDDEN');
+    }
+
+    const { nftEnabled, nftChain } = req.body;
+
+    if (typeof nftEnabled !== 'boolean') {
+      throw new AppError('nftEnabled must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await prisma.party.updateMany({
+      where: { eventType: 'gpp' },
+      data: {
+        nftEnabled,
+        ...(nftChain && { nftChain }),
+      },
+    });
+
+    res.json({
+      success: true,
+      updatedCount: result.count,
+      nftEnabled,
+      nftChain: nftChain || 'base',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
