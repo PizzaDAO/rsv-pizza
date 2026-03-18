@@ -221,4 +221,74 @@ router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, ne
   }
 });
 
+// GET /api/admin/checklist-defaults — Get default checklist items (from any GPP event)
+router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Forbidden', 403, 'FORBIDDEN');
+    }
+
+    // Find a GPP event that has been seeded and return its default items
+    const items = await prisma.checklistItem.findMany({
+      where: {
+        isDefault: true,
+        party: { eventType: 'gpp' },
+      },
+      distinct: ['name'],
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        name: true,
+        dueDate: true,
+        sortOrder: true,
+        isAuto: true,
+        autoRule: true,
+        linkTab: true,
+      },
+    });
+
+    res.json({ items });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/checklist-defaults — Bulk update default checklist items across all GPP events
+router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can update checklist defaults', 403, 'FORBIDDEN');
+    }
+
+    const { items } = req.body;
+
+    if (!Array.isArray(items)) {
+      throw new AppError('items must be an array', 400, 'VALIDATION_ERROR');
+    }
+
+    // Update each default item by name across all GPP events
+    let totalUpdated = 0;
+    for (const item of items) {
+      if (!item.name) continue;
+
+      const result = await prisma.checklistItem.updateMany({
+        where: {
+          name: item.name,
+          isDefault: true,
+          party: { eventType: 'gpp' },
+        },
+        data: {
+          ...(item.dueDate !== undefined && { dueDate: item.dueDate ? new Date(item.dueDate) : null }),
+          ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
+          ...(item.newName && { name: item.newName }),
+        },
+      });
+      totalUpdated += result.count;
+    }
+
+    res.json({ success: true, totalUpdated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

@@ -2179,6 +2179,27 @@ export async function updateGppNftSettings(data: { nftEnabled: boolean; nftChain
   });
 }
 
+// GPP Checklist Defaults
+export interface ChecklistDefault {
+  name: string;
+  dueDate: string | null;
+  sortOrder: number;
+  isAuto: boolean;
+  autoRule: string | null;
+  linkTab: string | null;
+}
+
+export async function fetchChecklistDefaults(): Promise<{ items: ChecklistDefault[] }> {
+  return apiRequest<{ items: ChecklistDefault[] }>('/api/admin/checklist-defaults');
+}
+
+export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string }>): Promise<{ totalUpdated: number }> {
+  return apiRequest<{ totalUpdated: number }>('/api/admin/checklist-defaults', {
+    method: 'PATCH',
+    body: { items },
+  });
+}
+
 // ============================================
 // Underboss Dashboard API
 // ============================================

@@ -16,7 +16,7 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
   return !!party;
 }
 
-// Default GPP checklist items
+// Default GPP checklist items (ordered by due date, then sortOrder)
 const DEFAULT_CHECKLIST_ITEMS = [
   {
     name: 'Create Event',
@@ -65,11 +65,20 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Find Partners',
-    dueDate: null,
+    dueDate: new Date('2026-04-15'),
     isAuto: false,
     autoRule: null,
     linkTab: 'sponsors',
     sortOrder: 5,
+    isDefault: true,
+  },
+  {
+    name: 'Select Pizzeria',
+    dueDate: new Date('2026-04-18'),
+    isAuto: false,
+    autoRule: null,
+    linkTab: 'venue',
+    sortOrder: 6,
     isDefault: true,
   },
   {
@@ -78,7 +87,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
     isAuto: false,
     autoRule: null,
     linkTab: null,
-    sortOrder: 6,
+    sortOrder: 7,
     isDefault: true,
   },
   {
@@ -87,7 +96,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
     isAuto: false,
     autoRule: null,
     linkTab: 'promo',
-    sortOrder: 7,
+    sortOrder: 8,
     isDefault: true,
   },
   {
@@ -96,7 +105,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
     isAuto: false,
     autoRule: null,
     linkTab: null,
-    sortOrder: 8,
+    sortOrder: 9,
     isDefault: true,
   },
 ];

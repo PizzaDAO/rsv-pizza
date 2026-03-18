@@ -6,13 +6,15 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
   fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
   fetchGppNftSettings, updateGppNftSettings,
+  fetchChecklistDefaults, updateChecklistDefaults,
 } from '../lib/api';
+import type { ChecklistDefault } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin } from '../types';
 
@@ -52,6 +54,12 @@ export function AdminPage() {
   const [savingNft, setSavingNft] = useState(false);
   const [nftMessage, setNftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Checklist defaults state
+  const [checklistItems, setChecklistItems] = useState<ChecklistDefault[]>([]);
+  const [checklistEdits, setChecklistEdits] = useState<Record<string, string>>({});
+  const [savingChecklist, setSavingChecklist] = useState(false);
+  const [checklistMessage, setChecklistMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const isSuperAdmin = currentRole === 'super_admin';
 
   // Set body class for elements outside React tree
@@ -73,15 +81,17 @@ export function AdminPage() {
         setCurrentRole(me.role || '');
         setCurrentEmail(me.email || '');
 
-        const [adminList, ubList, nftSettings] = await Promise.all([
+        const [adminList, ubList, nftSettings, clDefaults] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
           fetchGppNftSettings(),
+          fetchChecklistDefaults(),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
         setGppNftEnabled(nftSettings.nftEnabled);
         setGppNftChain(nftSettings.nftChain || 'base');
+        setChecklistItems(clDefaults.items);
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
       } finally {
@@ -111,6 +121,41 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [nftMessage]);
+
+  useEffect(() => {
+    if (checklistMessage) {
+      const t = setTimeout(() => setChecklistMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [checklistMessage]);
+
+  async function handleSaveChecklist() {
+    setSavingChecklist(true);
+    setChecklistMessage(null);
+    try {
+      const updates = checklistItems
+        .filter(item => checklistEdits[item.name] !== undefined)
+        .map(item => ({
+          name: item.name,
+          dueDate: checklistEdits[item.name] || null,
+        }));
+      if (updates.length === 0) {
+        setChecklistMessage({ type: 'error', text: 'No changes to save' });
+        setSavingChecklist(false);
+        return;
+      }
+      const result = await updateChecklistDefaults(updates);
+      setChecklistMessage({ type: 'success', text: `Updated ${result.totalUpdated} checklist items across all GPP events` });
+      setChecklistEdits({});
+      // Refresh
+      const clDefaults = await fetchChecklistDefaults();
+      setChecklistItems(clDefaults.items);
+    } catch (err: any) {
+      setChecklistMessage({ type: 'error', text: err.message || 'Failed to update' });
+    } finally {
+      setSavingChecklist(false);
+    }
+  }
 
   async function handleSaveGppNft() {
     setSavingNft(true);
@@ -549,6 +594,57 @@ export function AdminPage() {
               </table>
             </div>
           </section>
+
+          {/* Event Setup Checklist — super admin only */}
+          {isSuperAdmin && (
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ListChecks size={20} className="text-theme-text-secondary" />
+                <h2 className="text-lg font-semibold text-theme-text">Event Setup Checklist</h2>
+              </div>
+
+              {checklistMessage && (
+                <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  checklistMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+                }`}>
+                  {checklistMessage.text}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {checklistItems.map((item) => (
+                  <div key={item.name} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/30 border border-theme-stroke">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-theme-text font-medium">{item.name}</span>
+                      {item.isAuto && <span className="ml-2 text-xs text-theme-text-faint">(auto)</span>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Calendar size={14} className="text-theme-text-muted" />
+                      <input
+                        type="date"
+                        value={checklistEdits[item.name] ?? (item.dueDate ? item.dueDate.split('T')[0] : '')}
+                        onChange={(e) => setChecklistEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
+                        className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-36"
+                      />
+                    </div>
+                  </div>
+                ))}
+                {checklistItems.length === 0 && (
+                  <p className="text-sm text-theme-text-faint py-4 text-center">No checklist items found. Items are created when a GPP host first views their checklist.</p>
+                )}
+              </div>
+
+              {checklistItems.length > 0 && (
+                <button
+                  onClick={handleSaveChecklist}
+                  disabled={savingChecklist || Object.keys(checklistEdits).length === 0}
+                  className="mt-4 px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
+                >
+                  {savingChecklist ? 'Saving...' : 'Save Checklist Dates'}
+                </button>
+              )}
+            </section>
+          )}
 
           {/* GPP NFT Settings — super admin only */}
           {isSuperAdmin && (
