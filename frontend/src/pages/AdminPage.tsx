@@ -12,7 +12,7 @@ import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
   fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
   fetchGppNftSettings, updateGppNftSettings,
-  fetchChecklistDefaults, updateChecklistDefaults,
+  fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault,
 } from '../lib/api';
 import type { ChecklistDefault } from '../lib/api';
 import { GPP_REGIONS } from '../types';
@@ -59,6 +59,9 @@ export function AdminPage() {
   const [checklistEdits, setChecklistEdits] = useState<Record<string, string>>({});
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [checklistMessage, setChecklistMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDate, setNewItemDate] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -154,6 +157,25 @@ export function AdminPage() {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to update' });
     } finally {
       setSavingChecklist(false);
+    }
+  }
+
+  async function handleAddChecklistItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newItemName.trim()) return;
+    setAddingItem(true);
+    setChecklistMessage(null);
+    try {
+      const result = await addChecklistDefault({ name: newItemName.trim(), dueDate: newItemDate || null });
+      setChecklistMessage({ type: 'success', text: `Added "${newItemName.trim()}" to ${result.createdCount} GPP events` });
+      setNewItemName('');
+      setNewItemDate('');
+      const clDefaults = await fetchChecklistDefaults();
+      setChecklistItems(clDefaults.items);
+    } catch (err: any) {
+      setChecklistMessage({ type: 'error', text: err.message || 'Failed to add item' });
+    } finally {
+      setAddingItem(false);
     }
   }
 
@@ -634,15 +656,40 @@ export function AdminPage() {
                 )}
               </div>
 
-              {checklistItems.length > 0 && (
+              {checklistItems.length > 0 && Object.keys(checklistEdits).length > 0 && (
                 <button
                   onClick={handleSaveChecklist}
-                  disabled={savingChecklist || Object.keys(checklistEdits).length === 0}
+                  disabled={savingChecklist}
                   className="mt-4 px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
                 >
                   {savingChecklist ? 'Saving...' : 'Save Checklist Dates'}
                 </button>
               )}
+
+              <form onSubmit={handleAddChecklistItem} className="mt-4 pt-4 border-t border-theme-stroke flex items-end gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    placeholder="New checklist item..."
+                    className="w-full text-sm bg-white/50 border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
+                  />
+                </div>
+                <input
+                  type="date"
+                  value={newItemDate}
+                  onChange={(e) => setNewItemDate(e.target.value)}
+                  className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-36"
+                />
+                <button
+                  type="submit"
+                  disabled={addingItem || !newItemName.trim()}
+                  className="px-4 py-2 bg-[#E52828] text-white rounded-lg text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  {addingItem ? 'Adding...' : 'Add Item'}
+                </button>
+              </form>
             </section>
           )}
 

@@ -2200,6 +2200,13 @@ export async function updateChecklistDefaults(items: Array<{ name: string; dueDa
   });
 }
 
+export async function addChecklistDefault(data: { name: string; dueDate?: string | null }): Promise<{ createdCount: number }> {
+  return apiRequest<{ createdCount: number }>('/api/admin/checklist-defaults', {
+    method: 'POST',
+    body: data,
+  });
+}
+
 // ============================================
 // Underboss Dashboard API
 // ============================================

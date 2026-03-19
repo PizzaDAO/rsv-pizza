@@ -291,4 +291,52 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
+// POST /api/admin/checklist-defaults — Add a new default checklist item to all GPP events
+router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can add checklist items', 403, 'FORBIDDEN');
+    }
+
+    const { name, dueDate } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Get all GPP event IDs
+    const gppParties = await prisma.party.findMany({
+      where: { eventType: 'gpp' },
+      select: { id: true },
+    });
+
+    if (gppParties.length === 0) {
+      return res.json({ success: true, createdCount: 0 });
+    }
+
+    // Get max sortOrder across all GPP checklist items
+    const maxSort = await prisma.checklistItem.aggregate({
+      where: { party: { eventType: 'gpp' } },
+      _max: { sortOrder: true },
+    });
+    const nextSort = (maxSort._max.sortOrder ?? -1) + 1;
+
+    // Create the item for every GPP event
+    const result = await prisma.checklistItem.createMany({
+      data: gppParties.map(p => ({
+        partyId: p.id,
+        name: name.trim(),
+        dueDate: dueDate ? new Date(dueDate) : null,
+        isAuto: false,
+        isDefault: true,
+        sortOrder: nextSort,
+      })),
+    });
+
+    res.status(201).json({ success: true, createdCount: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
