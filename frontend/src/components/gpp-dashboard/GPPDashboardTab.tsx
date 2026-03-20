@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist } from '../../lib/api';
-import { AutoCompleteStates } from '../../types';
+import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 
@@ -12,6 +12,7 @@ export const GPPDashboardTab: React.FC = () => {
   const navigate = useNavigate();
   const { party, guests } = usePizza();
   const [autoStates, setAutoStates] = useState<AutoCompleteStates | null>(null);
+  const [dbItems, setDbItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hostsExpanded, setHostsExpanded] = useState(false);
   const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
@@ -24,11 +25,21 @@ export const GPPDashboardTab: React.FC = () => {
       const data = await getChecklist(party.id);
       if (!cancelled) {
         setAutoStates(data?.autoCompleteStates ?? null);
+        setDbItems(data?.items ?? []);
         setLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [party?.id]);
+
+  // Build a name→dueDate map from DB items
+  const dueDateMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const item of dbItems) {
+      map.set(item.name, item.dueDate ? item.dueDate.split('T')[0] : null);
+    }
+    return map;
+  }, [dbItems]);
 
   const goToTab = (tab: string) => {
     if (tab === 'details') {
@@ -46,14 +57,14 @@ export const GPPDashboardTab: React.FC = () => {
         done: true,
         tab: null,
         icon: PartyPopper,
-        dueDate: null,
+        dueDate: dueDateMap.get('Create Event') ?? null,
       },
       {
         label: 'Request Party Kit',
         done: autoStates?.party_kit_submitted ?? false,
         tab: 'gpp',
         icon: Package,
-        dueDate: '2026-03-17',
+        dueDate: dueDateMap.get('Request Party Kit') ?? null,
       },
       {
         label: 'Build a Team',
@@ -61,52 +72,59 @@ export const GPPDashboardTab: React.FC = () => {
         tab: null,
         onClick: () => setHostsExpanded(prev => !prev),
         icon: Users,
-        dueDate: '2026-03-30',
+        dueDate: dueDateMap.get('Build a Team') ?? null,
       },
       {
         label: 'Find a Venue',
         done: autoStates?.venue_added ?? !!party.venueName,
         tab: 'venue',
         icon: MapPin,
-        dueDate: '2026-04-08',
+        dueDate: dueDateMap.get('Find a Venue') ?? null,
       },
       {
         label: 'Set Up Budget',
         done: autoStates?.budget_submitted ?? false,
         tab: 'budget',
         icon: DollarSign,
-        dueDate: '2026-04-18',
+        dueDate: dueDateMap.get('Set Up Budget') ?? null,
       },
       {
         label: 'Find Partners',
         done: false,
         tab: 'sponsors',
         icon: Handshake,
-        dueDate: '2026-03-15',
+        dueDate: dueDateMap.get('Find Partners') ?? null,
+      },
+      {
+        label: 'Select Pizzeria',
+        done: false,
+        tab: 'venue',
+        icon: MapPin,
+        dueDate: dueDateMap.get('Select Pizzeria') ?? null,
       },
       {
         label: 'Prepare for the Party',
         done: false,
         tab: null,
         icon: ClipboardCheck,
-        dueDate: '2026-04-20',
+        dueDate: dueDateMap.get('Prepare for the Party') ?? null,
       },
       {
         label: 'Post to Socials',
         done: false,
         tab: 'promo',
         icon: Megaphone,
-        dueDate: '2026-04-22',
+        dueDate: dueDateMap.get('Post to Socials') ?? null,
       },
       {
         label: 'Throw the Party',
         done: false,
         tab: null,
         icon: Rocket,
-        dueDate: '2026-05-22',
+        dueDate: dueDateMap.get('Throw the Party') ?? null,
       },
     ];
-  }, [party, autoStates, coHostCount]);
+  }, [party, autoStates, coHostCount, dueDateMap]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;

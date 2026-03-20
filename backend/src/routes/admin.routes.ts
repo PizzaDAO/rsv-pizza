@@ -228,13 +228,12 @@ router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('Forbidden', 403, 'FORBIDDEN');
     }
 
-    // Find a GPP event that has been seeded and return its default items
-    const items = await prisma.checklistItem.findMany({
+    // Fetch ALL default GPP checklist items (no distinct — multiple events have the same items)
+    const allItems = await prisma.checklistItem.findMany({
       where: {
         isDefault: true,
         party: { eventType: 'gpp' },
       },
-      distinct: ['name'],
       orderBy: { sortOrder: 'asc' },
       select: {
         name: true,
@@ -245,6 +244,16 @@ router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Res
         linkTab: true,
       },
     });
+
+    // Deduplicate by name, preferring items with non-null dueDate
+    const itemMap = new Map<string, typeof allItems[0]>();
+    for (const item of allItems) {
+      const existing = itemMap.get(item.name);
+      if (!existing || (item.dueDate && !existing.dueDate)) {
+        itemMap.set(item.name, item);
+      }
+    }
+    const items = Array.from(itemMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 
     res.json({ items });
   } catch (error) {
