@@ -29,7 +29,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Request Party Kit',
-    dueDate: null,
+    dueDate: new Date('2026-03-17'),
     isAuto: true,
     autoRule: 'party_kit_submitted',
     linkTab: 'gpp',
@@ -38,7 +38,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Build a Team',
-    dueDate: null,
+    dueDate: new Date('2026-03-30'),
     isAuto: true,
     autoRule: 'team_built',
     linkTab: 'details',
@@ -47,7 +47,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Find a Venue',
-    dueDate: null,
+    dueDate: new Date('2026-04-08'),
     isAuto: true,
     autoRule: 'venue_added',
     linkTab: 'venue',
@@ -56,7 +56,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Set Up Budget',
-    dueDate: null,
+    dueDate: new Date('2026-04-18'),
     isAuto: true,
     autoRule: 'budget_submitted',
     linkTab: 'budget',
@@ -83,7 +83,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Prepare for the Party',
-    dueDate: null,
+    dueDate: new Date('2026-04-20'),
     isAuto: false,
     autoRule: null,
     linkTab: null,
@@ -92,7 +92,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Post to Socials',
-    dueDate: null,
+    dueDate: new Date('2026-04-22'),
     isAuto: false,
     autoRule: null,
     linkTab: 'promo',
@@ -101,7 +101,7 @@ const DEFAULT_CHECKLIST_ITEMS = [
   },
   {
     name: 'Throw the Party',
-    dueDate: null,
+    dueDate: new Date('2026-05-22'),
     isAuto: false,
     autoRule: null,
     linkTab: null,
