@@ -262,41 +262,53 @@ router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Res
 });
 
 // PATCH /api/admin/checklist-defaults — Bulk update default checklist items across all GPP events
-router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response) => {
+  // Auth check via raw SQL to avoid Prisma UUID deserialization issues
+  let adminRole: string | null = null;
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Only super admins can update checklist defaults', 403, 'FORBIDDEN');
-    }
+    const result = await prisma.$queryRaw<Array<{ role: string }>>`
+      SELECT role FROM admins WHERE email = ${(req.userEmail || '').toLowerCase()} LIMIT 1
+    `;
+    adminRole = result[0]?.role ?? null;
+  } catch (e: any) {
+    return res.status(500).json({ error: { message: 'Admin check failed: ' + e.message } });
+  }
 
-    const { items } = req.body;
+  if (adminRole !== 'super_admin') {
+    return res.status(403).json({ error: { message: 'Only super admins can update checklist defaults', code: 'FORBIDDEN' } });
+  }
 
-    if (!Array.isArray(items)) {
-      throw new AppError('items must be an array', 400, 'VALIDATION_ERROR');
-    }
+  const { items } = req.body;
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: { message: 'items must be an array', code: 'VALIDATION_ERROR' } });
+  }
 
-    // Update each default item by name across all GPP events
+  try {
+    // Update each default item by name across all GPP events using raw SQL
     let totalUpdated = 0;
     for (const item of items) {
       if (!item.name) continue;
+      const dueDate = item.dueDate !== undefined
+        ? (item.dueDate ? new Date(item.dueDate) : null)
+        : undefined;
 
-      const result = await prisma.checklistItem.updateMany({
-        where: {
-          name: item.name,
-          isDefault: true,
-          party: { eventType: 'gpp' },
-        },
-        data: {
-          ...(item.dueDate !== undefined && { dueDate: item.dueDate ? new Date(item.dueDate) : null }),
-          ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
-          ...(item.newName && { name: item.newName }),
-        },
-      });
-      totalUpdated += result.count;
+      if (dueDate === undefined) continue; // nothing to update
+
+      const result = await prisma.$executeRaw`
+        UPDATE checklist_items ci
+        SET due_date = ${dueDate}::date, updated_at = NOW()
+        FROM parties p
+        WHERE ci.party_id = p.id
+          AND p.event_type = 'gpp'
+          AND ci.is_default = true
+          AND ci.name = ${item.name}
+      `;
+      totalUpdated += result;
     }
 
     res.json({ success: true, totalUpdated });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({ error: { message: 'Update failed: ' + error.message } });
   }
 });
 
