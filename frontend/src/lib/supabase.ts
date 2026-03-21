@@ -658,7 +658,7 @@ export async function validateCustomSlug(
 export async function verifyPartyPassword(partyId: string, passwordAttempt: string): Promise<boolean> {
   const { count, error } = await supabase
     .from('parties')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('id', partyId)
     .eq('password', passwordAttempt);
 

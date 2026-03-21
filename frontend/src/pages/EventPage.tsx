@@ -46,6 +46,7 @@ export function EventPage() {
   const [showEditPasswordPrompt, setShowEditPasswordPrompt] = useState(false);
   const [editPasswordInput, setEditPasswordInput] = useState('');
   const [editPasswordError, setEditPasswordError] = useState<string | null>(null);
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [userHasRSVPd, setUserHasRSVPd] = useState(false);
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
@@ -203,21 +204,20 @@ export function EventPage() {
 
     if (!event?.hasPassword) return;
 
+    setVerifyingPassword(true);
+    setPasswordError(null);
+
     const isValid = await verifyPartyPassword(event.id, passwordInput);
 
     if (isValid) {
-      // Correct password
       setIsAuthenticated(true);
-      setPasswordError(null);
-      // Store in session storage to avoid re-prompting
-      // Use inviteCode as key to be consistent with RSVPPage
       const authKey = `rsvpizza_auth_${event.inviteCode}`;
       sessionStorage.setItem(authKey, passwordInput);
     } else {
-      // Wrong password
       setPasswordError('Incorrect password. Please try again.');
       setPasswordInput('');
     }
+    setVerifyingPassword(false);
   };
 
   const handleRSVP = () => {
@@ -299,8 +299,13 @@ export function EventPage() {
             <button
               type="submit"
               className="w-full btn-primary"
+              disabled={verifyingPassword}
             >
-              Continue
+              {verifyingPassword ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+                </span>
+              ) : 'Continue'}
             </button>
           </form>
 
