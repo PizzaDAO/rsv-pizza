@@ -16,100 +16,6 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
   return !!party;
 }
 
-// Default GPP checklist items (ordered by due date, then sortOrder)
-const DEFAULT_CHECKLIST_ITEMS = [
-  {
-    name: 'Create Event',
-    dueDate: null,
-    isAuto: true,
-    autoRule: 'event_created',
-    linkTab: null,
-    sortOrder: 0,
-    isDefault: true,
-  },
-  {
-    name: 'Request Party Kit',
-    dueDate: new Date('2026-03-17'),
-    isAuto: true,
-    autoRule: 'party_kit_submitted',
-    linkTab: 'gpp',
-    sortOrder: 1,
-    isDefault: true,
-  },
-  {
-    name: 'Build a Team',
-    dueDate: new Date('2026-03-30'),
-    isAuto: true,
-    autoRule: 'team_built',
-    linkTab: 'details',
-    sortOrder: 2,
-    isDefault: true,
-  },
-  {
-    name: 'Find a Venue',
-    dueDate: new Date('2026-04-08'),
-    isAuto: true,
-    autoRule: 'venue_added',
-    linkTab: 'venue',
-    sortOrder: 3,
-    isDefault: true,
-  },
-  {
-    name: 'Set Up Budget',
-    dueDate: new Date('2026-04-18'),
-    isAuto: true,
-    autoRule: 'budget_submitted',
-    linkTab: 'budget',
-    sortOrder: 4,
-    isDefault: true,
-  },
-  {
-    name: 'Find Partners',
-    dueDate: new Date('2026-04-15'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: 'sponsors',
-    sortOrder: 5,
-    isDefault: true,
-  },
-  {
-    name: 'Select Pizzeria',
-    dueDate: new Date('2026-04-18'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: 'venue',
-    sortOrder: 6,
-    isDefault: true,
-  },
-  {
-    name: 'Prepare for the Party',
-    dueDate: new Date('2026-04-20'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: null,
-    sortOrder: 7,
-    isDefault: true,
-  },
-  {
-    name: 'Post to Socials',
-    dueDate: new Date('2026-04-22'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: 'promo',
-    sortOrder: 8,
-    isDefault: true,
-  },
-  {
-    name: 'Throw the Party',
-    dueDate: new Date('2026-05-22'),
-    isAuto: false,
-    autoRule: null,
-    linkTab: null,
-    sortOrder: 9,
-    isDefault: true,
-  },
-];
-
 const router = Router();
 
 // All checklist routes require authentication
@@ -203,22 +109,26 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       team_built: teamBuilt,
     };
 
-    // Check if defaults have been seeded with current version
+    // Check if defaults have been seeded — compare against checklist_defaults count
     const defaultCount = await prisma.checklistItem.count({
       where: { partyId, isDefault: true },
     });
+    const templateCount = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) as count FROM checklist_defaults
+    `;
+    const expectedCount = Number(templateCount[0]?.count ?? 0);
 
     res.json({
       items,
       autoCompleteStates,
-      seeded: defaultCount === DEFAULT_CHECKLIST_ITEMS.length,
+      seeded: defaultCount >= expectedCount && expectedCount > 0,
     });
   } catch (error) {
     next(error);
   }
 });
 
-// POST /:partyId/checklist/seed - Seed default GPP items (idempotent)
+// POST /:partyId/checklist/seed - Seed default GPP items from checklist_defaults table
 router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
@@ -229,13 +139,35 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Read template from checklist_defaults
+    const defaults = await prisma.$queryRaw<Array<{
+      name: string;
+      due_date: Date | null;
+      is_auto: boolean;
+      auto_rule: string | null;
+      link_tab: string | null;
+      sort_order: number;
+    }>>`
+      SELECT name, due_date, is_auto, auto_rule, link_tab, sort_order
+      FROM checklist_defaults
+      ORDER BY sort_order ASC
+    `;
+
+    if (defaults.length === 0) {
+      const items = await prisma.checklistItem.findMany({
+        where: { partyId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      res.json({ items, seeded: true });
+      return;
+    }
+
     // Check if already seeded (idempotent)
     const existingDefaults = await prisma.checklistItem.count({
       where: { partyId, isDefault: true },
     });
 
-    if (existingDefaults === DEFAULT_CHECKLIST_ITEMS.length) {
-      // Already seeded with current version, return existing items
+    if (existingDefaults >= defaults.length) {
       const items = await prisma.checklistItem.findMany({
         where: { partyId },
         orderBy: { sortOrder: 'asc' },
@@ -251,11 +183,17 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       });
     }
 
-    // Seed defaults
+    // Seed from checklist_defaults table
     await prisma.checklistItem.createMany({
-      data: DEFAULT_CHECKLIST_ITEMS.map(item => ({
-        ...item,
+      data: defaults.map(d => ({
         partyId,
+        name: d.name,
+        dueDate: d.due_date,
+        isAuto: d.is_auto,
+        autoRule: d.auto_rule,
+        linkTab: d.link_tab,
+        sortOrder: d.sort_order,
+        isDefault: true,
       })),
     });
 

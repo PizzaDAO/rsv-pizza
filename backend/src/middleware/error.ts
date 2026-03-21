@@ -47,15 +47,10 @@ export const errorHandler = (
     }
   }
 
-  // Generic error — temporarily include details for debugging
   res.status(500).json({
     error: {
       message: 'Internal server error',
       code: 'INTERNAL_ERROR',
-      details: err.message,
-      errorName: err.name,
-      path: req.path,
-      method: req.method,
     },
   });
 };
