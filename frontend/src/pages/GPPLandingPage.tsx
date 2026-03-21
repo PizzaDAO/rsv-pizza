@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
@@ -55,6 +55,21 @@ export function GPPLandingPage() {
     size: number;
     rotation: number;
   }>>([]);
+  const [mapActive, setMapActive] = useState(false);
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  // Deactivate map when clicking outside it
+  useEffect(() => {
+    if (!mapActive) return;
+    const handler = (e: MouseEvent) => {
+      if (mapRef.current && !mapRef.current.contains(e.target as Node)) {
+        setMapActive(false);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [mapActive]);
+
   const [parachutes, setParachutes] = useState<Array<{
     id: number;
     x: number;
@@ -525,14 +540,25 @@ export function GPPLandingPage() {
             See where communities around the world came together for pizza
           </p>
 
-          <div className="rounded-2xl overflow-hidden border shadow-lg relative" style={{ borderColor: C.cardBorder, height: 500 }}>
+          <div ref={mapRef} className="rounded-2xl overflow-hidden border shadow-lg relative" style={{ borderColor: C.cardBorder, height: 500 }}>
             <iframe
               src="https://www.google.com/maps/d/u/0/embed?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA&z=3"
-              className="w-full pointer-events-none"
-              style={{ height: 600, border: 'none', marginTop: -100 }}
+              className="w-full"
+              style={{ height: 600, border: 'none', marginTop: -100, pointerEvents: mapActive ? 'auto' : 'none' }}
               title="Global Pizza Party Map"
               loading="lazy"
+              allowFullScreen={mapActive}
             />
+            {!mapActive && (
+              <div
+                className="absolute inset-0 z-10 cursor-pointer flex items-end justify-center pb-4"
+                onClick={() => setMapActive(true)}
+              >
+                <span className="bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm">
+                  Click to interact with map
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="text-center mt-6">
