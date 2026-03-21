@@ -221,60 +221,66 @@ router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, ne
   }
 });
 
-// GET /api/admin/checklist-defaults — Get default checklist items (from any GPP event)
+// ============================================
+// Checklist Defaults — using dedicated table
+// ============================================
+
+// Raw-SQL admin check helpers (bypass Prisma UUID deserialization bug)
+async function rawIsAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const result = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM admins WHERE email = ${email.toLowerCase()} LIMIT 1
+  `;
+  return result.length > 0;
+}
+
+async function rawIsSuperAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const result = await prisma.$queryRaw<Array<{ role: string }>>`
+    SELECT role FROM admins WHERE email = ${email.toLowerCase()} LIMIT 1
+  `;
+  return result[0]?.role === 'super_admin';
+}
+
+// GET /api/admin/checklist-defaults — Read from checklist_defaults table
 router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
+    if (!(await rawIsAdmin(req.userEmail))) {
       throw new AppError('Forbidden', 403, 'FORBIDDEN');
     }
 
-    // Fetch ALL default GPP checklist items (no distinct — multiple events have the same items)
-    const allItems = await prisma.checklistItem.findMany({
-      where: {
-        isDefault: true,
-        party: { eventType: 'gpp' },
-      },
-      orderBy: { sortOrder: 'asc' },
-      select: {
-        name: true,
-        dueDate: true,
-        sortOrder: true,
-        isAuto: true,
-        autoRule: true,
-        linkTab: true,
-      },
-    });
+    const items = await prisma.$queryRaw<Array<{
+      name: string;
+      due_date: Date | null;
+      sort_order: number;
+      is_auto: boolean;
+      auto_rule: string | null;
+      link_tab: string | null;
+    }>>`
+      SELECT name, due_date, sort_order, is_auto, auto_rule, link_tab
+      FROM checklist_defaults
+      ORDER BY sort_order ASC
+    `;
 
-    // Deduplicate by name, preferring items with non-null dueDate
-    const itemMap = new Map<string, typeof allItems[0]>();
-    for (const item of allItems) {
-      const existing = itemMap.get(item.name);
-      if (!existing || (item.dueDate && !existing.dueDate)) {
-        itemMap.set(item.name, item);
-      }
-    }
-    const items = Array.from(itemMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+    // Map to camelCase to match existing frontend interface
+    const mapped = items.map(i => ({
+      name: i.name,
+      dueDate: i.due_date ? i.due_date.toISOString().split('T')[0] : null,
+      sortOrder: i.sort_order,
+      isAuto: i.is_auto,
+      autoRule: i.auto_rule,
+      linkTab: i.link_tab,
+    }));
 
-    res.json({ items });
+    res.json({ items: mapped });
   } catch (error) {
     next(error);
   }
 });
 
-// PATCH /api/admin/checklist-defaults — Bulk update default checklist items across all GPP events
+// PATCH /api/admin/checklist-defaults — Update defaults + propagate to all GPP events
 router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response) => {
-  // Auth check via raw SQL to avoid Prisma UUID deserialization issues
-  let adminRole: string | null = null;
-  try {
-    const result = await prisma.$queryRaw<Array<{ role: string }>>`
-      SELECT role FROM admins WHERE email = ${(req.userEmail || '').toLowerCase()} LIMIT 1
-    `;
-    adminRole = result[0]?.role ?? null;
-  } catch (e: any) {
-    return res.status(500).json({ error: { message: 'Admin check failed: ' + e.message } });
-  }
-
-  if (adminRole !== 'super_admin') {
+  if (!(await rawIsSuperAdmin(req.userEmail))) {
     return res.status(403).json({ error: { message: 'Only super admins can update checklist defaults', code: 'FORBIDDEN' } });
   }
 
@@ -284,7 +290,6 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
   }
 
   try {
-    // Update each default item by name across all GPP events using raw SQL
     let totalUpdated = 0;
     for (const item of items) {
       if (!item.name) continue;
@@ -292,8 +297,16 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
         ? (item.dueDate ? new Date(item.dueDate) : null)
         : undefined;
 
-      if (dueDate === undefined) continue; // nothing to update
+      if (dueDate === undefined) continue;
 
+      // 1. Update the checklist_defaults row
+      await prisma.$executeRaw`
+        UPDATE checklist_defaults
+        SET due_date = ${dueDate}::date, updated_at = NOW()
+        WHERE name = ${item.name}
+      `;
+
+      // 2. Propagate to all GPP events' checklist_items
       const result = await prisma.$executeRaw`
         UPDATE checklist_items ci
         SET due_date = ${dueDate}::date, updated_at = NOW()
@@ -312,51 +325,48 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
-// POST /api/admin/checklist-defaults — Add a new default checklist item to all GPP events
-router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+// POST /api/admin/checklist-defaults — Add new item to defaults + all GPP events
+router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response) => {
+  if (!(await rawIsSuperAdmin(req.userEmail))) {
+    return res.status(403).json({ error: { message: 'Only super admins can add checklist items', code: 'FORBIDDEN' } });
+  }
+
+  const { name, dueDate } = req.body;
+
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: { message: 'Name is required', code: 'VALIDATION_ERROR' } });
+  }
+
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Only super admins can add checklist items', 403, 'FORBIDDEN');
+    const trimmedName = name.trim();
+    const parsedDate = dueDate ? new Date(dueDate) : null;
+
+    // Get next sort_order from checklist_defaults
+    const maxResult = await prisma.$queryRaw<Array<{ max_sort: number | null }>>`
+      SELECT MAX(sort_order) as max_sort FROM checklist_defaults
+    `;
+    const nextSort = (maxResult[0]?.max_sort ?? -1) + 1;
+
+    // 1. Insert into checklist_defaults
+    await prisma.$executeRaw`
+      INSERT INTO checklist_defaults (name, due_date, is_auto, sort_order)
+      VALUES (${trimmedName}, ${parsedDate}::date, false, ${nextSort})
+    `;
+
+    // 2. Insert into all GPP events' checklist_items
+    const result = await prisma.$executeRaw`
+      INSERT INTO checklist_items (id, party_id, name, due_date, is_auto, is_default, sort_order, created_at, updated_at)
+      SELECT gen_random_uuid(), p.id, ${trimmedName}, ${parsedDate}::date, false, true, ${nextSort}, NOW(), NOW()
+      FROM parties p
+      WHERE p.event_type = 'gpp'
+    `;
+
+    res.status(201).json({ success: true, createdCount: result });
+  } catch (error: any) {
+    if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+      return res.status(400).json({ error: { message: 'An item with that name already exists', code: 'DUPLICATE' } });
     }
-
-    const { name, dueDate } = req.body;
-
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
-    }
-
-    // Get all GPP event IDs
-    const gppParties = await prisma.party.findMany({
-      where: { eventType: 'gpp' },
-      select: { id: true },
-    });
-
-    if (gppParties.length === 0) {
-      return res.json({ success: true, createdCount: 0 });
-    }
-
-    // Get max sortOrder across all GPP checklist items
-    const maxSort = await prisma.checklistItem.aggregate({
-      where: { party: { eventType: 'gpp' } },
-      _max: { sortOrder: true },
-    });
-    const nextSort = (maxSort._max.sortOrder ?? -1) + 1;
-
-    // Create the item for every GPP event
-    const result = await prisma.checklistItem.createMany({
-      data: gppParties.map(p => ({
-        partyId: p.id,
-        name: name.trim(),
-        dueDate: dueDate ? new Date(dueDate) : null,
-        isAuto: false,
-        isDefault: true,
-        sortOrder: nextSort,
-      })),
-    });
-
-    res.status(201).json({ success: true, createdCount: result.count });
-  } catch (error) {
-    next(error);
+    res.status(500).json({ error: { message: 'Failed to add item: ' + error.message } });
   }
 });
 

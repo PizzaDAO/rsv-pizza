@@ -900,6 +900,20 @@ model ChecklistItem {
   @@map("checklist_items")
 }
 
+model ChecklistDefault {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  dueDate   DateTime? @map("due_date") @db.Date
+  isAuto    Boolean   @default(false) @map("is_auto")
+  autoRule  String?   @map("auto_rule")
+  linkTab   String?   @map("link_tab")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("checklist_defaults")
+}
+
 model AIPhoneCall {
   id     String @id @default(cuid())
   callId String @unique // Bland AI call_id
