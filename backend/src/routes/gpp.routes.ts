@@ -264,6 +264,26 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     // Auto-infer region from country code
     const inferredRegion = countryCode ? countryCodeToRegion(countryCode) : null;
 
+    // Find active underbosses for the inferred region and add as hidden co-hosts
+    let underbossCoHosts: any[] = [];
+    if (inferredRegion) {
+      const underbosses = await prisma.underboss.findMany({
+        where: {
+          isActive: true,
+          OR: [{ region: inferredRegion }, { regions: { has: inferredRegion } }],
+        },
+        select: { name: true, email: true },
+      });
+      underbossCoHosts = underbosses.map(ub => ({
+        id: crypto.randomUUID(),
+        name: ub.name,
+        email: ub.email.toLowerCase(),
+        showOnEvent: false,
+        canEdit: true,
+        isUnderboss: true,
+      }));
+    }
+
     // Create the party with GPP defaults
     const party = await prisma.party.create({
       data: {
@@ -294,7 +314,8 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
             email: normalizedEmail,
             showOnEvent: false,
             canEdit: true
-          }
+          },
+          ...underbossCoHosts,
         ],
         userId: user.id,
       },

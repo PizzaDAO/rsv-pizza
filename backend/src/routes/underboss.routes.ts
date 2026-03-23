@@ -631,6 +631,42 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       },
     });
 
+    // Add new underboss as co-host to all existing GPP events in their region(s)
+    try {
+      const gppEvents = await prisma.party.findMany({
+        where: {
+          eventType: 'gpp',
+          region: { in: regions },
+        },
+        select: { id: true, coHosts: true },
+      });
+
+      const ubEmail = email.toLowerCase();
+      for (const event of gppEvents) {
+        const existingCoHosts = (event.coHosts as any[]) || [];
+        // Skip if already a co-host
+        if (existingCoHosts.some((h: any) => h.email?.toLowerCase() === ubEmail)) continue;
+
+        const updatedCoHosts = [
+          ...existingCoHosts,
+          {
+            id: crypto.randomUUID(),
+            name,
+            email: ubEmail,
+            showOnEvent: false,
+            canEdit: true,
+            isUnderboss: true,
+          },
+        ];
+        await prisma.party.update({
+          where: { id: event.id },
+          data: { coHosts: updatedCoHosts },
+        });
+      }
+    } catch (syncError) {
+      console.error('Failed to sync underboss co-hosts on create:', syncError);
+    }
+
     res.status(201).json({
       underboss: {
         id: underboss.id,
@@ -686,6 +722,12 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
     const { id } = req.params;
     const { name, email, region, regions, notes, isActive } = req.body;
 
+    // Fetch old state before update for co-host sync
+    const oldUnderboss = await prisma.underboss.findUnique({
+      where: { id },
+      select: { name: true, email: true, regions: true, region: true, isActive: true },
+    });
+
     const updateData: any = {
       ...(name !== undefined && { name }),
       ...(email !== undefined && { email }),
@@ -719,6 +761,117 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
       },
     });
 
+    // Sync co-host entries across GPP events
+    if (oldUnderboss) {
+      try {
+        const oldEmail = oldUnderboss.email.toLowerCase();
+        const newEmail = (email !== undefined ? email : oldUnderboss.email).toLowerCase();
+        const newName = name !== undefined ? name : oldUnderboss.name;
+        const oldRegions = oldUnderboss.regions.length > 0 ? oldUnderboss.regions : [oldUnderboss.region];
+        const newRegions = Array.isArray(regions) ? regions : oldRegions;
+        const nowActive = isActive !== undefined ? isActive : oldUnderboss.isActive;
+
+        // If deactivated, remove from all events
+        if (!nowActive && oldUnderboss.isActive) {
+          const eventsWithUb = await prisma.party.findMany({
+            where: { eventType: 'gpp' },
+            select: { id: true, coHosts: true },
+          });
+          for (const event of eventsWithUb) {
+            const coHosts = (event.coHosts as any[]) || [];
+            const filtered = coHosts.filter((h: any) =>
+              !(h.email?.toLowerCase() === oldEmail && h.isUnderboss === true)
+            );
+            if (filtered.length !== coHosts.length) {
+              await prisma.party.update({
+                where: { id: event.id },
+                data: { coHosts: filtered },
+              });
+            }
+          }
+        } else if (nowActive) {
+          // Determine added and removed regions
+          const addedRegions = newRegions.filter((r: string) => !oldRegions.includes(r));
+          const removedRegions = oldRegions.filter((r: string) => !newRegions.includes(r));
+
+          // Remove from events in dropped regions
+          if (removedRegions.length > 0) {
+            const eventsToRemoveFrom = await prisma.party.findMany({
+              where: { eventType: 'gpp', region: { in: removedRegions } },
+              select: { id: true, coHosts: true },
+            });
+            for (const event of eventsToRemoveFrom) {
+              const coHosts = (event.coHosts as any[]) || [];
+              const filtered = coHosts.filter((h: any) =>
+                !(h.email?.toLowerCase() === oldEmail && h.isUnderboss === true)
+              );
+              if (filtered.length !== coHosts.length) {
+                await prisma.party.update({
+                  where: { id: event.id },
+                  data: { coHosts: filtered },
+                });
+              }
+            }
+          }
+
+          // Add to events in new regions
+          if (addedRegions.length > 0) {
+            const eventsToAddTo = await prisma.party.findMany({
+              where: { eventType: 'gpp', region: { in: addedRegions } },
+              select: { id: true, coHosts: true },
+            });
+            for (const event of eventsToAddTo) {
+              const coHosts = (event.coHosts as any[]) || [];
+              if (coHosts.some((h: any) => h.email?.toLowerCase() === newEmail)) continue;
+              const updatedCoHosts = [
+                ...coHosts,
+                {
+                  id: crypto.randomUUID(),
+                  name: newName,
+                  email: newEmail,
+                  showOnEvent: false,
+                  canEdit: true,
+                  isUnderboss: true,
+                },
+              ];
+              await prisma.party.update({
+                where: { id: event.id },
+                data: { coHosts: updatedCoHosts },
+              });
+            }
+          }
+
+          // Update name/email on existing co-host entries in remaining regions
+          const remainingRegions = newRegions.filter((r: string) => oldRegions.includes(r));
+          if (remainingRegions.length > 0 && (name !== undefined || email !== undefined)) {
+            const eventsToUpdate = await prisma.party.findMany({
+              where: { eventType: 'gpp', region: { in: remainingRegions } },
+              select: { id: true, coHosts: true },
+            });
+            for (const event of eventsToUpdate) {
+              const coHosts = (event.coHosts as any[]) || [];
+              let changed = false;
+              const updatedCoHosts = coHosts.map((h: any) => {
+                if (h.email?.toLowerCase() === oldEmail && h.isUnderboss === true) {
+                  changed = true;
+                  return { ...h, name: newName, email: newEmail };
+                }
+                return h;
+              });
+              if (changed) {
+                await prisma.party.update({
+                  where: { id: event.id },
+                  data: { coHosts: updatedCoHosts },
+                });
+              }
+            }
+          }
+        }
+      } catch (syncError) {
+        console.error('Failed to sync underboss co-hosts on update:', syncError);
+      }
+    }
+
     res.json({ underboss });
   } catch (error) {
     next(error);
@@ -734,12 +887,108 @@ router.delete('/admin/:id', requireAuth, async (req: AuthRequest, res: Response,
 
     const { id } = req.params;
 
+    // Fetch underboss email before deactivating
+    const underboss = await prisma.underboss.findUnique({
+      where: { id },
+      select: { email: true },
+    });
+
     await prisma.underboss.update({
       where: { id },
       data: { isActive: false },
     });
 
+    // Remove co-host entries from all GPP events
+    if (underboss) {
+      try {
+        const ubEmail = underboss.email.toLowerCase();
+        const eventsWithUb = await prisma.party.findMany({
+          where: { eventType: 'gpp' },
+          select: { id: true, coHosts: true },
+        });
+        for (const event of eventsWithUb) {
+          const coHosts = (event.coHosts as any[]) || [];
+          const filtered = coHosts.filter((h: any) =>
+            !(h.email?.toLowerCase() === ubEmail && h.isUnderboss === true)
+          );
+          if (filtered.length !== coHosts.length) {
+            await prisma.party.update({
+              where: { id: event.id },
+              data: { coHosts: filtered },
+            });
+          }
+        }
+      } catch (syncError) {
+        console.error('Failed to remove underboss co-hosts on delete:', syncError);
+      }
+    }
+
     res.json({ success: true, message: 'Underboss deactivated' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/underboss/admin/backfill-cohosts - Idempotent backfill of underboss co-hosts
+router.post('/admin/backfill-cohosts', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    // Get all active underbosses
+    const activeUnderbosses = await prisma.underboss.findMany({
+      where: { isActive: true },
+      select: { name: true, email: true, region: true, regions: true },
+    });
+
+    // Get all GPP events with a region
+    const gppEvents = await prisma.party.findMany({
+      where: { eventType: 'gpp', region: { not: null } },
+      select: { id: true, region: true, coHosts: true },
+    });
+
+    let eventsUpdated = 0;
+
+    for (const event of gppEvents) {
+      const eventRegion = event.region!;
+      const existingCoHosts = (event.coHosts as any[]) || [];
+
+      // Find underbosses for this event's region
+      const regionUnderbosses = activeUnderbosses.filter(ub => {
+        const ubRegions = ub.regions.length > 0 ? ub.regions : [ub.region];
+        return ubRegions.includes(eventRegion);
+      });
+
+      let newCoHosts = [...existingCoHosts];
+      let changed = false;
+
+      for (const ub of regionUnderbosses) {
+        const ubEmail = ub.email.toLowerCase();
+        // Skip if already present
+        if (newCoHosts.some((h: any) => h.email?.toLowerCase() === ubEmail)) continue;
+
+        newCoHosts.push({
+          id: crypto.randomUUID(),
+          name: ub.name,
+          email: ubEmail,
+          showOnEvent: false,
+          canEdit: true,
+          isUnderboss: true,
+        });
+        changed = true;
+      }
+
+      if (changed) {
+        await prisma.party.update({
+          where: { id: event.id },
+          data: { coHosts: newCoHosts },
+        });
+        eventsUpdated++;
+      }
+    }
+
+    res.json({ eventsUpdated, totalEvents: gppEvents.length });
   } catch (error) {
     next(error);
   }

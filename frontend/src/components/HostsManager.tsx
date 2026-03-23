@@ -20,12 +20,16 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   initialCoHosts,
   onCoHostsChange,
 }) => {
-  // Co-hosts state
-  const [coHosts, setCoHosts] = useState<CoHost[]>(initialCoHosts);
+  // Separate underboss co-hosts (hidden, not editable) from regular co-hosts
+  const underbossCoHosts = initialCoHosts.filter(h => h.isUnderboss === true);
+  const editableInitialCoHosts = initialCoHosts.filter(h => h.isUnderboss !== true);
+
+  // Co-hosts state (only editable ones)
+  const [coHosts, setCoHosts] = useState<CoHost[]>(editableInitialCoHosts);
 
   // Sync from props when enriched data arrives asynchronously
   useEffect(() => {
-    setCoHosts(initialCoHosts);
+    setCoHosts(initialCoHosts.filter(h => h.isUnderboss !== true));
   }, [initialCoHosts]);
 
   const [newCoHostName, setNewCoHostName] = useState('');
@@ -46,14 +50,17 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
   const saveCoHostsArray = async (coHostsToSave: CoHost[]) => {
     try {
-      const success = await updateParty(partyId, { co_hosts: coHostsToSave });
+      // Merge underboss entries back before sending to API
+      // (server also protects these, but this avoids unnecessary churn)
+      const allCoHosts = [...coHostsToSave, ...underbossCoHosts];
+      const success = await updateParty(partyId, { co_hosts: allCoHosts });
       if (success) {
         for (const coHost of coHostsToSave) {
           if (coHost.email) {
             await addGuestByHost(partyId, coHost.name, [], [], [], [], [], coHost.email);
           }
         }
-        onCoHostsChange?.(coHostsToSave);
+        onCoHostsChange?.(allCoHosts);
       }
     } catch (error) {
       console.error('Error saving co-hosts:', error);

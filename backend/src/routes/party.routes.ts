@@ -305,6 +305,25 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // Protect underboss co-host entries: preserve them on co-hosts update
+    let mergedCoHosts = coHosts;
+    if (coHosts !== undefined) {
+      const existingParty = await prisma.party.findUnique({
+        where: { id },
+        select: { coHosts: true },
+      });
+      const existingCoHosts = (existingParty?.coHosts as any[]) || [];
+      // Extract underboss entries from existing data
+      const underbossEntries = existingCoHosts.filter((h: any) => h.isUnderboss === true);
+      // Strip isUnderboss from client-submitted entries (prevent spoofing)
+      const clientCoHosts = (coHosts as any[]).map((h: any) => {
+        const { isUnderboss: _, ...rest } = h;
+        return rest;
+      });
+      // Merge: client entries + preserved underboss entries
+      mergedCoHosts = [...clientCoHosts, ...underbossEntries];
+    }
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -325,7 +344,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
-        ...(coHosts !== undefined && { coHosts }),
+        ...(mergedCoHosts !== undefined && { coHosts: mergedCoHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
         ...(donationEnabled !== undefined && { donationEnabled }),
         ...(donationGoal !== undefined && { donationGoal: donationGoal || null }),
