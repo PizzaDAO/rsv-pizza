@@ -585,6 +585,9 @@ export const EventDetailsTab: React.FC = () => {
           }}
           placeholder="Add Event Location"
         />
+        {venueName && (
+          <p className="text-xs text-white/40 -mt-1 ml-1">Venue: {venueName}</p>
+        )}
 
         {/* Change Date Button */}
         <button
