@@ -106,6 +106,7 @@ export interface CoHost {
   avatar_url?: string;
   showOnEvent?: boolean;
   canEdit?: boolean;
+  isUnderboss?: boolean;
 }
 
 // Host profile from the user account
