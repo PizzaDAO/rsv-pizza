@@ -279,17 +279,17 @@ router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Res
 });
 
 // PATCH /api/admin/checklist-defaults — Update defaults + propagate to all GPP events
-router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response) => {
-  if (!(await rawIsSuperAdmin(req.userEmail))) {
-    return res.status(403).json({ error: { message: 'Only super admins can update checklist defaults', code: 'FORBIDDEN' } });
-  }
-
-  const { items } = req.body;
-  if (!Array.isArray(items)) {
-    return res.status(400).json({ error: { message: 'items must be an array', code: 'VALIDATION_ERROR' } });
-  }
-
+router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can update checklist defaults', 403, 'FORBIDDEN');
+    }
+
+    const { items } = req.body;
+    if (!Array.isArray(items)) {
+      throw new AppError('items must be an array', 400, 'VALIDATION_ERROR');
+    }
+
     let totalUpdated = 0;
     for (const item of items) {
       if (!item.name) continue;
@@ -299,17 +299,19 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
 
       if (dueDate === undefined) continue;
 
+      const dueDateStr = dueDate ? dueDate.toISOString().split('T')[0] : null;
+
       // 1. Update the checklist_defaults row
       await prisma.$executeRaw`
         UPDATE checklist_defaults
-        SET due_date = ${dueDate}::date, updated_at = NOW()
+        SET due_date = ${dueDateStr}::date, updated_at = NOW()
         WHERE name = ${item.name}
       `;
 
       // 2. Propagate to all GPP events' checklist_items
       const result = await prisma.$executeRaw`
         UPDATE checklist_items ci
-        SET due_date = ${dueDate}::date, updated_at = NOW()
+        SET due_date = ${dueDateStr}::date, updated_at = NOW()
         FROM parties p
         WHERE ci.party_id = p.id
           AND p.event_type = 'gpp'
@@ -320,26 +322,27 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
     }
 
     res.json({ success: true, totalUpdated });
-  } catch (error: any) {
-    res.status(500).json({ error: { message: 'Update failed: ' + error.message } });
+  } catch (error) {
+    next(error);
   }
 });
 
 // POST /api/admin/checklist-defaults — Add new item to defaults + all GPP events
-router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response) => {
-  if (!(await rawIsSuperAdmin(req.userEmail))) {
-    return res.status(403).json({ error: { message: 'Only super admins can add checklist items', code: 'FORBIDDEN' } });
-  }
-
-  const { name, dueDate } = req.body;
-
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    return res.status(400).json({ error: { message: 'Name is required', code: 'VALIDATION_ERROR' } });
-  }
-
+router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can add checklist items', 403, 'FORBIDDEN');
+    }
+
+    const { name, dueDate } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
+    }
+
     const trimmedName = name.trim();
     const parsedDate = dueDate ? new Date(dueDate) : null;
+    const parsedDateStr = parsedDate ? parsedDate.toISOString().split('T')[0] : null;
 
     // Get next sort_order from checklist_defaults
     const maxResult = await prisma.$queryRaw<Array<{ max_sort: number | null }>>`
@@ -350,13 +353,13 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
     // 1. Insert into checklist_defaults
     await prisma.$executeRaw`
       INSERT INTO checklist_defaults (name, due_date, is_auto, sort_order)
-      VALUES (${trimmedName}, ${parsedDate}::date, false, ${nextSort})
+      VALUES (${trimmedName}, ${parsedDateStr}::date, false, ${nextSort})
     `;
 
     // 2. Insert into all GPP events' checklist_items
     const result = await prisma.$executeRaw`
       INSERT INTO checklist_items (id, party_id, name, due_date, is_auto, is_default, sort_order, created_at, updated_at)
-      SELECT gen_random_uuid(), p.id, ${trimmedName}, ${parsedDate}::date, false, true, ${nextSort}, NOW(), NOW()
+      SELECT gen_random_uuid(), p.id, ${trimmedName}, ${parsedDateStr}::date, false, true, ${nextSort}, NOW(), NOW()
       FROM parties p
       WHERE p.event_type = 'gpp'
     `;
@@ -366,7 +369,7 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
     if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
       return res.status(400).json({ error: { message: 'An item with that name already exists', code: 'DUPLICATE' } });
     }
-    res.status(500).json({ error: { message: 'Failed to add item: ' + error.message } });
+    next(error);
   }
 });
 
