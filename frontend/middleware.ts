@@ -221,6 +221,14 @@ export default async function middleware(request: Request) {
       /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/,
       `<meta property="og:image" content="${ogImageUrl}" />`
     );
+    html = html.replace(
+      /<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>/,
+      `<meta property="og:image:width" content="1200" />`
+    );
+    html = html.replace(
+      /<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>/,
+      `<meta property="og:image:height" content="1200" />`
+    );
 
     // Replace Twitter tags
     html = html.replace(

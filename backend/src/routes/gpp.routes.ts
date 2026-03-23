@@ -80,7 +80,7 @@ RSVP to secure your slice!`,
   hideGuests: false,
   photosEnabled: true,
   photosPublic: true,
-  eventImageUrl: 'https://rsv.pizza/gpp-flyer-2026.png',
+  eventImageUrl: 'https://www.rsv.pizza/gpp-flyer-2026-og.jpg',
 };
 
 // Helper function to send GPP welcome email with magic link
