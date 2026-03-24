@@ -234,6 +234,42 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// POST /api/events/:slug/check-host - Check if an email belongs to a co-host (public, no auth)
+router.post('/:slug/check-host', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    const { email } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      return res.json({ isHost: false });
+    }
+
+    // Find party by invite code or custom URL
+    let party = await prisma.party.findUnique({
+      where: { inviteCode: slug },
+      select: { coHosts: true, userId: true },
+    });
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: slug },
+        select: { coHosts: true, userId: true },
+      });
+    }
+    if (!party) {
+      return res.json({ isHost: false });
+    }
+
+    const coHosts = (party.coHosts as any[]) || [];
+    const isCoHost = coHosts.some(
+      (h: any) => h.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    res.json({ isHost: isCoHost });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/events/:slug/verify-tweet - Verify a tweet exists via oEmbed
 router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: NextFunction) => {
   try {
