@@ -30,6 +30,7 @@ import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
+import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
@@ -92,6 +93,7 @@ app.use('/api/rsvp', rsvpLimiter);
 // Routes
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
+app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests

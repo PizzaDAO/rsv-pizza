@@ -1024,6 +1024,24 @@ model Underboss {
 }
 
 // ============================================
+// Shipping Coordinator Models
+// ============================================
+
+model ShippingCoordinator {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  regions   String[] @default([])
+  isActive  Boolean  @default(true) @map("is_active")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([email])
+  @@map("shipping_coordinators")
+}
+
+// ============================================
 // Admin Management Models
 // ============================================
 

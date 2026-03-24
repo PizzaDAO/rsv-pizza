@@ -1024,3 +1024,65 @@ export interface UnderbossAdmin {
   notes: string | null;
   createdAt: string;
 }
+
+// ============================================
+// Shipping Dashboard types
+// ============================================
+
+export interface ShippingKit {
+  id: string;
+  partyId: string;
+  partyName: string;
+  eventDate: string | null;
+  region: string | null;
+  hostName: string | null;
+  hostEmail: string | null;
+  requestedTier: KitTier;
+  allocatedTier: KitTier | null;
+  recipientName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+  status: KitStatus;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  notes: string | null;
+  adminNotes: string | null;
+  requestedAt: string;
+  approvedAt: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+}
+
+export interface ShippingKitStats {
+  total: number;
+  pending: number;
+  approved: number;
+  shipped: number;
+  delivered: number;
+  declined: number;
+  byCountry: Record<string, number>;
+  byTier: Record<string, number>;
+}
+
+export interface ShippingCoordinator {
+  id: string;
+  name: string;
+  email: string;
+  regions: string[];
+  isActive: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShippingMeResponse {
+  role: 'admin' | 'coordinator' | null;
+  regions: string[];
+  name: string | null;
+  email: string;
+}

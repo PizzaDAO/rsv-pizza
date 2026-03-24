@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -2279,6 +2279,114 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
     method: 'DELETE',
     body: { partyIds },
   });
+}
+
+// ============================================
+// Shipping Dashboard API
+// ============================================
+
+// Fetch current user's shipping role
+export async function fetchShippingMe(): Promise<ShippingMeResponse> {
+  return apiRequest<ShippingMeResponse>('/api/shipping/me');
+}
+
+// Fetch shipping kit stats
+export async function fetchShippingStats(): Promise<{ stats: ShippingKitStats }> {
+  return apiRequest<{ stats: ShippingKitStats }>('/api/shipping/stats');
+}
+
+// Fetch shipping kits with filters
+export interface ShippingKitFilters {
+  status?: string;
+  tier?: string;
+  country?: string;
+  region?: string;
+  search?: string;
+  sort?: string;
+}
+
+export async function fetchShippingKits(filters?: ShippingKitFilters): Promise<{ kits: ShippingKit[] }> {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+  }
+  const qs = params.toString();
+  return apiRequest<{ kits: ShippingKit[] }>(`/api/shipping/kits${qs ? `?${qs}` : ''}`);
+}
+
+// Update a single shipping kit
+export async function updateShippingKit(kitId: string, data: {
+  status?: string;
+  allocatedTier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  adminNotes?: string;
+}): Promise<{ kit: ShippingKit }> {
+  return apiRequest<{ kit: ShippingKit }>(`/api/shipping/kits/${kitId}`, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+// Bulk update shipping kits
+export async function bulkUpdateShippingKits(kitIds: string[], updates: {
+  status?: string;
+  allocatedTier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  adminNotes?: string;
+}): Promise<{ updated: number }> {
+  return apiRequest<{ updated: number }>('/api/shipping/kits/bulk-update', {
+    method: 'PATCH',
+    body: { kitIds, updates },
+  });
+}
+
+// Export shipping kits CSV
+export async function exportShippingKitsCsv(filters?: ShippingKitFilters): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+  }
+  const qs = params.toString();
+  const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+  const token = localStorage.getItem('authToken');
+  const response = await fetch(`${API_URL}/api/shipping/kits/export${qs ? `?${qs}` : ''}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to export CSV');
+  }
+  return response.blob();
+}
+
+// Coordinator management (admin only)
+export async function fetchShippingCoordinators(): Promise<{ coordinators: ShippingCoordinator[] }> {
+  return apiRequest<{ coordinators: ShippingCoordinator[] }>('/api/shipping/admin/coordinators');
+}
+
+export async function createShippingCoordinator(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ coordinator: ShippingCoordinator }> {
+  return apiRequest<{ coordinator: ShippingCoordinator }>('/api/shipping/admin/coordinators', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export async function updateShippingCoordinator(id: string, data: { name?: string; email?: string; regions?: string[]; notes?: string; isActive?: boolean }): Promise<{ coordinator: ShippingCoordinator }> {
+  return apiRequest<{ coordinator: ShippingCoordinator }>(`/api/shipping/admin/coordinators/${id}`, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+export async function deactivateShippingCoordinator(id: string): Promise<void> {
+  await apiRequest(`/api/shipping/admin/coordinators/${id}`, { method: 'DELETE' });
 }
 
 // ============================================

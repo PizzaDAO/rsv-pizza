@@ -19,6 +19,7 @@ import { PublicReportPage } from './pages/PublicReportPage';
 import { PublicVenueReportPage } from './pages/PublicVenueReportPage';
 import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
+import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 
 function App() {
@@ -45,6 +46,7 @@ function App() {
             <Route path="/display/:partyId/:slug" element={<DisplayPage />} />
             <Route path="/underboss" element={<UnderbossDashboard />} />
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
+            <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
