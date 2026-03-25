@@ -131,7 +131,12 @@ export const GPPDashboardTab: React.FC = () => {
         icon: Rocket,
         dueDate: dueDateMap.get('Throw the Party') ?? null,
       },
-    ];
+    ].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
   }, [party, autoStates, coHostCount, dueDateMap]);
 
   const completedCount = checklist.filter((c) => c.done).length;
