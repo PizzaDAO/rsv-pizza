@@ -2220,6 +2220,12 @@ export async function addChecklistDefault(data: { name: string; dueDate?: string
   });
 }
 
+export async function deleteChecklistDefault(name: string): Promise<{ success: boolean; totalDeleted: number }> {
+  return apiRequest<{ success: boolean; totalDeleted: number }>(`/api/admin/checklist-defaults/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ============================================
 // Underboss Dashboard API
 // ============================================

@@ -327,6 +327,40 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
+// DELETE /api/admin/checklist-defaults/:name — Remove a checklist default + propagate to all GPP events
+router.delete('/checklist-defaults/:name', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can remove checklist items', 403, 'FORBIDDEN');
+    }
+
+    const itemName = decodeURIComponent(req.params.name);
+
+    // 1. Delete from checklist_defaults
+    const deleted = await prisma.$executeRaw`
+      DELETE FROM checklist_defaults WHERE name = ${itemName}
+    `;
+
+    if (deleted === 0) {
+      throw new AppError('Item not found', 404, 'NOT_FOUND');
+    }
+
+    // 2. Delete from all GPP events' checklist_items
+    const totalDeleted = await prisma.$executeRaw`
+      DELETE FROM checklist_items ci
+      USING parties p
+      WHERE ci.party_id = p.id
+        AND p.event_type = 'gpp'
+        AND ci.is_default = true
+        AND ci.name = ${itemName}
+    `;
+
+    res.json({ success: true, totalDeleted });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/admin/checklist-defaults — Add new item to defaults + all GPP events
 router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
