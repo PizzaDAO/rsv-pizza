@@ -12,7 +12,7 @@ import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
   fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
   fetchGppNftSettings, updateGppNftSettings,
-  fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault,
+  fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault, deleteChecklistDefault,
 } from '../lib/api';
 import type { ChecklistDefault } from '../lib/api';
 import { GPP_REGIONS } from '../types';
@@ -176,6 +176,18 @@ export function AdminPage() {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to add item' });
     } finally {
       setAddingItem(false);
+    }
+  }
+
+  async function handleDeleteChecklistItem(name: string) {
+    if (!confirm(`Remove "${name}" from all GPP events?`)) return;
+    const result = await deleteChecklistDefault(name);
+    if (result) {
+      setChecklistMessage({ type: 'success', text: `Removed "${name}" from ${result.totalDeleted} events` });
+      const clDefaults = await fetchChecklistDefaults();
+      if (clDefaults) setChecklistItems(clDefaults.items);
+    } else {
+      setChecklistMessage({ type: 'error', text: `Failed to remove "${name}"` });
     }
   }
 
@@ -649,6 +661,13 @@ export function AdminPage() {
                         className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-36"
                       />
                     </div>
+                    <button
+                      onClick={() => handleDeleteChecklistItem(item.name)}
+                      className="text-red-400 hover:text-red-600 transition-colors p-1"
+                      title={`Remove ${item.name}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 ))}
                 {checklistItems.length === 0 && (
