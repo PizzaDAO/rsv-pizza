@@ -112,8 +112,23 @@ export function EventPage() {
           }
 
           // Check if current user is a host (primary or co-host)
-          const isHost = user?.id === foundEvent.userId ||
-            (user?.email && foundEvent.coHosts?.some((h: any) => h.email?.toLowerCase() === user.email?.toLowerCase()));
+          let isHost = user?.id === foundEvent.userId;
+          if (!isHost && user?.email) {
+            try {
+              const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+              const resp = await fetch(`${apiUrl}/api/events/${slug}/check-host`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email }),
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                isHost = data.isHost;
+              }
+            } catch (e) {
+              console.warn('Could not check host status:', e);
+            }
+          }
 
           // Skip password for hosts and already-RSVP'd guests
           if (isHost || hasRSVPd) {

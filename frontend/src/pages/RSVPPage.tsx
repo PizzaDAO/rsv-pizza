@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, isUserHostOfParty, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
@@ -144,9 +144,25 @@ export function RSVPPage() {
           // Check if party has password protection
           if (foundParty.has_password) {
             // Skip password for existing guests (hosts are now added as guests too)
-            // Also check co_hosts for backward compatibility with old parties
+            // Also check co-host status via backend for backward compatibility with old parties
             const userIsGuest = user?.email && await isUserGuestAtParty(foundParty.id, user.email);
-            const userIsHost = user?.email && isUserHostOfParty(foundParty, user.email);
+            let userIsHost = false;
+            if (!userIsGuest && user?.email && inviteCode) {
+              try {
+                const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+                const resp = await fetch(`${apiUrl}/api/events/${inviteCode}/check-host`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: user.email }),
+                });
+                if (resp.ok) {
+                  const data = await resp.json();
+                  userIsHost = data.isHost;
+                }
+              } catch (e) {
+                console.warn('Could not check host status:', e);
+              }
+            }
 
             if (userIsGuest || userIsHost) {
               setIsAuthenticated(true);

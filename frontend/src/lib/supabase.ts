@@ -9,6 +9,7 @@ import {
   promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
+import { sanitizeCoHosts } from './sanitizeCoHosts';
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -572,6 +573,9 @@ export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty 
     console.error('Error fetching party:', error);
     return null;
   }
+  if (data) {
+    data.co_hosts = sanitizeCoHosts(data.co_hosts);
+  }
   return data;
 }
 
@@ -585,6 +589,9 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
   if (error) {
     console.error('Error fetching party by custom URL:', error);
     return null;
+  }
+  if (data) {
+    data.co_hosts = sanitizeCoHosts(data.co_hosts);
   }
   return data;
 }
@@ -707,6 +714,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
       .not('password', 'is', null);
 
     party.has_password = count === 1;
+    party.co_hosts = sanitizeCoHosts(party.co_hosts);
   }
 
   if (!party && error) {
@@ -1146,7 +1154,7 @@ export async function getAllParties(): Promise<DbParty[]> {
     console.error('Error fetching parties:', error);
     return [];
   }
-  return data || [];
+  return (data || []).map(p => ({ ...p, co_hosts: sanitizeCoHosts(p.co_hosts) }));
 }
 
 // Subscribe to guest changes (real-time)
@@ -1354,28 +1362,42 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
     if (error) {
       console.error('Error fetching guest parties:', error);
     } else {
-      guestParties = data || [];
+      guestParties = (data || []).map(p => ({ ...p, co_hosts: sanitizeCoHosts(p.co_hosts) }));
     }
   }
 
-  // Get parties where user is a host (co_hosts array contains their email)
-  // Note: Using filter with text match because .contains() doesn't work well with JSONB arrays of objects
-  const { data: allPartiesForHost, error: hostError } = await supabase
-    .from('parties')
-    .select(SAFE_PARTY_COLUMNS)
-    .order('date', { ascending: true, nullsFirst: false });
+  // Get parties where user is a co-host via backend endpoint
+  // This replaces the old approach of downloading ALL parties and filtering client-side
+  let hostPartyIds: string[] = [];
+  try {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+      const resp = await fetch(`${apiUrl}/api/parties/by-cohost?email=${encodeURIComponent(userEmail)}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        hostPartyIds = data.partyIds || [];
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch co-host parties from backend:', err);
+  }
 
-  // Filter client-side for parties where user is in co_hosts
-  const normalizedEmail = userEmail.toLowerCase();
-  const hostParties = (allPartiesForHost || []).filter((party: DbParty) => {
-    if (!party.co_hosts || !Array.isArray(party.co_hosts)) return false;
-    return party.co_hosts.some((host: any) =>
-      host.email?.toLowerCase() === normalizedEmail
-    );
-  });
+  let hostParties: DbParty[] = [];
+  if (hostPartyIds.length > 0) {
+    const { data, error: hostError } = await supabase
+      .from('parties')
+      .select(SAFE_PARTY_COLUMNS)
+      .in('id', hostPartyIds)
+      .order('date', { ascending: true, nullsFirst: false });
 
-  if (hostError) {
-    console.error('Error fetching host parties:', hostError);
+    if (hostError) {
+      console.error('Error fetching host parties:', hostError);
+    } else {
+      hostParties = (data || []).map(p => ({ ...p, co_hosts: sanitizeCoHosts(p.co_hosts) }));
+    }
   }
 
   // Combine and deduplicate

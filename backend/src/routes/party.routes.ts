@@ -89,6 +89,33 @@ const router = Router();
 // All party routes require authentication
 router.use(requireAuth);
 
+// GET /api/parties/by-cohost?email=xxx - Get party IDs where user is a co-host
+// Must be registered BEFORE /:id catch-all route
+router.get('/by-cohost', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const email = (req.query.email as string)?.toLowerCase();
+    if (!email) {
+      return res.json({ partyIds: [] });
+    }
+
+    // Find all parties and filter for co-host matches
+    const parties = await prisma.party.findMany({
+      select: { id: true, coHosts: true },
+    });
+
+    const matchingIds = parties
+      .filter((p) => {
+        const coHosts = (p.coHosts as any[]) || [];
+        return coHosts.some((h: any) => h.email?.toLowerCase() === email);
+      })
+      .map((p) => p.id);
+
+    res.json({ partyIds: matchingIds });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties - List user's parties
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
