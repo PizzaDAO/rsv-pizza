@@ -400,6 +400,19 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
             )}
           </div>
 
+          {/* Sponsor Message (from intake form — read-only for host context) */}
+          {sponsor?.sponsorMessage && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
+                <FileText size={16} />
+                Message from Sponsor
+              </h3>
+              <div className="p-3 bg-theme-surface rounded-lg border border-theme-stroke text-theme-text-secondary text-sm whitespace-pre-wrap">
+                {sponsor.sponsorMessage}
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">

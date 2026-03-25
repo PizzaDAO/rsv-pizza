@@ -435,6 +435,9 @@ export interface Sponsor {
   logoUrl: string | null;
   notes: string | null;
   lastContactedAt: string | null;
+  intakeToken: string | null;
+  intakeSubmittedAt: string | null;
+  sponsorMessage: string | null;
   createdAt: string;
   updatedAt: string;
 }

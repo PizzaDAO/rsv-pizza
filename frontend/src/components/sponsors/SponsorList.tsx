@@ -4,11 +4,14 @@ import {
   Mail, Phone, User, Building2, Calendar
 } from 'lucide-react';
 import { Sponsor, SponsorStatus } from '../../types';
+import { SponsorIntakeButton } from './SponsorIntakeButton';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
+  partyId: string;
   onEdit: (sponsor: Sponsor) => void;
   onDelete: (sponsorId: string) => void;
+  onSponsorUpdate: (sponsor: Sponsor) => void;
   isLoading?: boolean;
 }
 
@@ -37,7 +40,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, isLoading }: SponsorListProps) {
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterStatus, setFilterStatus] = useState<SponsorStatus | 'all'>('all');
@@ -322,6 +325,11 @@ export function SponsorList({ sponsors, onEdit, onDelete, isLoading }: SponsorLi
                   {/* Actions */}
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
+                      <SponsorIntakeButton
+                        sponsor={sponsor}
+                        partyId={partyId}
+                        onUpdate={onSponsorUpdate}
+                      />
                       <button
                         onClick={() => onEdit(sponsor)}
                         className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded transition-colors"
