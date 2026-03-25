@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
@@ -8,6 +8,7 @@ import { LocationAutocomplete, CityData } from '../components/LocationAutocomple
 import { createGPPEvent } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfetti } from '../hooks/useConfetti';
+const GPPMap = lazy(() => import('../components/GPPMap'));
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -55,20 +56,6 @@ export function GPPLandingPage() {
     size: number;
     rotation: number;
   }>>([]);
-  const [mapActive, setMapActive] = useState(false);
-  const mapRef = useRef<HTMLDivElement>(null);
-
-  // Deactivate map when clicking outside it
-  useEffect(() => {
-    if (!mapActive) return;
-    const handler = (e: MouseEvent) => {
-      if (mapRef.current && !mapRef.current.contains(e.target as Node)) {
-        setMapActive(false);
-      }
-    };
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, [mapActive]);
 
   const [parachutes, setParachutes] = useState<Array<{
     id: number;
@@ -540,25 +527,10 @@ export function GPPLandingPage() {
             See where communities around the world came together for pizza
           </p>
 
-          <div ref={mapRef} className="rounded-2xl overflow-hidden border shadow-lg relative" style={{ borderColor: C.cardBorder, height: 500 }}>
-            <iframe
-              src="https://www.google.com/maps/d/u/0/embed?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA&z=3"
-              className="w-full"
-              style={{ height: 600, border: 'none', marginTop: -100, pointerEvents: mapActive ? 'auto' : 'none' }}
-              title="Global Pizza Party Map"
-              loading="lazy"
-              allowFullScreen={mapActive}
-            />
-            {!mapActive && (
-              <div
-                className="absolute inset-0 z-10 cursor-pointer flex items-end justify-center pb-4"
-                onClick={() => setMapActive(true)}
-              >
-                <span className="bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm">
-                  Click to interact with map
-                </span>
-              </div>
-            )}
+          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
+            <Suspense fallback={<div style={{ height: 500 }} className="flex items-center justify-center bg-sky-100 rounded-2xl"><Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} /></div>}>
+              <GPPMap height={500} minZoom={3} maxZoom={12} initialZoom={3} />
+            </Suspense>
           </div>
 
           <div className="text-center mt-6">
