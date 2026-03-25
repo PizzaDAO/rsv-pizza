@@ -106,7 +106,7 @@ export const GPPDashboardTab: React.FC = () => {
       {
         label: 'Select Pizzeria',
         done: false,
-        tab: 'venue',
+        tab: 'pizza',
         icon: MapPin,
         dueDate: dueDateMap.get('Select Pizzeria') ?? null,
       },
