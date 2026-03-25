@@ -129,6 +129,46 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
   }
 });
 
+// GET /api/parties/:partyId/photos/tags - Get available tags for photos
+// NOTE: This route MUST be defined before /:partyId/photos/:photoId to avoid "tags" being matched as photoId
+router.get('/:partyId/photos/tags', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Get party to check existence
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, photosEnabled: true },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Static default tags
+    const defaultTags = ['Pizza', 'Box Tower', 'Group Photo'];
+
+    // Dynamic sponsor tags: confirmed sponsors (status in yes, billed, paid)
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        partyId,
+        status: { in: ['yes', 'billed', 'paid'] },
+      },
+      select: { name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const sponsorTags = sponsors.map(s => s.name);
+
+    // Combined tags list (defaults first, then sponsors)
+    const tags = [...defaultTags, ...sponsorTags];
+
+    res.json({ tags, defaultTags, sponsorTags });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/:partyId/photos/stats - Get photo statistics for a party
 // NOTE: This route MUST be defined before /:partyId/photos/:photoId to avoid "stats" being matched as photoId
 router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {

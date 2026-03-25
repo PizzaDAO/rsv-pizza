@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, Loader2, Image as ImageIcon, Check } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, Check, Tag } from 'lucide-react';
 import { uploadEventPhoto } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi, PhotoUploadData } from '../../lib/api';
 import { Photo } from '../../types';
@@ -10,6 +10,7 @@ interface PhotoUploadProps {
   uploaderEmail?: string;
   guestId?: string;
   photoModeration?: boolean;
+  availableTags?: string[];
   onUploadComplete?: (photo: Photo) => void;
   onClose?: () => void;
 }
@@ -29,12 +30,14 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   uploaderEmail,
   guestId,
   photoModeration = false,
+  availableTags = [],
   onUploadComplete,
   onClose,
 }) => {
   const [files, setFiles] = useState<UploadingFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [caption, setCaption] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback((selectedFiles: FileList | File[]) => {
@@ -115,6 +118,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           uploaderEmail,
           guestId,
           caption: caption || undefined,
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
         };
 
         const result = await uploadPhotoApi(partyId, photoData);
@@ -205,6 +209,39 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             placeholder="Add a caption (optional)"
             className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-4 py-2 text-theme-text placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
+        </div>
+      )}
+
+      {/* Tag Selector */}
+      {files.length > 0 && availableTags.length > 0 && (
+        <div className="mt-3">
+          <p className="text-theme-text-muted text-xs mb-2 flex items-center gap-1">
+            <Tag size={12} />
+            Tag your photos
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {availableTags.map((tag) => {
+              const isSelected = selectedTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTags((prev) =>
+                      isSelected ? prev.filter((t) => t !== tag) : [...prev, tag]
+                    )
+                  }
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    isSelected
+                      ? 'bg-[#ff393a] border-[#ff393a] text-white'
+                      : 'bg-transparent border-theme-stroke text-theme-text-secondary hover:border-[#ff393a]/50 hover:text-theme-text'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

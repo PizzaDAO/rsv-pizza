@@ -620,6 +620,19 @@ export async function batchReviewPhotos(
   }
 }
 
+// Get available photo tags for a party (defaults + confirmed sponsor names)
+export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] } | null> {
+  try {
+    return await apiRequest<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] }>(`/api/parties/${partyId}/photos/tags`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching photo tags:', error);
+    return null;
+  }
+}
+
 // ============================================
 // Sponsor CRM API functions
 // ============================================
