@@ -7,6 +7,7 @@ interface PhotoModalProps {
   photo: Photo;
   photos: Photo[];
   isHost?: boolean;
+  availableTags?: string[];
   onClose: () => void;
   onNavigate?: (photo: Photo) => void;
   onStar?: (photoId: string, starred: boolean) => void;
@@ -21,6 +22,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   photo,
   photos,
   isHost = false,
+  availableTags = [],
   onClose,
   onNavigate,
   onStar,
@@ -32,6 +34,8 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
 }) => {
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionValue, setCaptionValue] = useState(photo.caption || '');
+  const [editingTags, setEditingTags] = useState(false);
+  const [tagValues, setTagValues] = useState<string[]>(photo.tags || []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const currentIndex = photos.findIndex(p => p.id === photo.id);
@@ -66,10 +70,12 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, navigatePrev, navigateNext]);
 
-  // Update caption state when photo changes
+  // Update caption and tags state when photo changes
   useEffect(() => {
     setCaptionValue(photo.caption || '');
     setEditingCaption(false);
+    setTagValues(photo.tags || []);
+    setEditingTags(false);
   }, [photo]);
 
   const formatDate = (dateString: string) => {
@@ -96,6 +102,17 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   const handleSaveCaption = () => {
     onUpdateCaption?.(photo.id, captionValue);
     setEditingCaption(false);
+  };
+
+  const handleToggleTag = (tag: string) => {
+    setTagValues(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleSaveTags = () => {
+    onUpdateTags?.(photo.id, tagValues);
+    setEditingTags(false);
   };
 
   const handleDelete = () => {
@@ -275,22 +292,85 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           </div>
 
           {/* Tags */}
-          {photo.tags.length > 0 && (
+          {editingTags ? (
             <div className="mb-4">
               <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm mb-2">
                 <Tag size={14} />
                 <span>Tags</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {photo.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="bg-theme-surface-hover text-theme-text text-xs px-2 py-1 rounded-full"
-                  >
-                    #{tag}
-                  </span>
-                ))}
+              <div className="flex flex-wrap gap-2 mb-2">
+                {availableTags.map((tag) => {
+                  const isSelected = tagValues.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleToggleTag(tag)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        isSelected
+                          ? 'bg-[#ff393a] border-[#ff393a] text-white'
+                          : 'bg-transparent border-theme-stroke text-theme-text-secondary hover:border-[#ff393a]/50 hover:text-theme-text'
+                      }`}
+                    >
+                      #{tag}
+                    </button>
+                  );
+                })}
               </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveTags}
+                  className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white text-sm font-medium py-1.5 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setTagValues(photo.tags || []);
+                    setEditingTags(false);
+                  }}
+                  className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text text-sm font-medium py-1.5 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-4">
+              {photo.tags.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm mb-2">
+                    <Tag size={14} />
+                    <span>Tags</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {photo.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="bg-theme-surface-hover text-theme-text text-xs px-2 py-1 rounded-full"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                  {isHost && onUpdateTags && availableTags.length > 0 && (
+                    <button
+                      onClick={() => setEditingTags(true)}
+                      className="text-theme-text-muted hover:text-theme-text-secondary text-xs mt-1"
+                    >
+                      Edit tags
+                    </button>
+                  )}
+                </>
+              ) : isHost && onUpdateTags && availableTags.length > 0 ? (
+                <button
+                  onClick={() => setEditingTags(true)}
+                  className="text-theme-text-muted hover:text-theme-text-secondary text-sm flex items-center gap-1"
+                >
+                  <Tag size={14} />
+                  Add tags...
+                </button>
+              ) : null}
             </div>
           )}
 

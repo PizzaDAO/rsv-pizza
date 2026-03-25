@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck } from 'lucide-react';
+import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
-import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos } from '../../lib/api';
+import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
 import { PhotoCard } from './PhotoCard';
 import { PhotoModal } from './PhotoModal';
 import { PhotoUpload } from './PhotoUpload';
@@ -32,6 +32,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [filter, setFilter] = useState<FilterOption>('all');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -48,6 +50,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       const offset = reset ? 0 : photos.length;
       const result = await getPartyPhotos(partyId, {
         starred: filter === 'starred' ? true : undefined,
+        tag: activeTag || undefined,
         status: filter === 'pending' ? 'pending' : (isHost ? 'all' : undefined),
         limit: 20,
         offset,
@@ -69,7 +72,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [partyId, filter, photos.length, isHost]);
+  }, [partyId, filter, activeTag, photos.length, isHost]);
 
   const loadStats = useCallback(async () => {
     const result = await getPhotoStats(partyId);
@@ -78,11 +81,22 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     }
   }, [partyId]);
 
+  // Fetch available tags on mount
+  useEffect(() => {
+    const fetchTags = async () => {
+      const result = await getPhotoTags(partyId);
+      if (result) {
+        setAvailableTags(result.tags);
+      }
+    };
+    fetchTags();
+  }, [partyId]);
+
   // Initial load
   useEffect(() => {
     loadPhotos(true);
     loadStats();
-  }, [partyId, filter]);
+  }, [partyId, filter, activeTag]);
 
   const handleUploadComplete = (photo: Photo) => {
     // If moderation is on and we're viewing approved photos, don't add to the list
@@ -125,6 +139,19 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       if (selectedPhoto?.id === photoId) {
         setSelectedPhoto(result.photo);
       }
+    }
+  };
+
+  const handleUpdateTags = async (photoId: string, tags: string[]) => {
+    const result = await updatePhoto(partyId, photoId, { tags });
+    if (result) {
+      setPhotos(prev =>
+        prev.map(p => (p.id === photoId ? result.photo : p))
+      );
+      if (selectedPhoto?.id === photoId) {
+        setSelectedPhoto(result.photo);
+      }
+      loadStats();
     }
   };
 
@@ -309,6 +336,41 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         </div>
       )}
 
+      {/* Tag Filter Row */}
+      {availableTags.length > 0 && stats && stats.uniqueTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-theme-text-muted text-xs flex items-center gap-1">
+            <Tag size={12} />
+            Tags:
+          </span>
+          <button
+            onClick={() => setActiveTag(null)}
+            className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+              activeTag === null
+                ? 'bg-[#ff393a] border-[#ff393a] text-white'
+                : 'bg-transparent border-theme-stroke text-theme-text-secondary hover:border-[#ff393a]/50'
+            }`}
+          >
+            All
+          </button>
+          {availableTags
+            .filter(tag => stats.uniqueTags.includes(tag))
+            .map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                  activeTag === tag
+                    ? 'bg-[#ff393a] border-[#ff393a] text-white'
+                    : 'bg-transparent border-theme-stroke text-theme-text-secondary hover:border-[#ff393a]/50'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+        </div>
+      )}
+
       {/* Upload Modal */}
       {showUpload && (
         <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50 overflow-y-auto">
@@ -319,6 +381,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               uploaderEmail={uploaderEmail}
               guestId={guestId}
               photoModeration={photoModeration}
+              availableTags={availableTags}
               onUploadComplete={handleUploadComplete}
               onClose={() => setShowUpload(false)}
             />
@@ -388,11 +451,13 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           photo={selectedPhoto}
           photos={photos}
           isHost={isHost}
+          availableTags={availableTags}
           onClose={() => setSelectedPhoto(null)}
           onNavigate={setSelectedPhoto}
           onStar={handleStar}
           onDelete={handleDelete}
           onUpdateCaption={handleUpdateCaption}
+          onUpdateTags={handleUpdateTags}
           onApprove={isHost ? handleApprove : undefined}
           onReject={isHost ? handleReject : undefined}
         />
