@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, Search, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { VenueCreateData } from '../../lib/api';
 import { IconInput } from '../IconInput';
+import { LocationAutocomplete } from '../LocationAutocomplete';
 
 interface VenueFormProps {
   venue?: Venue;
@@ -21,85 +22,7 @@ const venueStatusOptions: { value: VenueStatus; label: string }[] = [
   { value: 'declined', label: 'Declined' },
 ];
 
-/** Check if a string looks like a Google Maps URL */
-function isGoogleMapsUrl(text: string): boolean {
-  return /google\.\w+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text);
-}
-
-/** Extract a place name query from a Google Maps URL */
-function extractPlaceQuery(url: string): string | null {
-  try {
-    const u = new URL(url);
-
-    // /maps/place/Place+Name/... -> "Place Name"
-    const placeMatch = u.pathname.match(/\/place\/([^/@]+)/);
-    if (placeMatch) {
-      return decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
-    }
-
-    // /maps/search/query/... -> "query"
-    const searchMatch = u.pathname.match(/\/search\/([^/@]+)/);
-    if (searchMatch) {
-      return decodeURIComponent(searchMatch[1].replace(/\+/g, ' '));
-    }
-
-    // ?q=Place+Name
-    const q = u.searchParams.get('q');
-    if (q) return q;
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/** Use Google Places API to look up a place by text query */
-function lookupPlace(query: string): Promise<google.maps.places.PlaceResult | null> {
-  return new Promise((resolve) => {
-    if (!window.google?.maps?.places) {
-      resolve(null);
-      return;
-    }
-
-    // PlacesService needs a DOM element (can be a hidden div)
-    const div = document.createElement('div');
-    const service = new google.maps.places.PlacesService(div);
-
-    service.findPlaceFromQuery(
-      {
-        query,
-        fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'place_id'],
-      },
-      (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
-          // findPlaceFromQuery doesn't return phone/website -- need getDetails
-          const placeId = results[0].place_id;
-          if (placeId) {
-            service.getDetails(
-              {
-                placeId,
-                fields: ['name', 'formatted_address', 'formatted_phone_number', 'website'],
-              },
-              (place, detailStatus) => {
-                if (detailStatus === google.maps.places.PlacesServiceStatus.OK && place) {
-                  resolve(place);
-                } else {
-                  resolve(results[0]);
-                }
-              }
-            );
-          } else {
-            resolve(results[0]);
-          }
-        } else {
-          resolve(null);
-        }
-      }
-    );
-  });
-}
-
-/** Fetch additional place details (phone, website) from a place_id */
+/** Fetch place details (website, phone) from a place_id */
 function fetchPlaceDetails(placeId: string): Promise<google.maps.places.PlaceResult | null> {
   return new Promise((resolve) => {
     if (!window.google?.maps?.places) {
@@ -126,12 +49,133 @@ function fetchPlaceDetails(placeId: string): Promise<google.maps.places.PlaceRes
   });
 }
 
-export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => {
+// ─── Simplified "Add Venue" modal ────────────────────────────────────────────
+// Shows only a LocationAutocomplete search. When a place is picked, auto-creates
+// the venue and closes the modal.
+
+const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: VenueFormProps['onClose'] }> = ({ onSave, onClose }) => {
+  const [searchValue, setSearchValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lookingUp, setLookingUp] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePlaceSelected = useCallback(async (address: string, venueName: string | null) => {
+    if (saving) return;
+
+    const name = venueName || address;
+    if (!name) return;
+
+    setSaving(true);
+    setError(null);
+
+    // Try to fetch additional details (website, phone) via Places text search
+    let website: string | undefined;
+    let contactPhone: string | undefined;
+
+    try {
+      if (window.google?.maps?.places && venueName) {
+        const searchQuery = venueName + (address ? ' ' + address : '');
+        const details = await new Promise<google.maps.places.PlaceResult | null>((resolve) => {
+          const div = document.createElement('div');
+          const service = new google.maps.places.PlacesService(div);
+          service.findPlaceFromQuery(
+            {
+              query: searchQuery,
+              fields: ['place_id'],
+            },
+            (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.place_id) {
+                fetchPlaceDetails(results[0].place_id).then(resolve);
+              } else {
+                resolve(null);
+              }
+            }
+          );
+        });
+
+        if (details) {
+          website = details.website || undefined;
+          contactPhone = (details as any).formatted_phone_number || undefined;
+        }
+      }
+    } catch {
+      // Non-critical — we'll create the venue without extra details
+    }
+
+    try {
+      await onSave({
+        name: name.trim(),
+        address: address.trim() || undefined,
+        website,
+        contactPhone,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add venue');
+      setSaving(false);
+    }
+  }, [saving, onSave, onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-theme-header border border-theme-stroke rounded-xl shadow-xl max-w-lg w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-theme-stroke">
+          <div className="flex items-center gap-2">
+            <MapPin size={20} className="text-[#ff393a]" />
+            <h2 className="text-lg font-semibold text-theme-text">Add Venue Option</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-theme-text-muted hover:text-theme-text transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {saving ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 size={24} className="animate-spin text-[#ff393a]" />
+              <p className="text-sm text-theme-text-secondary">Adding venue...</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-theme-text-secondary">
+                Search for a venue to add it to your options list.
+              </p>
+              <LocationAutocomplete
+                value={searchValue}
+                onChange={setSearchValue}
+                onPlaceSelected={handlePlaceSelected}
+                types={['establishment']}
+                fields={['formatted_address', 'name', 'place_id', 'geometry', 'website']}
+                placeholder="Search for a venue..."
+              />
+            </>
+          )}
+
+          {error && (
+            <div className="p-3 rounded-lg text-sm bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a]">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ─── Full edit form (existing venues) ────────────────────────────────────────
+
+const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState(venue?.name || '');
@@ -148,125 +192,6 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
   const [notes, setNotes] = useState(venue?.notes || '');
   const [pros, setPros] = useState(venue?.pros || '');
   const [cons, setCons] = useState(venue?.cons || '');
-
-  // Use refs to avoid stale closures in the Google Maps event listener
-  const nameRef = useRef(name);
-  const addressRef = useRef(address);
-  const websiteRef = useRef(website);
-  const contactPhoneRef = useRef(contactPhone);
-
-  useEffect(() => { nameRef.current = name; }, [name]);
-  useEffect(() => { addressRef.current = address; }, [address]);
-  useEffect(() => { websiteRef.current = website; }, [website]);
-  useEffect(() => { contactPhoneRef.current = contactPhone; }, [contactPhone]);
-
-  /** Apply place data to form fields (used by both autocomplete and link paste) */
-  const applyPlaceData = useCallback((place: google.maps.places.PlaceResult, fallbackUrl?: string) => {
-    if (place.name && !nameRef.current) setName(place.name);
-    if (place.formatted_address && !addressRef.current) setAddress(place.formatted_address);
-    if ((place as any).formatted_phone_number && !contactPhoneRef.current) {
-      setContactPhone((place as any).formatted_phone_number);
-    }
-    if (place.website && !websiteRef.current) {
-      setWebsite(place.website);
-    } else if (fallbackUrl && !websiteRef.current) {
-      setWebsite(fallbackUrl);
-    }
-  }, []);
-
-  // Initialize Google Places Autocomplete on the search input (only for new venues)
-  useEffect(() => {
-    if (venue) return; // Don't init autocomplete for edit mode
-    if (!searchInputRef.current) return;
-    if (!window.google?.maps?.places) return;
-
-    const autocompleteInstance = new window.google.maps.places.Autocomplete(
-      searchInputRef.current,
-      {
-        types: ['establishment'],
-        fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'place_id'],
-      }
-    );
-
-    autocompleteInstance.addListener('place_changed', () => {
-      const place = autocompleteInstance.getPlace();
-      if (!place) return;
-
-      // Apply basic place data immediately
-      if (place.name && !nameRef.current) setName(place.name);
-      if (place.formatted_address && !addressRef.current) setAddress(place.formatted_address);
-
-      // Check if we already have phone/website from the initial result
-      const hasPhone = !!(place as any).formatted_phone_number;
-      const hasWebsite = !!place.website;
-
-      if (hasPhone && !contactPhoneRef.current) {
-        setContactPhone((place as any).formatted_phone_number);
-      }
-      if (hasWebsite && !websiteRef.current) {
-        setWebsite(place.website!);
-      }
-
-      // If phone or website is missing, fetch full details
-      if ((!hasPhone || !hasWebsite) && place.place_id) {
-        fetchPlaceDetails(place.place_id).then((details) => {
-          if (details) {
-            applyPlaceData(details);
-          }
-        });
-      }
-    });
-
-    return () => {
-      window.google?.maps?.event?.clearInstanceListeners(autocompleteInstance);
-    };
-  }, [venue, applyPlaceData]);
-
-  const handleMapsLinkPaste = useCallback(async (text: string) => {
-    if (!isGoogleMapsUrl(text)) return;
-
-    setSearchValue(text);
-    const query = extractPlaceQuery(text);
-    if (!query) {
-      // Still set the link as the website
-      if (!websiteRef.current) setWebsite(text);
-      return;
-    }
-
-    setLookingUp(true);
-    try {
-      const place = await lookupPlace(query);
-      if (place) {
-        applyPlaceData(place, text);
-      } else {
-        // Couldn't look up, just fill what we can
-        if (!nameRef.current) setName(query);
-        if (!websiteRef.current) setWebsite(text);
-      }
-    } catch {
-      if (!nameRef.current) setName(query);
-      if (!websiteRef.current) setWebsite(text);
-    }
-    setLookingUp(false);
-  }, [applyPlaceData]);
-
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchValue(val);
-    if (isGoogleMapsUrl(val)) {
-      handleMapsLinkPaste(val);
-    }
-    // For non-URL text, Google Places Autocomplete widget handles suggestions natively
-  };
-
-  const handleSearchInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData('text');
-    if (isGoogleMapsUrl(text)) {
-      e.preventDefault();
-      handleMapsLinkPaste(text);
-    }
-    // For non-URL pastes, let the autocomplete widget handle it
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,9 +239,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
         <div className="flex items-center justify-between p-5 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-theme-text">
-              {venue ? 'Edit Venue' : 'Add Venue Option'}
-            </h2>
+            <h2 className="text-lg font-semibold text-theme-text">Edit Venue</h2>
           </div>
           <button
             type="button"
@@ -328,26 +251,6 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* Search / Google Maps Link Quick-Fill */}
-          {!venue && (
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none z-10" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchValue}
-                onChange={handleSearchInputChange}
-                onPaste={handleSearchInputPaste}
-                placeholder="Search for a venue or paste a Google Maps link"
-                className="w-full !pl-10 bg-theme-surface border border-dashed border-theme-stroke-hover rounded-xl text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-transparent py-2.5 pr-3 placeholder:text-theme-text-faint"
-                autoFocus
-              />
-              {lookingUp && (
-                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-theme-text-muted" />
-              )}
-            </div>
-          )}
-
           {/* Venue Info Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-theme-text-secondary">Venue Details</h3>
@@ -359,7 +262,7 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Venue Name *"
-              autoFocus={!!venue}
+              autoFocus
             />
 
             <IconInput
@@ -537,10 +440,8 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
                   <Loader2 size={14} className="animate-spin" />
                   Saving...
                 </>
-              ) : venue ? (
-                'Save Changes'
               ) : (
-                'Add Venue'
+                'Save Changes'
               )}
             </button>
           </div>
@@ -549,4 +450,14 @@ export const VenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) 
     </div>,
     document.body
   );
+};
+
+// ─── Exported component ──────────────────────────────────────────────────────
+// Routes to simplified add modal vs full edit form based on whether a venue is provided.
+
+export const VenueForm: React.FC<VenueFormProps> = (props) => {
+  if (props.venue) {
+    return <EditVenueForm {...props} />;
+  }
+  return <AddVenueModal onSave={props.onSave} onClose={props.onClose} />;
 };
