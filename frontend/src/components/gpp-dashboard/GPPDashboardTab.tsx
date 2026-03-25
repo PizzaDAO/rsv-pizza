@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getChecklist } from '../../lib/api';
+import { getChecklist, seedChecklist } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
@@ -22,7 +22,15 @@ export const GPPDashboardTab: React.FC = () => {
     if (!party?.id) return;
     let cancelled = false;
     (async () => {
-      const data = await getChecklist(party.id);
+      let data = await getChecklist(party.id);
+      // If not yet seeded, seed defaults so due dates propagate from checklist_defaults
+      if (data && !data.seeded) {
+        const seedResult = await seedChecklist(party.id);
+        if (seedResult) {
+          const refreshed = await getChecklist(party.id);
+          if (refreshed) data = refreshed;
+        }
+      }
       if (!cancelled) {
         setAutoStates(data?.autoCompleteStates ?? null);
         setDbItems(data?.items ?? []);
@@ -98,7 +106,7 @@ export const GPPDashboardTab: React.FC = () => {
       {
         label: 'Select Pizzeria',
         done: false,
-        tab: 'venue',
+        tab: 'pizza',
         icon: MapPin,
         dueDate: dueDateMap.get('Select Pizzeria') ?? null,
       },
