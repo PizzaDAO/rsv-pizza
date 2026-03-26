@@ -2619,3 +2619,48 @@ export async function fetchPublicVenueReport(
     return null;
   }
 }
+
+// ============================================
+// Telegram broadcast API functions
+// ============================================
+
+export interface BroadcastGroup {
+  chatId: string;
+  city: string;
+  country: string;
+}
+
+export interface BroadcastResult {
+  chatId: string;
+  city: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BroadcastResponse {
+  results: BroadcastResult[];
+  sent: number;
+  failed: number;
+}
+
+export async function sendTelegramBroadcast(
+  groups: BroadcastGroup[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
+    method: 'POST',
+    body: { groups, message, parseMode },
+  });
+}
+
+export async function sendTelegramTest(
+  chatId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
+    method: 'POST',
+    body: { chatId, message, parseMode },
+  });
+}
