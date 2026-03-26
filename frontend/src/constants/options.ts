@@ -13,7 +13,7 @@ export const DIETARY_OPTIONS = [
   'Dairy-Free',
 ] as const;
 
-// Role options for RSVP
+// Role options for RSVP (legacy, kept for backward compat with existing data)
 export const ROLE_OPTIONS = [
   'Biz Dev',
   'Dev',
@@ -24,6 +24,17 @@ export const ROLE_OPTIONS = [
   'Investor',
   'Ops',
   'Designer',
+] as const;
+
+// Turtle role options for RSVP
+export const TURTLES = [
+  { id: 'Leonardo', label: 'Leonardo', role: 'Leader', image: '/turtles/leonardo.png' },
+  { id: 'Donatello', label: 'Donatello', role: 'Builder', image: '/turtles/donatello.png' },
+  { id: 'Michelangelo', label: 'Michelangelo', role: 'Creative', image: '/turtles/michelangelo.png' },
+  { id: 'Raphael', label: 'Raphael', role: 'Connector', image: '/turtles/raphael.png' },
+  { id: 'April', label: 'April', role: 'Storyteller', image: '/turtles/april.png' },
+  { id: 'Splinter', label: 'Splinter', role: 'Counsel', image: '/turtles/splinter.png' },
+  { id: 'Foot Clan', label: 'Foot Clan', role: 'Ground Support', image: '/turtles/foot-clan.png' },
 ] as const;
 
 // Available pizza toppings
