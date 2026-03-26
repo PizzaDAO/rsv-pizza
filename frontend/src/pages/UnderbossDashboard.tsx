@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Send } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -64,6 +64,7 @@ export function UnderbossDashboard() {
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
 
   // Add underboss modal state
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
@@ -342,13 +343,6 @@ export function UnderbossDashboard() {
                   : `Signed in as ${filteredData.underboss.name}`}
               </span>
             </div>
-            <button
-              onClick={() => setShowBroadcast(true)}
-              className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
-            >
-              <Send size={14} />
-              Broadcast
-            </button>
             {isAdmin && (
               <button
                 onClick={() => setShowAddUnderboss(true)}
@@ -371,7 +365,7 @@ export function UnderbossDashboard() {
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             Events ({filteredData.events.length})
           </h2>
-          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} />
+          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
         </section>
         </div>
       </main>
@@ -379,7 +373,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => setShowBroadcast(false)} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(

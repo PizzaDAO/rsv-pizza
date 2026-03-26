@@ -6,11 +6,12 @@ import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../
 
 interface TelegramBroadcastProps {
   onClose: () => void;
+  preSelectedCities?: string[];
 }
 
 type ViewState = 'compose' | 'sending' | 'results';
 
-export function TelegramBroadcast({ onClose }: TelegramBroadcastProps) {
+export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadcastProps) {
   // Data loading
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -41,6 +42,17 @@ export function TelegramBroadcast({ onClose }: TelegramBroadcastProps) {
       try {
         const data = await fetchTelegramGroups();
         setGroups(data);
+        // Auto-select groups matching pre-selected cities
+        if (preSelectedCities && preSelectedCities.length > 0) {
+          const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
+          const matchingIds = new Set<string>();
+          for (const g of data) {
+            if (citySet.has(g.city.toLowerCase())) {
+              matchingIds.add(g.groupId);
+            }
+          }
+          if (matchingIds.size > 0) setSelectedIds(matchingIds);
+        }
       } catch (err: any) {
         setLoadError(err.message || 'Failed to load Telegram groups');
       } finally {
