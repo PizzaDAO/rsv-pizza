@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Send } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast } from '../components/underboss';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,6 +61,9 @@ export function UnderbossDashboard() {
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
+
+  // Telegram broadcast modal state
+  const [showBroadcast, setShowBroadcast] = useState(false);
 
   // Add underboss modal state
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
@@ -339,6 +342,13 @@ export function UnderbossDashboard() {
                   : `Signed in as ${filteredData.underboss.name}`}
               </span>
             </div>
+            <button
+              onClick={() => setShowBroadcast(true)}
+              className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
+            >
+              <Send size={14} />
+              Broadcast
+            </button>
             {isAdmin && (
               <button
                 onClick={() => setShowAddUnderboss(true)}
@@ -367,6 +377,9 @@ export function UnderbossDashboard() {
       </main>
 
       <Footer />
+
+      {/* Telegram Broadcast Modal */}
+      {showBroadcast && <TelegramBroadcast onClose={() => setShowBroadcast(false)} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(
