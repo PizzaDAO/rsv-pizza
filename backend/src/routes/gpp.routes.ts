@@ -252,14 +252,14 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     // Generate event name with city (no dash, just space)
     const eventName = `Global Pizza Party ${normalizedCity}`;
 
-    // Calculate default date: May 22 of current or next year
+    // Calculate default date: May 22 of current or next year (noon UTC stays May 22 in all timezones)
     const now = new Date();
-    let defaultYear = now.getFullYear();
-    const may22 = new Date(defaultYear, 4, 22); // Month is 0-indexed, so 4 = May
+    let defaultYear = now.getUTCFullYear();
+    const may22 = new Date(Date.UTC(defaultYear, 4, 22));
     if (now > may22) {
-      defaultYear++; // If May 22 has passed, use next year
+      defaultYear++;
     }
-    const defaultDate = new Date(defaultYear, 4, 22, 18, 0, 0); // May 22 at 6 PM
+    const defaultDate = new Date(Date.UTC(defaultYear, 4, 22, 12, 0, 0)); // May 22 noon UTC
 
     // Auto-infer region from country code
     const inferredRegion = countryCode ? countryCodeToRegion(countryCode) : null;
