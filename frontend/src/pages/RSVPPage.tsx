@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DIETARY_OPTIONS, ROLE_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
+import { DIETARY_OPTIONS, TURTLES, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { Pizzeria, DonationPublicStats } from '../types';
 import { IconInput } from '../components/IconInput';
@@ -559,25 +559,33 @@ export function RSVPPage() {
             />
             )}
 
-            {/* What do you do? */}
+            {/* What roles do you play? */}
             <div>
               <label className="block text-sm font-medium text-theme-text mb-2">
-                What do you do?
+                What roles do you play?
               </label>
-              <div className="flex flex-wrap gap-2">
-                {ROLE_OPTIONS.map((role) => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => toggleRole(role)}
-                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${roles.includes(role)
-                        ? 'bg-[#ff393a] text-white'
-                        : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
+              <div className="grid grid-cols-2 gap-2">
+                {TURTLES.map((t) => {
+                  const selected = roles.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleRole(t.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                        selected
+                          ? 'bg-[#ff393a] text-white'
+                          : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover/80'
                       }`}
-                  >
-                    {role}
-                  </button>
-                ))}
+                    >
+                      <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm leading-tight">{t.label}</div>
+                        <div className={`text-xs leading-tight ${selected ? 'text-white/70' : 'opacity-60'}`}>{t.role}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
