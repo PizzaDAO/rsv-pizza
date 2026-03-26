@@ -753,6 +753,7 @@ export interface CreateGPPEventData {
   countryCode?: string;
   cityLat?: number;
   cityLng?: number;
+  timezone?: string;
 }
 
 export interface GPPEventResponse {
