@@ -197,6 +197,7 @@ function HostPageContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                data-testid={`host-tab-${tab.id}`}
                 className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${activeTab === tab.id
                     ? 'text-theme-text'
                     : 'text-theme-text-muted hover:text-theme-text-secondary'

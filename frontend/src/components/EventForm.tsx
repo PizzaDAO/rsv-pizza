@@ -282,6 +282,7 @@ export function EventForm() {
             placeholder="Party Name"
             className="w-full pl-3"
             autoFocus
+            data-testid="event-form-name"
           />
         </div>
 
@@ -567,6 +568,7 @@ export function EventForm() {
           type="submit"
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
           disabled={creating}
+          data-testid="event-form-submit"
         >
           {creating ? (
             <>

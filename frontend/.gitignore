@@ -3,3 +3,7 @@
 # Environment variables
 .env.local
 .env
+
+# Playwright
+test-results/
+playwright-report/

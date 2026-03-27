@@ -309,12 +309,14 @@ export function EventPage() {
               required
               autoFocus
               autoComplete="off"
+              data-testid="password-input"
             />
 
             <button
               type="submit"
               className="w-full btn-primary"
               disabled={verifyingPassword}
+              data-testid="password-submit"
             >
               {verifyingPassword ? (
                 <span className="flex items-center justify-center gap-2">
@@ -753,7 +755,7 @@ export function EventPage() {
                     <GPPBadge />
                   </div>
                 )}
-                <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+                <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0" data-testid="event-name" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
@@ -775,7 +777,7 @@ export function EventPage() {
                   <div className="flex-1 space-y-3">
                     {/* Date & Time */}
                     {event.date && (
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3" data-testid="event-date">
                         <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div className="flex-1">
                           <p className="text-lg font-medium text-theme-text">
@@ -797,6 +799,7 @@ export function EventPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-start gap-3 group"
+                        data-testid="event-address"
                       >
                         <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
                         <div>
@@ -873,6 +876,7 @@ export function EventPage() {
                 <div className="pt-4">
                   <button
                     ref={mobileRsvpRef}
+                    data-testid="rsvp-button"
                     onClick={(e) => {
                       if (isGPP) {
                         const rect = e.currentTarget.getBoundingClientRect();

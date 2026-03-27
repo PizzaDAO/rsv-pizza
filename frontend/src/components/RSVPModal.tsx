@@ -483,6 +483,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       >
         <div
           className="card p-8 max-w-md w-full text-center"
+          data-testid="rsvp-success"
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
@@ -606,6 +607,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     return createPortal(
       <div
         className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
+        data-testid="rsvp-modal"
         onClick={handleClose}
       >
         <div className="min-h-full flex items-center justify-center p-4">
@@ -637,6 +639,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               placeholder="Name"
               required
               autoFocus
+              data-testid="rsvp-name"
             />
 
             <IconInput
@@ -646,6 +649,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               required
+              data-testid="rsvp-email"
             />
 
             {(event.nftEnabled || event.eventType === 'gpp') && (
@@ -750,6 +754,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <button
               type="submit"
               className="w-full btn-primary flex items-center justify-center gap-2"
+              data-testid="rsvp-next"
             >
               Next
               <ChevronRight size={18} />
@@ -1041,6 +1046,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               type="submit"
               disabled={submitting}
               className="flex-1 btn-primary flex items-center justify-center gap-2"
+              data-testid="rsvp-submit"
             >
               {submitting ? (
                 <>

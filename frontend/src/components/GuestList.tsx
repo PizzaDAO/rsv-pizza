@@ -182,6 +182,7 @@ export const GuestList: React.FC = () => {
             placeholder="Search guests by name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="guest-search"
           />
         </div>
 
