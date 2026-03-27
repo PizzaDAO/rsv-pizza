@@ -842,6 +842,11 @@ model Sponsor {
   notes           String? // Communication history, notes
   lastContactedAt DateTime? @map("last_contacted_at") @db.Timestamptz
 
+  // Intake form
+  intakeToken       String?   @unique @map("intake_token")
+  intakeSubmittedAt DateTime? @map("intake_submitted_at") @db.Timestamptz
+  sponsorMessage    String?   @map("sponsor_message")
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
