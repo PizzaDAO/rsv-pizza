@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { updatePartyApi } from './api';
+import { updatePartyApi, apiRequest, AUTH_EXPIRED_EVENT } from './api';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -94,5 +94,135 @@ describe('updatePartyApi', () => {
     expect(body.address).toBe('789 Elm St');
     expect(body.selectedPizzerias).toHaveLength(1);
     expect(body.selectedPizzerias[0].name).toBe('My Custom Pizzeria');
+  });
+});
+
+describe('apiRequest', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('adds Authorization header when authenticated', async () => {
+    localStorage.setItem('authToken', 'my-jwt-token');
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: 'test' }),
+    });
+
+    await apiRequest('/api/test');
+
+    const [, options] = mockFetch.mock.calls[0];
+    expect(options.headers['Authorization']).toBe('Bearer my-jwt-token');
+  });
+
+  it('throws "Not authenticated" when requireAuth is true and no token', async () => {
+    await expect(
+      apiRequest('/api/test', { requireAuth: true })
+    ).rejects.toThrow('Not authenticated');
+
+    // fetch should not have been called
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when requireAuth is false and no token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: 'public' }),
+    });
+
+    const result = await apiRequest('/api/public', { requireAuth: false });
+    expect(result).toEqual({ data: 'public' });
+  });
+
+  it('sends token when available even with requireAuth false', async () => {
+    localStorage.setItem('authToken', 'optional-token');
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await apiRequest('/api/test', { requireAuth: false });
+
+    const [, options] = mockFetch.mock.calls[0];
+    expect(options.headers['Authorization']).toBe('Bearer optional-token');
+  });
+
+  it('dispatches AUTH_EXPIRED_EVENT on 401', async () => {
+    localStorage.setItem('authToken', 'expired-token');
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'Token expired' }),
+    });
+
+    const handler = vi.fn();
+    window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+
+    try {
+      await apiRequest('/api/test');
+    } catch {
+      // Expected to throw
+    }
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    // Token should be cleared
+    expect(localStorage.getItem('authToken')).toBeNull();
+
+    window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
+  });
+
+  it('does not dispatch AUTH_EXPIRED_EVENT on 401 when requireAuth is false', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'Unauthorized' }),
+    });
+
+    const handler = vi.fn();
+    window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+
+    try {
+      await apiRequest('/api/test', { requireAuth: false });
+    } catch {
+      // Expected to throw
+    }
+
+    expect(handler).not.toHaveBeenCalled();
+
+    window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
+  });
+
+  it('uses correct HTTP method', async () => {
+    localStorage.setItem('authToken', 'test-token');
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await apiRequest('/api/test', { method: 'POST', body: { key: 'value' } });
+
+    const [, options] = mockFetch.mock.calls[0];
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ key: 'value' });
+  });
+
+  it('defaults to GET method', async () => {
+    localStorage.setItem('authToken', 'test-token');
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await apiRequest('/api/test');
+
+    const [, options] = mockFetch.mock.calls[0];
+    expect(options.method).toBe('GET');
+    expect(options.body).toBeUndefined();
   });
 });
