@@ -34,6 +34,7 @@ export function GPPLandingPage() {
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
   const [telegram, setTelegram] = useState('');
+  const [timezone, setTimezone] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
@@ -151,6 +152,7 @@ export function GPPLandingPage() {
           cityLat: cd.lat,
           cityLng: cd.lng,
         }),
+        timezone: timezone || undefined,
       });
 
       if (response.success) {
@@ -434,7 +436,9 @@ export function GPPLandingPage() {
                       onChange={(val) => {
                         setCity(val);
                         cityDataRef.current = null;
+                        setTimezone(null);
                       }}
+                      onTimezoneChange={setTimezone}
                       onCitySelected={handleCitySelected}
                       types={['(cities)']}
                       placeholder="What city are you hosting in?"
