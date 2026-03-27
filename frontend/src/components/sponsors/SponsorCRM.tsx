@@ -187,6 +187,8 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       {showForm && (
         <SponsorForm
           sponsor={editingSponsor}
+          partyId={partyId}
+          onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
           onSubmit={handleFormSubmit}
           onClose={handleCloseForm}
           isLoading={isSubmitting}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { generateSponsorIntakeToken, revokeSponsorIntakeToken } from '../../lib/api';
 
@@ -120,6 +120,13 @@ export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntak
         {showMenu && (
           <div className="absolute top-full right-0 mt-1 z-10 bg-theme-header border border-theme-stroke rounded-lg shadow-lg py-1 min-w-[140px]">
             <button
+              onClick={() => { window.open(intakeUrl!, '_blank'); setShowMenu(false); }}
+              className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
+            >
+              <ExternalLink size={12} />
+              Open Link
+            </button>
+            <button
               onClick={handleCopyUrl}
               className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
             >
@@ -159,6 +166,13 @@ export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntak
       </button>
       {showMenu && (
         <div className="absolute top-full right-0 mt-1 z-10 bg-theme-header border border-theme-stroke rounded-lg shadow-lg py-1 min-w-[140px]">
+          <button
+            onClick={() => { window.open(intakeUrl!, '_blank'); setShowMenu(false); }}
+            className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
+          >
+            <ExternalLink size={12} />
+            Open Link
+          </button>
           <button
             onClick={handleCopyUrl}
             className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
