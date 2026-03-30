@@ -531,7 +531,7 @@ export function GPPLandingPage() {
             See where communities around the world came together for pizza
           </p>
 
-          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
+          <div className="rounded-2xl border shadow-lg" style={{ borderColor: C.cardBorder }}>
             <Suspense fallback={<div style={{ height: 500 }} className="flex items-center justify-center bg-sky-100 rounded-2xl"><Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} /></div>}>
               <GPPMap height={500} minZoom={3} maxZoom={12} initialZoom={3} />
             </Suspense>
