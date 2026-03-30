@@ -125,47 +125,6 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// PATCH /api/admin/:id — Update admin role/name (super_admin only, can't downgrade self)
-router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
-    }
-
-    const { id } = req.params;
-    const { name, role } = req.body;
-
-    const admin = await prisma.admin.findUnique({ where: { id } });
-    if (!admin) {
-      throw new AppError('Admin not found', 404, 'NOT_FOUND');
-    }
-
-    if (admin.email === req.userEmail?.toLowerCase() && role && role !== 'super_admin') {
-      throw new AppError('Cannot downgrade your own role', 400, 'SELF_DOWNGRADE');
-    }
-
-    const updated = await prisma.admin.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name: name?.trim() || null }),
-        ...(role !== undefined && ['super_admin', 'admin'].includes(role) && { role }),
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        name: true,
-        createdBy: true,
-        createdAt: true,
-      },
-    });
-
-    res.json({ admin: updated });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // GET /api/admin/gpp-nft — Get current GPP NFT settings
 router.get('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -290,38 +249,81 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
       throw new AppError('items must be an array', 400, 'VALIDATION_ERROR');
     }
 
+    // Get all GPP party IDs for propagation
+    const gppParties = await prisma.party.findMany({
+      where: { eventType: 'gpp' },
+      select: { id: true },
+    });
+    const gppPartyIds = gppParties.map(p => p.id);
+
     let totalUpdated = 0;
     for (const item of items) {
       if (!item.name) continue;
-      const dueDate = item.dueDate !== undefined
-        ? (item.dueDate ? new Date(item.dueDate) : null)
-        : undefined;
-
-      if (dueDate === undefined) continue;
-
-      const dueDateStr = dueDate ? dueDate.toISOString().split('T')[0] : null;
+      const parsedDate = item.dueDate ? new Date(item.dueDate + 'T00:00:00.000Z') : null;
 
       // 1. Update the checklist_defaults row
-      await prisma.$executeRaw`
-        UPDATE checklist_defaults
-        SET due_date = ${dueDateStr}::date, updated_at = NOW()
-        WHERE name = ${item.name}
-      `;
+      await prisma.checklistDefault.updateMany({
+        where: { name: item.name },
+        data: { dueDate: parsedDate },
+      });
 
       // 2. Propagate to all GPP events' checklist_items
-      const result = await prisma.$executeRaw`
-        UPDATE checklist_items ci
-        SET due_date = ${dueDateStr}::date, updated_at = NOW()
-        FROM parties p
-        WHERE ci.party_id = p.id
-          AND p.event_type = 'gpp'
-          AND ci.is_default = true
-          AND ci.name = ${item.name}
-      `;
-      totalUpdated += result;
+      if (gppPartyIds.length > 0) {
+        const result = await prisma.checklistItem.updateMany({
+          where: {
+            partyId: { in: gppPartyIds },
+            isDefault: true,
+            name: item.name,
+          },
+          data: { dueDate: parsedDate },
+        });
+        totalUpdated += result.count;
+      }
     }
 
     res.json({ success: true, totalUpdated });
+  } catch (error: any) {
+    console.error('[checklist-defaults PATCH]', error);
+    res.status(500).json({
+      error: {
+        message: String(error?.message || error),
+        name: error?.name,
+        code: error?.code,
+        meta: error?.meta,
+      },
+    });
+  }
+});
+
+// DELETE /api/admin/checklist-defaults/:name — Remove a checklist default + propagate to all GPP events
+router.delete('/checklist-defaults/:name', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Only super admins can remove checklist items', 403, 'FORBIDDEN');
+    }
+
+    const itemName = decodeURIComponent(req.params.name);
+
+    // 1. Delete from checklist_defaults
+    const deleted = await prisma.$executeRaw`
+      DELETE FROM checklist_defaults WHERE name = ${itemName}
+    `;
+
+    if (deleted === 0) {
+      throw new AppError('Item not found', 404, 'NOT_FOUND');
+    }
+
+    // 2. Delete from all GPP events' checklist_items
+    const totalDeleted = await prisma.$executeRaw`
+      DELETE FROM checklist_items ci
+      USING parties p
+      WHERE ci.party_id = p.id
+        AND p.event_type = 'gpp'
+        AND ci.is_default = true
+        AND ci.name = ${itemName}
+    `;
+
+    res.json({ success: true, totalDeleted });
   } catch (error) {
     next(error);
   }
@@ -341,34 +343,92 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
     }
 
     const trimmedName = name.trim();
-    const parsedDate = dueDate ? new Date(dueDate) : null;
-    const parsedDateStr = parsedDate ? parsedDate.toISOString().split('T')[0] : null;
+    const parsedDate = dueDate ? new Date(dueDate + 'T00:00:00.000Z') : null;
 
-    // Get next sort_order from checklist_defaults
-    const maxResult = await prisma.$queryRaw<Array<{ max_sort: number | null }>>`
-      SELECT MAX(sort_order) as max_sort FROM checklist_defaults
-    `;
-    const nextSort = (maxResult[0]?.max_sort ?? -1) + 1;
+    // Get next sort_order
+    const existing = await prisma.checklistDefault.findMany({
+      orderBy: { sortOrder: 'desc' },
+      take: 1,
+      select: { sortOrder: true },
+    });
+    const nextSort = (existing[0]?.sortOrder ?? -1) + 1;
 
     // 1. Insert into checklist_defaults
-    await prisma.$executeRaw`
-      INSERT INTO checklist_defaults (name, due_date, is_auto, sort_order)
-      VALUES (${trimmedName}, ${parsedDateStr}::date, false, ${nextSort})
-    `;
+    await prisma.checklistDefault.create({
+      data: {
+        name: trimmedName,
+        dueDate: parsedDate,
+        isAuto: false,
+        sortOrder: nextSort,
+      },
+    });
 
     // 2. Insert into all GPP events' checklist_items
-    const result = await prisma.$executeRaw`
-      INSERT INTO checklist_items (id, party_id, name, due_date, is_auto, is_default, sort_order, created_at, updated_at)
-      SELECT gen_random_uuid(), p.id, ${trimmedName}, ${parsedDateStr}::date, false, true, ${nextSort}, NOW(), NOW()
-      FROM parties p
-      WHERE p.event_type = 'gpp'
-    `;
+    const gppParties = await prisma.party.findMany({
+      where: { eventType: 'gpp' },
+      select: { id: true },
+    });
 
-    res.status(201).json({ success: true, createdCount: result });
+    if (gppParties.length > 0) {
+      await prisma.checklistItem.createMany({
+        data: gppParties.map(p => ({
+          partyId: p.id,
+          name: trimmedName,
+          dueDate: parsedDate,
+          isAuto: false,
+          isDefault: true,
+          sortOrder: nextSort,
+        })),
+      });
+    }
+
+    res.status(201).json({ success: true, createdCount: gppParties.length });
   } catch (error: any) {
-    if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+    if (error.code === 'P2002') {
       return res.status(400).json({ error: { message: 'An item with that name already exists', code: 'DUPLICATE' } });
     }
+    next(error);
+  }
+});
+
+// PATCH /api/admin/:id — Update admin role/name (super_admin only, can't downgrade self)
+// IMPORTANT: This wildcard route must be LAST to avoid matching named routes like /checklist-defaults
+router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { id } = req.params;
+    const { name, role } = req.body;
+
+    const admin = await prisma.admin.findUnique({ where: { id } });
+    if (!admin) {
+      throw new AppError('Admin not found', 404, 'NOT_FOUND');
+    }
+
+    if (admin.email === req.userEmail?.toLowerCase() && role && role !== 'super_admin') {
+      throw new AppError('Cannot downgrade your own role', 400, 'SELF_DOWNGRADE');
+    }
+
+    const updated = await prisma.admin.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name: name?.trim() || null }),
+        ...(role !== undefined && ['super_admin', 'admin'].includes(role) && { role }),
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        name: true,
+        createdBy: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ admin: updated });
+  } catch (error) {
     next(error);
   }
 });

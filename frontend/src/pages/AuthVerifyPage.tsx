@@ -172,6 +172,7 @@ export function AuthVerifyPage() {
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   className="w-12 h-14 text-center text-2xl font-bold bg-theme-surface border border-theme-stroke-hover rounded-lg text-theme-text focus:outline-none focus:border-[#ff393a] focus:ring-1 focus:ring-[#ff393a] transition-all"
                   autoFocus={index === 0}
+                  data-testid={`verify-code-${index}`}
                 />
               ))}
             </div>

@@ -177,7 +177,7 @@ async function sendGPPWelcomeEmail(
 // POST /api/gpp/events - Create a GPP event (simplified flow, no auth required)
 router.post('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng } = req.body;
+    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng, timezone } = req.body;
 
     // Validate required fields
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
@@ -252,14 +252,33 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     // Generate event name with city (no dash, just space)
     const eventName = `Global Pizza Party ${normalizedCity}`;
 
-    // Calculate default date: May 22 of current or next year
+    // Calculate default date: May 22 of current or next year, 6-9 PM in event timezone
     const now = new Date();
-    let defaultYear = now.getFullYear();
-    const may22 = new Date(defaultYear, 4, 22); // Month is 0-indexed, so 4 = May
+    let defaultYear = now.getUTCFullYear();
+    const may22 = new Date(Date.UTC(defaultYear, 4, 22));
     if (now > may22) {
-      defaultYear++; // If May 22 has passed, use next year
+      defaultYear++;
     }
-    const defaultDate = new Date(defaultYear, 4, 22, 18, 0, 0); // May 22 at 6 PM
+
+    const eventTimezone = (typeof timezone === 'string' && timezone.trim()) || 'America/New_York';
+
+    // Convert a local time in a timezone to UTC
+    function localToUTC(year: number, month: number, day: number, hour: number, tz: string): Date {
+      const utcGuess = new Date(Date.UTC(year, month, day, hour, 0, 0));
+      const fmt = (timeZone: string) => new Intl.DateTimeFormat('en-US', {
+        timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
+      const parse = (str: string) => {
+        const m = str.match(/(\d+)\/(\d+)\/(\d+),?\s*(\d+):(\d+):(\d+)/);
+        return m ? Date.UTC(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +m[6]) : 0;
+      };
+      const offset = parse(fmt(tz).format(utcGuess)) - parse(fmt('UTC').format(utcGuess));
+      return new Date(utcGuess.getTime() - offset);
+    }
+
+    const defaultDate = localToUTC(defaultYear, 4, 22, 18, eventTimezone);    // 6 PM local
+    const defaultEndDate = localToUTC(defaultYear, 4, 22, 21, eventTimezone); // 9 PM local
 
     // Auto-infer region from country code
     const inferredRegion = countryCode ? countryCodeToRegion(countryCode) : null;
@@ -298,6 +317,9 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         eventImageUrl: GPP_DEFAULTS.eventImageUrl,
         customUrl: customUrl,
         date: defaultDate,
+        endTime: defaultEndDate,
+        duration: 3,
+        timezone: eventTimezone,
         region: inferredRegion,
         availableBeverages: [],
         availableToppings: [],

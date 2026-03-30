@@ -261,6 +261,64 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
   }
 });
 
+// ============================================
+// City status routes (underboss auth)
+// NOTE: Must be registered BEFORE /:region catch-all
+// ============================================
+
+// GET /api/underboss/city-statuses - Returns all city statuses as a map
+router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.cityStatus.findMany();
+    const map: Record<string, { status: string; updatedBy: string | null; updatedAt: string }> = {};
+    for (const row of rows) {
+      map[row.cityKey] = {
+        status: row.status,
+        updatedBy: row.updatedBy,
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }
+    res.json(map);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/city-statuses - Upsert a city status (or delete if 'todo')
+router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { cityKey, status } = req.body;
+
+    if (!cityKey || typeof cityKey !== 'string') {
+      throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const validStatuses = ['created', 'skip', 'todo'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError('status must be "created", "skip", or "todo"', 400, 'VALIDATION_ERROR');
+    }
+
+    const updatedBy = req.underboss?.email || null;
+
+    if (status === 'todo') {
+      // Default status doesn't need storage — delete the row
+      await prisma.cityStatus.deleteMany({ where: { cityKey } });
+      return res.json({ success: true, deleted: true });
+    }
+
+    // Upsert: create or update
+    const result = await prisma.cityStatus.upsert({
+      where: { cityKey },
+      update: { status, updatedBy },
+      create: { cityKey, status, updatedBy },
+    });
+
+    res.json({ success: true, cityStatus: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/underboss/:region - Main dashboard data
 router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {

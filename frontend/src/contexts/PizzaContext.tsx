@@ -51,7 +51,7 @@ export const pizzaStyles = PIZZA_STYLES;
 export const pizzaSizes = PIZZA_SIZES;
 
 // Convert database guest to app guest
-function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
+export function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
   return {
     id: dbGuest.id,
     name: dbGuest.name,
@@ -77,7 +77,7 @@ function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
 }
 
 // Convert database party to app party
-function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
+export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
   return {
     id: dbParty.id,
     name: dbParty.name,
@@ -100,7 +100,7 @@ function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     description: dbParty.description,
     address: dbParty.address,
     rsvpClosedAt: dbParty.rsvp_closed_at,
-    coHosts: dbParty.co_hosts || [],
+    coHosts: dbParty.co_hosts || dbParty.co_hosts_public || [],
     selectedPizzerias: dbParty.selected_pizzerias || [],
     venueName: dbParty.venue_name,
     shareToUnlock: dbParty.share_to_unlock || false,

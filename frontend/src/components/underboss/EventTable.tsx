@@ -13,6 +13,7 @@ interface EventTableProps {
   showRegion?: boolean;
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
   onBulkAction?: () => void;
+  onTelegramBroadcast?: (cities: string[]) => void;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
@@ -82,7 +83,7 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast }: EventTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -318,11 +319,24 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction }: 
                     Cancel Event
                   </button>
                   <button
-                    disabled
-                    className="w-full text-left px-4 py-2 text-sm text-theme-text-faint cursor-not-allowed"
-                    title="Coming soon"
+                    onClick={() => {
+                      setShowActionDropdown(false);
+                      // Extract city names from selected events (strip "Global Pizza Party " prefix)
+                      const cities = events
+                        .filter(e => selectedIds.has(e.id))
+                        .map(e => {
+                          // customUrl is the city name lowercase no spaces (e.g., "tokyo")
+                          // name is "Global Pizza Party CityName"
+                          const prefix = 'Global Pizza Party ';
+                          return e.name.startsWith(prefix)
+                            ? e.name.slice(prefix.length)
+                            : e.customUrl || e.name;
+                        });
+                      onTelegramBroadcast?.(cities);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
-                    Send Telegram (coming soon)
+                    Send Telegram
                   </button>
                 </div>
               </>

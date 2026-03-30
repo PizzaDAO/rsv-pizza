@@ -65,6 +65,23 @@ export async function apiRequest<T>(
   return response.json();
 }
 
+// Homepage events (single-call, slim payload)
+export interface UserPartyListItem {
+  id: string;
+  name: string;
+  inviteCode: string;
+  date: string | null;
+  address: string | null;
+  eventImageUrl: string | null;
+  guestCount: number;
+  role: 'host' | 'guest' | 'cohost';
+}
+
+export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
+  const res = await apiRequest<{ parties: UserPartyListItem[] }>('/api/parties/my-events');
+  return res.parties;
+}
+
 // Party API functions
 export interface CreatePartyData {
   name?: string;
@@ -753,6 +770,7 @@ export interface CreateGPPEventData {
   countryCode?: string;
   cityLat?: number;
   cityLng?: number;
+  timezone?: string;
 }
 
 export interface GPPEventResponse {
@@ -2320,6 +2338,12 @@ export async function addChecklistDefault(data: { name: string; dueDate?: string
   });
 }
 
+export async function deleteChecklistDefault(name: string): Promise<{ success: boolean; totalDeleted: number }> {
+  return apiRequest<{ success: boolean; totalDeleted: number }>(`/api/admin/checklist-defaults/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ============================================
 // Underboss Dashboard API
 // ============================================
@@ -2391,6 +2415,28 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-delete', {
     method: 'DELETE',
     body: { partyIds },
+  });
+}
+
+// ============================================
+// City Status API (Underboss)
+// ============================================
+
+export interface CityStatusMap {
+  [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
+}
+
+export async function fetchCityStatuses(): Promise<CityStatusMap> {
+  return apiRequest<CityStatusMap>('/api/underboss/city-statuses');
+}
+
+export async function updateCityStatus(
+  cityKey: string,
+  status: 'created' | 'skip' | 'todo'
+): Promise<void> {
+  await apiRequest('/api/underboss/city-statuses', {
+    method: 'PATCH',
+    body: { cityKey, status },
   });
 }
 
@@ -2711,5 +2757,149 @@ export async function fetchPublicVenueReport(
   } catch (error) {
     console.error('Error fetching public venue report:', error);
     return null;
+  }
+}
+
+// ============================================
+// Telegram broadcast API functions
+// ============================================
+
+export interface BroadcastGroup {
+  chatId: string;
+  city: string;
+  country: string;
+}
+
+export interface BroadcastResult {
+  chatId: string;
+  city: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BroadcastResponse {
+  results: BroadcastResult[];
+  sent: number;
+  failed: number;
+}
+
+export async function sendTelegramBroadcast(
+  groups: BroadcastGroup[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
+    method: 'POST',
+    body: { groups, message, parseMode },
+  });
+}
+
+export async function sendTelegramTest(
+  chatId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
+    method: 'POST',
+    body: { chatId, message, parseMode },
+  });
+}
+
+// ============================================
+// Sponsor Intake (Public)
+// ============================================
+
+export interface SponsorIntakeData {
+  name?: string;
+  website?: string;
+  brandTwitter?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactTwitter?: string;
+  telegram?: string;
+  sponsorshipType?: SponsorshipType | null;
+  productService?: string;
+  logoUrl?: string;
+  sponsorMessage?: string;
+}
+
+export interface SponsorIntakeResponse {
+  sponsor: {
+    name: string;
+    website: string | null;
+    brandTwitter: string | null;
+    contactName: string | null;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    contactTwitter: string | null;
+    telegram: string | null;
+    sponsorshipType: string | null;
+    productService: string | null;
+    logoUrl: string | null;
+    sponsorMessage: string | null;
+    intakeSubmittedAt: string | null;
+  };
+  eventName: string;
+}
+
+// Public: Get sponsor intake data by token (no auth)
+export async function getSponsorIntake(token: string): Promise<SponsorIntakeResponse | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/sponsor-intake/${token}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error('Failed to fetch intake data');
+    }
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+// Public: Submit sponsor intake form (no auth)
+export async function submitSponsorIntake(token: string, data: SponsorIntakeData): Promise<boolean> {
+  const response = await fetch(`${API_URL}/api/sponsor-intake/${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Submission failed' }));
+    throw new Error(error.message || 'Failed to submit intake form');
+  }
+  return true;
+}
+
+// Auth: Generate sponsor intake token
+export async function generateSponsorIntakeToken(
+  partyId: string,
+  sponsorId: string
+): Promise<{ token: string; url: string } | null> {
+  try {
+    return await apiRequest<{ token: string; url: string }>(
+      `/api/sponsor-intake/generate-token/${partyId}/${sponsorId}`,
+      { method: 'POST', requireAuth: true }
+    );
+  } catch (error) {
+    console.error('Error generating intake token:', error);
+    throw error;
+  }
+}
+
+// Auth: Revoke sponsor intake token
+export async function revokeSponsorIntakeToken(
+  partyId: string,
+  sponsorId: string
+): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(
+      `/api/sponsor-intake/revoke-token/${partyId}/${sponsorId}`,
+      { method: 'DELETE', requireAuth: true }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error revoking intake token:', error);
+    return false;
   }
 }

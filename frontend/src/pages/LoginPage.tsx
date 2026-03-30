@@ -71,6 +71,7 @@ export function LoginPage() {
               placeholder="Enter your email"
               required
               autoFocus
+              data-testid="login-email"
             />
 
             {error && (
@@ -83,6 +84,7 @@ export function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full btn-primary flex items-center justify-center gap-2"
+              data-testid="login-submit"
             >
               {loading ? (
                 <>

@@ -89,6 +89,111 @@ const router = Router();
 // All party routes require authentication
 router.use(requireAuth);
 
+// GET /api/parties/my-events - Get all events for the authenticated user (owned, guest, cohost) in a single call
+// Must be registered BEFORE /:id catch-all route
+router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId;
+    const userEmail = req.userEmail?.toLowerCase();
+
+    if (!userId || !userEmail) {
+      return res.json({ parties: [] });
+    }
+
+    // Slim select for homepage cards
+    const slimSelect = {
+      id: true,
+      name: true,
+      inviteCode: true,
+      date: true,
+      address: true,
+      eventImageUrl: true,
+      coHosts: true,
+      _count: { select: { guests: true } },
+    };
+
+    // 1. Owned parties
+    const ownedParties = await prisma.party.findMany({
+      where: { userId },
+      select: slimSelect,
+      orderBy: { date: 'asc' },
+    });
+
+    // 2. Parties where user is a guest (via email)
+    const guestEntries = await prisma.guest.findMany({
+      where: { email: userEmail },
+      select: { partyId: true },
+    });
+    const guestPartyIds = guestEntries.map(g => g.partyId);
+
+    let guestParties: typeof ownedParties = [];
+    if (guestPartyIds.length > 0) {
+      guestParties = await prisma.party.findMany({
+        where: { id: { in: guestPartyIds } },
+        select: slimSelect,
+        orderBy: { date: 'asc' },
+      });
+    }
+
+    // 3. Co-host parties via raw SQL with JSONB operator
+    const cohostRows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM parties
+      WHERE co_hosts::jsonb @> ${JSON.stringify([{ email: userEmail }])}::jsonb
+    `;
+    const cohostPartyIds = cohostRows.map(r => r.id);
+
+    let cohostParties: typeof ownedParties = [];
+    if (cohostPartyIds.length > 0) {
+      cohostParties = await prisma.party.findMany({
+        where: { id: { in: cohostPartyIds } },
+        select: slimSelect,
+        orderBy: { date: 'asc' },
+      });
+    }
+
+    // Deduplicate by party ID, assign roles (host > cohost > guest)
+    const partyMap = new Map<string, any>();
+
+    for (const p of ownedParties) {
+      partyMap.set(p.id, { ...p, role: 'host' as const });
+    }
+    for (const p of cohostParties) {
+      if (!partyMap.has(p.id)) {
+        partyMap.set(p.id, { ...p, role: 'cohost' as const });
+      }
+    }
+    for (const p of guestParties) {
+      if (!partyMap.has(p.id)) {
+        partyMap.set(p.id, { ...p, role: 'guest' as const });
+      }
+    }
+
+    // Format response
+    const parties = Array.from(partyMap.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      inviteCode: p.inviteCode,
+      date: p.date ? p.date.toISOString() : null,
+      address: p.address,
+      eventImageUrl: p.eventImageUrl,
+      guestCount: p._count?.guests ?? 0,
+      role: p.role,
+    }));
+
+    // Sort by date ascending (nulls last)
+    parties.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    res.json({ parties });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/by-cohost?email=xxx - Get party IDs where user is a co-host
 // Must be registered BEFORE /:id catch-all route
 router.get('/by-cohost', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -98,17 +203,13 @@ router.get('/by-cohost', async (req: AuthRequest, res: Response, next: NextFunct
       return res.json({ partyIds: [] });
     }
 
-    // Find all parties and filter for co-host matches
-    const parties = await prisma.party.findMany({
-      select: { id: true, coHosts: true },
-    });
+    // Use JSONB operator for efficient co-host lookup instead of loading all parties
+    const matchingParties = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM parties
+      WHERE co_hosts::jsonb @> ${JSON.stringify([{ email }])}::jsonb
+    `;
 
-    const matchingIds = parties
-      .filter((p) => {
-        const coHosts = (p.coHosts as any[]) || [];
-        return coHosts.some((h: any) => h.email?.toLowerCase() === email);
-      })
-      .map((p) => p.id);
+    const matchingIds = matchingParties.map(p => p.id);
 
     res.json({ partyIds: matchingIds });
   } catch (error) {

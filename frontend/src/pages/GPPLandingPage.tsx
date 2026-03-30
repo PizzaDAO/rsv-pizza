@@ -34,6 +34,7 @@ export function GPPLandingPage() {
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
   const [telegram, setTelegram] = useState('');
+  const [timezone, setTimezone] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ hostPageUrl: string; eventName: string; email: string } | null>(null);
@@ -151,6 +152,7 @@ export function GPPLandingPage() {
           cityLat: cd.lat,
           cityLng: cd.lng,
         }),
+        timezone: timezone || undefined,
       });
 
       if (response.success) {
@@ -434,7 +436,9 @@ export function GPPLandingPage() {
                       onChange={(val) => {
                         setCity(val);
                         cityDataRef.current = null;
+                        setTimezone(null);
                       }}
+                      onTimezoneChange={setTimezone}
                       onCitySelected={handleCitySelected}
                       types={['(cities)']}
                       placeholder="What city are you hosting in?"
@@ -527,7 +531,7 @@ export function GPPLandingPage() {
             See where communities around the world came together for pizza
           </p>
 
-          <div className="rounded-2xl overflow-hidden border shadow-lg" style={{ borderColor: C.cardBorder }}>
+          <div className="rounded-2xl border shadow-lg" style={{ borderColor: C.cardBorder }}>
             <Suspense fallback={<div style={{ height: 500 }} className="flex items-center justify-center bg-sky-100 rounded-2xl"><Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} /></div>}>
               <GPPMap height={500} minZoom={3} maxZoom={12} initialZoom={3} />
             </Suspense>
