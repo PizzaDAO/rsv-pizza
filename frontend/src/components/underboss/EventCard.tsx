@@ -231,7 +231,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             {event.underbossApproved && (
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
             )}
-            <span className="text-sm font-medium text-theme-text truncate">{event.name}</span>
+            <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
             {eventUrl && (
               <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0">
                 <ExternalLink size={12} />

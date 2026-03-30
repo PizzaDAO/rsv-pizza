@@ -265,7 +265,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
               {event.underbossApproved && (
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
               )}
-              <span className="text-sm font-medium text-theme-text truncate">{event.name}</span>
+              <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
               {eventUrl && (
                 <a
                   href={eventUrl}
