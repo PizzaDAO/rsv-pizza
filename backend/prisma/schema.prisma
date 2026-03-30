@@ -226,6 +226,7 @@ model Guest {
   raffleWins       RaffleWinner[]
   notableAttendees NotableAttendee[]
 
+  @@index([email])
   @@map("guests")
 }
 

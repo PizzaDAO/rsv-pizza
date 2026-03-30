@@ -1,37 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '../components/Layout';
 import { EventForm } from '../components/EventForm';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Loader2, Users, Plus, MapPin, Crown } from 'lucide-react';
-import { getUserParties, UserParty } from '../lib/supabase';
+import { fetchMyEvents } from '../lib/api';
 
 export function HomePage() {
   const { user, loading: authLoading } = useAuth();
 
-  // Parties state for signed-in users
-  const [userParties, setUserParties] = useState<UserParty[]>([]);
-  const [partiesLoading, setPartiesLoading] = useState(false);
   const [eventFilter, setEventFilter] = useState<'upcoming' | 'past'>('upcoming');
 
-  // Load user's parties when signed in
-  useEffect(() => {
-    if (user?.email) {
-      setPartiesLoading(true);
-      getUserParties(user.email)
-        .then(parties => {
-          setUserParties(parties);
-        })
-        .catch(err => {
-          console.error('Error loading user parties:', err);
-        })
-        .finally(() => {
-          setPartiesLoading(false);
-        });
-    } else {
-      setUserParties([]);
-    }
-  }, [user?.email]);
+  // Fetch all user events in a single API call with React Query caching
+  const { data: userParties = [], isLoading: partiesLoading } = useQuery({
+    queryKey: ['my-events'],
+    queryFn: fetchMyEvents,
+    enabled: !!user,
+    staleTime: 30_000, // 30 seconds - instant back-navigation
+  });
 
   // Format party date for display
   const formatPartyDate = (dateStr: string | null) => {
@@ -133,14 +120,14 @@ export function HomePage() {
                 return filteredParties.map(party => (
                 <Link
                   key={party.id}
-                  to={party.userRole === 'host' ? `/host/${party.invite_code}` : `/${party.invite_code}`}
+                  to={party.role === 'host' ? `/host/${party.inviteCode}` : `/${party.inviteCode}`}
                   className="block card p-4 hover:bg-theme-surface-hover transition-colors"
                 >
                   <div className="flex items-start gap-4">
                     {/* Event Image or Placeholder */}
-                    {party.event_image_url ? (
+                    {party.eventImageUrl ? (
                       <img
-                        src={party.event_image_url}
+                        src={party.eventImageUrl}
                         alt={party.name}
                         className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
                       />
@@ -153,7 +140,7 @@ export function HomePage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-theme-text truncate">{party.name}</h3>
-                        {party.userRole === 'host' && (
+                        {party.role === 'host' && (
                           <span className="flex items-center gap-1 px-2 py-0.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-full text-xs text-[#ff393a] flex-shrink-0">
                             <Crown size={10} />
                             Host

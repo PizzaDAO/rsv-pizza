@@ -65,6 +65,23 @@ export async function apiRequest<T>(
   return response.json();
 }
 
+// Homepage events (single-call, slim payload)
+export interface UserPartyListItem {
+  id: string;
+  name: string;
+  inviteCode: string;
+  date: string | null;
+  address: string | null;
+  eventImageUrl: string | null;
+  guestCount: number;
+  role: 'host' | 'guest' | 'cohost';
+}
+
+export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
+  const res = await apiRequest<{ parties: UserPartyListItem[] }>('/api/parties/my-events');
+  return res.parties;
+}
+
 // Party API functions
 export interface CreatePartyData {
   name?: string;
