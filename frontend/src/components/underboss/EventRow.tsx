@@ -357,19 +357,31 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
         </div>
       </td>
 
-      {/* Progress (8 items) */}
+      {/* Progress (compact 3x3 grid with count) */}
       <td className="py-3 px-3">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
-          <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
-          <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
-          <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
-          <ProgressIndicator done={event.progress.hasBudget} label="Budget" />
-          <ProgressIndicator done={event.progress.hasSponsors} label="Partners" />
-          <ProgressIndicator done={event.progress.hasPrepared} label="Prep" />
-          <ProgressIndicator done={event.progress.hasSocialPosts} label="Social" />
-          <ProgressIndicator done={event.progress.hasThrown} label="Thrown" />
-        </div>
+        {(() => {
+          const p = event.progress;
+          const completedCount = [
+            p.hasCreatedEvent, p.hasPartyKit, p.hasCoHosts, p.hasVenue,
+            p.hasBudget, p.hasSponsors, p.hasPrepared, p.hasSocialPosts, p.hasThrown,
+          ].filter(Boolean).length;
+          return (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs text-theme-text-muted font-medium">{completedCount}/9</span>
+              <div className="grid grid-cols-3 gap-1">
+                <ProgressIndicator done={p.hasCreatedEvent} label="Event" compact />
+                <ProgressIndicator done={p.hasPartyKit} label="Kit" compact />
+                <ProgressIndicator done={p.hasCoHosts} label="Team" compact />
+                <ProgressIndicator done={p.hasVenue} label="Venue" compact />
+                <ProgressIndicator done={p.hasBudget} label="Budget" compact />
+                <ProgressIndicator done={p.hasSponsors} label="Partners" compact />
+                <ProgressIndicator done={p.hasPrepared} label="Prep" compact />
+                <ProgressIndicator done={p.hasSocialPosts} label="Social" compact />
+                <ProgressIndicator done={p.hasThrown} label="Thrown" compact />
+              </div>
+            </div>
+          );
+        })()}
       </td>
     </tr>
   );
