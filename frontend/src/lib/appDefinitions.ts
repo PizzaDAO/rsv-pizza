@@ -10,6 +10,7 @@ import {
   ListChecks,
   Package,
   Megaphone,
+  Newspaper,
 } from 'lucide-react';
 
 /**
@@ -36,4 +37,5 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'checklist', name: 'Checklist', tab: 'checklist', icon: ListChecks },
   { id: 'party-kit', name: 'Party Kit', tab: 'gpp', icon: Package },
   { id: 'marketing-promo', name: 'Promo', tab: 'promo', icon: Megaphone },
+  { id: 'press-release', name: 'Press Release', tab: 'press-release', icon: Newspaper },
 ];

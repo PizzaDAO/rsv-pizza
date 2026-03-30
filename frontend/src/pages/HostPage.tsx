@@ -29,15 +29,16 @@ import { BudgetTab } from '../components/budget';
 import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
+import { PressReleaseWidget } from '../components/press-release';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'press-release' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'press-release', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -373,6 +374,10 @@ function HostPageContent() {
 
               {activeTab === 'promo' && (
                 <PromoWidget />
+              )}
+
+              {activeTab === 'press-release' && party && (
+                <PressReleaseWidget />
               )}
 
               {activeTab === 'gpp' && party && (
