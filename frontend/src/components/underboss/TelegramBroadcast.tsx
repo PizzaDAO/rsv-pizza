@@ -72,6 +72,12 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
   const filteredGroups = useMemo(() => {
     let filtered = groups;
 
+    // When opened from actions dropdown, only show groups matching the selected cities
+    if (preSelectedCities && preSelectedCities.length > 0) {
+      const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
+      filtered = filtered.filter(g => citySet.has(g.city.toLowerCase()));
+    }
+
     if (regionFilter !== 'all') {
       filtered = filtered.filter(g => g.region === regionFilter);
     }
@@ -87,7 +93,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
     }
 
     return filtered;
-  }, [groups, regionFilter, search]);
+  }, [groups, regionFilter, search, preSelectedCities]);
 
   // Selection helpers
   const toggleGroup = (groupId: string) => {
@@ -220,7 +226,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                   <h4 className="text-sm font-medium text-theme-text">
                     Select Groups
                     <span className="ml-2 text-theme-text-faint font-normal">
-                      {selectedIds.size} of {groups.length} selected
+                      {selectedIds.size} of {filteredGroups.length} selected
                     </span>
                   </h4>
                   <div className="flex items-center gap-2">
