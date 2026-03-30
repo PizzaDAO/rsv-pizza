@@ -3,3 +3,4 @@ export { EventTable } from './EventTable';
 export { EventRow } from './EventRow';
 export { ProgressIndicator } from './ProgressIndicator';
 export { TelegramBroadcast } from './TelegramBroadcast';
+export { CitiesTable } from './CitiesTable';

@@ -226,6 +226,7 @@ model Guest {
   raffleWins       RaffleWinner[]
   notableAttendees NotableAttendee[]
 
+  @@index([email])
   @@map("guests")
 }
 
@@ -1026,6 +1027,17 @@ model Underboss {
 
   @@index([region])
   @@map("underbosses")
+}
+
+model CityStatus {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityKey   String   @unique @map("city_key")
+  status    String   @default("todo")
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("city_statuses")
 }
 
 // ============================================
