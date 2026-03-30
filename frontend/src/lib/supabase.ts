@@ -414,7 +414,7 @@ export interface DbGuest {
 }
 
 // Safe column list for parties table — excludes password
-const SAFE_PARTY_COLUMNS = `
+export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
