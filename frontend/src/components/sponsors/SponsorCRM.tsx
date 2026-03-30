@@ -176,8 +176,10 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       {/* Sponsor List */}
       <SponsorList
         sponsors={sponsors}
+        partyId={partyId}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
         isLoading={isRefreshing}
       />
 
@@ -185,6 +187,8 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       {showForm && (
         <SponsorForm
           sponsor={editingSponsor}
+          partyId={partyId}
+          onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
           onSubmit={handleFormSubmit}
           onClose={handleCloseForm}
           isLoading={isSubmitting}

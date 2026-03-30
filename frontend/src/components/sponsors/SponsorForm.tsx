@@ -4,6 +4,7 @@ import { Sponsor, SponsorStatus, SponsorshipType } from '../../types';
 import { CreateSponsorData } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { uploadSponsorLogo } from '../../lib/supabase';
+import { SponsorIntakeButton } from './SponsorIntakeButton';
 
 // X (Twitter) icon component
 const XIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
@@ -21,6 +22,8 @@ const TelegramIcon: React.FC<{ size: number; className?: string }> = ({ size, cl
 
 interface SponsorFormProps {
   sponsor?: Sponsor | null;
+  partyId?: string;
+  onSponsorUpdate?: (sponsor: Sponsor) => void;
   onSubmit: (data: CreateSponsorData) => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
@@ -46,7 +49,7 @@ const TYPE_OPTIONS: { value: SponsorshipType; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFormProps) {
+export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClose, isLoading }: SponsorFormProps) {
   const [formData, setFormData] = useState<CreateSponsorData>({
     name: '',
     website: '',
@@ -399,6 +402,43 @@ export function SponsorForm({ sponsor, onSubmit, onClose, isLoading }: SponsorFo
               </div>
             )}
           </div>
+
+          {/* Sponsor Message (from intake form — read-only for host context) */}
+          {sponsor?.sponsorMessage && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
+                <FileText size={16} />
+                Message from Sponsor
+              </h3>
+              <div className="p-3 bg-theme-surface rounded-lg border border-theme-stroke text-theme-text-secondary text-sm whitespace-pre-wrap">
+                {sponsor.sponsorMessage}
+              </div>
+            </div>
+          )}
+
+          {/* Intake Form Link — only when editing an existing sponsor */}
+          {sponsor && partyId && onSponsorUpdate && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
+                <FileText size={16} />
+                Intake Form
+              </h3>
+              <div className="flex items-center gap-3 p-3 bg-theme-surface rounded-lg border border-theme-stroke">
+                <SponsorIntakeButton
+                  sponsor={sponsor}
+                  partyId={partyId}
+                  onUpdate={onSponsorUpdate}
+                />
+                <span className="text-xs text-theme-text-muted">
+                  {sponsor.intakeToken
+                    ? sponsor.intakeSubmittedAt
+                      ? 'Sponsor has submitted their intake form'
+                      : 'Waiting for sponsor to fill out intake form'
+                    : 'Generate a link for the sponsor to fill out their details'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-3">

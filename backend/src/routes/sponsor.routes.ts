@@ -140,6 +140,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       logoUrl,
       notes,
       lastContactedAt,
+      sponsorMessage,
     } = req.body;
 
     // Validate required fields
@@ -184,6 +185,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
         logoUrl: logoUrl?.trim() || null,
         notes: notes?.trim() || null,
         lastContactedAt: lastContactedAt ? new Date(lastContactedAt) : null,
+        sponsorMessage: sponsorMessage?.trim() || null,
       },
     });
 
@@ -239,6 +241,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       logoUrl,
       notes,
       lastContactedAt,
+      sponsorMessage,
     } = req.body;
 
     // Verify ownership or super admin
@@ -287,6 +290,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
         ...(logoUrl !== undefined && { logoUrl: logoUrl?.trim() || null }),
         ...(notes !== undefined && { notes: notes?.trim() || null }),
         ...(lastContactedAt !== undefined && { lastContactedAt: lastContactedAt ? new Date(lastContactedAt) : null }),
+        ...(sponsorMessage !== undefined && { sponsorMessage: sponsorMessage?.trim() || null }),
       },
     });
 
