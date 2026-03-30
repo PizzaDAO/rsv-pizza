@@ -2302,6 +2302,28 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
 }
 
 // ============================================
+// City Status API (Underboss)
+// ============================================
+
+export interface CityStatusMap {
+  [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
+}
+
+export async function fetchCityStatuses(): Promise<CityStatusMap> {
+  return apiRequest<CityStatusMap>('/api/underboss/city-statuses');
+}
+
+export async function updateCityStatus(
+  cityKey: string,
+  status: 'created' | 'skip' | 'todo'
+): Promise<void> {
+  await apiRequest('/api/underboss/city-statuses', {
+    method: 'PATCH',
+    body: { cityKey, status },
+  });
+}
+
+// ============================================
 // Shipping Dashboard API
 // ============================================
 

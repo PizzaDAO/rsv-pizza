@@ -5,7 +5,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable } from '../components/underboss';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -366,6 +366,14 @@ export function UnderbossDashboard() {
             Events ({filteredData.events.length})
           </h2>
           <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
+        </section>
+
+        {/* Cities Table */}
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-theme-text mb-4">
+            Cities
+          </h2>
+          <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} />
         </section>
         </div>
       </main>
