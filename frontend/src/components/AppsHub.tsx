@@ -12,6 +12,7 @@ import {
   Calculator,
   Package,
   Megaphone,
+  Shield,
   Printer,
   FileImage,
   CreditCard,
@@ -126,6 +127,14 @@ const apps: AppItem[] = [
     icon: BarChart3,
     status: 'live',
     tab: 'report',
+  },
+  {
+    id: 'swc',
+    name: 'Stand With Crypto',
+    description: 'Find and contact crypto-friendly candidates near your event',
+    icon: Shield,
+    status: 'live',
+    tab: 'swc',
   },
 
   // Coming Soon features

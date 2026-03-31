@@ -29,15 +29,16 @@ import { BudgetTab } from '../components/budget';
 import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
+import { SWCWidget } from '../components/swc';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'swc' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'swc', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -373,6 +374,18 @@ function HostPageContent() {
 
               {activeTab === 'promo' && (
                 <PromoWidget />
+              )}
+
+              {activeTab === 'swc' && party && (
+                <SWCWidget
+                  partyId={party.id}
+                  address={party.address}
+                  eventName={party.name}
+                  eventDate={party.date ? new Date(party.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                  eventLocation={party.venueName ? `${party.venueName}${party.address ? `, ${party.address}` : ''}` : (party.address || '')}
+                  rsvpUrl={party.customUrl ? `${window.location.origin}/${party.customUrl}` : `${window.location.origin}/rsvp/${party.inviteCode}`}
+                  hostName={party.hostName || user?.name || 'Event Host'}
+                />
               )}
 
               {activeTab === 'gpp' && party && (
