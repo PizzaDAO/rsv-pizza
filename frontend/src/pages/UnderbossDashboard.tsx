@@ -62,6 +62,9 @@ export function UnderbossDashboard() {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'events' | 'cities'>('events');
+
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
@@ -360,20 +363,44 @@ export function UnderbossDashboard() {
           <RegionStats stats={filteredData.stats} />
         </section>
 
-        {/* Events Table */}
+        {/* Events / Cities Tabs */}
         <section>
-          <h2 className="text-lg font-semibold text-theme-text mb-4">
-            Events ({filteredData.events.length})
-          </h2>
-          <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
-        </section>
+          <div className="border-b border-theme-stroke mb-4 flex gap-6">
+            <button
+              onClick={() => setActiveTab('events')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'events'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Events ({filteredData.events.length})
+              {activeTab === 'events' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('cities')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'cities'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Cities
+              {activeTab === 'cities' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+          </div>
 
-        {/* Cities Table */}
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-theme-text mb-4">
-            Cities
-          </h2>
-          <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} />
+          {activeTab === 'events' && (
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
+          )}
+
+          {activeTab === 'cities' && (
+            <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} />
+          )}
         </section>
         </div>
       </main>
