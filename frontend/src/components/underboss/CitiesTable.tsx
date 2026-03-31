@@ -113,7 +113,7 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
         chatUrl: sc.chatUrl,
         status,
         isAuto,
-        matchedEventUrl: matchedEvent ? `/e/${matchedEvent}` : null,
+        matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
       };
     });
   }, [sheetCities, cityStatuses, eventCityMap]);
@@ -371,26 +371,31 @@ function StatusBadge({ status, isAuto, matchedEventUrl }: { status: CityStatusVa
     todo: { bg: 'bg-orange-500/15', text: 'text-orange-700', label: 'To Do' },
   }[status];
 
-  return (
+  const badge = (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
       {config.label}
-      {isAuto && matchedEventUrl && (
-        <a
-          href={matchedEventUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="opacity-60 hover:opacity-100"
-          title="Auto-detected from event"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ExternalLink size={10} />
-        </a>
-      )}
+      {matchedEventUrl && <ExternalLink size={10} className="opacity-60" />}
       {isAuto && !matchedEventUrl && (
         <span className="opacity-50 text-[10px]">(auto)</span>
       )}
     </span>
   );
+
+  if (matchedEventUrl) {
+    return (
+      <a
+        href={matchedEventUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:opacity-80 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {badge}
+      </a>
+    );
+  }
+
+  return badge;
 }
 
 // === 3-Way Status Toggle ===
