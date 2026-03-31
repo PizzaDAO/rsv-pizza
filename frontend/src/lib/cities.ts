@@ -17,7 +17,7 @@ export async function fetchSheetCities(): Promise<SheetCity[]> {
   // Strip JSONP wrapper: google.visualization.Query.setResponse({...})
   const json = JSON.parse(text.replace(/^[^(]*\(/, '').replace(/\);?$/, ''));
 
-  return json.table.rows
+  const rows: SheetCity[] = json.table.rows
     .map((row: any) => ({
       country: row.c?.[4]?.v || '',
       city: row.c?.[5]?.v || '',
@@ -26,5 +26,14 @@ export async function fetchSheetCities(): Promise<SheetCity[]> {
       chatUrl: row.c?.[8]?.v || '',
       groupId: String(row.c?.[10]?.v || '').replace('#', '').trim(),
     }))
-    .filter((g: SheetCity) => g.city); // Include ALL rows with a city name
+    .filter((g: SheetCity) => g.city);
+
+  // Deduplicate by city name (case-insensitive), keep first occurrence
+  const seen = new Set<string>();
+  return rows.filter((city) => {
+    const key = city.city.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
