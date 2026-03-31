@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap } from '../../lib/api';
@@ -36,9 +36,10 @@ interface CitiesTableProps {
   events: UnderbossEvent[];
   selectedRegions: string[];
   meData: UnderbossMeResponse | null;
+  onTelegramBroadcast?: (cities: string[]) => void;
 }
 
-export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProps) {
+export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadcast }: CitiesTableProps) {
   const [sheetCities, setSheetCities] = useState<SheetCity[]>([]);
   const [cityStatuses, setCityStatuses] = useState<CityStatusMap>({});
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,8 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
   const [statusFilter, setStatusFilter] = useState<'all' | CityStatusValue>('all');
   const [sortField, setSortField] = useState<SortField>('city');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [showActionDropdown, setShowActionDropdown] = useState(false);
 
   // Load sheet cities and DB statuses
   useEffect(() => {
@@ -219,6 +222,44 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
     [cityStatuses]
   );
 
+  const toggleSelect = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedKeys.size === filteredCities.length) {
+      setSelectedKeys(new Set());
+    } else {
+      setSelectedKeys(new Set(filteredCities.map((c) => c.key)));
+    }
+  }, [selectedKeys.size, filteredCities]);
+
+  const handleBulkStatus = useCallback(
+    async (newStatus: CityStatusValue) => {
+      const keys = Array.from(selectedKeys);
+      // Optimistic updates
+      for (const key of keys) {
+        handleStatusChange(key, newStatus);
+      }
+      setSelectedKeys(new Set());
+      setShowActionDropdown(false);
+    },
+    [selectedKeys, handleStatusChange]
+  );
+
+  const handleBulkTelegram = useCallback(() => {
+    const cities = filteredCities
+      .filter((c) => selectedKeys.has(c.key))
+      .map((c) => c.city);
+    onTelegramBroadcast?.(cities);
+    setShowActionDropdown(false);
+  }, [selectedKeys, filteredCities, onTelegramBroadcast]);
+
   // Counts for header
   const statusCounts = useMemo(() => {
     const counts = { created: 0, skip: 0, todo: 0, total: 0 };
@@ -312,11 +353,67 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
         </select>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedKeys.size > 0 && (
+        <div className="flex items-center gap-3 py-2 px-3 bg-theme-surface border border-theme-stroke rounded-lg text-sm">
+          <span className="text-theme-text-secondary font-medium">
+            {selectedKeys.size} selected
+          </span>
+          <div className="relative">
+            <button
+              onClick={() => setShowActionDropdown(!showActionDropdown)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
+            >
+              Actions <ChevronDown size={12} />
+            </button>
+            {showActionDropdown && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
+                <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
+                  <button onClick={() => handleBulkStatus('created')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-theme-surface transition-colors">
+                    Set Created
+                  </button>
+                  <button onClick={() => handleBulkStatus('todo')} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-theme-surface transition-colors">
+                    Set To Do
+                  </button>
+                  <button onClick={() => handleBulkStatus('skip')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-theme-surface transition-colors">
+                    Set Skip
+                  </button>
+                  {onTelegramBroadcast && (
+                    <>
+                      <div className="border-t border-theme-stroke my-1" />
+                      <button onClick={handleBulkTelegram} className="w-full text-left px-4 py-2 text-sm text-blue-500 hover:bg-theme-surface transition-colors">
+                        Send Telegram Message
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => { setSelectedKeys(new Set()); setShowActionDropdown(false); }}
+            className="text-theme-text-faint hover:text-theme-text-secondary text-xs"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Table (desktop) */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-theme-stroke">
+              <th className="py-2 px-3 w-8">
+                <input
+                  type="checkbox"
+                  checked={selectedKeys.size === filteredCities.length && filteredCities.length > 0}
+                  ref={(el) => { if (el) el.indeterminate = selectedKeys.size > 0 && selectedKeys.size < filteredCities.length; }}
+                  onChange={toggleSelectAll}
+                  className="rounded border-theme-stroke-hover"
+                />
+              </th>
               <SortHeader field="status">Status</SortHeader>
               <SortHeader field="city">City</SortHeader>
               <SortHeader field="country">Country</SortHeader>
@@ -331,11 +428,13 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
                 key={city.key}
                 city={city}
                 onStatusChange={handleStatusChange}
+                isSelected={selectedKeys.has(city.key)}
+                onToggleSelect={toggleSelect}
               />
             ))}
             {filteredCities.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-theme-text-faint text-sm">
+                <td colSpan={7} className="py-8 text-center text-theme-text-faint text-sm">
                   No cities match your filters
                 </td>
               </tr>
@@ -347,7 +446,7 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
       {/* Cards (mobile) */}
       <div className="md:hidden space-y-2">
         {filteredCities.map((city) => (
-          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} />
+          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
         ))}
         {filteredCities.length === 0 && (
           <p className="py-8 text-center text-theme-text-faint text-sm">
@@ -452,12 +551,24 @@ function StatusToggle({
 function CityRow({
   city,
   onStatusChange,
+  isSelected,
+  onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, status: CityStatusValue) => void;
+  isSelected: boolean;
+  onToggleSelect: (key: string) => void;
 }) {
   return (
-    <tr className="border-b border-theme-stroke/50 hover:bg-theme-surface/50 transition-colors">
+    <tr className={`border-b border-theme-stroke/50 hover:bg-theme-surface/50 transition-colors ${isSelected ? 'bg-theme-surface/30' : ''}`}>
+      <td className="py-2.5 px-3 w-8">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(city.key)}
+          className="rounded border-theme-stroke-hover"
+        />
+      </td>
       <td className="py-2.5 px-3">
         <StatusBadge status={city.status} isAuto={city.isAuto} matchedEventUrl={city.matchedEventUrl} />
       </td>
@@ -497,14 +608,24 @@ function CityRow({
 function CityCard({
   city,
   onStatusChange,
+  isSelected,
+  onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, status: CityStatusValue) => void;
+  isSelected: boolean;
+  onToggleSelect: (key: string) => void;
 }) {
   return (
-    <div className="bg-theme-surface border border-theme-stroke rounded-xl p-3 space-y-2">
+    <div className={`bg-theme-surface border border-theme-stroke rounded-xl p-3 space-y-2 ${isSelected ? 'ring-1 ring-red-500/30' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(city.key)}
+            className="rounded border-theme-stroke-hover"
+          />
           <MapPin size={14} className="text-theme-text-faint" />
           <span className="text-theme-text font-medium text-sm">{city.city}</span>
           <StatusBadge status={city.status} isAuto={city.isAuto} matchedEventUrl={city.matchedEventUrl} />

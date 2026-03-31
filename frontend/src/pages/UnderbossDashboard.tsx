@@ -399,7 +399,7 @@ export function UnderbossDashboard() {
           )}
 
           {activeTab === 'cities' && (
-            <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} />
+            <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
           )}
         </section>
         </div>
