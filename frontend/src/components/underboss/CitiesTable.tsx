@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, MapPin, Check, X, Clock, ExternalLink } from 'lucide-react';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap } from '../../lib/api';
+import type { UnderbossMeResponse } from '../../lib/api';
 import { GPP_REGIONS } from '../../types';
 import type { UnderbossEvent } from '../../types';
 
@@ -20,18 +21,26 @@ interface MergedCity {
   matchedEventUrl: string | null; // link to the matching event if auto-detected
 }
 
+type SortField = 'city' | 'country' | 'underboss' | 'status';
+type SortDir = 'asc' | 'desc';
+
+const STATUS_ORDER: Record<CityStatusValue, number> = { created: 0, todo: 1, skip: 2 };
+
 interface CitiesTableProps {
   events: UnderbossEvent[];
   selectedRegions: string[];
+  meData: UnderbossMeResponse | null;
 }
 
-export function CitiesTable({ events, selectedRegions }: CitiesTableProps) {
+export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProps) {
   const [sheetCities, setSheetCities] = useState<SheetCity[]>([]);
   const [cityStatuses, setCityStatuses] = useState<CityStatusMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | CityStatusValue>('all');
+  const [sortField, setSortField] = useState<SortField>('city');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   // Load sheet cities and DB statuses
   useEffect(() => {
@@ -103,18 +112,21 @@ export function CitiesTable({ events, selectedRegions }: CitiesTableProps) {
     });
   }, [sheetCities, cityStatuses, eventCityMap]);
 
-  // Apply filters
+  // Apply filters + sorting
   const filteredCities = useMemo(() => {
     let result = mergedCities;
 
+    // Underboss name filter (non-admins only see their own cities)
+    if (meData && !meData.isAdmin && meData.name) {
+      const myName = meData.name.toLowerCase();
+      result = result.filter((c) => c.underboss.toLowerCase() === myName);
+    }
+
     // Region filter (synced with selectedRegions)
     if (selectedRegions.length > 0) {
-      // Normalize region names for comparison
       const normalizedRegions = selectedRegions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        // Sheet region might be like "USA", "Western Europe", etc.
-        // GPP_REGIONS ids are like "usa", "western-europe"
         const regionLower = c.region.toLowerCase().replace(/\s+/g, '-');
         return normalizedRegions.includes(regionLower);
       });
@@ -136,8 +148,28 @@ export function CitiesTable({ events, selectedRegions }: CitiesTableProps) {
       result = result.filter((c) => c.status === statusFilter);
     }
 
+    // Sort
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'city':
+          cmp = a.city.localeCompare(b.city);
+          break;
+        case 'country':
+          cmp = a.country.localeCompare(b.country);
+          break;
+        case 'underboss':
+          cmp = a.underboss.localeCompare(b.underboss);
+          break;
+        case 'status':
+          cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
     return result;
-  }, [mergedCities, selectedRegions, search, statusFilter]);
+  }, [mergedCities, meData, selectedRegions, search, statusFilter, sortField, sortDir]);
 
   // Optimistic status update
   const handleStatusChange = useCallback(
@@ -183,6 +215,32 @@ export function CitiesTable({ events, selectedRegions }: CitiesTableProps) {
     }
     return counts;
   }, [mergedCities]);
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  }
+
+  function SortHeader({ field, children }: { field: SortField; children: React.ReactNode }) {
+    const isActive = sortField === field;
+    return (
+      <th
+        className="py-2 px-3 text-left cursor-pointer hover:bg-theme-surface transition-colors select-none"
+        onClick={() => toggleSort(field)}
+      >
+        <div className="flex items-center gap-1">
+          <span className={`text-xs uppercase tracking-wider ${isActive ? 'text-theme-text-secondary' : 'text-theme-text-faint'}`}>
+            {children}
+          </span>
+          <ArrowUpDown size={10} className={isActive ? 'text-theme-text-muted' : 'text-theme-text-faint'} />
+        </div>
+      </th>
+    );
+  }
 
   if (loading) {
     return (
@@ -246,10 +304,10 @@ export function CitiesTable({ events, selectedRegions }: CitiesTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-theme-stroke">
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Status</th>
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">City</th>
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Country</th>
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Underboss</th>
+              <SortHeader field="status">Status</SortHeader>
+              <SortHeader field="city">City</SortHeader>
+              <SortHeader field="country">Country</SortHeader>
+              <SortHeader field="underboss">Underboss</SortHeader>
               <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Region</th>
               <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Actions</th>
             </tr>

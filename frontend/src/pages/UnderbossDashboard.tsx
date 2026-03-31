@@ -373,7 +373,7 @@ export function UnderbossDashboard() {
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             Cities
           </h2>
-          <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} />
+          <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} />
         </section>
         </div>
       </main>
