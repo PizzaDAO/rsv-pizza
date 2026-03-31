@@ -26,6 +26,12 @@ type SortDir = 'asc' | 'desc';
 
 const STATUS_ORDER: Record<CityStatusValue, number> = { created: 0, todo: 1, skip: 2 };
 
+// Map sheet region names to GPP region IDs they belong to
+const SHEET_REGION_TO_GPP: Record<string, string[]> = {
+  'north-america': ['usa', 'canada'],
+  'africa': ['west-africa', 'east-africa', 'south-africa'],
+};
+
 interface CitiesTableProps {
   events: UnderbossEvent[];
   selectedRegions: string[];
@@ -127,8 +133,15 @@ export function CitiesTable({ events, selectedRegions, meData }: CitiesTableProp
       const normalizedRegions = selectedRegions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        const regionLower = c.region.toLowerCase().replace(/\s+/g, '-');
-        return normalizedRegions.includes(regionLower);
+        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
+        // Direct match (e.g. "western-europe" === "western-europe")
+        if (normalizedRegions.includes(sheetRegion)) return true;
+        // Sheet uses umbrella regions (e.g. "North America" covers usa + canada)
+        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
+        if (mappedGppIds) {
+          return mappedGppIds.some((id) => normalizedRegions.includes(id));
+        }
+        return false;
       });
     }
 
