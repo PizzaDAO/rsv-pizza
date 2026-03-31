@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
 
 describe('sanitizeCoHosts', () => {
-  it('strips email, canEdit, and isUnderboss from co-host objects', () => {
+  it('strips email but keeps canEdit and isUnderboss', () => {
     const coHosts = [
       {
         id: '1',
@@ -19,11 +19,11 @@ describe('sanitizeCoHosts', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty('email');
-    expect(result[0]).not.toHaveProperty('canEdit');
-    expect(result[0]).not.toHaveProperty('isUnderboss');
+    expect(result[0]).toHaveProperty('canEdit', true);
+    expect(result[0]).toHaveProperty('isUnderboss', true);
   });
 
-  it('preserves id, name, avatar_url, showOnEvent, and social fields', () => {
+  it('preserves id, name, avatar_url, showOnEvent, canEdit, isUnderboss, and social fields', () => {
     const coHosts = [
       {
         id: '1',
@@ -44,6 +44,8 @@ describe('sanitizeCoHosts', () => {
     expect(result[0]).toEqual({
       id: '1',
       name: 'Alice',
+      canEdit: true,
+      isUnderboss: false,
       avatar_url: 'https://example.com/alice.jpg',
       showOnEvent: true,
       twitter: '@alice',
@@ -61,8 +63,8 @@ describe('sanitizeCoHosts', () => {
     const result = sanitizeCoHosts(coHosts);
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: '1', name: 'Alice' });
-    expect(result[1]).toEqual({ id: '2', name: 'Bob' });
+    expect(result[0]).toEqual({ id: '1', name: 'Alice', canEdit: true, isUnderboss: false });
+    expect(result[1]).toEqual({ id: '2', name: 'Bob', canEdit: false, isUnderboss: true });
   });
 
   it('returns empty array for null input', () => {
