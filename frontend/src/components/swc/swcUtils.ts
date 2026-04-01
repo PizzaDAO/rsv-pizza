@@ -3,16 +3,21 @@ import candidatesData from '../../data/swc-candidates.json';
 export interface SWCCandidate {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  nickname: string | null;
   party: string;
   grade: string;
+  stanceScore: number | null;
   office: string;
   state: string;
   district: string | null;
   photoUrl: string | null;
   swcProfileUrl: string;
-  incumbent: boolean;
-  districtLat: number;
-  districtLng: number;
+  stanceCount: number;
+  donationUrl: string | null;
+  officialUrl: string | null;
+  twitterHandles: string[];
 }
 
 /**
@@ -117,8 +122,8 @@ export function getCandidatesByState(stateCode: string): SWCCandidate[] {
     c => c.state.toUpperCase() === stateCode.toUpperCase()
   );
 
-  const gradeOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4 };
-  const officeOrder: Record<string, number> = { 'U.S. Senate': 0, 'Governor': 1, 'U.S. House': 2 };
+  const gradeOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4, '?': 5 };
+  const officeOrder: Record<string, number> = { 'President': 0, 'U.S. Senate': 1, 'Governor': 2, 'Attorney General': 3, 'U.S. House': 4 };
 
   return candidates.sort((a, b) => {
     const gradeDiff = (gradeOrder[a.grade] ?? 5) - (gradeOrder[b.grade] ?? 5);
@@ -165,6 +170,7 @@ export function getGradeColor(grade: string): { bg: string; text: string } {
     case 'C': return { bg: 'bg-yellow-500/20', text: 'text-yellow-400' };
     case 'D': return { bg: 'bg-orange-500/20', text: 'text-orange-400' };
     case 'F': return { bg: 'bg-red-500/20', text: 'text-red-400' };
+    case '?': return { bg: 'bg-gray-500/20', text: 'text-gray-400' };
     default: return { bg: 'bg-theme-surface', text: 'text-theme-text-muted' };
   }
 }

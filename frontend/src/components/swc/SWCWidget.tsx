@@ -19,8 +19,6 @@ interface SWCWidgetProps {
   eventLocation: string;
   rsvpUrl: string;
   hostName: string;
-  venueLat?: number;
-  venueLng?: number;
 }
 
 export const SWCWidget: React.FC<SWCWidgetProps> = ({
@@ -30,8 +28,6 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
   eventLocation,
   rsvpUrl,
   hostName,
-  venueLat,
-  venueLng,
 }) => {
   // Auto-detect state from event address
   const detectedState = useMemo(
@@ -139,7 +135,7 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
         </div>
 
         <p className="text-sm text-theme-text-secondary leading-relaxed mb-4">
-          Find A- and B-rated candidates from{' '}
+          Find crypto-friendly candidates from{' '}
           <a
             href="https://www.standwithcrypto.org"
             target="_blank"
@@ -199,7 +195,7 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
             <div className="py-8 text-center">
               <Shield size={24} className="mx-auto text-theme-text-faint mb-2" />
               <p className="text-sm text-theme-text-muted">
-                No A/B-rated candidates found for {getStateName(activeState)}
+                No candidates found for {getStateName(activeState)}
               </p>
               <p className="text-xs text-theme-text-faint mt-1">
                 Try selecting a different state, or visit{' '}
@@ -221,8 +217,6 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
                   key={candidate.id}
                   candidate={candidate}
                   onSelect={(c) => setSelectedCandidate(c)}
-                  venueLat={venueLat}
-                  venueLng={venueLng}
                 />
               ))}
             </div>
