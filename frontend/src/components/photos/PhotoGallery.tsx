@@ -155,6 +155,18 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     }
   };
 
+  const handleUpdateYear = async (photoId: string, year: number | null) => {
+    const result = await updatePhoto(partyId, photoId, { photoYear: year });
+    if (result) {
+      setPhotos(prev =>
+        prev.map(p => (p.id === photoId ? result.photo : p))
+      );
+      if (selectedPhoto?.id === photoId) {
+        setSelectedPhoto(result.photo);
+      }
+    }
+  };
+
   const handleApprove = async (photoId: string) => {
     const result = await updatePhoto(partyId, photoId, { status: 'approved' });
     if (result) {
@@ -458,6 +470,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           onDelete={handleDelete}
           onUpdateCaption={handleUpdateCaption}
           onUpdateTags={handleUpdateTags}
+          onUpdateYear={handleUpdateYear}
           onApprove={isHost ? handleApprove : undefined}
           onReject={isHost ? handleReject : undefined}
         />

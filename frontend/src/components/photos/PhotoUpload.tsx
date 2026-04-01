@@ -37,8 +37,12 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const [files, setFiles] = useState<UploadingFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [caption, setCaption] = useState('');
+  const [photoYear, setPhotoYear] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
 
   const handleFiles = useCallback((selectedFiles: FileList | File[]) => {
     const newFiles: UploadingFile[] = Array.from(selectedFiles)
@@ -119,6 +123,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           guestId,
           caption: caption || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
+          photoYear: photoYear || undefined,
         };
 
         const result = await uploadPhotoApi(partyId, photoData);
@@ -209,6 +214,24 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             placeholder="Add a caption (optional)"
             className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-4 py-2 text-theme-text placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
+        </div>
+      )}
+
+      {/* Year Selector */}
+      {files.length > 0 && (
+        <div className="mt-3">
+          <select
+            value={photoYear || ''}
+            onChange={(e) => setPhotoYear(e.target.value ? parseInt(e.target.value, 10) : null)}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+          >
+            <option value="" className="bg-[#1a1a2e] text-white">Year taken (optional)</option>
+            {yearOptions.map((year) => (
+              <option key={year} value={year} className="bg-[#1a1a2e] text-white">
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

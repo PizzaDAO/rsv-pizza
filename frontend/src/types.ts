@@ -391,6 +391,7 @@ export interface Photo {
   uploaderEmail: string | null;
   caption: string | null;
   tags: string[];
+  photoYear: number | null;
   starred: boolean;
   starredAt: string | null;
   status: 'approved' | 'pending' | 'rejected';

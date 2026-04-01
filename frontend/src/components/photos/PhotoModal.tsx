@@ -14,6 +14,7 @@ interface PhotoModalProps {
   onDelete?: (photoId: string) => void;
   onUpdateCaption?: (photoId: string, caption: string) => void;
   onUpdateTags?: (photoId: string, tags: string[]) => void;
+  onUpdateYear?: (photoId: string, year: number | null) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
 }
@@ -29,6 +30,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   onDelete,
   onUpdateCaption,
   onUpdateTags,
+  onUpdateYear,
   onApprove,
   onReject,
 }) => {
@@ -36,7 +38,12 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   const [captionValue, setCaptionValue] = useState(photo.caption || '');
   const [editingTags, setEditingTags] = useState(false);
   const [tagValues, setTagValues] = useState<string[]>(photo.tags || []);
+  const [editingYear, setEditingYear] = useState(false);
+  const [yearValue, setYearValue] = useState<number | null>(photo.photoYear);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
 
   const currentIndex = photos.findIndex(p => p.id === photo.id);
   const hasPrev = currentIndex > 0;
@@ -70,12 +77,14 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, navigatePrev, navigateNext]);
 
-  // Update caption and tags state when photo changes
+  // Update caption, tags, and year state when photo changes
   useEffect(() => {
     setCaptionValue(photo.caption || '');
     setEditingCaption(false);
     setTagValues(photo.tags || []);
     setEditingTags(false);
+    setYearValue(photo.photoYear);
+    setEditingYear(false);
   }, [photo]);
 
   const formatDate = (dateString: string) => {
@@ -102,6 +111,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   const handleSaveCaption = () => {
     onUpdateCaption?.(photo.id, captionValue);
     setEditingCaption(false);
+  };
+
+  const handleSaveYear = () => {
+    onUpdateYear?.(photo.id, yearValue);
+    setEditingYear(false);
   };
 
   const handleToggleTag = (tag: string) => {
@@ -186,7 +200,10 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
               <p className="text-theme-text font-medium">{uploaderDisplayName}</p>
               <p className="text-theme-text-muted text-sm flex items-center gap-1">
                 <Calendar size={12} />
-                {formatDate(photo.createdAt)}
+                {photo.photoYear
+                  ? `${photo.photoYear} (uploaded ${formatDate(photo.createdAt)})`
+                  : formatDate(photo.createdAt)
+                }
               </p>
             </div>
           </div>
@@ -373,6 +390,77 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
               ) : null}
             </div>
           )}
+
+          {/* Year */}
+          {editingYear ? (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm mb-2">
+                <Calendar size={14} />
+                <span>Year Taken</span>
+              </div>
+              <select
+                value={yearValue || ''}
+                onChange={(e) => setYearValue(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer mb-2"
+              >
+                <option value="" className="bg-[#1a1a2e] text-white">No year (use upload date)</option>
+                {yearOptions.map((year) => (
+                  <option key={year} value={year} className="bg-[#1a1a2e] text-white">
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveYear}
+                  className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white text-sm font-medium py-1.5 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setYearValue(photo.photoYear);
+                    setEditingYear(false);
+                  }}
+                  className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text text-sm font-medium py-1.5 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : isHost && onUpdateYear ? (
+            <div className="mb-4">
+              {photo.photoYear ? (
+                <div>
+                  <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm mb-1">
+                    <Calendar size={14} />
+                    <span>Year Taken: {photo.photoYear}</span>
+                  </div>
+                  <button
+                    onClick={() => setEditingYear(true)}
+                    className="text-theme-text-muted hover:text-theme-text-secondary text-xs"
+                  >
+                    Edit year
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingYear(true)}
+                  className="text-theme-text-muted hover:text-theme-text-secondary text-sm flex items-center gap-1"
+                >
+                  <Calendar size={14} />
+                  Set year taken...
+                </button>
+              )}
+            </div>
+          ) : photo.photoYear ? (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm">
+                <Calendar size={14} />
+                <span>Year Taken: {photo.photoYear}</span>
+              </div>
+            </div>
+          ) : null}
 
           {/* Actions */}
           <div className="space-y-2 border-t border-theme-stroke pt-4">

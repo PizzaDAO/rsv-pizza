@@ -491,6 +491,7 @@ export interface PhotoUploadData {
   guestId?: string;
   caption?: string;
   tags?: string[];
+  photoYear?: number;
 }
 
 export interface PhotosListResponse {
@@ -573,7 +574,7 @@ export async function getPhoto(
 export async function updatePhoto(
   partyId: string,
   photoId: string,
-  data: { caption?: string; tags?: string[]; starred?: boolean; status?: string }
+  data: { caption?: string; tags?: string[]; starred?: boolean; status?: string; photoYear?: number | null }
 ): Promise<{ photo: Photo } | null> {
   try {
     return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos/${photoId}`, {
