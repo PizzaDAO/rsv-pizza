@@ -443,11 +443,15 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       const existingCoHosts = (existingParty?.coHosts as any[]) || [];
       // Extract underboss entries from existing data
       const underbossEntries = existingCoHosts.filter((h: any) => h.isUnderboss === true);
+      const underbossIds = new Set(underbossEntries.map((h: any) => h.id));
       // Strip isUnderboss from client-submitted entries (prevent spoofing)
-      const clientCoHosts = (coHosts as any[]).map((h: any) => {
-        const { isUnderboss: _, ...rest } = h;
-        return rest;
-      });
+      // and remove any client entries that duplicate an underboss (to prevent duplicates)
+      const clientCoHosts = (coHosts as any[])
+        .map((h: any) => {
+          const { isUnderboss: _, ...rest } = h;
+          return rest;
+        })
+        .filter((h: any) => !underbossIds.has(h.id));
       // Merge: client entries + preserved underboss entries
       mergedCoHosts = [...clientCoHosts, ...underbossEntries];
     }
