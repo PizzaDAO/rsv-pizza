@@ -1,20 +1,28 @@
 import React from 'react';
-import { ExternalLink, User } from 'lucide-react';
-import { SWCCandidate, getGradeColor, getPartyName } from './swcUtils';
+import { ExternalLink, User, MapPin } from 'lucide-react';
+import { SWCCandidate, getGradeColor, getPartyName, getDistanceMiles } from './swcUtils';
 
 interface CandidateCardProps {
   candidate: SWCCandidate;
   selected?: boolean;
   onSelect?: (candidate: SWCCandidate) => void;
+  venueLat?: number;
+  venueLng?: number;
 }
 
 export const CandidateCard: React.FC<CandidateCardProps> = ({
   candidate,
   selected = false,
   onSelect,
+  venueLat,
+  venueLng,
 }) => {
   const gradeColor = getGradeColor(candidate.grade);
   const partyColor = candidate.party === 'D' ? 'text-blue-400' : candidate.party === 'R' ? 'text-red-400' : 'text-theme-text-muted';
+
+  const distance = venueLat != null && venueLng != null
+    ? Math.round(getDistanceMiles(venueLat, venueLng, candidate.districtLat, candidate.districtLng))
+    : null;
 
   return (
     <button
@@ -61,8 +69,25 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
             <span className="text-theme-text-faint text-[10px]">|</span>
             <span className="text-xs text-theme-text-muted truncate">
               {candidate.office}
-              {candidate.district ? ` (${candidate.state}-${candidate.district})` : ` (${candidate.state})`}
             </span>
+          </div>
+
+          {/* District + distance row */}
+          <div className="flex items-center gap-1.5 mt-1">
+            <MapPin size={11} className="text-theme-text-faint flex-shrink-0" />
+            <span className="text-xs text-theme-text-muted">
+              {candidate.district
+                ? `${candidate.state}-${candidate.district}`
+                : `${candidate.state} (statewide)`}
+            </span>
+            {distance != null && (
+              <>
+                <span className="text-theme-text-faint text-[10px]">·</span>
+                <span className="text-[10px] text-theme-text-faint">
+                  ~{distance} mi from venue
+                </span>
+              </>
+            )}
           </div>
 
           {candidate.incumbent && (

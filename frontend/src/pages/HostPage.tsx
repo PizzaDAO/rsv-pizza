@@ -173,7 +173,10 @@ function HostPageContent() {
   ];
 
   // Build pinned tabs from party.pinnedApps
+  const hasSwcTag = (party?.eventTags ?? []).some(t => t.toLowerCase() === 'swc');
   const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
+    // Only show SWC tab if event is tagged "swc"
+    if (appId === 'swc' && !hasSwcTag) return null;
     const appDef = PINNABLE_APPS.find(a => a.id === appId);
     if (!appDef) return null;
     return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
@@ -212,7 +215,7 @@ function HostPageContent() {
         {activeTab === 'dashboard' && party ? (
           <GPPDashboardTab />
         ) : activeTab === 'apps' && party ? (
-          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
+          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} eventTags={party.eventTags ?? []} />
         ) : activeTab !== 'apps' && activeTab !== 'dashboard' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">

@@ -8,8 +8,10 @@
     "state": "NY",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/kirsten-gillibrand",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/kirsten---gillibrand",
+    "incumbent": true,
+    "districtLat": 42.6526,
+    "districtLng": -73.7562
   },
   {
     "id": "wy-sen-lummis",
@@ -20,8 +22,10 @@
     "state": "WY",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/cynthia-lummis",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/cynthia---lummis",
+    "incumbent": true,
+    "districtLat": 41.1400,
+    "districtLng": -104.8202
   },
   {
     "id": "tx-sen-cruz",
@@ -32,8 +36,10 @@
     "state": "TX",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/ted-cruz",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/ted---cruz",
+    "incumbent": true,
+    "districtLat": 30.2672,
+    "districtLng": -97.7431
   },
   {
     "id": "pa-sen-fetterman",
@@ -44,8 +50,10 @@
     "state": "PA",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/john-fetterman",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/john---fetterman",
+    "incumbent": true,
+    "districtLat": 40.2732,
+    "districtLng": -76.8867
   },
   {
     "id": "oh-sen-moreno",
@@ -56,8 +64,10 @@
     "state": "OH",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/bernie-moreno",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/bernie---moreno",
+    "incumbent": true,
+    "districtLat": 39.9612,
+    "districtLng": -82.9988
   },
   {
     "id": "ca-rep-khanna",
@@ -68,8 +78,10 @@
     "state": "CA",
     "district": "17",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/ro-khanna",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/ro---khanna",
+    "incumbent": true,
+    "districtLat": 37.3541,
+    "districtLng": -121.9552
   },
   {
     "id": "ca-rep-issa",
@@ -80,8 +92,10 @@
     "state": "CA",
     "district": "48",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/darrell-issa",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/darrell---issa",
+    "incumbent": true,
+    "districtLat": 33.1959,
+    "districtLng": -117.3795
   },
   {
     "id": "fl-sen-scott",
@@ -92,8 +106,10 @@
     "state": "FL",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/rick-scott",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/rick---scott",
+    "incumbent": true,
+    "districtLat": 30.4383,
+    "districtLng": -84.2807
   },
   {
     "id": "ny-rep-ritchie-torres",
@@ -104,8 +120,10 @@
     "state": "NY",
     "district": "15",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/ritchie-torres",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/ritchie---torres",
+    "incumbent": true,
+    "districtLat": 40.8448,
+    "districtLng": -73.8648
   },
   {
     "id": "ar-sen-hagerty",
@@ -116,8 +134,10 @@
     "state": "TN",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/bill-hagerty",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/bill---hagerty",
+    "incumbent": true,
+    "districtLat": 36.1627,
+    "districtLng": -86.7816
   },
   {
     "id": "co-rep-polis",
@@ -128,8 +148,10 @@
     "state": "CO",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/jared-polis",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/jared---polis",
+    "incumbent": true,
+    "districtLat": 39.7392,
+    "districtLng": -104.9903
   },
   {
     "id": "tx-rep-sessions",
@@ -140,8 +162,10 @@
     "state": "TX",
     "district": "17",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/pete-sessions",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/pete---sessions",
+    "incumbent": true,
+    "districtLat": 31.1171,
+    "districtLng": -97.7278
   },
   {
     "id": "pa-rep-dean",
@@ -152,8 +176,10 @@
     "state": "PA",
     "district": "4",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/madeleine-dean",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/madeleine---dean",
+    "incumbent": true,
+    "districtLat": 40.1176,
+    "districtLng": -75.3424
   },
   {
     "id": "fl-rep-luna",
@@ -164,8 +190,10 @@
     "state": "FL",
     "district": "13",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/anna-paulina-luna",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/anna---paulina---luna",
+    "incumbent": true,
+    "districtLat": 27.7676,
+    "districtLng": -82.6403
   },
   {
     "id": "oh-rep-davidson",
@@ -176,8 +204,10 @@
     "state": "OH",
     "district": "8",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/warren-davidson",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/warren---davidson",
+    "incumbent": true,
+    "districtLat": 39.9061,
+    "districtLng": -84.0561
   },
   {
     "id": "ca-rep-swalwell",
@@ -188,8 +218,10 @@
     "state": "CA",
     "district": "14",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/eric-swalwell",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/eric---swalwell",
+    "incumbent": true,
+    "districtLat": 37.6879,
+    "districtLng": -121.7689
   },
   {
     "id": "ny-rep-bowman",
@@ -200,8 +232,10 @@
     "state": "NC",
     "district": "13",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/wiley-nickel",
-    "incumbent": false
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/wiley---nickel",
+    "incumbent": false,
+    "districtLat": 35.7796,
+    "districtLng": -78.6382
   },
   {
     "id": "il-rep-casten",
@@ -212,8 +246,10 @@
     "state": "IL",
     "district": "6",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/sean-casten",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/sean---casten",
+    "incumbent": true,
+    "districtLat": 41.8119,
+    "districtLng": -88.0296
   },
   {
     "id": "ga-rep-collins",
@@ -224,8 +260,10 @@
     "state": "GA",
     "district": "10",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/mike-collins",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/mike---collins",
+    "incumbent": true,
+    "districtLat": 33.9519,
+    "districtLng": -83.3576
   },
   {
     "id": "mi-rep-moolenaar",
@@ -236,8 +274,10 @@
     "state": "MI",
     "district": "2",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/john-moolenaar",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/john---moolenaar",
+    "incumbent": true,
+    "districtLat": 43.6147,
+    "districtLng": -84.2472
   },
   {
     "id": "wa-rep-delbene",
@@ -248,8 +288,10 @@
     "state": "WA",
     "district": "1",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/suzan-delbene",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/suzan---delbene",
+    "incumbent": true,
+    "districtLat": 47.8601,
+    "districtLng": -122.2054
   },
   {
     "id": "az-rep-stanton",
@@ -260,8 +302,10 @@
     "state": "AZ",
     "district": "4",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/greg-stanton",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/greg---stanton",
+    "incumbent": true,
+    "districtLat": 33.4152,
+    "districtLng": -111.8315
   },
   {
     "id": "nj-rep-kean",
@@ -272,8 +316,10 @@
     "state": "NJ",
     "district": "7",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/tom-kean",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/tom---kean",
+    "incumbent": true,
+    "districtLat": 40.6710,
+    "districtLng": -74.3001
   },
   {
     "id": "va-rep-spanberger",
@@ -284,8 +330,10 @@
     "state": "VA",
     "district": "7",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/abigail-spanberger",
-    "incumbent": false
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/abigail---spanberger",
+    "incumbent": false,
+    "districtLat": 37.5407,
+    "districtLng": -77.4360
   },
   {
     "id": "mn-rep-emmer",
@@ -296,8 +344,10 @@
     "state": "MN",
     "district": "6",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/tom-emmer",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/tom---emmer",
+    "incumbent": true,
+    "districtLat": 45.5579,
+    "districtLng": -93.5312
   },
   {
     "id": "ma-sen-warren",
@@ -308,8 +358,10 @@
     "state": "MA",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/elizabeth-warren",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/elizabeth---warren",
+    "incumbent": true,
+    "districtLat": 42.3601,
+    "districtLng": -71.0589
   },
   {
     "id": "mo-sen-schmitt",
@@ -320,8 +372,10 @@
     "state": "MO",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/eric-schmitt",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/eric---schmitt",
+    "incumbent": true,
+    "districtLat": 38.5767,
+    "districtLng": -92.1736
   },
   {
     "id": "ne-rep-flood",
@@ -332,8 +386,10 @@
     "state": "NE",
     "district": "1",
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/mike-flood",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/mike---flood",
+    "incumbent": true,
+    "districtLat": 40.8136,
+    "districtLng": -96.7026
   },
   {
     "id": "ut-sen-lee",
@@ -344,8 +400,10 @@
     "state": "UT",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/mike-lee",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/mike---lee",
+    "incumbent": true,
+    "districtLat": 40.7608,
+    "districtLng": -111.8910
   },
   {
     "id": "nc-sen-tillis",
@@ -356,7 +414,9 @@
     "state": "NC",
     "district": null,
     "photoUrl": null,
-    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/thom-tillis",
-    "incumbent": true
+    "swcProfileUrl": "https://www.standwithcrypto.org/politicians/person/thom---tillis",
+    "incumbent": true,
+    "districtLat": 35.7796,
+    "districtLng": -78.6382
   }
 ]

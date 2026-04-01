@@ -19,6 +19,8 @@ interface SWCWidgetProps {
   eventLocation: string;
   rsvpUrl: string;
   hostName: string;
+  venueLat?: number;
+  venueLng?: number;
 }
 
 export const SWCWidget: React.FC<SWCWidgetProps> = ({
@@ -28,6 +30,8 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
   eventLocation,
   rsvpUrl,
   hostName,
+  venueLat,
+  venueLng,
 }) => {
   // Auto-detect state from event address
   const detectedState = useMemo(
@@ -217,6 +221,8 @@ export const SWCWidget: React.FC<SWCWidgetProps> = ({
                   key={candidate.id}
                   candidate={candidate}
                   onSelect={(c) => setSelectedCandidate(c)}
+                  venueLat={venueLat}
+                  venueLng={venueLng}
                 />
               ))}
             </div>
