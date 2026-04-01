@@ -273,6 +273,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       guestId,
       caption,
       tags,
+      photoYear,
     } = req.body;
 
     // Validate required fields
@@ -316,6 +317,15 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
+    // Validate photoYear if provided
+    if (photoYear !== undefined && photoYear !== null) {
+      const year = parseInt(photoYear, 10);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1900 || year > currentYear + 1) {
+        throw new AppError(`photoYear must be between 1900 and ${currentYear + 1}`, 400, 'VALIDATION_ERROR');
+      }
+    }
+
     // All photos require approval
     const initialStatus = 'pending';
 
@@ -334,6 +344,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
         uploaderEmail: uploaderEmail?.toLowerCase() || null,
         caption: caption || null,
         tags: tags || [],
+        photoYear: photoYear ? parseInt(photoYear, 10) : null,
         status: initialStatus,
       },
       include: {
@@ -395,7 +406,7 @@ router.get('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, 
 router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
-    const { caption, tags, starred, status } = req.body;
+    const { caption, tags, starred, status, photoYear } = req.body;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -412,11 +423,21 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
       throw new AppError('Photo not found', 404, 'NOT_FOUND');
     }
 
+    // Validate photoYear if provided (allow null to clear)
+    if (photoYear !== undefined && photoYear !== null) {
+      const year = parseInt(photoYear, 10);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1900 || year > currentYear + 1) {
+        throw new AppError(`photoYear must be between 1900 and ${currentYear + 1}`, 400, 'VALIDATION_ERROR');
+      }
+    }
+
     const photo = await prisma.photo.update({
       where: { id: photoId },
       data: {
         ...(caption !== undefined && { caption }),
         ...(tags !== undefined && { tags }),
+        ...(photoYear !== undefined && { photoYear: photoYear === null ? null : parseInt(photoYear, 10) }),
         ...(starred !== undefined && {
           starred,
           starredAt: starred ? new Date() : null,

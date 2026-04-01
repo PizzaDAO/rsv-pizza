@@ -33,6 +33,8 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
     });
   };
 
+  const displayDate = photo.photoYear ? `${photo.photoYear}` : formatDate(photo.createdAt);
+
   return (
     <div
       className={`group relative aspect-square rounded-xl overflow-hidden bg-theme-surface cursor-pointer ${
@@ -141,7 +143,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
               <User size={14} className="text-theme-text-secondary" />
               <span className="truncate max-w-[100px]">{uploaderDisplayName}</span>
             </div>
-            <span className="text-theme-text-secondary text-xs">{formatDate(photo.createdAt)}</span>
+            <span className="text-theme-text-secondary text-xs">{displayDate}</span>
           </div>
           {photo.caption && (
             <p className="text-theme-text text-xs mt-1 truncate">{photo.caption}</p>

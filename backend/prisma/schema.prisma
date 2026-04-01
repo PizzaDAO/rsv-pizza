@@ -490,6 +490,7 @@ model Photo {
   // Organization
   caption   String?
   tags      String[] @default([])
+  photoYear Int?     @map("photo_year")
   starred   Boolean  @default(false) // Host can star photos
   starredAt DateTime? @map("starred_at") @db.Timestamptz
 
