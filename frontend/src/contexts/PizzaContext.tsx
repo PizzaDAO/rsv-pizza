@@ -120,6 +120,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     region: dbParty.region || null,
     eventType: dbParty.event_type || null,
     eventTags: dbParty.event_tags || [],
+    canEdit: dbParty.can_edit || false,
     guests,
   };
 }
