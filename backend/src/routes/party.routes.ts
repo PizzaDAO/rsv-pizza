@@ -386,13 +386,14 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       });
     }
 
-    // Return with hostName and userId for ownership checks
+    // Return with hostName, userId for ownership checks, and canEdit flag
     res.json({
       party: {
         ...party,
         coHosts: enrichedCoHosts,
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
+        canEdit: true, // If we reached here, getPartyWithOwnershipCheck verified edit permissions
       }
     });
   } catch (error) {

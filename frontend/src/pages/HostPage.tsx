@@ -51,12 +51,7 @@ function HostPageContent() {
     if (!party || !user) return false;
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
     if (party.userId === user.id) return true;
-    if (party.coHosts && Array.isArray(party.coHosts)) {
-      const isEditor = party.coHosts.some(
-        (h: any) => h.email?.toLowerCase() === user.email.toLowerCase() && h.canEdit === true
-      );
-      if (isEditor) return true;
-    }
+    if (party.canEdit) return true; // Backend already verified co-host permissions
     return false;
   }, [party, user]);
 

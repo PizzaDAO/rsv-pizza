@@ -383,6 +383,7 @@ export interface DbParty {
   region?: string | null;
   event_type?: string | null;
   event_tags?: string[];
+  can_edit?: boolean;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -789,6 +790,10 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
           if (data.party?.coHosts) {
             // Backend returns enriched coHosts (camelCase) — use them directly
             party.co_hosts = data.party.coHosts;
+          }
+          // Backend returns canEdit flag based on authenticated user's permissions
+          if (data.party?.canEdit !== undefined) {
+            party.can_edit = data.party.canEdit;
           }
         }
       }

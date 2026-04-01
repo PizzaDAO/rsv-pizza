@@ -260,6 +260,7 @@ export interface Party {
   donationEthAddress?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  canEdit?: boolean;
 }
 
 export interface Donation {
