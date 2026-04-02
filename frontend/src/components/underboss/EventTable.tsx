@@ -5,7 +5,7 @@ import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
 import { GPP_REGIONS } from '../../types';
-import { bulkApproveEvents, bulkDeleteEvents } from '../../lib/api';
+import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 
 interface EventTableProps {
@@ -94,6 +94,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [showTagSubmenu, setShowTagSubmenu] = useState<'add' | 'remove' | null>(null);
+  const [customTag, setCustomTag] = useState('');
 
   // Three-state progress filters: includes (must have) and excludes (must NOT have)
   const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
@@ -292,7 +294,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             </button>
             {showActionDropdown && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
+                <div className="fixed inset-0 z-40" onClick={() => { setShowActionDropdown(false); setShowTagSubmenu(null); setCustomTag(''); }} />
                 <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[180px]">
                   <button
                     onClick={async () => {
@@ -338,6 +340,131 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   >
                     Send Telegram
                   </button>
+
+                  {/* Divider */}
+                  <div className="border-t border-theme-stroke my-1" />
+
+                  {/* Add Tag */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowTagSubmenu(showTagSubmenu === 'add' ? null : 'add')}
+                      className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                    >
+                      Add Tag &rarr;
+                    </button>
+                    {showTagSubmenu === 'add' && (
+                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                        {['swc', 'Global Pizza Party'].map((tag) => (
+                          <button
+                            key={tag}
+                            onClick={async () => {
+                              setShowActionDropdown(false);
+                              setShowTagSubmenu(null);
+                              setBulkLoading(true);
+                              try {
+                                await bulkUpdateEventTags(Array.from(selectedIds), [tag], 'add');
+                                // Optimistic update
+                                for (const id of selectedIds) {
+                                  const evt = events.find(e => e.id === id);
+                                  if (evt) {
+                                    const existing = evt.eventTags || [];
+                                    if (!existing.includes(tag.toLowerCase())) {
+                                      onEventUpdate?.(id, { eventTags: [...existing, tag.toLowerCase()] });
+                                    }
+                                  }
+                                }
+                                onBulkAction?.();
+                              } catch (err) { console.error('Add tag failed', err); }
+                              setBulkLoading(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                        {/* Custom tag input */}
+                        <div className="px-3 py-2 border-t border-theme-stroke">
+                          <input
+                            type="text"
+                            value={customTag}
+                            onChange={(e) => setCustomTag(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && customTag.trim()) {
+                                setShowActionDropdown(false);
+                                setShowTagSubmenu(null);
+                                setBulkLoading(true);
+                                try {
+                                  await bulkUpdateEventTags(Array.from(selectedIds), [customTag.trim()], 'add');
+                                  for (const id of selectedIds) {
+                                    const evt = events.find(ev => ev.id === id);
+                                    if (evt) {
+                                      const existing = evt.eventTags || [];
+                                      const cleaned = customTag.trim().toLowerCase();
+                                      if (!existing.includes(cleaned)) {
+                                        onEventUpdate?.(id, { eventTags: [...existing, cleaned] });
+                                      }
+                                    }
+                                  }
+                                  onBulkAction?.();
+                                } catch (err) { console.error('Add custom tag failed', err); }
+                                setBulkLoading(false);
+                                setCustomTag('');
+                              }
+                            }}
+                            placeholder="Custom tag..."
+                            className="w-full bg-transparent border-b border-theme-stroke text-xs text-theme-text focus:outline-none placeholder:text-theme-text-faint"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remove Tag */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowTagSubmenu(showTagSubmenu === 'remove' ? null : 'remove')}
+                      className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                    >
+                      Remove Tag &rarr;
+                    </button>
+                    {showTagSubmenu === 'remove' && (
+                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                        {/* Show tags that exist on selected events */}
+                        {(() => {
+                          const selectedEvents = events.filter(e => selectedIds.has(e.id));
+                          const allTags = [...new Set(selectedEvents.flatMap(e => e.eventTags || []))];
+                          if (allTags.length === 0) {
+                            return <div className="px-4 py-2 text-xs text-theme-text-faint">No tags to remove</div>;
+                          }
+                          return allTags.map((tag) => (
+                            <button
+                              key={tag}
+                              onClick={async () => {
+                                setShowActionDropdown(false);
+                                setShowTagSubmenu(null);
+                                setBulkLoading(true);
+                                try {
+                                  await bulkUpdateEventTags(Array.from(selectedIds), [tag], 'remove');
+                                  // Optimistic update
+                                  for (const id of selectedIds) {
+                                    const evt = events.find(e => e.id === id);
+                                    if (evt) {
+                                      onEventUpdate?.(id, { eventTags: (evt.eventTags || []).filter(t => t !== tag) });
+                                    }
+                                  }
+                                  onBulkAction?.();
+                                } catch (err) { console.error('Remove tag failed', err); }
+                                setBulkLoading(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                            >
+                              {tag}
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
