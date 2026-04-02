@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { Calendar, MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
+import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
 import { IconInput } from '../components/IconInput';
@@ -449,6 +449,14 @@ export function EventPage() {
 
   const timezoneAbbr = formatTimezoneDisplay(event.timezone || '');
 
+  // Extract month abbreviation and day number for calendar icon
+  const eventMonthAbbr = eventDate
+    ? eventDate.toLocaleDateString('en-US', { month: 'short', timeZone: event.timezone || undefined }).toUpperCase()
+    : '';
+  const eventDayNum = eventDate
+    ? eventDate.toLocaleDateString('en-US', { day: 'numeric', timeZone: event.timezone || undefined })
+    : '';
+
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = googleMapsApiKey && event.address
@@ -778,7 +786,15 @@ export function EventPage() {
                     {/* Date & Time */}
                     {event.date && (
                       <div className="flex items-start gap-3" data-testid="event-date">
-                        <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
+                        {/* Stylized calendar page icon */}
+                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 overflow-hidden flex flex-col shadow-sm">
+                          <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
+                            {eventMonthAbbr}
+                          </div>
+                          <div className="flex-1 bg-white/10 flex items-center justify-center">
+                            <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
+                          </div>
+                        </div>
                         <div className="flex-1">
                           <p className="text-lg font-medium text-theme-text">
                             {formattedDate}
@@ -801,7 +817,10 @@ export function EventPage() {
                         className="flex items-start gap-3 group"
                         data-testid="event-address"
                       >
-                        <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
+                        {/* MapPin inside circular border */}
+                        <div className="flex-shrink-0 w-11 h-11 rounded-full border-2 border-[#ff393a]/40 flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                          <MapPin className="w-5 h-5 text-[#ff393a]" />
+                        </div>
                         <div>
                           {event.venueName && (
                             <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
@@ -840,7 +859,15 @@ export function EventPage() {
                 {/* Mobile: Date & Time */}
                 {event.date && (
                   <div className="md:hidden flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
+                    {/* Stylized calendar page icon */}
+                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 overflow-hidden flex flex-col shadow-sm">
+                      <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
+                        {eventMonthAbbr}
+                      </div>
+                      <div className="flex-1 bg-white/10 flex items-center justify-center">
+                        <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
+                      </div>
+                    </div>
                     <div className="flex-1">
                       <p className="text-lg font-medium text-theme-text">
                         {formattedDate}
@@ -862,7 +889,10 @@ export function EventPage() {
                     rel="noopener noreferrer"
                     className="md:hidden flex items-start gap-3 group"
                   >
-                    <MapPin className="w-5 h-5 text-[#ff393a] flex-shrink-0 mt-1" />
+                    {/* MapPin inside circular border */}
+                    <div className="flex-shrink-0 w-11 h-11 rounded-full border-2 border-[#ff393a]/40 flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                      <MapPin className="w-5 h-5 text-[#ff393a]" />
+                    </div>
                     <div>
                       {event.venueName && (
                         <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
