@@ -119,7 +119,7 @@ export function isUSAddress(address: string): boolean {
  */
 export function getCandidatesByState(stateCode: string): SWCCandidate[] {
   const candidates = (candidatesData as SWCCandidate[]).filter(
-    c => c.state.toUpperCase() === stateCode.toUpperCase()
+    c => c.state?.toUpperCase() === stateCode.toUpperCase()
   );
 
   const gradeOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4, '?': 5 };
@@ -136,7 +136,7 @@ export function getCandidatesByState(stateCode: string): SWCCandidate[] {
  * Get all unique states that have candidates in the dataset.
  */
 export function getAvailableStates(): string[] {
-  const states = new Set((candidatesData as SWCCandidate[]).map(c => c.state));
+  const states = new Set((candidatesData as SWCCandidate[]).filter(c => c.state).map(c => c.state));
   return Array.from(states).sort();
 }
 
