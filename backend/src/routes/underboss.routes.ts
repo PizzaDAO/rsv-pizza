@@ -198,6 +198,7 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     hostStatus: party.hostStatus || null,
     underbossApproved: party.underbossApproved || false,
     hostTags: party.hostTags || [],
+    eventTags: party.eventTags || [],
     createdAt: party.createdAt,
   };
 }
@@ -568,6 +569,66 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
     });
 
     res.json({ deleted: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/events/bulk-event-tags - Bulk add/remove event tags
+router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyIds, tags, action } = req.body;
+
+    if (!Array.isArray(partyIds) || partyIds.length === 0) {
+      throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (!Array.isArray(tags) || tags.length === 0) {
+      throw new AppError('tags must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (!['add', 'remove', 'set'].includes(action)) {
+      throw new AppError('action must be "add", "remove", or "set"', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate tags: strings, max 50 chars each, max 10 tags
+    const cleanTags = tags
+      .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+      .map((t: string) => t.trim().toLowerCase().slice(0, 50))
+      .slice(0, 10);
+
+    if (cleanTags.length === 0) {
+      throw new AppError('No valid tags provided', 400, 'VALIDATION_ERROR');
+    }
+
+    // Fetch current events
+    const parties = await prisma.party.findMany({
+      where: { id: { in: partyIds } },
+      select: { id: true, eventTags: true },
+    });
+
+    let updated = 0;
+    for (const party of parties) {
+      let newTags: string[];
+      const existing = party.eventTags || [];
+
+      if (action === 'add') {
+        // Append tags, deduplicated
+        const combined = [...existing, ...cleanTags];
+        newTags = [...new Set(combined)];
+      } else if (action === 'remove') {
+        newTags = existing.filter((t: string) => !cleanTags.includes(t));
+      } else {
+        // 'set' — replace entirely
+        newTags = cleanTags;
+      }
+
+      await prisma.party.update({
+        where: { id: party.id },
+        data: { eventTags: newTags },
+      });
+      updated++;
+    }
+
+    res.json({ updated });
   } catch (error) {
     next(error);
   }

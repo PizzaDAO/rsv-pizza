@@ -2419,6 +2419,18 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   });
 }
 
+// Bulk update event tags (underboss auth)
+export async function bulkUpdateEventTags(
+  partyIds: string[],
+  tags: string[],
+  action: 'add' | 'remove' | 'set'
+): Promise<void> {
+  await apiRequest('/api/underboss/events/bulk-event-tags', {
+    method: 'PATCH',
+    body: { partyIds, tags, action },
+  });
+}
+
 // ============================================
 // City Status API (Underboss)
 // ============================================

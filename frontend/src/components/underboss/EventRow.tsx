@@ -320,6 +320,25 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             onEventUpdate?.(event.id, { hostTags: tags });
           }}
         />
+        {/* Event tags (read-only) */}
+        {(event.eventTags || []).length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            {event.eventTags.map((tag) => (
+              <span
+                key={tag}
+                className={`text-[10px] px-1.5 py-0.5 rounded-md border ${
+                  tag === 'swc'
+                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                    : tag === 'global pizza party'
+                      ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                      : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                }`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </td>
 
       {/* Location */}

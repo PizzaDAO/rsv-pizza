@@ -981,6 +981,7 @@ export interface UnderbossEvent {
   hostStatus: HostStatus | null;
   underbossApproved: boolean;
   hostTags: string[];
+  eventTags: string[];
   createdAt: string;
 }
 
