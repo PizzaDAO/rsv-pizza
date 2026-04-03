@@ -820,7 +820,9 @@ model Sponsor {
   // Basic Info
   name         String  // Sponsor/company name
   website      String? // Company website
-  brandTwitter String? @map("brand_twitter") // Brand's X/Twitter handle
+  brandTwitter     String? @map("brand_twitter") // Brand's X/Twitter handle
+  brandInstagram   String? @map("brand_instagram") // Brand's Instagram handle
+  brandDescription String? @map("brand_description") // 1-2 sentence brand description
 
   // Contact Info
   pointPerson    String? @map("point_person") // Who's managing this relationship

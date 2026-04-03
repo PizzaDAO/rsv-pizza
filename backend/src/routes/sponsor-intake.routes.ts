@@ -40,6 +40,8 @@ const SPONSOR_FACING_FIELDS = [
   'name',
   'website',
   'brandTwitter',
+  'brandInstagram',
+  'brandDescription',
   'contactName',
   'contactEmail',
   'contactPhone',
@@ -160,6 +162,8 @@ router.get('/:token', async (req: AuthRequest, res: Response, next: NextFunction
         name: sponsor.name,
         website: sponsor.website,
         brandTwitter: sponsor.brandTwitter,
+        brandInstagram: sponsor.brandInstagram,
+        brandDescription: sponsor.brandDescription,
         contactName: sponsor.contactName,
         contactEmail: sponsor.contactEmail,
         contactPhone: sponsor.contactPhone,
@@ -208,6 +212,12 @@ router.post('/:token', async (req: AuthRequest, res: Response, next: NextFunctio
     }
     if (body.brandTwitter !== undefined) {
       updateData.brandTwitter = body.brandTwitter?.trim() || null;
+    }
+    if (body.brandInstagram !== undefined) {
+      updateData.brandInstagram = body.brandInstagram?.trim() || null;
+    }
+    if (body.brandDescription !== undefined) {
+      updateData.brandDescription = body.brandDescription?.trim() || null;
     }
     if (body.contactName !== undefined) {
       updateData.contactName = body.contactName?.trim() || null;
