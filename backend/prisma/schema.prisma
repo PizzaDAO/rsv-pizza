@@ -175,8 +175,9 @@ model Party {
   socialPosts      SocialPost[]
   notableAttendees NotableAttendee[]
   aiPhoneCalls     AIPhoneCall[]
-  pageViews        PageView[]
-  linkClicks       LinkClick[]
+  pageViews             PageView[]
+  linkClicks            LinkClick[]
+  sponsorChecklistItems SponsorChecklistItem[]
 
   @@map("parties")
 }
@@ -1076,4 +1077,45 @@ model Admin {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("admins")
+}
+
+// ============================================
+// Sponsor Dashboard Models
+// ============================================
+
+model SponsorUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  tag       String
+  isActive  Boolean  @default(true) @map("is_active")
+  notes     String?
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  checklistItems SponsorChecklistItem[]
+
+  @@index([tag])
+  @@map("sponsor_users")
+}
+
+model SponsorChecklistItem {
+  id            String    @id @default(uuid()) @db.Uuid
+  sponsorUserId String    @map("sponsor_user_id") @db.Uuid
+  sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
+  partyId       String    @map("party_id") @db.Uuid
+  party         Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  name          String
+  completed     Boolean   @default(false)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  dueDate       DateTime? @map("due_date") @db.Date
+  sortOrder     Int       @default(0) @map("sort_order")
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([sponsorUserId])
+  @@index([partyId])
+  @@map("sponsor_checklist_items")
 }

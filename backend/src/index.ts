@@ -34,6 +34,7 @@ import telegramRoutes from './routes/telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -96,6 +97,8 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
+app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
+app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
