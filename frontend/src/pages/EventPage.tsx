@@ -140,7 +140,7 @@ export function EventPage() {
             const storedAuth = sessionStorage.getItem(authKey);
 
             if (storedAuth) {
-              const isValid = await verifyPartyPassword(foundEvent.id, storedAuth);
+              const isValid = await verifyPartyPassword(slug!, storedAuth);
               if (isValid) {
                 setIsAuthenticated(true);
               }
@@ -222,7 +222,7 @@ export function EventPage() {
     setVerifyingPassword(true);
     setPasswordError(null);
 
-    const isValid = await verifyPartyPassword(event.id, passwordInput);
+    const isValid = await verifyPartyPassword(slug!, passwordInput);
 
     if (isValid) {
       setIsAuthenticated(true);
@@ -249,7 +249,7 @@ export function EventPage() {
 
     if (!event?.hasPassword) return;
 
-    const isValid = await verifyPartyPassword(event.id, editPasswordInput);
+    const isValid = await verifyPartyPassword(slug!, editPasswordInput);
 
     if (isValid) {
       // Correct password - navigate to host page

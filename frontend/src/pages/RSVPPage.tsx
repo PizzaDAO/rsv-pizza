@@ -85,7 +85,7 @@ export function RSVPPage() {
               const authKey = `rsvpizza_auth_${inviteCode}`;
               const storedAuth = sessionStorage.getItem(authKey);
               if (storedAuth) {
-                const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
+                const isValid = await verifyPartyPassword(inviteCode!, storedAuth);
                 if (isValid) {
                   setIsAuthenticated(true);
                 }
@@ -128,7 +128,7 @@ export function RSVPPage() {
     e.preventDefault();
     if (!party?.has_password) return;
 
-    const isValid = await verifyPartyPassword(party.id, passwordInput);
+    const isValid = await verifyPartyPassword(inviteCode!, passwordInput);
     if (isValid) {
       setIsAuthenticated(true);
       setPasswordError(null);

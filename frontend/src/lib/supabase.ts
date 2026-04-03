@@ -678,19 +678,22 @@ export async function validateCustomSlug(
   return { valid: true };
 }
 
-// Securely verify password without fetching it
-export async function verifyPartyPassword(partyId: string, passwordAttempt: string): Promise<boolean> {
-  const { count, error } = await supabase
-    .from('parties')
-    .select('id', { count: 'exact', head: true })
-    .eq('id', partyId)
-    .eq('password', passwordAttempt);
-
-  if (error) {
+// Verify event password via backend API (password column is not readable by anon)
+export async function verifyPartyPassword(inviteCode: string, passwordAttempt: string): Promise<boolean> {
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/rsvp/${inviteCode}/verify-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: passwordAttempt }),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.valid === true;
+  } catch (error) {
     console.error('Error verifying password:', error);
     return false;
   }
-  return count === 1;
 }
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
