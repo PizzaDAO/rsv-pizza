@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, ThumbsUp, ThumbsDown, Lock, X, ChevronRight, ChevronLeft, Square, CheckSquare2, User, Mail, Wallet, Star, MapPin, Heart, Plus } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, addGuestToParty, getUserPreferences, saveUserPreferences, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
+import { Pizza, Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
+import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DIETARY_OPTIONS, TURTLES, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
-import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
-import { Pizzeria, DonationPublicStats } from '../types';
-import { IconInput } from '../components/IconInput';
 import { DonationForm } from '../components/DonationForm';
 import { getDonationStats } from '../lib/api';
-import { PlaceAutocomplete } from '../components/PlaceAutocomplete';
-import { uuid } from '../lib/utils';
-// GPP theme applied conditionally — gppClass + body class via useEffect
+import { DonationPublicStats } from '../types';
+import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
+import { RSVPFormStep1 } from '../components/RSVPFormStep1';
+import { RSVPFormStep2 } from '../components/RSVPFormStep2';
+// GPP theme applied conditionally
 import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
 
@@ -20,29 +18,26 @@ export function RSVPPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Page-level loading state
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [party, setParty] = useState<DbParty | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState(false);
-  const [step, setStep] = useState(1); // 1 or 2
-  const [guestId, setGuestId] = useState<string | null>(null);
+
+  // Donation state (page-specific)
   const [donationsEnabled, setDonationsEnabled] = useState(false);
   const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
   const [showDonationForm, setShowDonationForm] = useState(false);
 
+  // GPP theme
   const isGPP = party?.event_type === 'gpp';
   const gppClass = isGPP ? 'gpp-theme' : '';
-  const themeBackgroundStyle = isGPP ? { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties : undefined;
 
-  // Set body class for Google Maps autocomplete styling
   useEffect(() => {
     if (isGPP) document.body.classList.add('gpp-theme-active');
     else document.body.classList.remove('gpp-theme-active');
     return () => { document.body.classList.remove('gpp-theme-active'); };
   }, [isGPP]);
+
   const { fire: fireConfetti, fireFromCenter, ConfettiOverlay } = useConfetti();
 
   // Password protection state
@@ -50,91 +45,13 @@ export function RSVPPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Step 1 - Personal Info
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [ethereumAddress, setEthereumAddress] = useState('');
-  const [roles, setRoles] = useState<string[]>([]);
-  const [mailingListOptIn, setMailingListOptIn] = useState(false);
-
-  // Step 2 - Pizza Preferences
-  const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
-  const [likedToppings, setLikedToppings] = useState<string[]>([]);
-  const [dislikedToppings, setDislikedToppings] = useState<string[]>(['anchovies']);
-  const [likedBeverages, setLikedBeverages] = useState<string[]>([]);
-  const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
-  const [availableBeverages, setAvailableBeverages] = useState<string[]>([]);
-  const [availableToppings, setAvailableToppings] = useState<string[]>([]);
-  const [saveToProfile, setSaveToProfile] = useState(false);
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
-
-  // Pizzeria rankings
-  const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
-  const [pizzeriaRankings, setPizzeriaRankings] = useState<string[]>([]); // Array of pizzeria IDs in rank order
-  const [loadingPizzerias, setLoadingPizzerias] = useState(false);
-  const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
-  const [showSuggestModal, setShowSuggestModal] = useState(false);
-  const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
-
-  // Load saved preferences when user is logged in or when email matches a saved profile
-  useEffect(() => {
-    async function loadSavedPreferences() {
-      const emailToCheck = user?.email || email;
-      if (!emailToCheck || preferencesLoaded) return;
-
-      const prefs = await getUserPreferences(emailToCheck);
-      if (prefs) {
-        if (prefs.dietary_restrictions.length > 0) {
-          setDietaryRestrictions(prefs.dietary_restrictions);
-        }
-        if (prefs.liked_toppings.length > 0) {
-          setLikedToppings(prefs.liked_toppings);
-        }
-        if (prefs.disliked_toppings.length > 0) {
-          setDislikedToppings(prefs.disliked_toppings);
-        }
-        if (prefs.liked_beverages.length > 0) {
-          setLikedBeverages(prefs.liked_beverages);
-        }
-        if (prefs.disliked_beverages.length > 0) {
-          setDislikedBeverages(prefs.disliked_beverages);
-        }
-        setPreferencesLoaded(true);
-        // Auto-check save to profile if user is logged in
-        if (user?.email) {
-          setSaveToProfile(true);
-        }
-      }
-    }
-    loadSavedPreferences();
-  }, [user?.email, email, preferencesLoaded]);
-
-  // Auto-deselect liked toppings that conflict with selected dietary restrictions
-  useEffect(() => {
-    const excluded = getExcludedToppingIds(dietaryRestrictions);
-    if (excluded.size > 0) {
-      setLikedToppings(prev => prev.filter(id => !excluded.has(id)));
-    }
-  }, [dietaryRestrictions]);
-
-  // Pre-fill email if user is logged in
-  useEffect(() => {
-    if (user?.email && !email) {
-      setEmail(user.email);
-    }
-    if (user?.name && !name) {
-      setName(user.name);
-    }
-  }, [user]);
-
+  // Load party
   useEffect(() => {
     async function loadParty() {
       if (inviteCode) {
         const foundParty = await getPartyByInviteCodeOrCustomUrl(inviteCode);
         if (foundParty) {
           setParty(foundParty);
-          setAvailableBeverages(foundParty.available_beverages || []);
-          setAvailableToppings(foundParty.available_toppings || []);
 
           // Check if donations are enabled
           const stats = await getDonationStats(foundParty.id);
@@ -143,8 +60,6 @@ export function RSVPPage() {
 
           // Check if party has password protection
           if (foundParty.has_password) {
-            // Skip password for existing guests (hosts are now added as guests too)
-            // Also check co-host status via backend for backward compatibility with old parties
             const userIsGuest = user?.email && await isUserGuestAtParty(foundParty.id, user.email);
             let userIsHost = false;
             if (!userIsGuest && user?.email && inviteCode) {
@@ -166,12 +81,9 @@ export function RSVPPage() {
 
             if (userIsGuest || userIsHost) {
               setIsAuthenticated(true);
-            }
-            // Check stored password
-            else {
+            } else {
               const authKey = `rsvpizza_auth_${inviteCode}`;
               const storedAuth = sessionStorage.getItem(authKey);
-
               if (storedAuth) {
                 const isValid = await verifyPartyPassword(foundParty.id, storedAuth);
                 if (isValid) {
@@ -183,7 +95,7 @@ export function RSVPPage() {
             setIsAuthenticated(true);
           }
         } else {
-          setError('Party not found. The invite link may be invalid or expired.');
+          setLoadError('Party not found. The invite link may be invalid or expired.');
         }
       }
       setLoading(false);
@@ -191,83 +103,32 @@ export function RSVPPage() {
     loadParty();
   }, [inviteCode, user?.email]);
 
-  // Use host-selected pizzerias if available, otherwise fetch nearby pizzerias
-  useEffect(() => {
-    async function fetchPizzerias() {
-      // If host has selected specific pizzerias, use those
-      if (party?.selectedPizzerias && party.selectedPizzerias.length > 0) {
-        setNearbyPizzerias(party.selectedPizzerias);
-        if (party?.address) {
-          geocodeAddress(party.address).then(loc => { if (loc) setVenueLocation(loc); });
-        }
-        return;
-      }
+  // Create the eventData only when party is loaded
+  const eventData = party ? dbPartyToRSVPData(party) : null;
 
-      // Otherwise, fall back to auto-fetching based on address
-      if (!party?.address) return;
-
-      setLoadingPizzerias(true);
-      try {
-        const location = await geocodeAddress(party.address);
-        if (location) setVenueLocation(location);
-        if (location) {
-          const results = await searchPizzerias(location.lat, location.lng);
-          // Take only top 3
-          setNearbyPizzerias(results.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('Failed to fetch pizzerias:', err);
-      } finally {
-        setLoadingPizzerias(false);
-      }
-    }
-    fetchPizzerias();
-  }, [party?.address, party?.selectedPizzerias]);
-
-  const handlePizzeriaClick = (pizzeriaId: string) => {
-    setPizzeriaRankings(prev => {
-      const currentIndex = prev.indexOf(pizzeriaId);
-      if (currentIndex === -1) {
-        // Not ranked yet, add to end
-        return [...prev, pizzeriaId];
-      } else {
-        // Already ranked, remove it (toggle off)
-        return prev.filter(id => id !== pizzeriaId);
-      }
-    });
-  };
-
-  const handleSuggestPizzeria = (place: Partial<Pizzeria>) => {
-    const pizzeria: Pizzeria = {
-      id: place.id || `suggested-${uuid()}`,
-      placeId: place.placeId || '',
-      name: place.name || '',
-      address: place.address || '',
-      phone: place.phone,
-      url: place.url,
-      rating: place.rating,
-      reviewCount: place.reviewCount,
-      priceLevel: place.priceLevel,
-      isOpen: place.isOpen,
-      location: place.location || { lat: 0, lng: 0 },
-      orderingOptions: place.orderingOptions || [],
-    };
-
-    setSuggestedPizzerias(prev => [...prev, pizzeria]);
-    setNearbyPizzerias(prev => {
-      if (prev.some(p => p.id === pizzeria.id)) return prev;
-      return [...prev, pizzeria];
-    });
-    setShowSuggestModal(false);
-  };
+  // Use the shared form hook (only when party is loaded)
+  const form = useRSVPForm({
+    eventData: eventData || {
+      id: '',
+      name: '',
+      inviteCode: inviteCode || '',
+      customUrl: null,
+      address: null,
+      availableBeverages: [],
+      availableToppings: [],
+    },
+    user,
+    isOpen: !!party, // Only active when party is loaded
+    onSuccess: (result) => {
+      if (isGPP) fireFromCenter();
+    },
+  });
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!party?.has_password) return;
 
     const isValid = await verifyPartyPassword(party.id, passwordInput);
-
     if (isValid) {
       setIsAuthenticated(true);
       setPasswordError(null);
@@ -279,111 +140,6 @@ export function RSVPPage() {
     }
   };
 
-  const handleStep1Continue = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-
-    setError(null);
-    setStep(2);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!inviteCode) {
-      setError('Invalid invite code');
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const result = await addGuestToParty(
-        party!.id,
-        name.trim(),
-        dietaryRestrictions,
-        likedToppings,
-        dislikedToppings,
-        likedBeverages,
-        dislikedBeverages,
-        email.trim() || undefined,
-        ethereumAddress.trim() || undefined,
-        roles,
-        mailingListOptIn,
-        inviteCode,
-        pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined,
-        suggestedPizzerias.length > 0 ? suggestedPizzerias : undefined
-      );
-
-      if (result) {
-        // Save preferences to profile if checkbox is checked and email is provided
-        if (saveToProfile && email.trim() && !result.alreadyRegistered) {
-          await saveUserPreferences(email.trim(), {
-            dietary_restrictions: dietaryRestrictions,
-            liked_toppings: likedToppings,
-            disliked_toppings: dislikedToppings,
-            liked_beverages: likedBeverages,
-            disliked_beverages: dislikedBeverages,
-          });
-        }
-        setAlreadyRegistered(result.alreadyRegistered);
-        setPendingApproval(result.requireApproval);
-        setGuestId(result.guest?.id || null);
-
-        // Go directly to success - donation is handled on step 2
-        if (isGPP) fireFromCenter();
-        setSubmitted(true);
-      } else {
-        setError('Failed to submit. Please try again.');
-      }
-    } catch (err) {
-      setError('Failed to submit. The party may no longer exist.');
-    }
-
-    setSubmitting(false);
-  };
-
-  const toggleRole = (role: string) => {
-    setRoles(prev =>
-      prev.includes(role)
-        ? prev.filter(r => r !== role)
-        : [...prev, role]
-    );
-  };
-
-  const toggleDietary = (option: string) => {
-    setDietaryRestrictions(prev =>
-      prev.includes(option)
-        ? prev.filter(d => d !== option)
-        : [...prev, option]
-    );
-  };
-
-  const handleToppingLike = (id: string) => {
-    setDislikedToppings(prev => prev.filter(t => t !== id));
-    setLikedToppings(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
-  };
-
-  const handleToppingDislike = (id: string) => {
-    setLikedToppings(prev => prev.filter(t => t !== id));
-    setDislikedToppings(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
-  };
-
-  const handleDrinkLike = (id: string) => {
-    setDislikedBeverages(prev => prev.filter(b => b !== id));
-    setLikedBeverages(prev => prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]);
-  };
-
-  const handleDrinkDislike = (id: string) => {
-    setLikedBeverages(prev => prev.filter(b => b !== id));
-    setDislikedBeverages(prev => prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]);
-  };
-
   const handleClose = () => {
     const eventUrl = party?.custom_url
       ? `/${party.custom_url}`
@@ -391,6 +147,7 @@ export function RSVPPage() {
     navigate(eventUrl);
   };
 
+  // ---- Loading state ----
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -399,19 +156,20 @@ export function RSVPPage() {
     );
   }
 
-  if (error && !party) {
+  // ---- Error state (no party found) ----
+  if (loadError && !party) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
-          <p className="text-theme-text-secondary">{error}</p>
+          <p className="text-theme-text-secondary">{loadError}</p>
         </div>
       </div>
     );
   }
 
-  // Password protection UI
+  // ---- Password protection UI ----
   if (!isAuthenticated && party?.has_password) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
@@ -453,17 +211,68 @@ export function RSVPPage() {
     );
   }
 
-  // Success screen
-  if (submitted) {
+  // ---- Donation slot for Step 2 ----
+  const donationSlot = donationsEnabled && donationStats ? (
+    <>
+      {!showDonationForm && (
+        <div className="border-t border-theme-stroke pt-4">
+          <button
+            type="button"
+            onClick={() => setShowDonationForm(true)}
+            className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-[#ff393a]/10 to-[#ff6b6b]/10 rounded-xl border border-[#ff393a]/20 hover:border-[#ff393a]/40 transition-all"
+          >
+            <div className="w-12 h-12 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30 flex-shrink-0">
+              <Heart size={24} className="text-[#ff393a]" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-theme-text font-medium">Donate</p>
+              <p className="text-theme-text-muted text-sm">
+                {donationStats.message || 'Make a donation to help make this event possible'}
+              </p>
+            </div>
+            <ChevronRight size={20} className="text-theme-text-muted" />
+          </button>
+        </div>
+      )}
+      {showDonationForm && (
+        <div className="border-t border-theme-stroke pt-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30">
+              <Heart size={20} className="text-[#ff393a]" />
+            </div>
+            <div>
+              <h3 className="text-theme-text font-medium">Make a Donation</h3>
+              <p className="text-theme-text-muted text-sm">
+                {donationStats.recipient ? (
+                  <>Buy Pizza for {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
+                ) : 'Buy Pizza for this event'}
+              </p>
+            </div>
+          </div>
+          <DonationForm
+            partyId={party!.id}
+            stats={donationStats}
+            guestName={form.name}
+            guestEmail={form.email}
+            onSuccess={() => setShowDonationForm(false)}
+            onCancel={() => setShowDonationForm(false)}
+          />
+        </div>
+      )}
+    </>
+  ) : undefined;
+
+  // ---- Success screen ----
+  if (form.submitted) {
     const getSuccessIcon = () => {
-      if (alreadyRegistered) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
-      if (pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
+      if (form.alreadyRegistered) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
+      if (form.pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       return 'bg-[#39d98a]/20 border-[#39d98a]/30';
     };
 
     const getSuccessTitle = () => {
-      if (alreadyRegistered) return "You're already registered!";
-      if (pendingApproval) return "RSVP Submitted!";
+      if (form.alreadyRegistered) return "You're already registered!";
+      if (form.pendingApproval) return 'RSVP Submitted!';
       return `See you at ${party?.name}!`;
     };
 
@@ -472,9 +281,9 @@ export function RSVPPage() {
         {isGPP && <GPPClouds />}
         <div className="card p-8 max-w-md text-center">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
-            {alreadyRegistered ? (
+            {form.alreadyRegistered ? (
               <AlertCircle className="w-8 h-8 text-[#ff393a]" />
-            ) : pendingApproval ? (
+            ) : form.pendingApproval ? (
               <Loader2 className="w-8 h-8 text-[#ffc107]" />
             ) : (
               <Check className="w-8 h-8 text-[#39d98a]" />
@@ -483,12 +292,12 @@ export function RSVPPage() {
           <h1 className="text-2xl font-bold text-theme-text mb-2">
             {getSuccessTitle()}
           </h1>
-          {alreadyRegistered && (
+          {form.alreadyRegistered && (
             <p className="text-theme-text-secondary mb-4">
               This email has already been used to RSVP to this event.
             </p>
           )}
-          {pendingApproval && !alreadyRegistered && (
+          {form.pendingApproval && !form.alreadyRegistered && (
             <p className="text-theme-text-secondary mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
@@ -500,17 +309,17 @@ export function RSVPPage() {
             Back to Event
           </button>
         </div>
+        {ConfettiOverlay}
       </div>
     );
   }
 
-  // Step 1 - Personal Info
-  if (step === 1) {
+  // ---- Step 1 - Personal Info ----
+  if (form.step === 1) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
         {isGPP && <GPPClouds />}
         <div className="card p-8 max-w-lg w-full relative">
-          {/* Close button */}
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
@@ -526,112 +335,21 @@ export function RSVPPage() {
             </div>
           </div>
 
-          <form onSubmit={handleStep1Continue} className="space-y-3">
-            {/* Name */}
-            <IconInput
-              icon={User}
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name"
-              required
-              autoFocus
-            />
-
-            {/* Email */}
-            <IconInput
-              icon={Mail}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-            />
-
-            {/* Ethereum Address - show when NFT minting is enabled OR for GPP events */}
-            {(party?.nft_enabled || party?.event_type === 'gpp') && (
-            <IconInput
-              icon={Wallet}
-              type="text"
-              value={ethereumAddress}
-              onChange={(e) => setEthereumAddress(e.target.value)}
-              placeholder="Wallet Address"
-            />
-            )}
-
-            {/* What roles do you play? */}
-            <div>
-              <label className="block text-sm font-medium text-theme-text mb-2">
-                What roles do you play?
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {TURTLES.map((t) => {
-                  const selected = roles.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleRole(t.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                        selected
-                          ? 'bg-[#ff393a] text-white'
-                          : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover/80'
-                      }`}
-                    >
-                      <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm leading-tight">{t.label}</div>
-                        <div className={`text-xs leading-tight ${selected ? 'text-white/70' : 'opacity-60'}`}>{t.role}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Mailing List */}
-            <button
-              type="button"
-              onClick={() => setMailingListOptIn(!mailingListOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
-            >
-              {mailingListOptIn ? (
-                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                Want to join the mailing list?
-              </span>
-            </button>
-
-            {error && (
-              <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full btn-primary flex items-center justify-center gap-2"
-            >
-              Next
-              <ChevronRight size={18} />
-            </button>
-          </form>
+          <RSVPFormStep1
+            form={form}
+            eventName={party?.name || ''}
+            showWallet={!!(party?.nft_enabled || party?.event_type === 'gpp')}
+          />
         </div>
       </div>
     );
   }
 
-  // Step 2 - Pizza Preferences
-  const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
-
+  // ---- Step 2 - Pizza Preferences ----
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
       {isGPP && <GPPClouds />}
       <div className="card p-8 max-w-2xl w-full relative">
-        {/* Close button */}
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
@@ -647,330 +365,10 @@ export function RSVPPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Dietary Restrictions */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-3">
-              Diet
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {DIETARY_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleDietary(option)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${dietaryRestrictions.includes(option)
-                      ? 'bg-[#ff393a] text-white'
-                      : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
-                    }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Toppings */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-3">
-              Toppings
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {TOPPINGS.filter(t => availableToppings.length === 0 || availableToppings.includes(t.id)).map((topping) => {
-                const isLiked = likedToppings.includes(topping.id);
-                const isDisliked = dislikedToppings.includes(topping.id);
-                const isExcluded = excludedToppings.has(topping.id);
-
-                return (
-                  <div
-                    key={topping.id}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isExcluded
-                        ? 'opacity-40 cursor-not-allowed bg-theme-surface border-theme-stroke'
-                        : isLiked
-                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                          : isDisliked
-                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-theme-surface border-theme-stroke'
-                      }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => !isExcluded && handleToppingLike(topping.id)}
-                      disabled={isExcluded}
-                      className={`flex items-center gap-1.5 flex-1 py-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
-                    >
-                      <ThumbsUp
-                        size={12}
-                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
-                          }`}
-                      />
-                      <span className={`text-xs ${isExcluded ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{topping.name}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => !isExcluded && handleToppingDislike(topping.id)}
-                      disabled={isExcluded}
-                      className={`p-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
-                    >
-                      <ThumbsDown
-                        size={12}
-                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
-                          }`}
-                      />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Drinks */}
-          {availableBeverages.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-theme-text mb-3">
-                Drink Preferences
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {DRINKS.filter(d => availableBeverages.includes(d.id)).map((drink) => {
-                  const isLiked = likedBeverages.includes(drink.id);
-                  const isDisliked = dislikedBeverages.includes(drink.id);
-
-                  return (
-                    <div
-                      key={drink.id}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${isLiked
-                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                          : isDisliked
-                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-theme-surface border-theme-stroke'
-                        }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleDrinkLike(drink.id)}
-                        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
-                      >
-                        <ThumbsUp
-                          size={12}
-                          className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'
-                            }`}
-                        />
-                        <span className="text-theme-text text-xs">{drink.name}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDrinkDislike(drink.id)}
-                        className="p-0.5 hover:opacity-70 transition-opacity"
-                      >
-                        <ThumbsDown
-                          size={12}
-                          className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'
-                            }`}
-                        />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Pizzeria Rankings - only show if party has location and pizzerias found */}
-          {nearbyPizzerias.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-theme-text mb-3">
-                Favorite Pizzerias <span className="text-theme-text-muted font-normal">(click to rank 1-3)</span>
-              </label>
-              {loadingPizzerias ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-theme-text-muted" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {nearbyPizzerias.map((pizzeria) => {
-                    const rankIndex = pizzeriaRankings.indexOf(pizzeria.id);
-                    const rank = rankIndex !== -1 ? rankIndex + 1 : null;
-
-                    return (
-                      <button
-                        key={pizzeria.id}
-                        type="button"
-                        onClick={() => handlePizzeriaClick(pizzeria.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${rank
-                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                            : 'bg-theme-surface border-theme-stroke hover:bg-theme-surface-hover'
-                          }`}
-                      >
-                        {/* Rank badge or empty circle */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${rank
-                            ? 'bg-[#ff393a] text-white'
-                            : 'bg-theme-surface-hover text-theme-text-faint'
-                          }`}>
-                          {rank || '—'}
-                        </div>
-
-                        {/* Pizzeria info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-theme-text truncate">{pizzeria.name}</span>
-                            {pizzeria.rating && (
-                              <span className="flex items-center gap-0.5 text-yellow-400 text-xs">
-                                <Star size={10} className="fill-yellow-400" />
-                                {pizzeria.rating.toFixed(1)}
-                              </span>
-                            )}
-                            {venueLocation && pizzeria.location && pizzeria.location.lat !== 0 && (
-                              <span className="text-xs text-theme-text-muted">
-                                {formatDistanceMiles(calculateDistanceMiles(venueLocation.lat, venueLocation.lng, pizzeria.location.lat, pizzeria.location.lng))}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-theme-text-muted">
-                            <MapPin size={10} />
-                            <span className="truncate">{pizzeria.address}</span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Suggest a Pizzeria button */}
-              <button
-                type="button"
-                onClick={() => setShowSuggestModal(true)}
-                className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-theme-stroke-hover text-theme-text-muted hover:text-theme-text hover:border-theme-stroke-hover hover:bg-theme-surface transition-all text-sm"
-              >
-                <Plus size={14} />
-                Suggest a Pizzeria
-              </button>
-            </div>
-          )}
-
-          {/* Suggest Pizzeria Sub-Modal */}
-          {showSuggestModal && (
-            <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-theme-text">Suggest a pizzeria</p>
-                <button
-                  type="button"
-                  onClick={() => setShowSuggestModal(false)}
-                  className="text-theme-text-muted hover:text-theme-text"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <PlaceAutocomplete
-                onPlaceSelected={(place) => handleSuggestPizzeria(place)}
-                placeholder="Search for a pizzeria..."
-                autoFocus
-              />
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Donation Option - only show if donations are enabled */}
-          {donationsEnabled && donationStats && !showDonationForm && (
-            <div className="border-t border-theme-stroke pt-4">
-              <button
-                type="button"
-                onClick={() => setShowDonationForm(true)}
-                className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-[#ff393a]/10 to-[#ff6b6b]/10 rounded-xl border border-[#ff393a]/20 hover:border-[#ff393a]/40 transition-all"
-              >
-                <div className="w-12 h-12 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30 flex-shrink-0">
-                  <Heart size={24} className="text-[#ff393a]" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-theme-text font-medium">Donate</p>
-                  <p className="text-theme-text-muted text-sm">
-                    {donationStats.message || 'Make a donation to help make this event possible'}
-                  </p>
-                </div>
-                <ChevronRight size={20} className="text-theme-text-muted" />
-              </button>
-            </div>
-          )}
-
-          {/* Donation Form - shows when user clicks to donate */}
-          {donationsEnabled && donationStats && showDonationForm && (
-            <div className="border-t border-theme-stroke pt-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-[#ff393a]/20 rounded-full flex items-center justify-center border border-[#ff393a]/30">
-                  <Heart size={20} className="text-[#ff393a]" />
-                </div>
-                <div>
-                  <h3 className="text-theme-text font-medium">Make a Donation</h3>
-                  <p className="text-theme-text-muted text-sm">
-                    {donationStats.recipient ? (
-                      <>Buy Pizza for {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
-                    ) : 'Buy Pizza for this event'}
-                  </p>
-                </div>
-              </div>
-              <DonationForm
-                partyId={party!.id}
-                stats={donationStats}
-                guestName={name}
-                guestEmail={email}
-                onSuccess={() => setShowDonationForm(false)}
-                onCancel={() => setShowDonationForm(false)}
-              />
-            </div>
-          )}
-
-          {/* Save to Profile Checkbox - only show if email is provided */}
-          {email.trim() && (
-            <button
-              type="button"
-              onClick={() => setSaveToProfile(!saveToProfile)}
-              className="flex items-center gap-3 w-full p-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors"
-            >
-              {saveToProfile ? (
-                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <div className="text-left">
-                <span className="text-sm font-medium text-theme-text">Save to profile</span>
-                <p className="text-xs text-theme-text-muted">Remember my preferences for future events</p>
-              </div>
-            </button>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="btn-secondary flex items-center gap-2"
-            >
-              <ChevronLeft size={18} />
-              Back
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 btn-primary flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Pizza size={18} />
-                  RSVP
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        <RSVPFormStep2
+          form={form}
+          donationSlot={donationSlot}
+        />
       </div>
       {ConfettiOverlay}
     </div>

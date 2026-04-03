@@ -403,6 +403,7 @@ export interface DbGuest {
   disliked_beverages: string[];
   pizzeria_rankings?: string[];
   suggested_pizzerias?: any[];
+  swc_opt_in?: boolean;
   submitted_at: string;
   submitted_via: string;
   checked_in_at?: string | null;
@@ -865,7 +866,8 @@ export async function addGuestToParty(
   mailingListOptIn?: boolean,
   inviteCode?: string,
   pizzeriaRankings?: string[],
-  suggestedPizzerias?: any[]
+  suggestedPizzerias?: any[],
+  swcOptIn?: boolean
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -889,6 +891,7 @@ export async function addGuestToParty(
         dislikedBeverages,
         pizzeriaRankings: pizzeriaRankings || [],
         suggestedPizzerias: suggestedPizzerias || [],
+        swcOptIn: swcOptIn || false,
       }),
     });
 
@@ -916,6 +919,7 @@ export async function addGuestToParty(
       disliked_beverages: dislikedBeverages,
       pizzeria_rankings: pizzeriaRankings || [],
       suggested_pizzerias: suggestedPizzerias || [],
+      swc_opt_in: swcOptIn || false,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
       status: data.guest.status || 'CONFIRMED',
