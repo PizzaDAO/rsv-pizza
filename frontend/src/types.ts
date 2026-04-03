@@ -1126,6 +1126,7 @@ export interface SponsorDashboardEvent {
   timezone: string | null;
   address: string | null;
   venueName: string | null;
+  region: string | null;
   eventImageUrl: string | null;
   hostName: string | null;
   hostProfile: {
@@ -1146,6 +1147,8 @@ export interface SponsorDashboardEvent {
     pending: number;
     remaining: number | null;
   } | null;
+  sponsorStatuses?: string[];
+  sponsorCount?: number;
   checklist: SponsorChecklistItem[];
 }
 

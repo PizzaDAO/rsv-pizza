@@ -233,6 +233,9 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         budgetItems: {
           select: { id: true, cost: true, status: true },
         },
+        sponsors: {
+          select: { id: true, status: true },
+        },
         sponsorChecklistItems: {
           ...(sponsorUserId ? { where: { sponsorUserId } } : {}),
           select: {
@@ -298,6 +301,10 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         return rest;
       });
 
+      // Sponsor statuses for this event
+      const sponsorStatuses = event.sponsors.map(s => s.status);
+      const sponsorCount = event.sponsors.length;
+
       return {
         id: event.id,
         name: event.name,
@@ -306,6 +313,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         timezone: event.timezone,
         address: event.address,
         venueName: event.venueName,
+        region: event.region || null,
         eventImageUrl: event.eventImageUrl,
         hostName: event.user?.name || null,
         hostProfile: event.user ? {
@@ -320,6 +328,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         approvedCount,
         maxGuests: event.maxGuests,
         budget,
+        sponsorStatuses,
+        sponsorCount,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,
