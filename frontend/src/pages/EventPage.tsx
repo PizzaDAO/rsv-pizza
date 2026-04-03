@@ -460,7 +460,7 @@ export function EventPage() {
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = googleMapsApiKey && event.address
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=16&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=17&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
     : null;
   const googleMapsUrl = event.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
@@ -780,8 +780,8 @@ export function EventPage() {
 
               {/* Event Details */}
               <div className="p-6 pt-2 space-y-3 flex-1">
-                {/* Desktop: Date, Location, and Map Thumbnail */}
-                <div className="hidden md:flex items-start gap-4">
+                {/* Desktop: Date, Location, RSVP, and Map Thumbnail */}
+                <div className="hidden md:flex items-stretch gap-4">
                   <div className="flex-1 space-y-3">
                     {/* Date & Time */}
                     {event.date && (
@@ -817,7 +817,7 @@ export function EventPage() {
                         className="flex items-start gap-3 group"
                         data-testid="event-address"
                       >
-                        {/* MapPin inside circular border */}
+                        {/* MapPin inside rounded square border */}
                         <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
                           <MapPin className="w-5 h-5 text-[#ff393a]" />
                         </div>
@@ -829,6 +829,24 @@ export function EventPage() {
                         </div>
                       </a>
                     )}
+
+                    {/* RSVP Button - Desktop */}
+                    <div className="pt-1">
+                      <button
+                        ref={mobileRsvpRef}
+                        data-testid="rsvp-button-desktop"
+                        onClick={(e) => {
+                          if (isGPP) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                          }
+                          handleRSVP();
+                        }}
+                        className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                      >
+                        {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Map Thumbnail - Desktop */}
@@ -837,7 +855,7 @@ export function EventPage() {
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 w-36 self-stretch bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
+                      className="flex-shrink-0 w-44 bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
                       title="View on Google Maps"
                     >
                       {staticMapUrl ? (
@@ -902,10 +920,9 @@ export function EventPage() {
                   </a>
                 )}
 
-                {/* RSVP Button */}
-                <div className="pt-4">
+                {/* RSVP Button - Mobile only (desktop version is inside the map layout above) */}
+                <div className="pt-4 md:hidden">
                   <button
-                    ref={mobileRsvpRef}
                     data-testid="rsvp-button"
                     onClick={(e) => {
                       if (isGPP) {
