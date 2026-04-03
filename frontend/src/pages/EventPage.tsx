@@ -28,6 +28,7 @@ import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
+import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -60,6 +61,8 @@ export function EventPage() {
   const [tweetError, setTweetError] = useState<string | null>(null);
   const [verifyingTweet, setVerifyingTweet] = useState(false);
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
+  const [showCalendarPopup, setShowCalendarPopup] = useState(false);
+  const calendarAnchorRef = useRef<HTMLDivElement>(null);
 
   // Sticky RSVP button on mobile: show when inline button is scrolled above the viewport.
   // Uses a scroll listener instead of IntersectionObserver because IO won't fire when an
@@ -457,6 +460,8 @@ export function EventPage() {
     ? eventDate.toLocaleDateString('en-US', { day: 'numeric', timeZone: event.timezone || undefined })
     : '';
 
+  const isFutureEvent = eventDate ? eventDate.getTime() > Date.now() : false;
+
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = googleMapsApiKey && event.address
@@ -785,26 +790,41 @@ export function EventPage() {
                   <div className="w-[58%] space-y-3">
                     {/* Date & Time */}
                     {event.date && (
-                      <div className="flex items-start gap-3" data-testid="event-date">
-                        {/* Stylized calendar page icon */}
-                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm">
-                          <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
-                            {eventMonthAbbr}
+                      <div className="relative">
+                        <div
+                          ref={calendarAnchorRef}
+                          className={`flex items-start gap-3 group${isFutureEvent ? ' cursor-pointer' : ''}`}
+                          data-testid="event-date"
+                          onClick={isFutureEvent ? () => setShowCalendarPopup((v) => !v) : undefined}
+                        >
+                          {/* Stylized calendar page icon */}
+                          <div className={`flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm${isFutureEvent ? ' group-hover:border-[#ff393a] transition-colors' : ''}`}>
+                            <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
+                              {eventMonthAbbr}
+                            </div>
+                            <div className="flex-1 bg-theme-surface flex items-center justify-center">
+                              <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
+                            </div>
                           </div>
-                          <div className="flex-1 bg-theme-surface flex items-center justify-center">
-                            <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
+                          <div className="flex-1">
+                            <p className={`text-lg font-medium text-theme-text${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
+                              {formattedDate}
+                            </p>
+                            <p className={`text-base text-theme-text-secondary${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
+                              {formattedTime}
+                              {formattedEndTime && ` - ${formattedEndTime}`}
+                              {timezoneAbbr && ` ${timezoneAbbr}`}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-lg font-medium text-theme-text">
-                            {formattedDate}
-                          </p>
-                          <p className="text-base text-theme-text-secondary">
-                            {formattedTime}
-                            {formattedEndTime && ` - ${formattedEndTime}`}
-                            {timezoneAbbr && ` ${timezoneAbbr}`}
-                          </p>
-                        </div>
+                        {isFutureEvent && (
+                          <AddToCalendarPopup
+                            isOpen={showCalendarPopup}
+                            onClose={() => setShowCalendarPopup(false)}
+                            event={event}
+                            anchorRef={calendarAnchorRef}
+                          />
+                        )}
                       </div>
                     )}
 
@@ -876,9 +896,12 @@ export function EventPage() {
 
                 {/* Mobile: Date & Time */}
                 {event.date && (
-                  <div className="md:hidden flex items-start gap-3">
+                  <div
+                    className={`md:hidden flex items-start gap-3 group${isFutureEvent ? ' cursor-pointer' : ''}`}
+                    onClick={isFutureEvent ? () => setShowCalendarPopup((v) => !v) : undefined}
+                  >
                     {/* Stylized calendar page icon */}
-                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm">
+                    <div className={`flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm${isFutureEvent ? ' group-hover:border-[#ff393a] transition-colors' : ''}`}>
                       <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
                         {eventMonthAbbr}
                       </div>
