@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Pizza, Check, AlertCircle, Loader2, X, Wallet, Heart } from 'lucide-react';
+import { Check, AlertCircle, Loader2, X, Wallet, Heart } from 'lucide-react';
 import { ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from './IconInput';
@@ -372,12 +372,9 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               <X size={24} />
             </button>
 
-            <div className="flex items-center gap-3 mb-6">
-              <Pizza className="w-10 h-10 text-[#ff393a]" />
-              <div>
-                <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
-                <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
-              </div>
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
+              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
             </div>
 
             <RSVPFormStep1
@@ -412,12 +409,9 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <X size={24} />
           </button>
 
-          <div className="flex items-center gap-3 mb-6">
-            <Pizza className="w-10 h-10 text-[#ff393a]" />
-            <div>
-              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
-              <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
+            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
           </div>
 
           <RSVPFormStep2

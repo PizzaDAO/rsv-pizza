@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pizza, Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
+import { Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
@@ -327,12 +327,9 @@ export function RSVPPage() {
             <X size={24} />
           </button>
 
-          <div className="flex items-center gap-3 mb-6">
-            <Pizza className="w-10 h-10 text-[#ff393a]" />
-            <div>
-              <h1 className="text-2xl font-bold text-theme-text">RSVP to {party?.name}</h1>
-              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-theme-text">RSVP to {party?.name}</h1>
+            <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
           </div>
 
           <RSVPFormStep1
@@ -357,12 +354,9 @@ export function RSVPPage() {
           <X size={24} />
         </button>
 
-        <div className="flex items-center gap-3 mb-6">
-          <Pizza className="w-10 h-10 text-[#ff393a]" />
-          <div>
-            <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
-            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
+          <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
         </div>
 
         <RSVPFormStep2
