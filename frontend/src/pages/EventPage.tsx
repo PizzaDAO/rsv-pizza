@@ -807,10 +807,10 @@ export function EventPage() {
                             </div>
                           </div>
                           <div className="flex-1">
-                            <p className="text-lg font-medium text-theme-text">
+                            <p className={`text-lg font-medium text-theme-text${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
                               {formattedDate}
                             </p>
-                            <p className="text-base text-theme-text-secondary">
+                            <p className={`text-base text-theme-text-secondary${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
                               {formattedTime}
                               {formattedEndTime && ` - ${formattedEndTime}`}
                               {timezoneAbbr && ` ${timezoneAbbr}`}

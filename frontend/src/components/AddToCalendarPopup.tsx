@@ -77,7 +77,7 @@ export function AddToCalendarPopup({ isOpen, onClose, event, anchorRef }: AddToC
   const desktopPopup = (
     <div
       ref={desktopRef}
-      className="hidden md:block absolute left-0 top-full mt-2 z-50 w-64 bg-theme-header border border-theme-stroke rounded-xl shadow-xl overflow-hidden animate-fade-in"
+      className="hidden md:block absolute left-0 top-full mt-2 z-50 w-64 bg-theme-card backdrop-blur-xl border border-theme-stroke rounded-xl shadow-xl overflow-hidden animate-fade-in"
     >
       <div className="p-1">
         <button
