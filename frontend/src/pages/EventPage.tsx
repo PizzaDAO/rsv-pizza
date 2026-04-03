@@ -1089,8 +1089,8 @@ export function EventPage() {
                 {/* Music Lineup Section */}
                 <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
 
-                {/* Photo Gallery Section */}
-                {photoStats?.photosEnabled && (
+                {/* Photo Gallery Section - only for confirmed guests */}
+                {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
                   <div className="border-t border-theme-stroke pt-6 mt-6">
                     {showPhotos ? (
                       <PhotoGallery

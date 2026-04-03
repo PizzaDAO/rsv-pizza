@@ -137,6 +137,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         likedBeverages: true,
         dislikedBeverages: true,
         pizzeriaRankings: true,
+        status: true,
       },
     });
 
