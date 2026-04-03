@@ -273,8 +273,30 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         };
       }
 
-      // Co-hosts
-      const coHosts = Array.isArray(event.coHosts) ? event.coHosts : [];
+      // Co-hosts — enrich with user profile data (avatar, socials)
+      const rawCoHosts = Array.isArray(event.coHosts) ? (event.coHosts as any[]) : [];
+      const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
+      let profilesByEmail: Record<string, any> = {};
+      if (coHostEmails.length > 0) {
+        const users = await prisma.user.findMany({
+          where: { email: { in: coHostEmails } },
+          select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
+        });
+        profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
+      }
+      const coHosts = rawCoHosts.map(({ email, ...rest }: any) => {
+        const profile = email ? profilesByEmail[email] : null;
+        if (profile) {
+          return {
+            ...rest,
+            avatar_url: rest.avatar_url || profile.profilePictureUrl || null,
+            twitter: rest.twitter || profile.twitter || null,
+            website: rest.website || profile.website || null,
+            instagram: rest.instagram || profile.instagram || null,
+          };
+        }
+        return rest;
+      });
 
       return {
         id: event.id,
