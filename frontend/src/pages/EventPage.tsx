@@ -886,7 +886,6 @@ export function EventPage() {
                     }}
                     className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
                   >
-                    <Pizza size={20} />
                     {userHasRSVPd ? "Edit RSVP" : "RSVP"}
                   </button>
                 </div>
@@ -1111,7 +1110,6 @@ export function EventPage() {
             }}
             className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
           >
-            <Pizza size={16} />
             {userHasRSVPd ? "Edit RSVP" : "RSVP"}
           </button>
         </div>
