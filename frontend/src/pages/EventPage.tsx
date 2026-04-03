@@ -839,7 +839,7 @@ export function EventPage() {
                       >
                         {/* MapPin inside rounded square border */}
                         <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
-                          <MapPin className="w-5 h-5 text-[#ff393a]" />
+                          <MapPin className="w-5 h-5 text-theme-text" />
                         </div>
                         <div>
                           {event.venueName && (
@@ -932,7 +932,7 @@ export function EventPage() {
                   >
                     {/* MapPin inside rounded square border */}
                     <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
-                      <MapPin className="w-5 h-5 text-[#ff393a]" />
+                      <MapPin className="w-5 h-5 text-theme-text" />
                     </div>
                     <div>
                       {event.venueName && (
