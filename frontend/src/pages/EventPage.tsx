@@ -787,11 +787,11 @@ export function EventPage() {
                     {event.date && (
                       <div className="flex items-start gap-3" data-testid="event-date">
                         {/* Stylized calendar page icon */}
-                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 overflow-hidden flex flex-col shadow-sm">
+                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm">
                           <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
                             {eventMonthAbbr}
                           </div>
-                          <div className="flex-1 bg-white/10 flex items-center justify-center">
+                          <div className="flex-1 bg-theme-surface flex items-center justify-center">
                             <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
                           </div>
                         </div>
@@ -818,7 +818,7 @@ export function EventPage() {
                         data-testid="event-address"
                       >
                         {/* MapPin inside rounded square border */}
-                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
                           <MapPin className="w-5 h-5 text-[#ff393a]" />
                         </div>
                         <div>
@@ -878,11 +878,11 @@ export function EventPage() {
                 {event.date && (
                   <div className="md:hidden flex items-start gap-3">
                     {/* Stylized calendar page icon */}
-                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 overflow-hidden flex flex-col shadow-sm">
+                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke overflow-hidden flex flex-col shadow-sm">
                       <div className="bg-[#ff393a] text-white text-[9px] font-bold tracking-wider text-center py-0.5 leading-tight">
                         {eventMonthAbbr}
                       </div>
-                      <div className="flex-1 bg-white/10 flex items-center justify-center">
+                      <div className="flex-1 bg-theme-surface flex items-center justify-center">
                         <span className="text-lg font-bold text-theme-text leading-none">{eventDayNum}</span>
                       </div>
                     </div>
@@ -907,8 +907,8 @@ export function EventPage() {
                     rel="noopener noreferrer"
                     className="md:hidden flex items-start gap-3 group"
                   >
-                    {/* MapPin inside circular border */}
-                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-[#ff393a]/30 flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                    {/* MapPin inside rounded square border */}
+                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
                       <MapPin className="w-5 h-5 text-[#ff393a]" />
                     </div>
                     <div>
