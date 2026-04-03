@@ -91,7 +91,7 @@ export function RSVPFormStep1({
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors border-2 ${
                   selected
                     ? 'border-[#ff393a] bg-theme-surface-hover text-theme-text'
-                    : 'border-transparent bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover/80'
+                    : 'border-theme-stroke bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover/80'
                 }`}
               >
                 <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />

@@ -617,7 +617,7 @@ export function EventPage() {
         />
       )}
 
-      <div className="py-8 md:px-8">
+      <div className="max-w-[1212px] mx-auto py-8 md:px-8">
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0 md:gap-8">
             {/* Left Column - Image and Host Info (Desktop only) */}
