@@ -265,12 +265,12 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
             <img
               src={hostProfile.avatar_url}
               alt={displayHostName}
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
+              className="w-8 h-8 aspect-square rounded-full object-cover flex-shrink-0 border-2 border-black"
               style={{ zIndex: 10, marginLeft: '-8px' }}
             />
           ) : (
             <div
-              className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative"
+              className="w-8 h-8 aspect-square rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black relative"
               style={{ zIndex: 10, marginLeft: '-8px' }}
             >
               <User className="w-4 h-4 text-theme-text" />
@@ -284,10 +284,10 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
               <img
                 src={coHost.avatar_url}
                 alt={coHost.name}
-                className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2 border-black"
+                className="w-8 h-8 aspect-square rounded-full object-cover flex-shrink-0 border-2 border-black"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black">
+              <div className="w-8 h-8 aspect-square rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-black">
                 <User className="w-4 h-4 text-theme-text" />
               </div>
             )}
