@@ -21,6 +21,8 @@ export function SponsorDashboardPage() {
   const [meData, setMeData] = useState<SponsorMeResponse | null>(null);
   const [dashboardData, setDashboardData] = useState<SponsorDashboardData | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -40,8 +42,26 @@ export function SponsorDashboardPage() {
           return;
         }
 
-        const data = await fetchSponsorEvents();
+        // If admin, load all events first to get available tags
+        const tag = me.isAdmin ? selectedTag : me.sponsor?.tag;
+        const data = await fetchSponsorEvents(tag);
         setDashboardData(data);
+
+        // For admins, extract unique tags from events to build a tag picker
+        if (me.isAdmin && !selectedTag) {
+          const tags = new Set<string>();
+          data.events.forEach(e => {
+            // eventTags are on the event but not in the response — use the dashboard tag
+            if (data.tag) tags.add(data.tag);
+          });
+          // Also fetch all sponsor users to get all tags
+          try {
+            const { fetchSponsorUsers } = await import('../lib/api');
+            const sponsorUsers = await fetchSponsorUsers();
+            sponsorUsers.forEach(su => tags.add(su.tag));
+          } catch { /* admin-only, ok to fail */ }
+          setAvailableTags(Array.from(tags).sort());
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load sponsor dashboard');
       } finally {
@@ -50,7 +70,7 @@ export function SponsorDashboardPage() {
     }
 
     loadDashboard();
-  }, [user, authLoading]);
+  }, [user, authLoading, selectedTag]);
 
   async function handleToggleChecklist(eventId: string, itemId: string) {
     if (!dashboardData) return;
@@ -175,13 +195,42 @@ export function SponsorDashboardPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">
-                {sponsor?.name || 'Sponsor'} Dashboard
+                {dashboardData?.isAdmin ? 'Sponsor Dashboard' : `${sponsor?.name || 'Sponsor'} Dashboard`}
               </h1>
               <p className="text-sm text-white/50">
-                Showing {events.length} event{events.length !== 1 ? 's' : ''} tagged &quot;{sponsor?.tag}&quot;
+                Showing {events.length} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
               </p>
             </div>
           </div>
+
+          {/* Admin tag filter */}
+          {dashboardData?.isAdmin && availableTags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedTag(undefined)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                  !selectedTag
+                    ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
+                    : 'border-white/10 text-white/50 hover:text-white/70'
+                }`}
+              >
+                All tags
+              </button>
+              {availableTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                    selectedTag === tag
+                      ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
+                      : 'border-white/10 text-white/50 hover:text-white/70'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Events grid */}

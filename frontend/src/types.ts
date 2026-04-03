@@ -1151,6 +1151,7 @@ export interface SponsorDashboardEvent {
 
 export interface SponsorMeResponse {
   isSponsor: boolean;
+  isAdmin: boolean;
   sponsor: {
     id: string;
     email: string;
@@ -1164,6 +1165,8 @@ export interface SponsorDashboardData {
     name: string | null;
     email: string;
     tag: string;
-  };
+  } | null;
+  isAdmin: boolean;
+  tag: string | null;
   events: SponsorDashboardEvent[];
 }

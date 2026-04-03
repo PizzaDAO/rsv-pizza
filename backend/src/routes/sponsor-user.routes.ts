@@ -152,13 +152,15 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
 
 export const sponsorDashboardRouter = Router();
 
-// GET /api/sponsor/me - Check if logged-in user is a sponsor
+// GET /api/sponsor/me - Check if logged-in user is a sponsor or admin
 sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const email = req.userEmail;
     if (!email) {
       throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
     }
+
+    const adminUser = await isAdmin(email);
 
     const sponsorUser = await prisma.sponsorUser.findFirst({
       where: { email: email.toLowerCase(), isActive: true },
@@ -174,6 +176,7 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
     if (sponsorUser) {
       return res.json({
         isSponsor: true,
+        isAdmin: adminUser,
         sponsor: {
           id: sponsorUser.id,
           email: sponsorUser.email,
@@ -183,8 +186,18 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
       });
     }
 
+    // Admins can view all sponsor dashboards even without a sponsor_users entry
+    if (adminUser) {
+      return res.json({
+        isSponsor: true,
+        isAdmin: true,
+        sponsor: null,
+      });
+    }
+
     return res.json({
       isSponsor: false,
+      isAdmin: false,
       sponsor: null,
     });
   } catch (error) {
@@ -192,17 +205,26 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
   }
 });
 
-// GET /api/sponsor/events - Get all events matching sponsor's tag
+// GET /api/sponsor/events - Get all events matching sponsor's tag (or ?tag= for admins)
 sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
-    const tag = req.sponsorUser!.tag;
-    const sponsorUserId = req.sponsorUser!.id;
+    // Admins can pass ?tag= to filter, or see all tagged events
+    const queryTag = req.query.tag as string | undefined;
+    const tag = queryTag?.trim().toLowerCase() || req.sponsorUser?.tag;
+    const sponsorUserId = req.sponsorUser?.id;
 
-    // Find events where eventTags contains the sponsor's tag
+    // Build where clause — admins without a tag filter see all events that have any eventTags
+    const where: any = {};
+    if (tag) {
+      where.eventTags = { has: tag };
+    } else if (req.isAdminViewing) {
+      // Admin with no tag filter — show events that have at least one eventTag
+      where.NOT = { eventTags: { equals: [] } };
+    }
+
+    // Find events
     const events = await prisma.party.findMany({
-      where: {
-        eventTags: { has: tag },
-      },
+      where,
       include: {
         user: { select: { name: true, email: true, profilePictureUrl: true, website: true, twitter: true, instagram: true } },
         guests: {
@@ -212,7 +234,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           select: { id: true, cost: true, status: true },
         },
         sponsorChecklistItems: {
-          where: { sponsorUserId },
+          ...(sponsorUserId ? { where: { sponsorUserId } } : {}),
           select: {
             id: true,
             name: true,
@@ -288,11 +310,13 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     });
 
     res.json({
-      sponsor: {
-        name: req.sponsorUser!.name,
-        email: req.sponsorUser!.email,
-        tag: req.sponsorUser!.tag,
-      },
+      sponsor: req.sponsorUser ? {
+        name: req.sponsorUser.name,
+        email: req.sponsorUser.email,
+        tag: req.sponsorUser.tag,
+      } : null,
+      isAdmin: req.isAdminViewing || false,
+      tag: tag || null,
       events: formattedEvents,
     });
   } catch (error) {
@@ -304,11 +328,15 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
 sponsorDashboardRouter.post('/checklist/:itemId/toggle', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
     const { itemId } = req.params;
-    const sponsorUserId = req.sponsorUser!.id;
+    const sponsorUserId = req.sponsorUser?.id;
 
-    // Verify the checklist item belongs to this sponsor
+    // Verify the checklist item belongs to this sponsor (admins can toggle any)
+    const whereClause: any = { id: itemId };
+    if (!req.isAdminViewing && sponsorUserId) {
+      whereClause.sponsorUserId = sponsorUserId;
+    }
     const item = await prisma.sponsorChecklistItem.findFirst({
-      where: { id: itemId, sponsorUserId },
+      where: whereClause,
     });
 
     if (!item) {

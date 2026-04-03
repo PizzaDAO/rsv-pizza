@@ -2826,8 +2826,9 @@ export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
   return apiRequest<SponsorMeResponse>('/api/sponsor/me');
 }
 
-export async function fetchSponsorEvents(): Promise<SponsorDashboardData> {
-  return apiRequest<SponsorDashboardData>('/api/sponsor/events');
+export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboardData> {
+  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+  return apiRequest<SponsorDashboardData>(`/api/sponsor/events${params}`);
 }
 
 export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
