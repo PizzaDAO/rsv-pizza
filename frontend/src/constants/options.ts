@@ -28,7 +28,7 @@ export const ROLE_OPTIONS = [
 
 // Turtle role options for RSVP
 export const TURTLES = [
-  { id: 'Leonardo', label: 'Leonardo', role: 'Leader', image: '/turtles/leonardo.png' },
+  { id: 'Leonardo', label: 'Leonardo', role: 'Organizer', image: '/turtles/leonardo.png' },
   { id: 'Donatello', label: 'Donatello', role: 'Builder', image: '/turtles/donatello.png' },
   { id: 'Michelangelo', label: 'Michelangelo', role: 'Creative', image: '/turtles/michelangelo.png' },
   { id: 'Raphael', label: 'Raphael', role: 'Connector', image: '/turtles/raphael.png' },
