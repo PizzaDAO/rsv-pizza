@@ -1092,3 +1092,78 @@ export interface ShippingMeResponse {
   name: string | null;
   email: string;
 }
+
+// ============================================
+// Sponsor Dashboard types
+// ============================================
+
+export interface SponsorUser {
+  id: string;
+  email: string;
+  name: string | null;
+  tag: string;
+  isActive: boolean;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SponsorChecklistItem {
+  id: string;
+  name: string;
+  completed: boolean;
+  completedAt: string | null;
+  dueDate: string | null;
+  sortOrder: number;
+}
+
+export interface SponsorDashboardEvent {
+  id: string;
+  name: string;
+  slug: string;
+  date: string | null;
+  timezone: string | null;
+  address: string | null;
+  venueName: string | null;
+  eventImageUrl: string | null;
+  hostName: string | null;
+  hostProfile: {
+    name: string | null;
+    avatar_url: string | null;
+    website: string | null;
+    twitter: string | null;
+    instagram: string | null;
+  } | null;
+  coHosts: CoHost[];
+  rsvpCount: number;
+  approvedCount: number;
+  maxGuests: number | null;
+  budget: {
+    total: number;
+    spent: number;
+    paid: number;
+    pending: number;
+    remaining: number | null;
+  } | null;
+  checklist: SponsorChecklistItem[];
+}
+
+export interface SponsorMeResponse {
+  isSponsor: boolean;
+  sponsor: {
+    id: string;
+    email: string;
+    name: string | null;
+    tag: string;
+  } | null;
+}
+
+export interface SponsorDashboardData {
+  sponsor: {
+    name: string | null;
+    email: string;
+    tag: string;
+  };
+  events: SponsorDashboardEvent[];
+}

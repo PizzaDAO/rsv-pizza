@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -2816,5 +2816,50 @@ export async function sendTelegramTest(
     method: 'POST',
     body: { chatId, message, parseMode },
   });
+}
+
+// ============================================
+// Sponsor Dashboard API
+// ============================================
+
+export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
+  return apiRequest<SponsorMeResponse>('/api/sponsor/me');
+}
+
+export async function fetchSponsorEvents(): Promise<SponsorDashboardData> {
+  return apiRequest<SponsorDashboardData>('/api/sponsor/events');
+}
+
+export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
+  return apiRequest<{ item: SponsorChecklistItem }>(`/api/sponsor/checklist/${itemId}/toggle`, {
+    method: 'POST',
+  });
+}
+
+// ============================================
+// Sponsor User Admin API
+// ============================================
+
+export async function fetchSponsorUsers(): Promise<SponsorUser[]> {
+  const result = await apiRequest<{ sponsorUsers: SponsorUser[] }>('/api/sponsor-users/list');
+  return result.sponsorUsers;
+}
+
+export async function createSponsorUser(data: { email: string; tag: string; name?: string; notes?: string }): Promise<{ sponsorUser: SponsorUser }> {
+  return apiRequest<{ sponsorUser: SponsorUser }>('/api/sponsor-users', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export async function updateSponsorUser(id: string, data: { email?: string; name?: string; tag?: string; notes?: string; isActive?: boolean }): Promise<{ sponsorUser: SponsorUser }> {
+  return apiRequest<{ sponsorUser: SponsorUser }>(`/api/sponsor-users/${id}`, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+export async function deleteSponsorUser(id: string): Promise<void> {
+  await apiRequest(`/api/sponsor-users/${id}`, { method: 'DELETE' });
 }
 
