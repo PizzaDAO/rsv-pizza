@@ -23,11 +23,12 @@ import { Music, Plus, Loader2, Mic2, ListMusic, Disc3, Upload, Share2, Check, Ey
 interface MusicWidgetProps {
   isHost?: boolean;
   partyId?: string; // Optional - if not provided, will use PizzaContext
+  className?: string; // Applied to outer wrapper only when widget renders content
 }
 
 type MusicSection = 'performers' | 'songs' | 'playlists';
 
-export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyId: propsPartyId }) => {
+export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyId: propsPartyId, className }) => {
   // Try to use PizzaContext, but don't require it
   const pizzaContext = useContext(PizzaContext);
   const contextPartyId = pizzaContext?.party?.id;
@@ -391,6 +392,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   }
 
   return (
+    <div className={className}>
     <div className="card p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -695,6 +697,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
         onSave={handleSavePlaylist}
         saving={savingPlaylist}
       />
+    </div>
     </div>
   );
 };

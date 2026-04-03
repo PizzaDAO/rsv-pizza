@@ -1070,9 +1070,7 @@ export function EventPage() {
                 </div>
 
                 {/* Music Lineup Section */}
-                <div className="border-t border-theme-stroke pt-6 mt-6">
-                  <MusicWidget isHost={false} partyId={event.id} />
-                </div>
+                <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
 
                 {/* Photo Gallery Section */}
                 {photoStats?.photosEnabled && (
