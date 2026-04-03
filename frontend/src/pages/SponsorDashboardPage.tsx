@@ -141,6 +141,78 @@ export function SponsorDashboardPage() {
     }
   }
 
+  // Derived data (must be above early returns to preserve hook order)
+  const sponsor = dashboardData?.sponsor;
+  const allEvents = dashboardData?.events || [];
+
+  const availableCities = useMemo(() => {
+    const cities = new Set<string>();
+    allEvents.forEach(e => {
+      const city = extractCity(e.address);
+      if (city) cities.add(city);
+    });
+    return Array.from(cities).sort();
+  }, [allEvents]);
+
+  const events = useMemo(() => {
+    let filtered = allEvents;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(e =>
+        e.name.toLowerCase().includes(q) ||
+        (e.hostName && e.hostName.toLowerCase().includes(q)) ||
+        (e.venueName && e.venueName.toLowerCase().includes(q)) ||
+        (e.address && e.address.toLowerCase().includes(q))
+      );
+    }
+
+    if (timeFilter === 'upcoming') {
+      filtered = filtered.filter(e => isUpcoming(e.date));
+    } else if (timeFilter === 'past') {
+      filtered = filtered.filter(e => !isUpcoming(e.date));
+    }
+
+    if (selectedCity) {
+      filtered = filtered.filter(e => extractCity(e.address) === selectedCity);
+    }
+
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case 'date-asc':
+        sorted.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+        break;
+      case 'date-desc':
+        sorted.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        break;
+      case 'name':
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'rsvps':
+        sorted.sort((a, b) => b.rsvpCount - a.rsvpCount);
+        break;
+    }
+
+    return sorted;
+  }, [allEvents, searchQuery, timeFilter, selectedCity, sortBy]);
+
+  const hasActiveFilters = searchQuery.trim() !== '' || timeFilter !== 'all' || selectedCity !== null;
+
+  function clearAllFilters() {
+    setSearchQuery('');
+    setTimeFilter('all');
+    setSelectedCity(null);
+    setSortBy('date-desc');
+  }
+
   // Loading state
   if (authLoading || loading) {
     return (
@@ -208,83 +280,6 @@ export function SponsorDashboardPage() {
         <Footer />
       </div>
     );
-  }
-
-  const sponsor = dashboardData?.sponsor;
-  const allEvents = dashboardData?.events || [];
-
-  // Extract unique cities from all events
-  const availableCities = useMemo(() => {
-    const cities = new Set<string>();
-    allEvents.forEach(e => {
-      const city = extractCity(e.address);
-      if (city) cities.add(city);
-    });
-    return Array.from(cities).sort();
-  }, [allEvents]);
-
-  // Apply filters and sorting
-  const events = useMemo(() => {
-    let filtered = allEvents;
-
-    // Text search (name, host, venue, address)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(e =>
-        e.name.toLowerCase().includes(q) ||
-        (e.hostName && e.hostName.toLowerCase().includes(q)) ||
-        (e.venueName && e.venueName.toLowerCase().includes(q)) ||
-        (e.address && e.address.toLowerCase().includes(q))
-      );
-    }
-
-    // Time filter
-    if (timeFilter === 'upcoming') {
-      filtered = filtered.filter(e => isUpcoming(e.date));
-    } else if (timeFilter === 'past') {
-      filtered = filtered.filter(e => !isUpcoming(e.date));
-    }
-
-    // City filter
-    if (selectedCity) {
-      filtered = filtered.filter(e => extractCity(e.address) === selectedCity);
-    }
-
-    // Sort
-    const sorted = [...filtered];
-    switch (sortBy) {
-      case 'date-asc':
-        sorted.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
-        });
-        break;
-      case 'date-desc':
-        sorted.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        });
-        break;
-      case 'name':
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'rsvps':
-        sorted.sort((a, b) => b.rsvpCount - a.rsvpCount);
-        break;
-    }
-
-    return sorted;
-  }, [allEvents, searchQuery, timeFilter, selectedCity, sortBy]);
-
-  const hasActiveFilters = searchQuery.trim() !== '' || timeFilter !== 'all' || selectedCity !== null;
-
-  function clearAllFilters() {
-    setSearchQuery('');
-    setTimeFilter('all');
-    setSelectedCity(null);
-    setSortBy('date-desc');
   }
 
   return (
