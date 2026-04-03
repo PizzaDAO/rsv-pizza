@@ -63,8 +63,8 @@ export const HostsList: React.FC<HostsListProps> = ({
   // Size configurations
   const sizeConfig = {
     sm: { avatar: 'w-8 h-8', icon: 'w-4 h-4', text: 'text-sm', socialIcon: 14, gap: 'gap-2' },
-    md: { avatar: 'w-10 h-10', icon: 'w-5 h-5', text: 'text-base', socialIcon: 14, gap: 'gap-3' },
-    lg: { avatar: 'w-12 h-12', icon: 'w-6 h-6', text: 'text-lg', socialIcon: 18, gap: 'gap-3' },
+    md: { avatar: 'w-10 h-10', icon: 'w-5 h-5', text: 'text-lg', socialIcon: 18, gap: 'gap-3' },
+    lg: { avatar: 'w-12 h-12', icon: 'w-6 h-6', text: 'text-xl', socialIcon: 22, gap: 'gap-3' },
   };
 
   const config = sizeConfig[size];
