@@ -655,6 +655,15 @@ body.gpp-theme-active .pac-item-query {
   animation: fade-in 0.2s ease-out;
 }
 
+/* Slide up from bottom (for mobile bottom sheets) */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
+}
+
 @keyframes confetti-fly {
   0% {
     transform: translate(-50%, -50%) rotate(0deg) scale(1);
