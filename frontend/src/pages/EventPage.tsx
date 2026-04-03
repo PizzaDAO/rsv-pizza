@@ -842,7 +842,7 @@ export function EventPage() {
                           }
                           handleRSVP();
                         }}
-                        className="w-full btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                        className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
                       >
                         {userHasRSVPd ? "Edit RSVP" : "RSVP"}
                       </button>
@@ -855,7 +855,7 @@ export function EventPage() {
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 w-44 bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
+                      className="flex-shrink-0 w-[40%] bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
                       title="View on Google Maps"
                     >
                       {staticMapUrl ? (
