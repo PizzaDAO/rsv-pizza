@@ -781,8 +781,8 @@ export function EventPage() {
               {/* Event Details */}
               <div className="p-6 pt-2 space-y-3 flex-1">
                 {/* Desktop: Date, Location, RSVP, and Map Thumbnail */}
-                <div className="hidden md:flex items-stretch gap-4">
-                  <div className="flex-1 space-y-3">
+                <div className="hidden md:block relative">
+                  <div className="w-[58%] space-y-3">
                     {/* Date & Time */}
                     {event.date && (
                       <div className="flex items-start gap-3" data-testid="event-date">
@@ -849,13 +849,13 @@ export function EventPage() {
                     </div>
                   </div>
 
-                  {/* Map Thumbnail - Desktop */}
+                  {/* Map Thumbnail - Desktop (absolutely positioned to match left column height) */}
                   {event.address && googleMapsUrl && (
                     <a
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 w-[40%] bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
+                      className="absolute right-0 top-0 bottom-0 w-[40%] bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden"
                       title="View on Google Maps"
                     >
                       {staticMapUrl ? (
