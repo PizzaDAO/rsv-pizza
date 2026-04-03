@@ -460,7 +460,7 @@ export function EventPage() {
   // Google Maps static map for location thumbnail
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = googleMapsApiKey && event.address
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=15&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=16&size=400x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
     : null;
   const googleMapsUrl = event.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
@@ -837,7 +837,7 @@ export function EventPage() {
                       href={googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 w-24 h-24 bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
+                      className="flex-shrink-0 w-36 self-stretch bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden relative"
                       title="View on Google Maps"
                     >
                       {staticMapUrl ? (
