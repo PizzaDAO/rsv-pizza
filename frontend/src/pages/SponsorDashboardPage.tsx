@@ -475,23 +475,27 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col md:flex-row">
+      {/* Flyer image — banner on mobile, left column on desktop */}
+      {event.eventImageUrl && (
+        <div className="md:w-44 flex-shrink-0 self-stretch">
+          <img
+            src={event.eventImageUrl}
+            alt=""
+            className="w-full h-32 md:h-full object-cover"
+          />
+        </div>
+      )}
+
+      {/* Right side: header + body */}
+      <div className="flex-1 min-w-0">
       {/* Event header */}
       <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          {event.eventImageUrl && (
-            <img
-              src={event.eventImageUrl}
-              alt=""
-              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-            />
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-white truncate">{event.name}</h2>
+          {event.hostName && (
+            <p className="text-xs text-white/40">Hosted by {event.hostName}</p>
           )}
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-white truncate">{event.name}</h2>
-            {event.hostName && (
-              <p className="text-xs text-white/40">Hosted by {event.hostName}</p>
-            )}
-          </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           <a
@@ -584,6 +588,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
           </div>
         )}
       </div>
+      </div>{/* closes flex-1 wrapper */}
     </div>
   );
 }
