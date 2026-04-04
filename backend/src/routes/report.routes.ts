@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 
@@ -319,8 +319,22 @@ router.delete('/:partyId/report/publish', requireAuth, async (req: AuthRequest, 
   }
 });
 
-// GET /api/reports/:publicSlug/check - Check if report requires password (public)
-router.get('/public/:publicSlug/check', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Helper: check if user is a sponsor tagged on an event (by public slug)
+async function isSponsorForReport(publicSlug: string, userEmail?: string): Promise<boolean> {
+  if (!userEmail) return false;
+  const sponsorUser = await prisma.sponsorUser.findFirst({
+    where: { email: userEmail.toLowerCase(), isActive: true },
+  });
+  if (!sponsorUser) return false;
+  const party = await prisma.party.findUnique({
+    where: { reportPublicSlug: publicSlug },
+    select: { eventTags: true },
+  });
+  return !!(party?.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag));
+}
+
+// GET /api/reports/:publicSlug/check - Check if report requires password (public, optionalAuth)
+router.get('/public/:publicSlug/check', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
     const party = await prisma.party.findUnique({
@@ -332,14 +346,16 @@ router.get('/public/:publicSlug/check', async (req: AuthRequest, res: Response, 
       throw new AppError('Report not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ requiresPassword: !!party.reportPassword, name: party.name });
+    // Sponsors tagged on this event bypass the password
+    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
+    res.json({ requiresPassword: !sponsorBypass && !!party.reportPassword, name: party.name });
   } catch (error) {
     next(error);
   }
 });
 
-// GET /api/reports/:publicSlug - View published report (public)
-router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// GET /api/reports/:publicSlug - View published report (public, optionalAuth)
+router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
     const password = req.query.password as string | undefined;
@@ -350,7 +366,9 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
       select: { reportPassword: true, reportPublished: true },
     });
 
-    if (check?.reportPassword && check.reportPassword !== password) {
+    // Sponsors tagged on this event bypass the password
+    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
+    if (check?.reportPassword && !sponsorBypass && check.reportPassword !== password) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 
