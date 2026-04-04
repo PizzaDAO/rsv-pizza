@@ -478,11 +478,11 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col md:flex-row">
       {/* Flyer image — banner on mobile, left column on desktop */}
       {event.eventImageUrl && (
-        <div className="md:w-44 flex-shrink-0 self-stretch">
+        <div className="md:w-44 flex-shrink-0 self-stretch bg-black/40 flex items-center justify-center">
           <img
             src={event.eventImageUrl}
             alt=""
-            className="w-full h-32 md:h-full object-cover"
+            className="w-full h-32 md:h-full object-contain"
           />
         </div>
       )}
