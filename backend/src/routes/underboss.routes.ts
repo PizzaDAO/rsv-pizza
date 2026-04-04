@@ -182,6 +182,9 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     address: party.address,
     venueName: party.venueName,
     region: party.region || null,
+    eventImageUrl: party.eventImageUrl || null,
+    timezone: party.timezone || null,
+    duration: party.duration ? Number(party.duration) : null,
     host: {
       name: party.user?.name || null,
       email: party.user?.email || null,
