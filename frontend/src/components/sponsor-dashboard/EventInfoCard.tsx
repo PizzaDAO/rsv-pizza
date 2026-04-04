@@ -16,6 +16,7 @@ function formatDate(dateStr: string, timezone?: string | null): string {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      ...(timezone ? { timeZone: timezone } : {}),
     });
   } catch {
     return dateStr;
@@ -29,6 +30,7 @@ function formatTime(dateStr: string, timezone?: string | null): string {
       hour: 'numeric',
       minute: '2-digit',
       timeZoneName: 'short',
+      ...(timezone ? { timeZone: timezone } : {}),
     });
   } catch {
     return '';
