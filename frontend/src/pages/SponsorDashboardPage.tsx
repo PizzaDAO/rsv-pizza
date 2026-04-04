@@ -12,7 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
 import {
   Loader2, Shield, Tag, ExternalLink, ClipboardList, MapPin, DollarSign, Users,
-  Search, Calendar, ArrowUpDown, X, ThumbsUp, ThumbsDown, ChevronDown, Check, Globe,
+  Search, Calendar, ArrowUpDown, X, ChevronDown, Check, Globe,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 
@@ -21,63 +21,7 @@ import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, Co
 // ============================================
 
 type TimeFilter = 'all' | 'upcoming' | 'past';
-type SortOption = 'date-asc' | 'date-desc' | 'name' | 'rsvps' | 'sponsors';
-type FilterPillState = 'neutral' | 'include' | 'exclude';
-
-// Sponsor statuses to filter on
-const STATUS_FILTER_KEYS: { key: string; label: string }[] = [
-  { key: 'yes', label: 'Yes' },
-  { key: 'paid', label: 'Paid' },
-  { key: 'billed', label: 'Billed' },
-  { key: 'asked', label: 'Asked' },
-  { key: 'todo', label: 'Todo' },
-  { key: 'stuck', label: 'Stuck' },
-];
-
-// Three-state filter pill (adapted from underboss EventTable)
-function FilterPill({
-  label,
-  state,
-  onToggle,
-}: {
-  label: string;
-  state: FilterPillState;
-  onToggle: (newState: FilterPillState) => void;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-        state === 'include'
-          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-          : state === 'exclude'
-            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-            : 'bg-white/[0.03] border-white/10'
-      }`}
-    >
-      <button
-        onClick={() => onToggle(state === 'include' ? 'neutral' : 'include')}
-        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
-        title={`Must have ${label}`}
-      >
-        <ThumbsUp
-          size={12}
-          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-white/30'}`}
-        />
-        <span className="text-white text-xs">{label}</span>
-      </button>
-      <button
-        onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
-        className="p-0.5 hover:opacity-70 transition-opacity"
-        title={`Must NOT have ${label}`}
-      >
-        <ThumbsDown
-          size={12}
-          className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-white/30'}`}
-        />
-      </button>
-    </div>
-  );
-}
+type SortOption = 'date-asc' | 'date-desc' | 'name' | 'rsvps';
 
 /** Extract city from an address string (usually the component after the first comma) */
 function extractCity(address: string | null): string | null {
@@ -114,10 +58,6 @@ export function SponsorDashboardPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('date-desc');
-
-  // Status filter pills (three-state: include/exclude/neutral)
-  const [statusIncludes, setStatusIncludes] = useState<string[]>([]);
-  const [statusExcludes, setStatusExcludes] = useState<string[]>([]);
 
   // Region multi-select filter
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
@@ -226,23 +166,6 @@ export function SponsorDashboardPage() {
     return Array.from(regions).sort();
   }, [allEvents]);
 
-  // Status filter helpers
-  function getStatusFilterState(key: string): FilterPillState {
-    if (statusIncludes.includes(key)) return 'include';
-    if (statusExcludes.includes(key)) return 'exclude';
-    return 'neutral';
-  }
-
-  function setStatusFilterState(key: string, newState: FilterPillState) {
-    setStatusIncludes(prev => prev.filter(k => k !== key));
-    setStatusExcludes(prev => prev.filter(k => k !== key));
-    if (newState === 'include') {
-      setStatusIncludes(prev => [...prev, key]);
-    } else if (newState === 'exclude') {
-      setStatusExcludes(prev => [...prev, key]);
-    }
-  }
-
   function toggleRegion(region: string) {
     setSelectedRegions(prev =>
       prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
@@ -272,22 +195,6 @@ export function SponsorDashboardPage() {
       filtered = filtered.filter(e => extractCity(e.address) === selectedCity);
     }
 
-    // Status includes (AND: event must have ALL included statuses among its sponsors)
-    if (statusIncludes.length > 0) {
-      filtered = filtered.filter(e => {
-        const statuses = e.sponsorStatuses || [];
-        return statusIncludes.every(s => statuses.includes(s));
-      });
-    }
-
-    // Status excludes (AND: event must NOT have ANY excluded statuses among its sponsors)
-    if (statusExcludes.length > 0) {
-      filtered = filtered.filter(e => {
-        const statuses = e.sponsorStatuses || [];
-        return statusExcludes.every(s => !statuses.includes(s));
-      });
-    }
-
     // Region filter (multi-select)
     if (selectedRegions.length > 0) {
       filtered = filtered.filter(e => e.region && selectedRegions.includes(e.region));
@@ -315,24 +222,19 @@ export function SponsorDashboardPage() {
       case 'rsvps':
         sorted.sort((a, b) => b.rsvpCount - a.rsvpCount);
         break;
-      case 'sponsors':
-        sorted.sort((a, b) => (b.sponsorCount || 0) - (a.sponsorCount || 0));
-        break;
     }
 
     return sorted;
-  }, [allEvents, searchQuery, timeFilter, selectedCity, sortBy, statusIncludes, statusExcludes, selectedRegions]);
+  }, [allEvents, searchQuery, timeFilter, selectedCity, sortBy, selectedRegions]);
 
   const hasActiveFilters = searchQuery.trim() !== '' || timeFilter !== 'all' || selectedCity !== null
-    || statusIncludes.length > 0 || statusExcludes.length > 0 || selectedRegions.length > 0;
+    || selectedRegions.length > 0;
 
   function clearAllFilters() {
     setSearchQuery('');
     setTimeFilter('all');
     setSelectedCity(null);
     setSortBy('date-desc');
-    setStatusIncludes([]);
-    setStatusExcludes([]);
     setSelectedRegions([]);
   }
 
@@ -491,7 +393,6 @@ export function SponsorDashboardPage() {
                   <option value="date-asc">Oldest first</option>
                   <option value="name">Name A-Z</option>
                   <option value="rsvps">Most RSVPs</option>
-                  <option value="sponsors">Most Sponsors</option>
                 </select>
               </div>
             </div>
@@ -545,31 +446,6 @@ export function SponsorDashboardPage() {
                   ))}
                 </div>
               )}
-
-              {/* Clear filters */}
-              {hasActiveFilters && (
-                <button
-                  onClick={clearAllFilters}
-                  className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white/70 transition-colors flex items-center gap-1"
-                >
-                  <X size={12} />
-                  Clear filters
-                </button>
-              )}
-            </div>
-
-            {/* Row 3: Status filter pills + Region dropdown */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Status filter pills (three-state: include/exclude) */}
-              <span className="text-xs text-white/30 mr-1">Sponsor status:</span>
-              {STATUS_FILTER_KEYS.map(({ key, label }) => (
-                <FilterPill
-                  key={key}
-                  label={label}
-                  state={getStatusFilterState(key)}
-                  onToggle={(newState) => setStatusFilterState(key, newState)}
-                />
-              ))}
 
               {/* Region multi-select dropdown (only show if multiple regions exist) */}
               {availableRegions.length > 1 && (
@@ -626,6 +502,17 @@ export function SponsorDashboardPage() {
                     </>
                   )}
                 </div>
+              )}
+
+              {/* Clear filters */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white/70 transition-colors flex items-center gap-1"
+                >
+                  <X size={12} />
+                  Clear filters
+                </button>
               )}
             </div>
           </div>
