@@ -19,6 +19,32 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
   return !!party;
 }
 
+// Helper: extends canUserEditParty to also allow sponsors tagged on the event (read-only access)
+async function canUserViewReport(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
+  // First check normal edit permissions (owner, super admin)
+  if (await canUserEditParty(partyId, userId, userEmail)) {
+    return true;
+  }
+
+  // Check if user is a sponsor tagged on this event
+  if (userEmail) {
+    const sponsorUser = await prisma.sponsorUser.findFirst({
+      where: { email: userEmail.toLowerCase(), isActive: true },
+    });
+    if (sponsorUser) {
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { eventTags: true },
+      });
+      if (party && party.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Generate a unique slug for public reports
 function generateSlug(): string {
   return crypto.randomBytes(8).toString('hex');
@@ -26,14 +52,14 @@ function generateSlug(): string {
 
 const router = Router();
 
-// GET /api/parties/:partyId/report - Get full report data (host only)
+// GET /api/parties/:partyId/report - Get full report data (host or sponsor)
 router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -458,14 +484,14 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
 // Page View Stats
 // =====================
 
-// GET /api/parties/:partyId/report/views - Get page view stats (host only)
+// GET /api/parties/:partyId/report/views - Get page view stats (host or sponsor)
 router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -533,14 +559,14 @@ router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: 
 // Link Click Stats
 // =====================
 
-// GET /api/parties/:partyId/report/link-clicks - Get link click stats (host only)
+// GET /api/parties/:partyId/report/link-clicks - Get link click stats (host or sponsor)
 router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -614,14 +640,14 @@ router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest,
 // Social Posts CRUD
 // =====================
 
-// GET /api/parties/:partyId/report/social-posts - List social posts
+// GET /api/parties/:partyId/report/social-posts - List social posts (host or sponsor)
 router.get('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
