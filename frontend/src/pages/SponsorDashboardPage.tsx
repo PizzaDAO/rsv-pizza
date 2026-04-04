@@ -12,7 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
 import {
   Loader2, Shield, Tag, ExternalLink, ClipboardList, DollarSign, Users,
-  Search, ThumbsUp, ThumbsDown,
+  Search, ThumbsUp, ThumbsDown, BarChart3,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -493,15 +493,27 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             )}
           </div>
         </div>
-        <a
-          href={`/${event.slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/30 hover:text-white/60 transition-colors flex-shrink-0 ml-2"
-          title="View event page"
-        >
-          <ExternalLink size={16} />
-        </a>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <a
+            href={`/host/${event.slug}/report`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white/70 border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+            title="View event report"
+          >
+            <BarChart3 size={14} />
+            Report
+          </a>
+          <a
+            href={`/${event.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/30 hover:text-white/60 transition-colors"
+            title="View event page"
+          >
+            <ExternalLink size={16} />
+          </a>
+        </div>
       </div>
 
       {/* Event body */}
