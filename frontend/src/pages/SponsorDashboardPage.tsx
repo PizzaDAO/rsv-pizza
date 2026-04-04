@@ -499,7 +499,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           <a
-            href={`/host/${event.slug}/report`}
+            href={`/report/${event.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white/70 border border-white/10 hover:border-white/20 rounded-lg transition-colors"
