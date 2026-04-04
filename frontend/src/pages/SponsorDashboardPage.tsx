@@ -11,36 +11,68 @@ import { RsvpCounter } from '../components/sponsor-dashboard/RsvpCounter';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
 import {
-  Loader2, Shield, Tag, ExternalLink, ClipboardList, MapPin, DollarSign, Users,
-  Search, Calendar, ArrowUpDown, X, ChevronDown, Check, Globe,
+  Loader2, Shield, Tag, ExternalLink, ClipboardList, DollarSign, Users,
+  Search, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
+import { GPP_REGIONS } from '../types';
 
 // ============================================
-// Types & helpers for filtering
+// Progress filter constants & FilterPill
 // ============================================
 
-type TimeFilter = 'all' | 'upcoming' | 'past';
-type SortOption = 'date-asc' | 'date-desc' | 'name' | 'rsvps';
+const PROGRESS_FILTER_KEYS: { key: string; label: string }[] = [
+  { key: 'hasPartyKit', label: 'Kit' },
+  { key: 'hasCoHosts', label: 'Team' },
+  { key: 'hasVenue', label: 'Venue' },
+  { key: 'hasBudget', label: 'Budget' },
+  { key: 'hasSponsors', label: 'Partners' },
+  { key: 'hasSocialPosts', label: 'Social' },
+  { key: 'hasThrown', label: 'Thrown' },
+];
 
-/** Extract city from an address string (usually the component after the first comma) */
-function extractCity(address: string | null): string | null {
-  if (!address) return null;
-  // Common pattern: "123 Main St, CityName, State ZIP" or "Venue, City, Country"
-  const parts = address.split(',').map(s => s.trim());
-  if (parts.length >= 2) {
-    // The second part is usually the city; strip leading numbers (zip-like prefixes)
-    const candidate = parts[1].replace(/^\d+\s*/, '').trim();
-    // If it looks like a state abbreviation or zip, try part[0]
-    if (candidate.length <= 2 || /^\d+$/.test(candidate)) return parts[0];
-    return candidate;
-  }
-  return parts[0];
-}
-
-function isUpcoming(date: string | null): boolean {
-  if (!date) return false;
-  return new Date(date) >= new Date();
+function FilterPill({
+  label,
+  state,
+  onToggle,
+}: {
+  label: string;
+  state: 'neutral' | 'include' | 'exclude';
+  onToggle: (newState: 'neutral' | 'include' | 'exclude') => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+        state === 'include'
+          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+          : state === 'exclude'
+            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+            : 'bg-white/[0.03] border-white/10'
+      }`}
+    >
+      <button
+        onClick={() => onToggle(state === 'include' ? 'neutral' : 'include')}
+        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+        title={`Must have ${label}`}
+      >
+        <ThumbsUp
+          size={12}
+          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-white/30'}`}
+        />
+        <span className="text-white text-xs">{label}</span>
+      </button>
+      <button
+        onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
+        className="p-0.5 hover:opacity-70 transition-opacity"
+        title={`Must NOT have ${label}`}
+      >
+        <ThumbsDown
+          size={12}
+          className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-white/30'}`}
+        />
+      </button>
+    </div>
+  );
 }
 
 export function SponsorDashboardPage() {
@@ -55,13 +87,13 @@ export function SponsorDashboardPage() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
 
-  // Region multi-select filter
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
-  const [showRegionDropdown, setShowRegionDropdown] = useState(false);
+  // Three-state progress filters
+  const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
+  const [progressExcludes, setProgressExcludes] = useState<string[]>([]);
+
+  // Region filter (simple dropdown like underboss)
+  const [regionFilter, setRegionFilter] = useState<string>('all');
 
   useEffect(() => {
     if (authLoading) return;
@@ -149,32 +181,26 @@ export function SponsorDashboardPage() {
   const sponsor = dashboardData?.sponsor;
   const allEvents = dashboardData?.events || [];
 
-  const availableCities = useMemo(() => {
-    const cities = new Set<string>();
-    allEvents.forEach(e => {
-      const city = extractCity(e.address);
-      if (city) cities.add(city);
-    });
-    return Array.from(cities).sort();
-  }, [allEvents]);
+  function getFilterState(key: string): 'neutral' | 'include' | 'exclude' {
+    if (progressIncludes.includes(key)) return 'include';
+    if (progressExcludes.includes(key)) return 'exclude';
+    return 'neutral';
+  }
 
-  const availableRegions = useMemo(() => {
-    const regions = new Set<string>();
-    allEvents.forEach(e => {
-      if (e.region) regions.add(e.region);
-    });
-    return Array.from(regions).sort();
-  }, [allEvents]);
-
-  function toggleRegion(region: string) {
-    setSelectedRegions(prev =>
-      prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
-    );
+  function setFilterState(key: string, newState: 'neutral' | 'include' | 'exclude') {
+    setProgressIncludes((prev) => prev.filter((k) => k !== key));
+    setProgressExcludes((prev) => prev.filter((k) => k !== key));
+    if (newState === 'include') {
+      setProgressIncludes((prev) => [...prev, key]);
+    } else if (newState === 'exclude') {
+      setProgressExcludes((prev) => [...prev, key]);
+    }
   }
 
   const events = useMemo(() => {
     let filtered = allEvents;
 
+    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(e =>
@@ -185,57 +211,44 @@ export function SponsorDashboardPage() {
       );
     }
 
-    if (timeFilter === 'upcoming') {
-      filtered = filtered.filter(e => isUpcoming(e.date));
-    } else if (timeFilter === 'past') {
-      filtered = filtered.filter(e => !isUpcoming(e.date));
+    // Progress includes (AND: event must have ALL included progress items)
+    if (progressIncludes.length > 0) {
+      filtered = filtered.filter(e => {
+        if (!e.progress) return false;
+        return progressIncludes.every(key => e.progress![key as keyof typeof e.progress]);
+      });
     }
 
-    if (selectedCity) {
-      filtered = filtered.filter(e => extractCity(e.address) === selectedCity);
+    // Progress excludes (AND: event must NOT have ANY excluded progress items)
+    if (progressExcludes.length > 0) {
+      filtered = filtered.filter(e => {
+        if (!e.progress) return true; // if no progress data, don't exclude
+        return progressExcludes.every(key => !e.progress![key as keyof typeof e.progress]);
+      });
     }
 
-    // Region filter (multi-select)
-    if (selectedRegions.length > 0) {
-      filtered = filtered.filter(e => e.region && selectedRegions.includes(e.region));
+    // Region filter
+    if (regionFilter !== 'all') {
+      filtered = filtered.filter(e => e.region === regionFilter);
     }
 
-    const sorted = [...filtered];
-    switch (sortBy) {
-      case 'date-asc':
-        sorted.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
-        });
-        break;
-      case 'date-desc':
-        sorted.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        });
-        break;
-      case 'name':
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'rsvps':
-        sorted.sort((a, b) => b.rsvpCount - a.rsvpCount);
-        break;
-    }
+    // Sort by date descending (default, no user-selectable sort)
+    const sorted = [...filtered].sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
 
     return sorted;
-  }, [allEvents, searchQuery, timeFilter, selectedCity, sortBy, selectedRegions]);
+  }, [allEvents, searchQuery, progressIncludes, progressExcludes, regionFilter]);
 
-  const hasActiveFilters = searchQuery.trim() !== '' || timeFilter !== 'all' || selectedCity !== null
-    || selectedRegions.length > 0;
+  const hasActiveFilters = searchQuery.trim() !== '' || progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
 
   function clearAllFilters() {
     setSearchQuery('');
-    setTimeFilter('all');
-    setSelectedCity(null);
-    setSortBy('date-desc');
-    setSelectedRegions([]);
+    setProgressIncludes([]);
+    setProgressExcludes([]);
+    setRegionFilter('all');
   }
 
   // Loading state
@@ -365,152 +378,46 @@ export function SponsorDashboardPage() {
         {/* Filters */}
         {allEvents.length > 0 && (
           <div className="mb-6 space-y-3">
-            {/* Row 1: Search + Sort */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <IconInput
-                  icon={Search}
-                  type="search"
-                  placeholder="Search events, hosts, venues..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-                />
-              </div>
-              <div className="relative flex-shrink-0">
-                <ArrowUpDown size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="w-full sm:w-48 !pl-10 appearance-none"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                    paddingRight: '36px',
-                  }}
-                >
-                  <option value="date-desc">Newest first</option>
-                  <option value="date-asc">Oldest first</option>
-                  <option value="name">Name A-Z</option>
-                  <option value="rsvps">Most RSVPs</option>
-                </select>
-              </div>
+            {/* Search */}
+            <div className="max-w-sm">
+              <IconInput
+                icon={Search}
+                type="search"
+                placeholder="Search events, hosts, venues..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+              />
             </div>
 
-            {/* Row 2: Time filter + City pills */}
+            {/* Progress filter pills + Region dropdown */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Time filter pills */}
-              <div className="flex items-center gap-1 mr-2">
-                <Calendar size={14} className="text-white/40" />
-                {(['all', 'upcoming', 'past'] as TimeFilter[]).map(tf => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeFilter(tf)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                      timeFilter === tf
-                        ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                        : 'border-white/10 text-white/50 hover:text-white/70'
-                    }`}
-                  >
-                    {tf === 'all' ? 'All dates' : tf === 'upcoming' ? 'Upcoming' : 'Past'}
-                  </button>
+              {PROGRESS_FILTER_KEYS.map(({ key, label }) => (
+                <FilterPill
+                  key={key}
+                  label={label}
+                  state={getFilterState(key)}
+                  onToggle={(newState) => setFilterState(key, newState)}
+                />
+              ))}
+
+              {/* Region filter dropdown */}
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:border-white/20"
+              >
+                <option value="all">Region: All</option>
+                {GPP_REGIONS.map((r) => (
+                  <option key={r.id} value={r.id}>{r.label}</option>
                 ))}
-              </div>
-
-              {/* City filter pills (only show if there are multiple cities) */}
-              {availableCities.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1">
-                  <MapPin size={14} className="text-white/40 mr-1" />
-                  <button
-                    onClick={() => setSelectedCity(null)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                      selectedCity === null
-                        ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                        : 'border-white/10 text-white/50 hover:text-white/70'
-                    }`}
-                  >
-                    All cities
-                  </button>
-                  {availableCities.map(city => (
-                    <button
-                      key={city}
-                      onClick={() => setSelectedCity(city)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                        selectedCity === city
-                          ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                          : 'border-white/10 text-white/50 hover:text-white/70'
-                      }`}
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Region multi-select dropdown (only show if multiple regions exist) */}
-              {availableRegions.length > 1 && (
-                <div className="relative ml-2">
-                  <button
-                    onClick={() => setShowRegionDropdown(!showRegionDropdown)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                      selectedRegions.length > 0
-                        ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                        : 'border-white/10 text-white/50 hover:text-white/70'
-                    }`}
-                  >
-                    <Globe size={12} />
-                    {selectedRegions.length > 0
-                      ? `${selectedRegions.length} region${selectedRegions.length > 1 ? 's' : ''}`
-                      : 'All regions'}
-                    <ChevronDown size={12} />
-                  </button>
-                  {showRegionDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowRegionDropdown(false)} />
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl py-1 min-w-[180px]">
-                        {availableRegions.map(region => {
-                          const isSelected = selectedRegions.includes(region);
-                          return (
-                            <button
-                              key={region}
-                              onClick={() => toggleRegion(region)}
-                              className="w-full text-left px-3 py-2 text-sm text-white/70 hover:bg-white/5 transition-colors flex items-center gap-2"
-                            >
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                                isSelected
-                                  ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
-                                  : 'border-white/20 text-transparent'
-                              }`}>
-                                {isSelected && <Check size={10} />}
-                              </div>
-                              <span className="capitalize">{region.replace(/-/g, ' ')}</span>
-                            </button>
-                          );
-                        })}
-                        {selectedRegions.length > 0 && (
-                          <>
-                            <div className="border-t border-white/10 my-1" />
-                            <button
-                              onClick={() => { setSelectedRegions([]); setShowRegionDropdown(false); }}
-                              className="w-full text-left px-3 py-2 text-xs text-red-400/70 hover:text-red-400 transition-colors"
-                            >
-                              Clear regions
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              </select>
 
               {/* Clear filters */}
               {hasActiveFilters && (
                 <button
                   onClick={clearAllFilters}
-                  className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white/70 transition-colors flex items-center gap-1"
+                  className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
                 >
-                  <X size={12} />
                   Clear filters
                 </button>
               )}

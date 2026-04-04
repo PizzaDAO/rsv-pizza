@@ -1147,6 +1147,15 @@ export interface SponsorDashboardEvent {
     pending: number;
     remaining: number | null;
   } | null;
+  progress?: {
+    hasPartyKit: boolean;
+    hasCoHosts: boolean;
+    hasVenue: boolean;
+    hasBudget: boolean;
+    hasSponsors: boolean;
+    hasSocialPosts: boolean;
+    hasThrown: boolean;
+  };
   sponsorStatuses?: string[];
   sponsorCount?: number;
   checklist: SponsorChecklistItem[];

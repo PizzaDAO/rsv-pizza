@@ -228,7 +228,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       include: {
         user: { select: { name: true, email: true, profilePictureUrl: true, website: true, twitter: true, instagram: true } },
         guests: {
-          select: { id: true, approved: true },
+          select: { id: true, approved: true, checkedInAt: true },
         },
         budgetItems: {
           select: { id: true, cost: true, status: true },
@@ -236,6 +236,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         sponsors: {
           select: { id: true, status: true },
         },
+        partyKit: { select: { id: true } },
         sponsorChecklistItems: {
           ...(sponsorUserId ? { where: { sponsorUserId } } : {}),
           select: {
@@ -305,6 +306,30 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       const sponsorStatuses = event.sponsors.map(s => s.status);
       const sponsorCount = event.sponsors.length;
 
+      // Compute progress (same logic as underboss)
+      const hostEmail = (event.user?.email || '').toLowerCase();
+      const hostName = (event.user?.name || '').toLowerCase();
+      const realCoHosts = rawCoHosts.filter((h: any) => {
+        const email = (h.email || '').toLowerCase();
+        const name = (h.name || '').toLowerCase();
+        if (name === 'pizzadao' || email === 'hello@rarepizzas.com') return false;
+        if (hostEmail && email === hostEmail) return false;
+        if (hostName && name === hostName && !email) return false;
+        return true;
+      });
+      const checkedInCount = event.guests?.filter((g: any) => g.checkedInAt).length || 0;
+      const eventPassed = event.date ? new Date(event.date) < new Date() : false;
+
+      const progress = {
+        hasPartyKit: !!event.partyKit,
+        hasCoHosts: realCoHosts.length > 0,
+        hasVenue: !!(event.venueName || event.address),
+        hasBudget: !!(event.budgetEnabled && event.budgetTotal),
+        hasSponsors: event.sponsors.length > 0,
+        hasSocialPosts: !!(event.xPostUrl || event.farcasterPostUrl),
+        hasThrown: eventPassed && checkedInCount > 0,
+      };
+
       return {
         id: event.id,
         name: event.name,
@@ -328,6 +353,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         approvedCount,
         maxGuests: event.maxGuests,
         budget,
+        progress,
         sponsorStatuses,
         sponsorCount,
         checklist: event.sponsorChecklistItems.map(item => ({
