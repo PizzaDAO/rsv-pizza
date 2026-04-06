@@ -1,21 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { Decimal } from '@prisma/client/runtime/library';
-
-// Helper function to check if user can edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty } from '../helpers/partyAccess.js';
 
 const router = Router();
 

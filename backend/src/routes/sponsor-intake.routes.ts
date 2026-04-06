@@ -1,39 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-
-// Helper function to check if user can access/edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  // Super admin can edit any party
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  // Check if user is the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  if (party) return true;
-
-  // Check if user is a co-host with edit access
-  const partyForCohost = await prisma.party.findUnique({
-    where: { id: partyId },
-    select: { coHosts: true },
-  });
-
-  if (partyForCohost?.coHosts) {
-    const coHosts = partyForCohost.coHosts as any[];
-    const isCoHost = coHosts.some(
-      (ch: any) => ch.email?.toLowerCase() === userEmail?.toLowerCase() && ch.canEdit
-    );
-    if (isCoHost) return true;
-  }
-
-  return false;
-}
+import { canUserEditParty } from '../helpers/partyAccess.js';
 
 // Sponsor-facing fields that the intake form is allowed to read/write
 const SPONSOR_FACING_FIELDS = [
