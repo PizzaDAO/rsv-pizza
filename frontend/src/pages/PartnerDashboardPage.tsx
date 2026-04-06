@@ -497,11 +497,11 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
     <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
       {event.eventImageUrl && (
-        <div className="md:w-44 flex-shrink-0 self-stretch bg-black/40 flex items-center justify-center">
+        <div className="md:w-44 flex-shrink-0 self-stretch">
           <img
             src={event.eventImageUrl}
             alt=""
-            className="w-full h-32 md:h-full object-contain"
+            className="w-full h-32 md:h-full object-cover"
           />
         </div>
       )}
