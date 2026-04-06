@@ -260,11 +260,11 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
     }
 
     const coHosts = (party.coHosts as any[]) || [];
-    const isCoHost = coHosts.some(
+    const matchedHost = coHosts.find(
       (h: any) => h.email?.toLowerCase() === email.toLowerCase()
     );
 
-    res.json({ isHost: isCoHost });
+    res.json({ isHost: !!matchedHost, canEdit: !!matchedHost?.canEdit });
   } catch (error) {
     next(error);
   }
