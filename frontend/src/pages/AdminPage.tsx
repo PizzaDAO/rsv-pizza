@@ -165,16 +165,16 @@ export function AdminPage() {
       setSpEmail('');
       setSpName('');
       setSpTag('');
-      setSponsorMessage({ type: 'success', text: `Added ${result.sponsorUser.email} as sponsor with tag "${result.sponsorUser.tag}"` });
+      setSponsorMessage({ type: 'success', text: `Added ${result.sponsorUser.email} as partner with tag "${result.sponsorUser.tag}"` });
     } catch (err: any) {
-      setSponsorMessage({ type: 'error', text: err.message || 'Failed to add sponsor' });
+      setSponsorMessage({ type: 'error', text: err.message || 'Failed to add partner' });
     } finally {
       setAddingSponsor(false);
     }
   }
 
   async function handleDeactivateSponsor(id: string, email: string) {
-    if (!confirm(`Deactivate sponsor ${email}? They will lose access to the sponsor dashboard.`)) return;
+    if (!confirm(`Deactivate partner ${email}? They will lose access to the partner dashboard.`)) return;
     try {
       await deleteSponsorUser(id);
       setSponsorUsers((prev) =>
@@ -683,11 +683,11 @@ export function AdminPage() {
             </div>
           </section>
 
-          {/* Sponsor Users Management */}
+          {/* Partners Management */}
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Tag size={18} className="text-theme-text-secondary" />
-              Sponsor Users ({sponsorUsers.length})
+              Partners ({sponsorUsers.length})
             </h2>
 
             {sponsorMessage && (
@@ -719,7 +719,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Tag}
                       type="text"
-                      placeholder="Sponsor tag (e.g. swc)"
+                      placeholder="Partner tag (e.g. swc)"
                       value={spTag}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpTag(e.target.value)}
                       required
@@ -740,7 +740,7 @@ export function AdminPage() {
                     className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     {addingSponsor ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                    Add Sponsor
+                    Add Partner
                   </button>
                 </div>
               </form>
@@ -788,7 +788,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleDeactivateSponsor(sp.id, sp.email)}
                               className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                              title="Deactivate sponsor"
+                              title="Deactivate partner"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -800,7 +800,7 @@ export function AdminPage() {
                   {sponsorUsers.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-theme-text-faint">
-                        No sponsor users yet
+                        No partners yet
                       </td>
                     </tr>
                   )}
