@@ -125,10 +125,17 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const filteredCities = useMemo(() => {
     let result = mergedCities;
 
-    // Underboss name filter (non-admins only see their own cities)
-    if (meData && !meData.isAdmin && meData.name) {
-      const myName = meData.name.toLowerCase();
-      result = result.filter((c) => c.underboss.toLowerCase() === myName);
+    // Region-based filter (non-admins only see cities in their assigned regions)
+    if (meData && !meData.isAdmin && meData.regions.length > 0) {
+      const myRegions = meData.regions.map((r) => r.toLowerCase());
+      result = result.filter((c) => {
+        if (!c.region) return false;
+        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
+        if (myRegions.includes(sheetRegion)) return true;
+        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
+        if (mappedGppIds) return mappedGppIds.some((id) => myRegions.includes(id));
+        return false;
+      });
     }
 
     // Region filter (synced with selectedRegions)
