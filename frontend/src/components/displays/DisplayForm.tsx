@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link } from 'lucide-react';
+import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link, Grid3X3, RefreshCw, Timer, Palette } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import {
@@ -341,29 +341,25 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   </select>
                 </div>
                 {photosLayout === 'grid' && (
-                  <div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={6}
-                      value={photosColumns}
-                      onChange={(e) => setPhotosColumns(parseInt(e.target.value) || 3)}
-                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
-                      placeholder="Columns (1-6)"
-                    />
-                  </div>
-                )}
-                <div>
-                  <input
+                  <IconInput
+                    icon={Grid3X3}
                     type="number"
-                    min={5}
-                    max={300}
-                    value={photosAutoRefresh}
-                    onChange={(e) => setPhotosAutoRefresh(parseInt(e.target.value) || 30)}
-                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
-                    placeholder="Auto-refresh interval (seconds)"
+                    min={1}
+                    max={6}
+                    value={photosColumns}
+                    onChange={(e) => setPhotosColumns(parseInt(e.target.value) || 3)}
+                    placeholder="Columns (1-6)"
                   />
-                </div>
+                )}
+                <IconInput
+                  icon={RefreshCw}
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={photosAutoRefresh}
+                  onChange={(e) => setPhotosAutoRefresh(parseInt(e.target.value) || 30)}
+                  placeholder="Auto-refresh interval (seconds)"
+                />
               </div>
             )}
 
@@ -428,17 +424,15 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
             <h3 className="font-medium text-theme-text">Display Settings</h3>
 
             {(contentType === 'slideshow' || contentType === 'photos') && (
-              <div>
-                <input
-                  type="number"
-                  min={3}
-                  max={120}
-                  value={rotationInterval}
-                  onChange={(e) => setRotationInterval(parseInt(e.target.value) || 10)}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
-                  placeholder="Rotation interval (seconds)"
-                />
-              </div>
+              <IconInput
+                icon={Timer}
+                type="number"
+                min={3}
+                max={120}
+                value={rotationInterval}
+                onChange={(e) => setRotationInterval(parseInt(e.target.value) || 10)}
+                placeholder="Rotation interval (seconds)"
+              />
             )}
 
             <div>
@@ -449,12 +443,13 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   onChange={(e) => setBackgroundColor(e.target.value)}
                   className="w-10 h-10 rounded cursor-pointer"
                 />
-                <input
+                <IconInput
+                  icon={Palette}
                   type="text"
                   value={backgroundColor}
                   onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="flex-1 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text font-mono"
                   placeholder="Background color"
+                  className="font-mono"
                 />
               </div>
             </div>

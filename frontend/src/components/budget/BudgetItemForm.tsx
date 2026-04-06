@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, FileText, DollarSign, User, Link, StickyNote } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { BudgetItem, BudgetCategory, BudgetStatus, BUDGET_CATEGORIES } from '../../types';
 
 interface BudgetItemFormProps {
@@ -87,26 +88,19 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Description *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Pizza from Joe's"
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              autoFocus
-            />
-          </div>
+          <IconInput
+            icon={FileText}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Description (e.g., Pizza from Joe's)"
+            required
+            autoFocus
+          />
 
           {/* Category and Cost */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-theme-text mb-1">
-                Category
-              </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as BudgetCategory)}
@@ -119,30 +113,20 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-theme-text mb-1">
-                Cost *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-7 pr-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
-            </div>
+            <IconInput
+              icon={DollarSign}
+              type="number"
+              step="0.01"
+              min="0"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="Cost"
+              required
+            />
           </div>
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Status
-            </label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -170,46 +154,32 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
           </div>
 
           {/* Point Person */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Point Person
-            </label>
-            <input
-              type="text"
-              value={pointPerson}
-              onChange={(e) => setPointPerson(e.target.value)}
-              placeholder="Who's handling this?"
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput
+            icon={User}
+            type="text"
+            value={pointPerson}
+            onChange={(e) => setPointPerson(e.target.value)}
+            placeholder="Point person (who's handling this?)"
+          />
 
           {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional details..."
-              rows={2}
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
-            />
-          </div>
+          <IconInput
+            icon={StickyNote}
+            multiline
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional details..."
+          />
 
           {/* Receipt URL */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Receipt URL
-            </label>
-            <input
-              type="url"
-              value={receiptUrl}
-              onChange={(e) => setReceiptUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput
+            icon={Link}
+            type="url"
+            value={receiptUrl}
+            onChange={(e) => setReceiptUrl(e.target.value)}
+            placeholder="Receipt URL (https://...)"
+          />
 
           {/* Error */}
           {error && (

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown } from 'lucide-react';
+import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
 import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../lib/api';
 
@@ -248,14 +249,14 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
                 {/* Search and region filter */}
                 <div className="flex gap-2 mb-3">
-                  <div className="flex-1 relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-faint" />
-                    <input
+                  <div className="flex-1">
+                    <IconInput
+                      icon={Search}
+                      iconSize={14}
                       type="text"
                       placeholder="Search city, country, or underboss..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-9 pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
                     />
                   </div>
                   <div className="relative">
@@ -416,7 +417,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                     </select>
                   </div>
                 </div>
-                <textarea
+                <IconInput
+                  icon={MessageSquare}
+                  multiline
+                  rows={6}
                   placeholder="Type your message here..."
                   value={message}
                   onChange={(e) => {
@@ -424,8 +428,6 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                       setMessage(e.target.value);
                     }
                   }}
-                  rows={6}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-3 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover resize-none"
                 />
                 <p className="text-xs text-theme-text-faint mt-1.5">
                   Use <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{city}'}</code> and <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{country}'}</code> for per-group personalization

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { Photo } from '../../types';
 
 interface PhotoModalProps {
@@ -258,12 +259,13 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
           <div className="mb-4">
             {editingCaption ? (
               <div className="space-y-2">
-                <textarea
+                <IconInput
+                  icon={MessageSquare}
+                  multiline
+                  rows={3}
                   value={captionValue}
                   onChange={(e) => setCaptionValue(e.target.value)}
                   placeholder="Add a caption..."
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
-                  rows={3}
                   autoFocus
                 />
                 <div className="flex gap-2">

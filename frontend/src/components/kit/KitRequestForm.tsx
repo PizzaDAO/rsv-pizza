@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, AlertCircle, MapPin, Info, Gift, Package, Star, Check } from 'lucide-react';
+import { X, Loader2, AlertCircle, MapPin, Info, Gift, Package, Star, Check, User, Home, Building, Hash, Globe, Phone, StickyNote } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { KIT_TIERS, PartyKit } from '../../types';
 import { KitRequestData } from '../../lib/api';
 import { ShippingAddressAutocomplete, AddressComponents } from './ShippingAddressAutocomplete';
@@ -214,13 +215,14 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             </div>
 
             <div className="space-y-3">
-              <input
+              <IconInput
+                icon={User}
                 type="text"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="Recipient Name *"
+                placeholder="Recipient Name"
+                required
                 disabled={isDeadlinePassed}
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
               />
 
               <ShippingAddressAutocomplete
@@ -231,59 +233,62 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 disabled={isDeadlinePassed}
               />
 
-              <input
+              <IconInput
+                icon={Home}
                 type="text"
                 value={addressLine2}
                 onChange={(e) => setAddressLine2(e.target.value)}
                 placeholder="Address Line 2 (Apt, Suite, etc.)"
                 disabled={isDeadlinePassed}
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
               />
 
               <div className="grid grid-cols-2 gap-3">
-                <input
+                <IconInput
+                  icon={Building}
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="City *"
+                  placeholder="City"
+                  required
                   disabled={isDeadlinePassed}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
                 />
-                <input
+                <IconInput
+                  icon={MapPin}
                   type="text"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   placeholder="State/Province"
                   disabled={isDeadlinePassed}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <input
+                <IconInput
+                  icon={Hash}
                   type="text"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="Postal Code *"
+                  placeholder="Postal Code"
+                  required
                   disabled={isDeadlinePassed}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
                 />
                 <>
-                  <input
+                  <IconInput
+                    icon={Globe}
                     type="text"
                     list="country-list"
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
-                    placeholder="Country *"
+                    placeholder="Country"
+                    required
                     disabled={isDeadlinePassed}
-                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
                   />
                   <datalist id="country-list">
-                    <option value="" disabled>— Common —</option>
+                    <option value="" disabled>-- Common --</option>
                     {COMMON_COUNTRIES.map((c) => (
                       <option key={`common-${c}`} value={c} />
                     ))}
-                    <option value="" disabled>— All Countries —</option>
+                    <option value="" disabled>-- All Countries --</option>
                     {ALL_COUNTRIES.filter(c => !COMMON_COUNTRIES.includes(c)).map((c) => (
                       <option key={c} value={c} />
                     ))}
@@ -291,29 +296,27 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 </>
               </div>
 
-              <input
+              <IconInput
+                icon={Phone}
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Phone (optional)"
                 disabled={isDeadlinePassed}
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50"
               />
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-theme-text mb-2">
-              Special Requests (optional)
-            </label>
-            <textarea
+            <IconInput
+              icon={StickyNote}
+              multiline
+              rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any special requests or notes..."
+              placeholder="Special requests or notes (optional)"
               disabled={isDeadlinePassed}
-              rows={3}
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50 resize-none"
             />
           </div>
 

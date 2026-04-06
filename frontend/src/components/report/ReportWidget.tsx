@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon, Lock } from 'lucide-react';
+import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon, Lock, Palette, Link as LinkIcon, Camera } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { EventReport, Guest, PageViewStats as PageViewStatsType, LinkClickStats as LinkClickStatsType } from '../../types';
 import { ReportKPIs } from './ReportKPIs';
@@ -451,47 +451,42 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
         <div className="space-y-4">
           {/* Recap */}
           <div>
-            <textarea
-              value={report.reportRecap || ''}
-              onChange={(e) => handleChange('reportRecap', e.target.value || null)}
-              placeholder="Write a recap of your event..."
+            <IconInput
+              icon={FileText}
+              multiline
               rows={4}
-              className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] resize-none"
+              value={report.reportRecap || ''}
+              onChange={(e) => handleChange('reportRecap', (e.target as HTMLTextAreaElement).value || null)}
+              placeholder="Write a recap of your event..."
             />
             <p className="text-xs text-theme-text-faint mt-1">A summary of the event for the report</p>
           </div>
 
           {/* Flyer Artist & URLs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <input
-                type="text"
-                value={report.flyerArtist || ''}
-                onChange={(e) => handleChange('flyerArtist', e.target.value || null)}
-                placeholder="Flyer artist credit"
-                className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-              />
-            </div>
-            <div>
-              <input
-                type="url"
-                value={report.flyerArtistUrl || ''}
-                onChange={(e) => handleChange('flyerArtistUrl', e.target.value || null)}
-                placeholder="Flyer artist link"
-                className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <input
+            <IconInput
+              icon={Palette}
+              type="text"
+              value={report.flyerArtist || ''}
+              onChange={(e) => handleChange('flyerArtist', e.target.value || null)}
+              placeholder="Flyer artist credit"
+            />
+            <IconInput
+              icon={LinkIcon}
               type="url"
-              value={report.reportPhotosUrl || ''}
-              onChange={(e) => handleChange('reportPhotosUrl', e.target.value || null)}
-              placeholder="Raw photos / video drive link"
-              className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
+              value={report.flyerArtistUrl || ''}
+              onChange={(e) => handleChange('flyerArtistUrl', e.target.value || null)}
+              placeholder="Flyer artist link"
             />
           </div>
+
+          <IconInput
+            icon={Camera}
+            type="url"
+            value={report.reportPhotosUrl || ''}
+            onChange={(e) => handleChange('reportPhotosUrl', e.target.value || null)}
+            placeholder="Raw photos / video drive link"
+          />
         </div>
       </div>
 
