@@ -56,6 +56,7 @@ export function EventPage() {
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [canEditAsCoHost, setCanEditAsCoHost] = useState(false);
   const [showTweetInput, setShowTweetInput] = useState(false);
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export function EventPage() {
         const foundEvent = await getEventBySlug(slug);
         if (foundEvent) {
           setEvent(foundEvent);
+          setCanEditAsCoHost(false);
 
           // Check if logged-in user has already RSVP'd and fetch their data
           let hasRSVPd = false;
@@ -127,6 +129,7 @@ export function EventPage() {
               if (resp.ok) {
                 const data = await resp.json();
                 isHost = data.isHost;
+                setCanEditAsCoHost(data.canEdit || false);
               }
             } catch (e) {
               console.warn('Could not check host status:', e);
@@ -643,7 +646,7 @@ export function EventPage() {
               )}
 
               {/* Host Button - Desktop */}
-              {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+              {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com' || canEditAsCoHost) && (
                 <div className="p-4 border-t border-theme-stroke">
                   <button
                     onClick={handleEditEvent}
@@ -748,7 +751,7 @@ export function EventPage() {
                 )}
 
                 {/* Host Button - Mobile */}
-                {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com') && (
+                {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com' || canEditAsCoHost) && (
                   <div className="p-4 border-b border-theme-stroke">
                     <button
                       onClick={handleEditEvent}
