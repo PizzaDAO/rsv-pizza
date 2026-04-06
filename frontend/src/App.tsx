@@ -22,6 +22,7 @@ import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 import { SponsorIntakePage } from './pages/SponsorIntakePage';
+import { SponsorDashboardPage } from './pages/SponsorDashboardPage';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/sponsor-dashboard" element={<SponsorDashboardPage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakePage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />

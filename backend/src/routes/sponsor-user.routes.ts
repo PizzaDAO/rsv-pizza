@@ -310,6 +310,10 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         return rest;
       });
 
+      // Sponsor statuses for this event
+      const sponsorStatuses = event.sponsors.map(s => s.status);
+      const sponsorCount = event.sponsors.length;
+
       // Compute progress (same logic as underboss)
       const hostEmail = (event.user?.email || '').toLowerCase();
       const hostName = (event.user?.name || '').toLowerCase();
@@ -358,6 +362,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         maxGuests: event.maxGuests,
         budget,
         progress,
+        sponsorStatuses,
+        sponsorCount,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,

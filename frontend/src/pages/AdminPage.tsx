@@ -6,17 +6,18 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
   fetchUnderbossList, createUnderboss, updateUnderboss, deactivateUnderboss,
   fetchGppNftSettings, updateGppNftSettings,
   fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault, deleteChecklistDefault,
+  fetchSponsorUsers, createSponsorUser, deleteSponsorUser,
 } from '../lib/api';
 import type { ChecklistDefault } from '../lib/api';
 import { GPP_REGIONS } from '../types';
-import type { AdminUser, UnderbossAdmin } from '../types';
+import type { AdminUser, UnderbossAdmin, SponsorUser } from '../types';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -63,6 +64,14 @@ export function AdminPage() {
   const [newItemDate, setNewItemDate] = useState('');
   const [addingItem, setAddingItem] = useState(false);
 
+  // Sponsor users state
+  const [sponsorUsers, setSponsorUsers] = useState<SponsorUser[]>([]);
+  const [spEmail, setSpEmail] = useState('');
+  const [spName, setSpName] = useState('');
+  const [spTag, setSpTag] = useState('');
+  const [addingSponsor, setAddingSponsor] = useState(false);
+  const [sponsorMessage, setSponsorMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const isSuperAdmin = currentRole === 'super_admin';
 
   // Set body class for elements outside React tree
@@ -84,17 +93,19 @@ export function AdminPage() {
         setCurrentRole(me.role || '');
         setCurrentEmail(me.email || '');
 
-        const [adminList, ubList, nftSettings, clDefaults] = await Promise.all([
+        const [adminList, ubList, nftSettings, clDefaults, spList] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
           fetchGppNftSettings(),
           fetchChecklistDefaults(),
+          fetchSponsorUsers(),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
         setGppNftEnabled(nftSettings.nftEnabled);
         setGppNftChain(nftSettings.nftChain || 'base');
         setChecklistItems(clDefaults.items);
+        setSponsorUsers(spList);
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
       } finally {
@@ -131,6 +142,49 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [checklistMessage]);
+
+  useEffect(() => {
+    if (sponsorMessage) {
+      const t = setTimeout(() => setSponsorMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [sponsorMessage]);
+
+  async function handleAddSponsor(e: React.FormEvent) {
+    e.preventDefault();
+    if (!spEmail.trim() || !spTag.trim()) return;
+    setAddingSponsor(true);
+    setSponsorMessage(null);
+    try {
+      const result = await createSponsorUser({
+        email: spEmail.trim(),
+        tag: spTag.trim(),
+        name: spName.trim() || undefined,
+      });
+      setSponsorUsers((prev) => [result.sponsorUser, ...prev]);
+      setSpEmail('');
+      setSpName('');
+      setSpTag('');
+      setSponsorMessage({ type: 'success', text: `Added ${result.sponsorUser.email} as sponsor with tag "${result.sponsorUser.tag}"` });
+    } catch (err: any) {
+      setSponsorMessage({ type: 'error', text: err.message || 'Failed to add sponsor' });
+    } finally {
+      setAddingSponsor(false);
+    }
+  }
+
+  async function handleDeactivateSponsor(id: string, email: string) {
+    if (!confirm(`Deactivate sponsor ${email}? They will lose access to the sponsor dashboard.`)) return;
+    try {
+      await deleteSponsorUser(id);
+      setSponsorUsers((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isActive: false } : s))
+      );
+      setSponsorMessage({ type: 'success', text: `Deactivated ${email}` });
+    } catch (err: any) {
+      setSponsorMessage({ type: 'error', text: err.message || 'Failed to deactivate' });
+    }
+  }
 
   async function handleSaveChecklist() {
     setSavingChecklist(true);
@@ -621,6 +675,132 @@ export function AdminPage() {
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
                         No underbosses yet
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Sponsor Users Management */}
+          <section className="mb-10">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Tag size={18} className="text-theme-text-secondary" />
+              Sponsor Users ({sponsorUsers.length})
+            </h2>
+
+            {sponsorMessage && (
+              <div
+                className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  sponsorMessage.type === 'success'
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+              >
+                {sponsorMessage.text}
+              </div>
+            )}
+
+            {isSuperAdmin && (
+              <form onSubmit={handleAddSponsor} className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <IconInput
+                      icon={Mail}
+                      type="email"
+                      placeholder="Email address"
+                      value={spEmail}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <IconInput
+                      icon={Tag}
+                      type="text"
+                      placeholder="Sponsor tag (e.g. swc)"
+                      value={spTag}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpTag(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <IconInput
+                      icon={User}
+                      type="text"
+                      placeholder="Name (optional)"
+                      value={spName}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpName(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={addingSponsor || !spEmail.trim() || !spTag.trim()}
+                    className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+                  >
+                    {addingSponsor ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                    Add Sponsor
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Tag</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Added</th>
+                    {isSuperAdmin && <th className="px-4 py-3 font-medium w-20"></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sponsorUsers.map((sp) => (
+                    <tr key={sp.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
+                      <td className="px-4 py-3 text-theme-text">{sp.email}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">{sp.name || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-300">
+                          {sp.tag}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                            sp.isActive
+                              ? 'bg-green-100 text-green-700 border border-green-300'
+                              : 'bg-red-100 text-red-700 border border-red-300'
+                          }`}
+                        >
+                          {sp.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-theme-text-muted">
+                        {new Date(sp.createdAt).toLocaleDateString()}
+                      </td>
+                      {isSuperAdmin && (
+                        <td className="px-4 py-3">
+                          {sp.isActive && (
+                            <button
+                              onClick={() => handleDeactivateSponsor(sp.id, sp.email)}
+                              className="text-red-400/60 hover:text-red-400 transition-colors p-1"
+                              title="Deactivate sponsor"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {sponsorUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-theme-text-faint">
+                        No sponsor users yet
                       </td>
                     </tr>
                   )}
