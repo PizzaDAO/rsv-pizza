@@ -4,7 +4,6 @@ import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check } from 'l
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
-import { GPP_REGIONS } from '../../types';
 import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 
@@ -141,23 +140,32 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       );
     }
 
-    // Progress includes (AND logic — event must have ALL included progress items)
+    // Progress + approved includes (AND logic — event must have ALL included items)
     if (progressIncludes.length > 0) {
       result = result.filter((e) =>
-        progressIncludes.every((key) => e.progress[key as keyof typeof e.progress])
+        progressIncludes.every((key) => {
+          if (key === 'approved') return e.underbossApproved;
+          return e.progress[key as keyof typeof e.progress];
+        })
       );
     }
 
-    // Progress excludes (AND logic — event must NOT have ANY excluded progress items)
+    // Progress + approved excludes (AND logic — event must NOT have ANY excluded items)
     if (progressExcludes.length > 0) {
       result = result.filter((e) =>
-        progressExcludes.every((key) => !e.progress[key as keyof typeof e.progress])
+        progressExcludes.every((key) => {
+          if (key === 'approved') return !e.underbossApproved;
+          return !e.progress[key as keyof typeof e.progress];
+        })
       );
     }
 
-    // Region filter (only when showRegion is active)
+    // Country filter (only when showRegion is active)
     if (showRegion && regionFilter !== 'all') {
-      result = result.filter((e) => e.region === regionFilter);
+      result = result.filter((e) => {
+        const country = e.address?.split(',').pop()?.trim() || '';
+        return country === regionFilter;
+      });
     }
 
     result = [...result].sort((a, b) => {
@@ -247,16 +255,23 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           />
         ))}
 
-        {/* Region filter -- only when showRegion */}
+        {/* Approved filter */}
+        <FilterPill
+          label="Approved"
+          state={getFilterState('approved')}
+          onToggle={(newState) => setFilterState('approved', newState)}
+        />
+
+        {/* Country filter -- only when showRegion */}
         {showRegion && (
           <select
             value={regionFilter}
             onChange={(e) => setRegionFilter(e.target.value)}
             className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
           >
-            <option value="all">Region: All</option>
-            {GPP_REGIONS.map((r) => (
-              <option key={r.id} value={r.id}>{r.label}</option>
+            <option value="all">Country: All</option>
+            {[...new Set(events.map(e => e.address?.split(',').pop()?.trim()).filter(Boolean))].sort().map((c) => (
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
         )}
@@ -548,7 +563,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               <SortHeader field="name">Event</SortHeader>
               {showRegion && (
                 <th className="py-2 px-3 text-left">
-                  <span className="text-xs text-theme-text-faint uppercase tracking-wider">Region</span>
+                  <span className="text-xs text-theme-text-faint uppercase tracking-wider">Country</span>
                 </th>
               )}
               <th className="py-2 px-3 text-left">

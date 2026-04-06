@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
-import { GPP_REGIONS } from '../../types';
 import { updateHostStatus, updateHostTags } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
@@ -245,11 +244,11 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
               {relTime.text}
             </span>
-            {showRegion && event.region && (
+            {showRegion && event.address && (
               <>
                 <span className="text-theme-text-faint">·</span>
                 <span className="text-xs text-theme-text-muted">
-                  {GPP_REGIONS.find((r) => r.id === event.region)?.label || event.region}
+                  {event.address.split(',').pop()?.trim() || ''}
                 </span>
               </>
             )}

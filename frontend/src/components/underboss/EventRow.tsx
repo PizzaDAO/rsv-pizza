@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
-import { GPP_REGIONS } from '../../types';
 import { updateHostStatus, updateHostTags } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
@@ -287,11 +286,11 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
         </div>
       </td>
 
-      {/* Region (optional) */}
+      {/* Country (optional) */}
       {showRegion && (
         <td className="py-3 px-3">
           <span className="text-xs text-theme-text-muted">
-            {GPP_REGIONS.find((r) => r.id === event.region)?.label || event.region || '\u2014'}
+            {event.address ? event.address.split(',').pop()?.trim() || '\u2014' : '\u2014'}
           </span>
         </td>
       )}

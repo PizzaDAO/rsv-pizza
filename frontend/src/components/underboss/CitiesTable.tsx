@@ -315,17 +315,38 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
 
   return (
     <div className="space-y-3">
-      {/* Summary badges */}
+      {/* Summary badges (clickable to filter) */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="px-2 py-1 rounded-full bg-green-500/15 text-green-700 font-medium">
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'created' ? 'all' : 'created')}
+          className={`px-2 py-1 rounded-full font-medium transition-all cursor-pointer ${
+            statusFilter === 'created'
+              ? 'bg-green-500/30 text-green-700 ring-1 ring-green-500/40'
+              : 'bg-green-500/15 text-green-700 hover:bg-green-500/25'
+          }`}
+        >
           {statusCounts.created} Created
-        </span>
-        <span className="px-2 py-1 rounded-full bg-orange-500/15 text-orange-700 font-medium">
+        </button>
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'todo' ? 'all' : 'todo')}
+          className={`px-2 py-1 rounded-full font-medium transition-all cursor-pointer ${
+            statusFilter === 'todo'
+              ? 'bg-orange-500/30 text-orange-700 ring-1 ring-orange-500/40'
+              : 'bg-orange-500/15 text-orange-700 hover:bg-orange-500/25'
+          }`}
+        >
           {statusCounts.todo} To Do
-        </span>
-        <span className="px-2 py-1 rounded-full bg-gray-400/15 text-gray-600 font-medium">
+        </button>
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'skip' ? 'all' : 'skip')}
+          className={`px-2 py-1 rounded-full font-medium transition-all cursor-pointer ${
+            statusFilter === 'skip'
+              ? 'bg-gray-400/30 text-gray-600 ring-1 ring-gray-400/40'
+              : 'bg-gray-400/15 text-gray-600 hover:bg-gray-400/25'
+          }`}
+        >
           {statusCounts.skip} Skip
-        </span>
+        </button>
       </div>
 
       {/* Search + filters */}
