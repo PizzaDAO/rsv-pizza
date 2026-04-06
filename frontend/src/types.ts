@@ -107,6 +107,7 @@ export interface CoHost {
   showOnEvent?: boolean;
   canEdit?: boolean;
   isUnderboss?: boolean;
+  allowedTabs?: string[];
 }
 
 // Host profile from the user account
@@ -261,6 +262,7 @@ export interface Party {
   pinnedApps?: string[];
   region?: string | null;
   canEdit?: boolean;
+  allowedTabs?: string[];
 }
 
 export interface Donation {

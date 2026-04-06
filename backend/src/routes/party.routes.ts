@@ -386,7 +386,20 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       });
     }
 
-    // Return with hostName, userId for ownership checks, and canEdit flag
+    // Resolve the requesting user's co-host tab permissions
+    let allowedTabs: string[] | undefined;
+    const isOwner = party.userId === req.userId;
+    const isSuper = await isSuperAdmin(req.userEmail);
+    if (!isOwner && !isSuper && req.userEmail) {
+      const myCoHostEntry = rawCoHosts.find(
+        (h: any) => h.email?.toLowerCase() === req.userEmail!.toLowerCase() && h.canEdit === true
+      );
+      if (myCoHostEntry && Array.isArray(myCoHostEntry.allowedTabs)) {
+        allowedTabs = myCoHostEntry.allowedTabs;
+      }
+    }
+
+    // Return with hostName, userId for ownership checks, canEdit flag, and allowedTabs
     res.json({
       party: {
         ...party,
@@ -394,6 +407,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
         canEdit: true, // If we reached here, getPartyWithOwnershipCheck verified edit permissions
+        allowedTabs, // undefined for owner/admin (all tabs), string[] for restricted co-hosts
       }
     });
   } catch (error) {

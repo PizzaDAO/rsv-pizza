@@ -31,6 +31,7 @@ import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
+import { getCoHostAllowedTabs } from '../lib/tabPermissions';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -60,6 +61,25 @@ function HostPageContent() {
       navigate(`/rsvp/${inviteCode}`, { replace: true });
     }
   }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
+
+  // Determine if this user is the owner or super admin (full access)
+  const isOwnerOrAdmin = useMemo(() => {
+    if (!party || !user) return false;
+    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+    if (party.userId === user.id) return true;
+    return false;
+  }, [party, user]);
+
+  // Resolve co-host tab permissions from the party.allowedTabs field (set by backend)
+  // undefined = all tabs (legacy/owner), string[] = restricted (including empty = no tabs)
+  const allowedTabs = useMemo<'all' | string[]>(() => {
+    if (isOwnerOrAdmin) return 'all';
+    // party.allowedTabs is set by the backend for restricted co-hosts
+    if (Array.isArray(party?.allowedTabs)) {
+      return party.allowedTabs;
+    }
+    return 'all'; // Backward compat: no allowedTabs field = full access
+  }, [isOwnerOrAdmin, party?.allowedTabs]);
 
   const isGPP = party?.eventType === 'gpp';
   const defaultTab: TabType = isGPP ? 'dashboard' : 'details';
@@ -178,7 +198,25 @@ function HostPageContent() {
     return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
   }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
 
-  const tabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
+  const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
+
+  // Filter tabs based on co-host permissions
+  // 'apps' tab is always visible so co-hosts can see the hub
+  const tabs = allowedTabs === 'all'
+    ? allTabs
+    : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
+
+  // Redirect to first allowed tab if current tab is not permitted
+  useEffect(() => {
+    if (!party || allowedTabs === 'all') return;
+    // activeTab is forbidden if it's not 'apps' and not in allowedTabs
+    if (activeTab !== 'apps' && !allowedTabs.includes(activeTab)) {
+      const firstAllowed = tabs.find(t => t.id !== 'apps');
+      if (firstAllowed) {
+        setActiveTab(firstAllowed.id);
+      }
+    }
+  }, [activeTab, allowedTabs, party, tabs]);
 
   return (
     <Layout>

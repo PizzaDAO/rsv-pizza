@@ -384,6 +384,7 @@ export interface DbParty {
   event_type?: string | null;
   event_tags?: string[];
   can_edit?: boolean;
+  allowed_tabs?: string[];
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -794,6 +795,9 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
             }
             if (data.party?.canEdit !== undefined) {
               party!.can_edit = data.party.canEdit;
+            }
+            if (data.party?.allowedTabs !== undefined) {
+              party!.allowed_tabs = data.party.allowedTabs;
             }
           }
         }
