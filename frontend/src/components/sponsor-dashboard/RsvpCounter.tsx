@@ -13,22 +13,22 @@ export const RsvpCounter: React.FC<RsvpCounterProps> = ({ rsvpCount, maxGuests }
 
   return (
     <div className="flex items-center gap-3">
-      <Users size={16} className="text-white/40 flex-shrink-0" />
+      <Users size={16} className="text-theme-text-muted flex-shrink-0" />
       <div className="flex-1">
         <div className="flex items-baseline gap-1">
-          <span className="text-lg font-bold text-white/90">{rsvpCount}</span>
+          <span className="text-lg font-bold text-theme-text">{rsvpCount}</span>
           {maxGuests && (
             <>
-              <span className="text-white/40">/</span>
-              <span className="text-sm text-white/50">{maxGuests}</span>
+              <span className="text-theme-text-muted">/</span>
+              <span className="text-sm text-theme-text-secondary">{maxGuests}</span>
             </>
           )}
-          <span className="text-xs text-white/40 ml-1">RSVPs</span>
+          <span className="text-xs text-theme-text-muted ml-1">RSVPs</span>
         </div>
         {percentage !== null && (
-          <div className="mt-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div className="mt-1 h-1.5 bg-theme-surface rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#ff393a] rounded-full transition-all duration-300"
+              className="h-full bg-[#E52828] rounded-full transition-all duration-300"
               style={{ width: `${percentage}%` }}
             />
           </div>

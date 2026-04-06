@@ -17,6 +17,9 @@ import {
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 
+const themeClass = 'gpp-theme';
+const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
 // ============================================
 // Progress filter constants & FilterPill
 // ============================================
@@ -46,8 +49,8 @@ function FilterPill({
         state === 'include'
           ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
           : state === 'exclude'
-            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-            : 'bg-white/[0.03] border-white/10'
+            ? 'bg-[#E52828]/20 border-[#E52828]/30'
+            : 'bg-theme-surface border-theme-stroke'
       }`}
     >
       <button
@@ -57,9 +60,9 @@ function FilterPill({
       >
         <ThumbsUp
           size={12}
-          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-white/30'}`}
+          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
         />
-        <span className="text-white text-xs">{label}</span>
+        <span className="text-theme-text text-xs">{label}</span>
       </button>
       <button
         onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
@@ -68,7 +71,7 @@ function FilterPill({
       >
         <ThumbsDown
           size={12}
-          className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-white/30'}`}
+          className={`transition-all ${state === 'exclude' ? 'text-[#E52828]' : 'text-theme-text-faint'}`}
         />
       </button>
     </div>
@@ -77,6 +80,13 @@ function FilterPill({
 
 export function PartnerDashboardPage() {
   const { user, loading: authLoading } = useAuth();
+
+  // Set body class for elements outside React tree (modals, portals)
+  useEffect(() => {
+    document.body.classList.add('gpp-theme-active');
+    return () => { document.body.classList.remove('gpp-theme-active'); };
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meData, setMeData] = useState<SponsorMeResponse | null>(null);
@@ -259,10 +269,10 @@ export function PartnerDashboardPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex items-center justify-center py-32">
-          <Loader2 size={32} className="animate-spin text-white/40" />
+          <Loader2 size={32} className="animate-spin text-theme-text-muted" />
         </div>
         <Footer />
       </div>
@@ -272,17 +282,17 @@ export function PartnerDashboardPage() {
   // Not logged in
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
-          <Shield size={48} className="text-white/20 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Partner Dashboard</h1>
-          <p className="text-white/50 text-center max-w-md mb-6">
+          <Shield size={48} className="text-theme-text-faint mb-4" />
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Partner Dashboard</h1>
+          <p className="text-theme-text-muted text-center max-w-md mb-6">
             Log in to access your partner dashboard.
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
-            className="px-6 py-2 bg-[#ff393a] text-white rounded-xl text-sm font-medium hover:bg-[#e62e2f] transition-colors"
+            className="px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors"
           >
             Log In
           </button>
@@ -296,12 +306,12 @@ export function PartnerDashboardPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-red-400/60 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Error</h1>
-          <p className="text-white/50 text-center max-w-md">{error}</p>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Error</h1>
+          <p className="text-theme-text-muted text-center max-w-md">{error}</p>
         </div>
         <Footer />
       </div>
@@ -311,12 +321,12 @@ export function PartnerDashboardPage() {
   // Not a partner
   if (!meData?.isSponsor) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
-          <Shield size={48} className="text-white/20 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-white/50 text-center max-w-md">
+          <Shield size={48} className="text-theme-text-faint mb-4" />
+          <h1 className="text-2xl font-bold text-theme-text mb-2">Access Denied</h1>
+          <p className="text-theme-text-muted text-center max-w-md">
             You do not have partner access. Contact an admin to get set up.
           </p>
         </div>
@@ -326,25 +336,26 @@ export function PartnerDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className={`min-h-screen ${themeClass} relative overflow-hidden`} style={backgroundStyle}>
       <Helmet>
         <title>Partner Dashboard | RSV.Pizza</title>
       </Helmet>
 
       <Header />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+        <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[#ff393a]/20 flex items-center justify-center">
-              <Tag size={20} className="text-[#ff393a]" />
+            <div className="w-10 h-10 rounded-xl bg-[#E52828]/20 flex items-center justify-center">
+              <Tag size={20} className="text-[#E52828]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-2xl font-bold text-theme-text">
                 {dashboardData?.isAdmin ? 'Partner Dashboard' : `${sponsor?.name || 'Partner'} Dashboard`}
               </h1>
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-theme-text-muted">
                 Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
               </p>
             </div>
@@ -357,8 +368,8 @@ export function PartnerDashboardPage() {
                 onClick={() => setSelectedTag(undefined)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                   !selectedTag
-                    ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                    : 'border-white/10 text-white/50 hover:text-white/70'
+                    ? 'border-[#E52828] text-theme-text bg-[#E52828]/20'
+                    : 'border-theme-stroke text-theme-text-muted hover:text-theme-text-secondary'
                 }`}
               >
                 All tags
@@ -369,8 +380,8 @@ export function PartnerDashboardPage() {
                   onClick={() => setSelectedTag(tag)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                     selectedTag === tag
-                      ? 'border-[#ff393a] text-white bg-[#ff393a]/20'
-                      : 'border-white/10 text-white/50 hover:text-white/70'
+                      ? 'border-[#E52828] text-theme-text bg-[#E52828]/20'
+                      : 'border-theme-stroke text-theme-text-muted hover:text-theme-text-secondary'
                   }`}
                 >
                   {tag}
@@ -410,7 +421,7 @@ export function PartnerDashboardPage() {
                 <select
                   value={regionFilter}
                   onChange={(e) => setRegionFilter(e.target.value)}
-                  className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:border-white/20 [&>option]:bg-neutral-900 [&>option]:text-white/70"
+                  className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                 >
                   <option value="all">Region: All</option>
                   {GPP_REGIONS.map((r) => (
@@ -435,19 +446,19 @@ export function PartnerDashboardPage() {
         {/* Events grid */}
         {events.length === 0 ? (
           <div className="text-center py-16">
-            <Tag size={48} className="text-white/10 mx-auto mb-4" />
+            <Tag size={48} className="text-theme-text-faint mx-auto mb-4" />
             {hasActiveFilters ? (
               <>
-                <p className="text-white/40 mb-3">No events match your filters.</p>
+                <p className="text-theme-text-muted mb-3">No events match your filters.</p>
                 <button
                   onClick={clearAllFilters}
-                  className="px-4 py-2 text-sm text-white/60 hover:text-white border border-white/10 hover:border-white/20 rounded-xl transition-colors"
+                  className="px-4 py-2 text-sm text-theme-text-secondary hover:text-theme-text border border-theme-stroke hover:border-theme-stroke-hover rounded-xl transition-colors"
                 >
                   Clear all filters
                 </button>
               </>
             ) : (
-              <p className="text-white/40">No events found with your partner tag.</p>
+              <p className="text-theme-text-muted">No events found with your partner tag.</p>
             )}
           </div>
         ) : (
@@ -461,6 +472,7 @@ export function PartnerDashboardPage() {
             ))}
           </div>
         )}
+        </div>{/* closes inner panel */}
       </main>
 
       <Footer />
@@ -482,7 +494,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col md:flex-row">
+    <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
       {event.eventImageUrl && (
         <div className="md:w-44 flex-shrink-0 self-stretch bg-black/40 flex items-center justify-center">
@@ -497,11 +509,11 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
       {/* Right side: header + body */}
       <div className="flex-1 min-w-0">
       {/* Event header */}
-      <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-5 py-4 border-b border-theme-stroke flex items-center justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-white truncate">{event.name}</h2>
+          <h2 className="text-lg font-semibold text-theme-text truncate">{event.name}</h2>
           {event.hostName && (
-            <p className="text-xs text-white/40">Hosted by {event.hostName}</p>
+            <p className="text-xs text-theme-text-muted">Hosted by {event.hostName}</p>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
@@ -510,7 +522,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
               href={`/report/${event.reportPublicSlug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white/70 border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-lg transition-colors"
               title="View event report"
             >
               <BarChart3 size={14} />
@@ -518,7 +530,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             </a>
           ) : (
             <span
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/20 border border-white/5 rounded-lg cursor-default"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-theme-text-faint border border-theme-surface rounded-lg cursor-default"
               title="Report not published yet"
             >
               <BarChart3 size={14} />
@@ -529,7 +541,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             href={`/${event.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/30 hover:text-white/60 transition-colors"
+            className="text-theme-text-faint hover:text-theme-text-secondary transition-colors"
             title="View event page"
           >
             <ExternalLink size={16} />
@@ -561,14 +573,14 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
         {visibleCoHosts.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Users size={14} className="text-white/40" />
-              <span className="text-xs text-white/40 uppercase tracking-wider">Co-hosts</span>
+              <Users size={14} className="text-theme-text-muted" />
+              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Co-hosts</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {visibleCoHosts.map((host: CoHost, i: number) => (
                 <span
                   key={host.id || i}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 text-xs text-white/60"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-theme-surface text-xs text-theme-text-secondary"
                 >
                   {host.avatar_url && (
                     <img src={host.avatar_url} alt="" className="w-4 h-4 rounded-full" />
@@ -584,8 +596,8 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
         {event.budget && (
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign size={14} className="text-white/40" />
-              <span className="text-xs text-white/40 uppercase tracking-wider">Budget</span>
+              <DollarSign size={14} className="text-theme-text-muted" />
+              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Budget</span>
             </div>
             <BudgetSummary budget={event.budget} />
           </div>
@@ -595,8 +607,8 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
         {event.checklist.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <ClipboardList size={14} className="text-white/40" />
-              <span className="text-xs text-white/40 uppercase tracking-wider">Checklist</span>
+              <ClipboardList size={14} className="text-theme-text-muted" />
+              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Checklist</span>
             </div>
             <SponsorChecklist
               items={event.checklist}
