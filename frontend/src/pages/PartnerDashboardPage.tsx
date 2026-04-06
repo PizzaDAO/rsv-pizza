@@ -4,15 +4,11 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
-import { SponsorChecklist } from '../components/sponsor-dashboard/SponsorChecklist';
-import { EventInfoCard } from '../components/sponsor-dashboard/EventInfoCard';
-import { BudgetSummary } from '../components/sponsor-dashboard/BudgetSummary';
-import { RsvpCounter } from '../components/sponsor-dashboard/RsvpCounter';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
 import {
-  Loader2, Shield, Tag, ExternalLink, ClipboardList, DollarSign, Users,
-  Search, ThumbsUp, ThumbsDown, BarChart3,
+  Loader2, Shield, Tag, ExternalLink, Users,
+  Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -497,93 +493,97 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
     <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
       {event.eventImageUrl && (
-        <div className="md:w-44 flex-shrink-0 self-stretch">
+        <div className="md:w-44 flex-shrink-0 self-stretch bg-black/40 flex items-center justify-center">
           <img
             src={event.eventImageUrl}
             alt=""
-            className="w-full h-32 md:h-full object-cover"
+            className="w-full h-32 md:h-full object-contain"
           />
         </div>
       )}
 
-      {/* Right side: header + body */}
-      <div className="flex-1 min-w-0">
-      {/* Event header */}
-      <div className="px-5 py-4 border-b border-theme-stroke flex items-center justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-theme-text truncate">{event.name}</h2>
-          {event.hostName && (
-            <p className="text-xs text-theme-text-muted">Hosted by {event.hostName}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          {event.reportPublicSlug ? (
+      {/* Right side: compact content to fit within image height */}
+      <div className="flex-1 min-w-0 px-4 py-3 flex flex-col justify-between">
+        {/* Top: title + links */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-theme-text truncate">{event.name}</h2>
+            {event.hostName && (
+              <p className="text-xs text-theme-text-muted">Hosted by {event.hostName}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {event.reportPublicSlug ? (
+              <a
+                href={`/report/${event.reportPublicSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
+                title="View event report"
+              >
+                <BarChart3 size={12} />
+                Report
+              </a>
+            ) : (
+              <span
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-faint border border-theme-surface rounded-md cursor-default"
+                title="Report not published yet"
+              >
+                <BarChart3 size={12} />
+                Report
+              </span>
+            )}
             <a
-              href={`/report/${event.reportPublicSlug}`}
+              href={`/${event.slug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-lg transition-colors"
-              title="View event report"
+              className="text-theme-text-faint hover:text-theme-text-secondary transition-colors"
+              title="View event page"
             >
-              <BarChart3 size={14} />
-              Report
+              <ExternalLink size={14} />
             </a>
-          ) : (
-            <span
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-theme-text-faint border border-theme-surface rounded-lg cursor-default"
-              title="Report not published yet"
-            >
-              <BarChart3 size={14} />
-              Report
-            </span>
-          )}
-          <a
-            href={`/${event.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-theme-text-faint hover:text-theme-text-secondary transition-colors"
-            title="View event page"
-          >
-            <ExternalLink size={16} />
-          </a>
-        </div>
-      </div>
-
-      {/* Event body */}
-      <div className="px-5 py-4 space-y-5">
-        {/* Row 1: Event info + RSVP count */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <EventInfoCard
-              date={event.date}
-              timezone={event.timezone}
-              address={event.address}
-              venueName={event.venueName}
-            />
-          </div>
-          <div className="flex items-center">
-            <RsvpCounter
-              rsvpCount={event.rsvpCount}
-              maxGuests={event.maxGuests}
-            />
           </div>
         </div>
 
-        {/* Co-hosts */}
+        {/* Middle: date/time/venue + RSVP inline */}
+        <div className="flex items-center gap-4 mt-2">
+          <div className="flex-1 min-w-0 space-y-0.5 text-xs text-theme-text-secondary">
+            {event.date && (
+              <div className="flex items-center gap-1.5">
+                <Calendar size={12} className="text-theme-text-muted flex-shrink-0" />
+                <span>{new Date(event.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(event.timezone ? { timeZone: event.timezone } : {}) })}</span>
+                <span className="text-theme-text-muted mx-0.5">·</span>
+                <span>{new Date(event.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', ...(event.timezone ? { timeZone: event.timezone } : {}) })}</span>
+              </div>
+            )}
+            {(event.venueName || event.address) && (
+              <div className="flex items-center gap-1.5">
+                <MapPin size={12} className="text-theme-text-muted flex-shrink-0" />
+                <span className="truncate">
+                  {event.venueName}{event.venueName && event.address ? ' - ' : ''}{event.address}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Users size={14} className="text-theme-text-muted" />
+            <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
+            <span className="text-xs text-theme-text-muted">RSVPs</span>
+          </div>
+        </div>
+
+        {/* Bottom: co-hosts */}
         {visibleCoHosts.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Users size={14} className="text-theme-text-muted" />
-              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Co-hosts</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 mt-2 overflow-hidden">
+            <Users size={12} className="text-theme-text-muted flex-shrink-0" />
+            <div className="flex flex-wrap gap-1.5 overflow-hidden max-h-6">
               {visibleCoHosts.map((host: CoHost, i: number) => (
                 <span
                   key={host.id || i}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-theme-surface text-xs text-theme-text-secondary"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-theme-surface text-xs text-theme-text-secondary"
                 >
                   {host.avatar_url && (
-                    <img src={host.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                    <img src={host.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full" />
                   )}
                   {host.name}
                 </span>
@@ -591,32 +591,6 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             </div>
           </div>
         )}
-
-        {/* Budget */}
-        {event.budget && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign size={14} className="text-theme-text-muted" />
-              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Budget</span>
-            </div>
-            <BudgetSummary budget={event.budget} />
-          </div>
-        )}
-
-        {/* Checklist */}
-        {event.checklist.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <ClipboardList size={14} className="text-theme-text-muted" />
-              <span className="text-xs text-theme-text-muted uppercase tracking-wider">Checklist</span>
-            </div>
-            <SponsorChecklist
-              items={event.checklist}
-              onToggle={onToggleChecklist}
-            />
-          </div>
-        )}
-      </div>
       </div>{/* closes flex-1 wrapper */}
     </div>
   );
