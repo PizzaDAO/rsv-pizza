@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 
@@ -19,6 +19,32 @@ async function canUserEditParty(partyId: string, userId?: string, userEmail?: st
   return !!party;
 }
 
+// Helper: extends canUserEditParty to also allow sponsors tagged on the event (read-only access)
+async function canUserViewReport(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
+  // First check normal edit permissions (owner, super admin)
+  if (await canUserEditParty(partyId, userId, userEmail)) {
+    return true;
+  }
+
+  // Check if user is a sponsor tagged on this event
+  if (userEmail) {
+    const sponsorUser = await prisma.sponsorUser.findFirst({
+      where: { email: userEmail.toLowerCase(), isActive: true },
+    });
+    if (sponsorUser) {
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { eventTags: true },
+      });
+      if (party && party.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Generate a unique slug for public reports
 function generateSlug(): string {
   return crypto.randomBytes(8).toString('hex');
@@ -26,14 +52,14 @@ function generateSlug(): string {
 
 const router = Router();
 
-// GET /api/parties/:partyId/report - Get full report data (host only)
+// GET /api/parties/:partyId/report - Get full report data (host or sponsor)
 router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -293,8 +319,22 @@ router.delete('/:partyId/report/publish', requireAuth, async (req: AuthRequest, 
   }
 });
 
-// GET /api/reports/:publicSlug/check - Check if report requires password (public)
-router.get('/public/:publicSlug/check', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Helper: check if user is a sponsor tagged on an event (by public slug)
+async function isSponsorForReport(publicSlug: string, userEmail?: string): Promise<boolean> {
+  if (!userEmail) return false;
+  const sponsorUser = await prisma.sponsorUser.findFirst({
+    where: { email: userEmail.toLowerCase(), isActive: true },
+  });
+  if (!sponsorUser) return false;
+  const party = await prisma.party.findUnique({
+    where: { reportPublicSlug: publicSlug },
+    select: { eventTags: true },
+  });
+  return !!(party?.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag));
+}
+
+// GET /api/reports/:publicSlug/check - Check if report requires password (public, optionalAuth)
+router.get('/public/:publicSlug/check', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
     const party = await prisma.party.findUnique({
@@ -306,14 +346,16 @@ router.get('/public/:publicSlug/check', async (req: AuthRequest, res: Response, 
       throw new AppError('Report not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ requiresPassword: !!party.reportPassword, name: party.name });
+    // Sponsors tagged on this event bypass the password
+    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
+    res.json({ requiresPassword: !sponsorBypass && !!party.reportPassword, name: party.name });
   } catch (error) {
     next(error);
   }
 });
 
-// GET /api/reports/:publicSlug - View published report (public)
-router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// GET /api/reports/:publicSlug - View published report (public, optionalAuth)
+router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
     const password = req.query.password as string | undefined;
@@ -324,7 +366,9 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
       select: { reportPassword: true, reportPublished: true },
     });
 
-    if (check?.reportPassword && check.reportPassword !== password) {
+    // Sponsors tagged on this event bypass the password
+    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
+    if (check?.reportPassword && !sponsorBypass && check.reportPassword !== password) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 
@@ -458,14 +502,14 @@ router.get('/public/:publicSlug', async (req: AuthRequest, res: Response, next: 
 // Page View Stats
 // =====================
 
-// GET /api/parties/:partyId/report/views - Get page view stats (host only)
+// GET /api/parties/:partyId/report/views - Get page view stats (host or sponsor)
 router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -533,14 +577,14 @@ router.get('/:partyId/report/views', requireAuth, async (req: AuthRequest, res: 
 // Link Click Stats
 // =====================
 
-// GET /api/parties/:partyId/report/link-clicks - Get link click stats (host only)
+// GET /api/parties/:partyId/report/link-clicks - Get link click stats (host or sponsor)
 router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
@@ -614,14 +658,14 @@ router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest,
 // Social Posts CRUD
 // =====================
 
-// GET /api/parties/:partyId/report/social-posts - List social posts
+// GET /api/parties/:partyId/report/social-posts - List social posts (host or sponsor)
 router.get('/:partyId/report/social-posts', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
-    // Verify ownership or super admin
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 

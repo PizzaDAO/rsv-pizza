@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`site-header border-b border-theme-stroke ${bgClass}`}>
-      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <img
             src="/logo.png"

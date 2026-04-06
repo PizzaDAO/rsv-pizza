@@ -678,19 +678,22 @@ export async function validateCustomSlug(
   return { valid: true };
 }
 
-// Securely verify password without fetching it
-export async function verifyPartyPassword(partyId: string, passwordAttempt: string): Promise<boolean> {
-  const { count, error } = await supabase
-    .from('parties')
-    .select('id', { count: 'exact', head: true })
-    .eq('id', partyId)
-    .eq('password', passwordAttempt);
-
-  if (error) {
+// Verify event password via backend API (password column is not readable by anon)
+export async function verifyPartyPassword(inviteCode: string, passwordAttempt: string): Promise<boolean> {
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/rsvp/${inviteCode}/verify-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: passwordAttempt }),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.valid === true;
+  } catch (error) {
     console.error('Error verifying password:', error);
     return false;
   }
-  return count === 1;
 }
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
@@ -774,40 +777,39 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
   // Normalize: Supabase returns co_hosts_public (sanitized), copy to co_hosts
   normalizePartyCoHosts(party);
 
-  // Enrich co-hosts with user profile data via backend API
-  // Direct Supabase User table query is blocked by RLS; the backend already enriches co-hosts.
-  // Note: co_hosts_public (from Supabase) won't contain emails — the backend has full access
-  // via service_role and returns enriched co-host data for authenticated users.
-  if (party.co_hosts && Array.isArray(party.co_hosts) && party.co_hosts.length > 0) {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-        const response = await fetch(`${apiUrl}/api/parties/${party.id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.party?.coHosts) {
-            // Backend returns enriched coHosts (camelCase) — use them directly
-            party.co_hosts = data.party.coHosts;
-          }
-          // Backend returns canEdit flag based on authenticated user's permissions
-          if (data.party?.canEdit !== undefined) {
-            party.can_edit = data.party.canEdit;
+  // Run co-host enrichment and guest fetch in parallel
+  const enrichPromise = (async () => {
+    if (party!.co_hosts && Array.isArray(party!.co_hosts) && party!.co_hosts.length > 0) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+          const response = await fetch(`${apiUrl}/api/parties/${party!.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.party?.coHosts) {
+              party!.co_hosts = data.party.coHosts;
+            }
+            if (data.party?.canEdit !== undefined) {
+              party!.can_edit = data.party.canEdit;
+            }
           }
         }
+      } catch (err) {
+        console.warn('Could not enrich co-host profiles via API:', err);
       }
-    } catch (err) {
-      console.warn('Could not enrich co-host profiles via API:', err);
     }
-  }
+  })();
 
-  const { data: guests, error: guestsError } = await supabase
+  const guestsPromise = supabase
     .from('guests')
     .select('*')
     .eq('party_id', party.id)
     .order('submitted_at', { ascending: true });
+
+  const [, { data: guests, error: guestsError }] = await Promise.all([enrichPromise, guestsPromise]);
 
   if (guestsError) {
     console.error('Error fetching guests:', guestsError);
@@ -954,6 +956,7 @@ export interface ExistingGuestData {
   dislikedBeverages: string[];
   pizzeriaRankings: string[];
   suggestedPizzerias: any[];
+  status: DbGuestStatus;
 }
 
 export async function getExistingGuest(
@@ -988,6 +991,7 @@ export async function getExistingGuest(
       dislikedBeverages: guest.dislikedBeverages || [],
       pizzeriaRankings: guest.pizzeriaRankings || [],
       suggestedPizzerias: guest.suggestedPizzerias || [],
+      status: guest.status || 'CONFIRMED',
     };
   } catch (error) {
     console.error('Error fetching guest:', error);

@@ -96,6 +96,40 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// POST /api/rsvp/:inviteCode/verify-password - Verify event password (public)
+router.post('/:inviteCode/verify-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    // Find party by invite code OR custom URL
+    let party = await prisma.party.findUnique({
+      where: { inviteCode },
+      select: { id: true, password: true },
+    });
+
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: inviteCode },
+        select: { id: true, password: true },
+      });
+    }
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const valid = party.password === password;
+    res.json({ valid });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/rsvp/:inviteCode/guest/:email - Get existing guest by email (public)
 router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -137,6 +171,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         likedBeverages: true,
         dislikedBeverages: true,
         pizzeriaRankings: true,
+        status: true,
       },
     });
 

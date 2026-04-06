@@ -33,10 +33,10 @@ export function RSVPFormStep2({
               key={option}
               type="button"
               onClick={() => form.toggleDietary(option)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-colors border ${
                 form.dietaryRestrictions.includes(option)
-                  ? 'bg-[#ff393a] text-white'
-                  : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
+                  ? 'border-[#ff393a] bg-theme-surface-hover text-theme-text'
+                  : 'border-theme-stroke bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
               }`}
             >
               {option}

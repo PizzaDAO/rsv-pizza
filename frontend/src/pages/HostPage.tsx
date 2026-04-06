@@ -77,8 +77,8 @@ function HostPageContent() {
     async function load() {
       if (inviteCode && inviteCode !== loadedCode) {
         setError(null);
-        setLoadedCode(inviteCode);
         const success = await loadParty(inviteCode);
+        setLoadedCode(inviteCode);
         if (!success) {
           setError('Party not found. The link may be invalid or expired.');
         }

@@ -163,6 +163,76 @@ describe('RSVP Routes', () => {
     });
   });
 
+  describe('POST /api/rsvp/:inviteCode/verify-password', () => {
+    it('returns valid=true for correct password', async () => {
+      const app = createTestApp();
+      mockPrisma.party.findUnique.mockResolvedValue({
+        id: PARTY_ID,
+        password: 'cowabunga',
+      });
+
+      const res = await request(app)
+        .post(`/api/rsvp/${INVITE_CODE}/verify-password`)
+        .send({ password: 'cowabunga' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(true);
+    });
+
+    it('returns valid=false for wrong password', async () => {
+      const app = createTestApp();
+      mockPrisma.party.findUnique.mockResolvedValue({
+        id: PARTY_ID,
+        password: 'cowabunga',
+      });
+
+      const res = await request(app)
+        .post(`/api/rsvp/${INVITE_CODE}/verify-password`)
+        .send({ password: 'wrong' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(false);
+    });
+
+    it('falls back to custom URL lookup', async () => {
+      const app = createTestApp();
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: PARTY_ID, password: 'secret' });
+
+      const res = await request(app)
+        .post('/api/rsvp/my-custom-url/verify-password')
+        .send({ password: 'secret' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(true);
+      expect(mockPrisma.party.findUnique).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns 404 for non-existent party', async () => {
+      const app = createTestApp();
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .post('/api/rsvp/nonexistent/verify-password')
+        .send({ password: 'anything' });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 when password is missing', async () => {
+      const app = createTestApp();
+
+      const res = await request(app)
+        .post(`/api/rsvp/${INVITE_CODE}/verify-password`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /api/rsvp/:inviteCode/guest - Submit RSVP', () => {
     beforeEach(() => {
       mockPrisma.guest.findFirst.mockResolvedValue(null); // No duplicate

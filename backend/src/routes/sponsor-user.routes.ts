@@ -254,6 +254,23 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       orderBy: { date: 'asc' },
     });
 
+    // Batch-fetch all co-host profile data upfront (avoid await inside .map)
+    const allCoHostEmails = new Set<string>();
+    for (const event of events) {
+      const rawCoHosts = Array.isArray(event.coHosts) ? (event.coHosts as any[]) : [];
+      for (const h of rawCoHosts) {
+        if (h.email) allCoHostEmails.add(h.email);
+      }
+    }
+    let allProfilesByEmail: Record<string, any> = {};
+    if (allCoHostEmails.size > 0) {
+      const users = await prisma.user.findMany({
+        where: { email: { in: Array.from(allCoHostEmails) } },
+        select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
+      });
+      allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
+    }
+
     const formattedEvents = events.map(event => {
       const guestCount = event._count.guests;
       const approvedCount = event.guests.filter(g => g.approved !== false).length;
@@ -279,17 +296,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
 
       // Co-hosts — enrich with user profile data (avatar, socials)
       const rawCoHosts = Array.isArray(event.coHosts) ? (event.coHosts as any[]) : [];
-      const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
-      let profilesByEmail: Record<string, any> = {};
-      if (coHostEmails.length > 0) {
-        const users = await prisma.user.findMany({
-          where: { email: { in: coHostEmails } },
-          select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
-        });
-        profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
-      }
       const coHosts = rawCoHosts.map(({ email, ...rest }: any) => {
-        const profile = email ? profilesByEmail[email] : null;
+        const profile = email ? allProfilesByEmail[email] : null;
         if (profile) {
           return {
             ...rest,
@@ -310,11 +318,11 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       const hostEmail = (event.user?.email || '').toLowerCase();
       const hostName = (event.user?.name || '').toLowerCase();
       const realCoHosts = rawCoHosts.filter((h: any) => {
-        const email = (h.email || '').toLowerCase();
-        const name = (h.name || '').toLowerCase();
-        if (name === 'pizzadao' || email === 'hello@rarepizzas.com') return false;
-        if (hostEmail && email === hostEmail) return false;
-        if (hostName && name === hostName && !email) return false;
+        const hEmail = (h.email || '').toLowerCase();
+        const hName = (h.name || '').toLowerCase();
+        if (hName === 'pizzadao' || hEmail === 'hello@rarepizzas.com') return false;
+        if (hostEmail && hEmail === hostEmail) return false;
+        if (hostName && hName === hostName && !hEmail) return false;
         return true;
       });
       const checkedInCount = event.guests?.filter((g: any) => g.checkedInAt).length || 0;

@@ -223,11 +223,11 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           <select
             value={photoYear || ''}
             onChange={(e) => setPhotoYear(e.target.value ? parseInt(e.target.value, 10) : null)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+            className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-4 py-2 text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
           >
-            <option value="" className="bg-[#1a1a2e] text-white">Year taken (optional)</option>
+            <option value="" className="bg-theme-card text-theme-text">Year taken (optional)</option>
             {yearOptions.map((year) => (
-              <option key={year} value={year} className="bg-[#1a1a2e] text-white">
+              <option key={year} value={year} className="bg-theme-card text-theme-text">
                 {year}
               </option>
             ))}
