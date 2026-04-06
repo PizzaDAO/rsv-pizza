@@ -75,7 +75,7 @@ function FilterPill({
   );
 }
 
-export function SponsorDashboardPage() {
+export function PartnerDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export function SponsorDashboardPage() {
           setAvailableTags(Array.from(tags).sort());
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to load sponsor dashboard');
+        setError(err.message || 'Failed to load partner dashboard');
       } finally {
         setLoading(false);
       }
@@ -242,7 +242,12 @@ export function SponsorDashboardPage() {
     return sorted;
   }, [allEvents, searchQuery, progressIncludes, progressExcludes, regionFilter]);
 
-  const hasActiveFilters = searchQuery.trim() !== '' || progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
+  const uniqueRegions = useMemo(() => {
+    const regions = new Set(allEvents.map(e => e.region).filter(Boolean));
+    return regions;
+  }, [allEvents]);
+
+  const hasActiveFilters = searchQuery.trim() !== '' || progressIncludes.length > 0 || progressExcludes.length > 0 || (uniqueRegions.size > 1 && regionFilter !== 'all');
 
   function clearAllFilters() {
     setSearchQuery('');
@@ -271,9 +276,9 @@ export function SponsorDashboardPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-white/20 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Sponsor Dashboard</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">Partner Dashboard</h1>
           <p className="text-white/50 text-center max-w-md mb-6">
-            Log in to access your sponsor dashboard.
+            Log in to access your partner dashboard.
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
@@ -303,7 +308,7 @@ export function SponsorDashboardPage() {
     );
   }
 
-  // Not a sponsor
+  // Not a partner
   if (!meData?.isSponsor) {
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
@@ -312,7 +317,7 @@ export function SponsorDashboardPage() {
           <Shield size={48} className="text-white/20 mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
           <p className="text-white/50 text-center max-w-md">
-            You do not have sponsor access. Contact an admin to get set up.
+            You do not have partner access. Contact an admin to get set up.
           </p>
         </div>
         <Footer />
@@ -323,7 +328,7 @@ export function SponsorDashboardPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <Helmet>
-        <title>Sponsor Dashboard | RSV.Pizza</title>
+        <title>Partner Dashboard | RSV.Pizza</title>
       </Helmet>
 
       <Header />
@@ -337,7 +342,7 @@ export function SponsorDashboardPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">
-                {dashboardData?.isAdmin ? 'Sponsor Dashboard' : `${sponsor?.name || 'Sponsor'} Dashboard`}
+                {dashboardData?.isAdmin ? 'Partner Dashboard' : `${sponsor?.name || 'Partner'} Dashboard`}
               </h1>
               <p className="text-sm text-white/50">
                 Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
@@ -400,17 +405,19 @@ export function SponsorDashboardPage() {
                 />
               ))}
 
-              {/* Region filter dropdown */}
-              <select
-                value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value)}
-                className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:border-white/20"
-              >
-                <option value="all">Region: All</option>
-                {GPP_REGIONS.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
+              {/* Region filter dropdown — hidden when all events share one region */}
+              {uniqueRegions.size > 1 && (
+                <select
+                  value={regionFilter}
+                  onChange={(e) => setRegionFilter(e.target.value)}
+                  className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:border-white/20 [&>option]:bg-neutral-900 [&>option]:text-white/70"
+                >
+                  <option value="all">Region: All</option>
+                  {GPP_REGIONS.map((r) => (
+                    <option key={r.id} value={r.id}>{r.label}</option>
+                  ))}
+                </select>
+              )}
 
               {/* Clear filters */}
               {hasActiveFilters && (
@@ -440,7 +447,7 @@ export function SponsorDashboardPage() {
                 </button>
               </>
             ) : (
-              <p className="text-white/40">No events found with your sponsor tag.</p>
+              <p className="text-white/40">No events found with your partner tag.</p>
             )}
           </div>
         ) : (
@@ -498,16 +505,26 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <a
-            href={`/report/${event.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white/70 border border-white/10 hover:border-white/20 rounded-lg transition-colors"
-            title="View event report"
-          >
-            <BarChart3 size={14} />
-            Report
-          </a>
+          {event.reportPublicSlug ? (
+            <a
+              href={`/report/${event.reportPublicSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white/70 border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+              title="View event report"
+            >
+              <BarChart3 size={14} />
+              Report
+            </a>
+          ) : (
+            <span
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/20 border border-white/5 rounded-lg cursor-default"
+              title="Report not published yet"
+            >
+              <BarChart3 size={14} />
+              Report
+            </span>
+          )}
           <a
             href={`/${event.slug}`}
             target="_blank"

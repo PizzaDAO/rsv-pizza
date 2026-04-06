@@ -1122,6 +1122,7 @@ export interface SponsorDashboardEvent {
   id: string;
   name: string;
   slug: string;
+  reportPublicSlug: string | null;
   date: string | null;
   timezone: string | null;
   address: string | null;
