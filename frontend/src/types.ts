@@ -430,6 +430,8 @@ export interface Sponsor {
   contactPhone: string | null;
   contactTwitter: string | null;
   telegram: string | null;
+  brandInstagram: string | null;
+  brandDescription: string | null;
   status: SponsorStatus;
   amount: number | null;
   sponsorshipType: SponsorshipType | null;

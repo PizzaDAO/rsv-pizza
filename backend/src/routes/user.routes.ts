@@ -95,4 +95,67 @@ router.patch('/preferences', async (req: AuthRequest, res: Response, next: NextF
   }
 });
 
+// GET /api/user/sponsorships - Get sponsorships where user email matches sponsor contactEmail
+router.get('/sponsorships', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { email: true },
+    });
+
+    if (!user?.email) {
+      return res.json([]);
+    }
+
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        contactEmail: {
+          equals: user.email,
+          mode: 'insensitive',
+        },
+        intakeSubmittedAt: {
+          not: null,
+        },
+      },
+      include: {
+        party: {
+          select: {
+            id: true,
+            name: true,
+            customUrl: true,
+            date: true,
+            eventImageUrl: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    const result = sponsors.map((s) => ({
+      id: s.id,
+      brandName: s.name,
+      brandLogo: s.logoUrl,
+      brandDescription: s.brandDescription,
+      brandInstagram: s.brandInstagram,
+      sponsorshipType: s.sponsorshipType,
+      amount: s.amount ? Number(s.amount) : null,
+      status: s.status,
+      intakeSubmittedAt: s.intakeSubmittedAt,
+      party: {
+        id: s.party.id,
+        name: s.party.name,
+        customUrl: s.party.customUrl,
+        date: s.party.date,
+        eventImageUrl: s.party.eventImageUrl,
+      },
+    }));
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
