@@ -30,8 +30,8 @@ export const BudgetSummary: React.FC<BudgetSummaryProps> = ({ budget }) => {
       {/* Progress bar */}
       {budget.total > 0 && (
         <div className="flex items-center gap-3 mb-3">
-          <DollarSign size={14} className="text-white/40 flex-shrink-0" />
-          <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+          <DollarSign size={14} className="text-theme-text-muted flex-shrink-0" />
+          <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
@@ -40,7 +40,7 @@ export const BudgetSummary: React.FC<BudgetSummaryProps> = ({ budget }) => {
               }}
             />
           </div>
-          <span className="text-xs text-white/60 whitespace-nowrap">
+          <span className="text-xs text-theme-text-secondary whitespace-nowrap">
             {percentage}%
           </span>
         </div>
@@ -49,23 +49,23 @@ export const BudgetSummary: React.FC<BudgetSummaryProps> = ({ budget }) => {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {budget.total > 0 && (
-          <div className="bg-white/5 rounded-lg px-3 py-2">
-            <div className="text-xs text-white/40">Budget</div>
-            <div className="text-sm font-medium text-white/80">{formatCurrency(budget.total)}</div>
+          <div className="bg-theme-surface rounded-lg px-3 py-2">
+            <div className="text-xs text-theme-text-muted">Budget</div>
+            <div className="text-sm font-medium text-theme-text">{formatCurrency(budget.total)}</div>
           </div>
         )}
-        <div className="bg-white/5 rounded-lg px-3 py-2">
-          <div className="text-xs text-white/40">Spent</div>
-          <div className="text-sm font-medium text-white/80">{formatCurrency(budget.spent)}</div>
+        <div className="bg-theme-surface rounded-lg px-3 py-2">
+          <div className="text-xs text-theme-text-muted">Spent</div>
+          <div className="text-sm font-medium text-theme-text">{formatCurrency(budget.spent)}</div>
         </div>
-        <div className="bg-white/5 rounded-lg px-3 py-2">
-          <div className="text-xs text-white/40">Paid</div>
-          <div className="text-sm font-medium text-green-400/80">{formatCurrency(budget.paid)}</div>
+        <div className="bg-theme-surface rounded-lg px-3 py-2">
+          <div className="text-xs text-theme-text-muted">Paid</div>
+          <div className="text-sm font-medium text-green-600">{formatCurrency(budget.paid)}</div>
         </div>
         {budget.remaining !== null && (
-          <div className="bg-white/5 rounded-lg px-3 py-2">
-            <div className="text-xs text-white/40">Remaining</div>
-            <div className={`text-sm font-medium ${budget.remaining >= 0 ? 'text-white/80' : 'text-red-400/80'}`}>
+          <div className="bg-theme-surface rounded-lg px-3 py-2">
+            <div className="text-xs text-theme-text-muted">Remaining</div>
+            <div className={`text-sm font-medium ${budget.remaining >= 0 ? 'text-theme-text' : 'text-red-500'}`}>
               {formatCurrency(budget.remaining)}
             </div>
           </div>

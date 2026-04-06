@@ -55,7 +55,7 @@ export const EventInfoCard: React.FC<EventInfoCardProps> = ({ date, timezone, ad
           href={`https://maps.google.com/?q=${encodeURIComponent(address!)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 w-24 h-20 rounded-lg overflow-hidden bg-white/5"
+          className="flex-shrink-0 w-24 h-20 rounded-lg overflow-hidden bg-theme-surface"
         >
           <img
             src={mapUrl}
@@ -69,23 +69,23 @@ export const EventInfoCard: React.FC<EventInfoCardProps> = ({ date, timezone, ad
       {/* Info */}
       <div className="flex-1 min-w-0 space-y-1.5">
         {date && (
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <Calendar size={14} className="text-white/40 flex-shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-theme-text-secondary">
+            <Calendar size={14} className="text-theme-text-muted flex-shrink-0" />
             <span>{formatDate(date, timezone)}</span>
           </div>
         )}
         {date && (
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <Clock size={14} className="text-white/40 flex-shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-theme-text-secondary">
+            <Clock size={14} className="text-theme-text-muted flex-shrink-0" />
             <span>{formatTime(date, timezone)}</span>
           </div>
         )}
         {(venueName || address) && (
-          <div className="flex items-start gap-2 text-sm text-white/70">
-            <MapPin size={14} className="text-white/40 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 text-sm text-theme-text-secondary">
+            <MapPin size={14} className="text-theme-text-muted flex-shrink-0 mt-0.5" />
             <span className="truncate">
               {venueName && <span className="font-medium">{venueName}</span>}
-              {venueName && address && <span className="text-white/40"> - </span>}
+              {venueName && address && <span className="text-theme-text-muted"> - </span>}
               {address}
             </span>
           </div>
