@@ -765,7 +765,7 @@ export function EventPage() {
               </div>
 
               {/* Event Title */}
-              <div className="p-6 pb-1 md:border-b md:border-theme-stroke">
+              <div className="p-6 md:border-b md:border-theme-stroke">
                 {event.eventType === 'gpp' && (
                   <div className="mb-3">
                     <GPPBadge />
