@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza } from 'lucide-react';
+import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza, Handshake, ExternalLink, Calendar } from 'lucide-react';
 import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
+import { getUserSponsorships, UserSponsorshipEntry } from '../lib/api';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
@@ -35,6 +36,9 @@ export function AccountPage() {
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [originalPreferences, setOriginalPreferences] = useState<UserPreferences | null>(null);
+
+  // Sponsorships
+  const [sponsorships, setSponsorships] = useState<UserSponsorshipEntry[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -138,6 +142,22 @@ export function AccountPage() {
     }
     loadPreferences();
   }, [user?.email, preferencesLoaded]);
+
+  // Load sponsorships
+  useEffect(() => {
+    async function loadSponsorships() {
+      if (user) {
+        try {
+          const data = await getUserSponsorships();
+          setSponsorships(data);
+        } catch (err) {
+          // Silently fail - section just won't show
+          console.error('Failed to load sponsorships:', err);
+        }
+      }
+    }
+    loadSponsorships();
+  }, [user]);
 
   // Auto-deselect liked toppings that conflict with selected dietary restrictions
   useEffect(() => {
@@ -634,6 +654,99 @@ export function AccountPage() {
                 </div>
               </div>
             </div>
+
+            {/* Sponsorships Section - only show if user has sponsorships */}
+            {sponsorships.length > 0 && (
+              <div className="pt-6 border-t border-theme-stroke">
+                <div className="flex items-center gap-3 mb-6">
+                  <Handshake className="w-6 h-6 text-[#ff393a]" />
+                  <h2 className="text-lg font-semibold text-theme-text">Your Sponsorships</h2>
+                </div>
+
+                <div className="space-y-4">
+                  {sponsorships.map((s) => {
+                    const eventUrl = `/${s.party.customUrl || s.party.id}`;
+                    const statusColors: Record<string, string> = {
+                      paid: 'bg-[#39d98a]/20 text-[#39d98a]',
+                      yes: 'bg-[#5b8af5]/20 text-[#5b8af5]',
+                      billed: 'bg-[#f5c85b]/20 text-[#f5c85b]',
+                      stuck: 'bg-[#ff393a]/20 text-[#ff393a]',
+                    };
+                    const statusColor = statusColors[s.status] || 'bg-theme-surface-hover text-theme-text-secondary';
+                    const typeLabels: Record<string, string> = {
+                      cash: 'Cash',
+                      'in-kind': 'In-Kind',
+                      venue: 'Venue',
+                      pizza: 'Pizza',
+                      drinks: 'Drinks',
+                      other: 'Other',
+                    };
+
+                    return (
+                      <div
+                        key={s.id}
+                        className="bg-theme-surface border border-theme-stroke rounded-xl p-4"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Brand logo */}
+                          {s.brandLogo && (
+                            <img
+                              src={s.brandLogo}
+                              alt={s.brandName}
+                              className="w-12 h-12 rounded-lg object-contain bg-white flex-shrink-0"
+                            />
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            {/* Brand name + badges */}
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <span className="font-semibold text-theme-text truncate">{s.brandName}</span>
+                              {s.sponsorshipType && (
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-theme-surface-hover text-theme-text-secondary">
+                                  {typeLabels[s.sponsorshipType] || s.sponsorshipType}
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                                {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                              </span>
+                            </div>
+
+                            {/* Event link */}
+                            <Link
+                              to={eventUrl}
+                              className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff393a]/80 transition-colors mb-1"
+                            >
+                              <ExternalLink size={12} />
+                              {s.party.name}
+                            </Link>
+
+                            {/* Amount (if cash) */}
+                            {s.sponsorshipType === 'cash' && s.amount != null && (
+                              <p className="text-sm text-theme-text-secondary">
+                                ${s.amount.toLocaleString()}
+                              </p>
+                            )}
+
+                            {/* Brand description */}
+                            {s.brandDescription && (
+                              <p className="text-sm text-theme-text-muted mt-1 line-clamp-2">
+                                {s.brandDescription}
+                              </p>
+                            )}
+
+                            {/* Submission date */}
+                            <div className="flex items-center gap-1.5 mt-2 text-xs text-theme-text-faint">
+                              <Calendar size={11} />
+                              Submitted {new Date(s.intakeSubmittedAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Save Button - only show when there are changes */}
             {(hasChanges || saving || saved) && (

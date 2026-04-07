@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Loader2, Upload, FileText, Link, Receipt } from 'lucide-react';
+import { X, Loader2, Upload, FileText, DollarSign, User, Link, StickyNote } from 'lucide-react';
 import { BudgetItem, BudgetCategory, BudgetStatus, BUDGET_CATEGORIES } from '../../types';
 import { IconInput } from '../IconInput';
 import { uploadReceipt } from '../../lib/supabase';
@@ -162,7 +162,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Description"
+            placeholder="Description (e.g., Pizza from Joe's)"
             required
             autoFocus
           />
@@ -182,20 +182,16 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 ))}
               </select>
             </div>
-            <div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-7 pr-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
-            </div>
+            <IconInput
+              icon={DollarSign}
+              type="number"
+              step="0.01"
+              min="0"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="Cost"
+              required
+            />
           </div>
 
           {/* Status */}
@@ -228,20 +224,20 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
           {/* Point Person */}
           <IconInput
-            icon={FileText}
+            icon={User}
             type="text"
             value={pointPerson}
             onChange={(e) => setPointPerson(e.target.value)}
-            placeholder="Point Person"
+            placeholder="Point person (who's handling this?)"
           />
 
           {/* Notes */}
           <IconInput
-            icon={FileText}
+            icon={StickyNote}
             multiline
             rows={2}
             value={notes}
-            onChange={(e) => setNotes((e.target as HTMLTextAreaElement).value)}
+            onChange={(e) => setNotes(e.target.value)}
             placeholder="Additional details..."
           />
 

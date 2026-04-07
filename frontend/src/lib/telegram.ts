@@ -26,5 +26,5 @@ export async function fetchTelegramGroups(): Promise<TelegramGroup[]> {
       chatUrl: row.c?.[8]?.v || '',
       groupId: String(row.c?.[10]?.v || '').replace('#', '').trim(),
     }))
-    .filter((g: TelegramGroup) => g.groupId && g.city);
+    .filter((g: TelegramGroup) => g.groupId && g.city && /^-?\d+$/.test(g.groupId));
 }

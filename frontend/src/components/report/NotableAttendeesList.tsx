@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Loader2, Users, Building2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Users, Building2, User, Link } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { NotableAttendee, Guest } from '../../types';
 import { BrowseGuestsModal } from './BrowseGuestsModal';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
@@ -257,19 +258,19 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
       {/* Add new attendee form (manual) */}
       {isAdding && (
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke space-y-3">
-          <input
+          <IconInput
+            icon={User}
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name or company"
-            className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
-          <input
+          <IconInput
+            icon={Link}
             type="url"
             value={newLink}
             onChange={(e) => setNewLink(e.target.value)}
             placeholder="Link to profile or website (optional)"
-            className="w-full bg-theme-surface-hover border border-theme-stroke-hover rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a]"
           />
           <div className="flex gap-2">
             <button

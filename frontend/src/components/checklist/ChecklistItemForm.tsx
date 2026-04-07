@@ -58,18 +58,14 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
 
           {/* Due date */}
           <div>
-            <div className="relative">
-              <Calendar
-                size={20}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none"
-              />
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full bg-theme-surface border border-theme-stroke rounded-xl pl-10 pr-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] [color-scheme:dark]"
-              />
-            </div>
+            <IconInput
+              icon={Calendar}
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              placeholder="Due date"
+              style={{ colorScheme: 'dark' }}
+            />
             <p className="text-xs text-theme-text-muted mt-1">Optional due date</p>
           </div>
 

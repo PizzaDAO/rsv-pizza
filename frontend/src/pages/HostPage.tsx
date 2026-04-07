@@ -287,7 +287,7 @@ function HostPageContent() {
                       const minValue = 0;
                       const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
                       const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
-                      const maxCap = guests.length > 0 ? guests.length * 5 : 100;
+                      const maxCap = guests.length > 0 ? Math.max(guests.length * 5, currentValue) : Math.max(100, currentValue);
                       const maxValue = Math.min(dynamicMax, maxCap);
                       const requestsPercent = ((guestsWithRequests - minValue) / (maxValue - minValue)) * 100;
                       const rsvpsPercent = ((guests.length - minValue) / (maxValue - minValue)) * 100;

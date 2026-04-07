@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown } from 'lucide-react';
+import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
 import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../lib/api';
 
@@ -122,14 +123,38 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
   const allFilteredSelected = filteredGroups.length > 0 && filteredGroups.every(g => selectedIds.has(g.groupId));
 
-  // Build selected groups array for API
+  // Build selected groups array for API (dedup by groupId to prevent spam)
   const selectedGroups = useMemo(() => {
-    return groups.filter(g => selectedIds.has(g.groupId)).map(g => ({
-      chatId: g.groupId,
-      city: g.city,
-      country: g.country,
-    }));
+    const seen = new Set<string>();
+    return groups
+      .filter(g => selectedIds.has(g.groupId))
+      .filter(g => {
+        if (seen.has(g.groupId)) return false;
+        seen.add(g.groupId);
+        return true;
+      })
+      .map(g => ({
+        chatId: g.groupId,
+        city: g.city,
+        country: g.country,
+      }));
   }, [groups, selectedIds]);
+
+  // Detect duplicate groupIds in loaded data
+  const duplicateGroupWarnings = useMemo(() => {
+    const groupIdToCities = new Map<string, string[]>();
+    for (const g of groups) {
+      if (!g.groupId || g.groupId === 'tbd' || g.groupId === 'x') continue;
+      const cities = groupIdToCities.get(g.groupId) || [];
+      cities.push(g.city);
+      groupIdToCities.set(g.groupId, cities);
+    }
+    const dupes: { groupId: string; cities: string[] }[] = [];
+    for (const [groupId, cities] of groupIdToCities) {
+      if (cities.length > 1) dupes.push({ groupId, cities });
+    }
+    return dupes;
+  }, [groups]);
 
   // Send broadcast
   const handleSend = async () => {
@@ -180,7 +205,8 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
       onClick={onClose}
     >
       <div
-        className="bg-theme-card border border-theme-stroke rounded-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        className="border border-theme-stroke rounded-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        style={{ background: 'var(--bg-main)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -220,6 +246,28 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
           {/* Compose view */}
           {!loadingGroups && !loadError && viewState === 'compose' && (
             <div className="space-y-6">
+              {/* Duplicate groupId warning */}
+              {duplicateGroupWarnings.length > 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-600">Duplicate Telegram groups detected</p>
+                      <p className="text-xs text-yellow-600/80 mt-1">
+                        These cities share the same group ID in the sheet — only the first city per group will receive a message:
+                      </p>
+                      <ul className="text-xs text-yellow-600/80 mt-1 space-y-0.5">
+                        {duplicateGroupWarnings.map(d => (
+                          <li key={d.groupId}>
+                            {d.cities.join(', ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Group Selector Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -248,14 +296,14 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
                 {/* Search and region filter */}
                 <div className="flex gap-2 mb-3">
-                  <div className="flex-1 relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-faint" />
-                    <input
+                  <div className="flex-1">
+                    <IconInput
+                      icon={Search}
+                      iconSize={14}
                       type="text"
                       placeholder="Search city, country, or underboss..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full bg-theme-surface border border-theme-stroke rounded-lg pl-9 pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
                     />
                   </div>
                   <div className="relative">
@@ -416,7 +464,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                     </select>
                   </div>
                 </div>
-                <textarea
+                <IconInput
+                  icon={MessageSquare}
+                  multiline
+                  rows={6}
                   placeholder="Type your message here..."
                   value={message}
                   onChange={(e) => {
@@ -424,8 +475,6 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                       setMessage(e.target.value);
                     }
                   }}
-                  rows={6}
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-3 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover resize-none"
                 />
                 <p className="text-xs text-theme-text-faint mt-1.5">
                   Use <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{city}'}</code> and <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{country}'}</code> for per-group personalization
