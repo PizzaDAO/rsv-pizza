@@ -478,7 +478,7 @@ export function FlyerGenerator() {
           let drawY = positions.sponsors.y + (boxH - totalH) / 2;
 
           for (const row of rows) {
-            let drawX = boxX;
+            let drawX = boxX + (boxW - row.width) / 2;
             for (const item of row.items) {
               const itemY = drawY + (row.height - item.h) / 2;
               ctx.drawImage(item.img, drawX, itemY, item.w, item.h);
@@ -797,6 +797,7 @@ export function FlyerGenerator() {
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 alignContent: 'center',
+                justifyContent: 'center',
                 gap: 16,
                 ...dragProps.style,
               }}
