@@ -95,6 +95,49 @@ export function RSVPFormStep2({
               </div>
             );
           })}
+          {/* Custom toppings (host-added, stored as custom:Name) */}
+          {form.availableToppings
+            .filter(id => id.startsWith('custom:'))
+            .map(id => {
+              const name = id.slice('custom:'.length);
+              const isLiked = form.likedToppings.includes(id);
+              const isDisliked = form.dislikedToppings.includes(id);
+
+              return (
+                <div
+                  key={id}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                    isLiked
+                      ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                      : isDisliked
+                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                        : 'bg-theme-surface border-theme-stroke'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => form.handleToppingLike(id)}
+                    className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                  >
+                    <ThumbsUp
+                      size={12}
+                      className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                    />
+                    <span className="text-xs text-theme-text">{name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => form.handleToppingDislike(id)}
+                    className="p-0.5 hover:opacity-70 transition-opacity"
+                  >
+                    <ThumbsDown
+                      size={12}
+                      className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
         </div>
       </div>
 
@@ -144,6 +187,49 @@ export function RSVPFormStep2({
                 </div>
               );
             })}
+            {/* Custom drinks (host-added, stored as custom:Name) */}
+            {form.availableBeverages
+              .filter(id => id.startsWith('custom:'))
+              .map(id => {
+                const name = id.slice('custom:'.length);
+                const isLiked = form.likedBeverages.includes(id);
+                const isDisliked = form.dislikedBeverages.includes(id);
+
+                return (
+                  <div
+                    key={id}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                      isLiked
+                        ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                        : isDisliked
+                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                          : 'bg-theme-surface border-theme-stroke'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => form.handleDrinkLike(id)}
+                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsUp
+                        size={12}
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                      />
+                      <span className="text-theme-text text-xs">{name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => form.handleDrinkDislike(id)}
+                      className="p-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsDown
+                        size={12}
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
