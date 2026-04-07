@@ -137,6 +137,52 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 }
 
 /**
+ * Upload a receipt file (image or PDF) to Supabase Storage and return the public URL
+ * @param file The receipt file to upload (JPEG, PNG, WebP, or PDF)
+ * @param partyId The party ID for organizing uploads
+ * @returns The public URL of the uploaded receipt, or null if upload failed
+ */
+export async function uploadReceipt(file: File, partyId: string): Promise<string | null> {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) {
+    console.error('Invalid file type for receipt:', file.type);
+    return null;
+  }
+
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    console.error('Receipt file too large:', file.size);
+    return null;
+  }
+
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `receipts/${partyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading receipt:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading receipt:', error);
+    return null;
+  }
+}
+
+/**
  * Upload an event photo to Supabase Storage
  * @param file The image file to upload
  * @param partyId The party ID for organizing uploads
