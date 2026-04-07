@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { updateParty, addGuestByHost } from '../lib/supabase';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid } from '../lib/utils';
+import { ALL_HOST_TABS } from '../lib/tabPermissions';
 
 interface HostsManagerProps {
   partyId: string;
@@ -47,6 +48,45 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [editHostTwitter, setEditHostTwitter] = useState('');
   const [editHostInstagram, setEditHostInstagram] = useState('');
   const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
+  const [expandedPermissionsId, setExpandedPermissionsId] = useState<string | null>(null);
+
+  // Tabs available for permission assignment (exclude 'apps' which is always visible)
+  const permissionTabs = ALL_HOST_TABS.filter(t => t.id !== 'apps');
+
+  const getPermissionSummary = (coHost: CoHost): string => {
+    if (!Array.isArray(coHost.allowedTabs)) return 'All tabs';
+    if (coHost.allowedTabs.length === 0) return '0 of ' + permissionTabs.length + ' tabs';
+    return `${coHost.allowedTabs.length} of ${permissionTabs.length} tabs`;
+  };
+
+  const toggleTabPermission = async (coHostId: string, tabId: string) => {
+    const newCoHosts = coHosts.map(h => {
+      if (h.id !== coHostId) return h;
+      // If allowedTabs is undefined (all access), start with full list then remove the toggled tab
+      const current = Array.isArray(h.allowedTabs) ? h.allowedTabs : permissionTabs.map(t => t.id);
+      const updated = current.includes(tabId)
+        ? current.filter(t => t !== tabId)
+        : [...current, tabId];
+      // If all tabs selected, clear to undefined (= all access, backward compat)
+      if (updated.length >= permissionTabs.length) return { ...h, allowedTabs: undefined };
+      return { ...h, allowedTabs: updated };
+    });
+    setCoHosts(newCoHosts);
+    await saveCoHostsArray(newCoHosts);
+  };
+
+  const toggleAllTabs = async (coHostId: string) => {
+    const coHost = coHosts.find(h => h.id === coHostId);
+    if (!coHost) return;
+    const hasAll = !Array.isArray(coHost.allowedTabs);
+    const newCoHosts = coHosts.map(h => {
+      if (h.id !== coHostId) return h;
+      // If currently all tabs (undefined), restrict to empty; if restricted, give all (undefined)
+      return { ...h, allowedTabs: hasAll ? [] : undefined };
+    });
+    setCoHosts(newCoHosts);
+    await saveCoHostsArray(newCoHosts);
+  };
 
   const saveCoHostsArray = async (coHostsToSave: CoHost[]) => {
     try {
@@ -156,9 +196,16 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   const toggleCoHostCanEdit = async (id: string) => {
-    const newCoHosts = coHosts.map(h =>
-      h.id === id ? { ...h, canEdit: !h.canEdit } : h
-    );
+    const newCoHosts = coHosts.map(h => {
+      if (h.id !== id) return h;
+      const newCanEdit = !h.canEdit;
+      // Clear allowedTabs and collapse permissions when turning off Editor
+      if (!newCanEdit) {
+        setExpandedPermissionsId(prev => prev === id ? null : prev);
+        return { ...h, canEdit: false, allowedTabs: undefined };
+      }
+      return { ...h, canEdit: true };
+    });
     setCoHosts(newCoHosts);
     // Auto-save
     await saveCoHostsArray(newCoHosts);
@@ -295,6 +342,50 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 Edit
               </button>
             </div>
+
+            {/* Tab permissions expander (only when canEdit is true) */}
+            {coHost.canEdit && (
+              <div className="mt-2 pl-9">
+                <button
+                  type="button"
+                  onClick={() => setExpandedPermissionsId(expandedPermissionsId === coHost.id ? null : coHost.id)}
+                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
+                >
+                  {expandedPermissionsId === coHost.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <span>Permissions: {getPermissionSummary(coHost)}</span>
+                </button>
+
+                {expandedPermissionsId === coHost.id && (
+                  <div className="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-white/60">Allowed tabs</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleAllTabs(coHost.id)}
+                        className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                      >
+                        {!Array.isArray(coHost.allowedTabs) ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {permissionTabs.map(tab => {
+                        const isAllowed = !Array.isArray(coHost.allowedTabs) || coHost.allowedTabs.includes(tab.id);
+                        return (
+                          <Checkbox
+                            key={tab.id}
+                            checked={isAllowed}
+                            onChange={() => toggleTabPermission(coHost.id, tab.id)}
+                            label={tab.label}
+                            size={14}
+                            labelClassName="text-xs text-white/60"
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

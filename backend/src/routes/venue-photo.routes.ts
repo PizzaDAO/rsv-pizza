@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -19,6 +19,12 @@ router.post('/:partyId/venues/:venueId/photos', async (req: AuthRequest, res: Re
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party
@@ -73,6 +79,12 @@ router.get('/:partyId/venues/:venueId/photos', async (req: AuthRequest, res: Res
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Verify venue belongs to party
     const venue = await prisma.venue.findFirst({
       where: { id: venueId, partyId },
@@ -103,6 +115,12 @@ router.patch('/:partyId/venues/:venueId/photos/:photoId', async (req: AuthReques
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party
@@ -147,6 +165,12 @@ router.delete('/:partyId/venues/:venueId/photos/:photoId', async (req: AuthReque
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party

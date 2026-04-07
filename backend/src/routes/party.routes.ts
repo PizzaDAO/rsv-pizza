@@ -4,7 +4,7 @@ import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -350,7 +350,20 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       });
     }
 
-    // Return with hostName, userId for ownership checks, and canEdit flag
+    // Resolve the requesting user's co-host tab permissions
+    let allowedTabs: string[] | undefined;
+    const isOwner = party.userId === req.userId;
+    const isSuper = await isSuperAdmin(req.userEmail);
+    if (!isOwner && !isSuper && req.userEmail) {
+      const myCoHostEntry = rawCoHosts.find(
+        (h: any) => h.email?.toLowerCase() === req.userEmail!.toLowerCase() && h.canEdit === true
+      );
+      if (myCoHostEntry && Array.isArray(myCoHostEntry.allowedTabs)) {
+        allowedTabs = myCoHostEntry.allowedTabs;
+      }
+    }
+
+    // Return with hostName, userId for ownership checks, canEdit flag, and allowedTabs
     res.json({
       party: {
         ...party,
@@ -358,6 +371,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
         canEdit: true, // If we reached here, getPartyWithOwnershipCheck verified edit permissions
+        allowedTabs, // undefined for owner/admin (all tabs), string[] for restricted co-hosts
       }
     });
   } catch (error) {
@@ -411,9 +425,16 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       const underbossIds = new Set(underbossEntries.map((h: any) => h.id));
       // Strip isUnderboss from client-submitted entries (prevent spoofing)
       // and remove any client entries that duplicate an underboss (to prevent duplicates)
+      // Also validate allowedTabs: strip invalid tab IDs
       const clientCoHosts = (coHosts as any[])
         .map((h: any) => {
           const { isUnderboss: _, ...rest } = h;
+          // Validate allowedTabs if present
+          if (Array.isArray(rest.allowedTabs)) {
+            rest.allowedTabs = rest.allowedTabs.filter(
+              (tab: string) => VALID_TAB_IDS.includes(tab as any)
+            );
+          }
           return rest;
         })
         .filter((h: any) => !underbossIds.has(h.id));
@@ -597,6 +618,12 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to guests tab
+    const canAccessGuests = await canUserAccessTab(id, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
@@ -647,6 +674,12 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to guests tab
+    const canAccessGuests = await canUserAccessTab(partyId, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     await prisma.guest.delete({
       where: { id: guestId, partyId },
     });
@@ -670,6 +703,12 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to guests tab
+    const canAccessGuests = await canUserAccessTab(partyId, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (typeof approved !== 'boolean') {
@@ -737,6 +776,12 @@ router.get('/:id/waitlist', async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to guests tab
+    const canAccessGuests = await canUserAccessTab(id, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const waitlistedGuests = await prisma.guest.findMany({
       where: {
         partyId: id,
@@ -760,6 +805,12 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to guests tab
+    const canAccessGuests = await canUserAccessTab(partyId, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get the guest

@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -202,6 +202,12 @@ router.post('/:partyId/photos/batch-review', requireAuth, async (req: AuthReques
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to photos tab
+    const canAccessPhotos = await canUserAccessTab(partyId, req.userEmail, req.userId, 'photos');
+    if (!canAccessPhotos) {
+      throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const result = await prisma.photo.updateMany({
       where: {
         id: { in: photoIds },
@@ -378,6 +384,12 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to photos tab
+    const canAccessPhotosTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'photos');
+    if (!canAccessPhotosTab) {
+      throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Check if photo exists
     const existingPhoto = await prisma.photo.findFirst({
       where: { id: photoId, partyId },
@@ -438,7 +450,7 @@ router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest,
     }
 
     // Check if user can delete:
-    // 1. Party host/owner can delete any photo
+    // 1. Party host/owner can delete any photo (if they have photos tab access)
     // 2. Authenticated user whose email matches the uploader can delete their own photo
     const isHost = await canUserEditParty(partyId, req.userId, req.userEmail);
     const isUploader = req.userEmail &&
@@ -447,6 +459,14 @@ router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest,
 
     if (!isHost && !isUploader) {
       throw new AppError('Unauthorized to delete this photo', 403, 'UNAUTHORIZED');
+    }
+
+    // If acting as host (not just uploader), verify co-host has access to photos tab
+    if (isHost && !isUploader) {
+      const canAccessPhotosForDelete = await canUserAccessTab(partyId, req.userEmail, req.userId, 'photos');
+      if (!canAccessPhotosForDelete) {
+        throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
+      }
     }
 
     await prisma.photo.delete({

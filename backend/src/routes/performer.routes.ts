@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -78,6 +78,12 @@ router.post('/:partyId/performers', requireAuth, async (req: AuthRequest, res: R
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to music tab
+    const canAccessMusic = await canUserAccessTab(partyId, req.userEmail, req.userId, 'music');
+    if (!canAccessMusic) {
+      throw new AppError('You do not have access to the music tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate required fields
@@ -163,6 +169,12 @@ router.patch('/:partyId/performers/:performerId', requireAuth, async (req: AuthR
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to music tab
+    const canAccessMusic = await canUserAccessTab(partyId, req.userEmail, req.userId, 'music');
+    if (!canAccessMusic) {
+      throw new AppError('You do not have access to the music tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Check if performer exists
     const existingPerformer = await prisma.performer.findFirst({
       where: { id: performerId, partyId },
@@ -227,6 +239,12 @@ router.delete('/:partyId/performers/:performerId', requireAuth, async (req: Auth
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to music tab
+    const canAccessMusic = await canUserAccessTab(partyId, req.userEmail, req.userId, 'music');
+    if (!canAccessMusic) {
+      throw new AppError('You do not have access to the music tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Check if performer exists
     const existingPerformer = await prisma.performer.findFirst({
       where: { id: performerId, partyId },
@@ -256,6 +274,12 @@ router.patch('/:partyId/performers/reorder', requireAuth, async (req: AuthReques
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to music tab
+    const canAccessMusic = await canUserAccessTab(partyId, req.userEmail, req.userId, 'music');
+    if (!canAccessMusic) {
+      throw new AppError('You do not have access to the music tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate performerIds
