@@ -737,38 +737,49 @@ export function FlyerGenerator() {
               {groupLogos.map(s => {
                 const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
                 const isSelected = selectedGroupLogo === s.id;
+
+                const handleResizeStart = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startY = e.clientY;
+                  const startSize = size;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: MouseEvent) => {
+                    const deltaY = (moveEvent.clientY - startY) / sc;
+                    const newSize = Math.max(20, Math.min(200, startSize + deltaY));
+                    setLogoSizes(prev => ({ ...prev, [s.id]: Math.round(newSize) }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                  };
+                  document.addEventListener('mousemove', handleMove);
+                  document.addEventListener('mouseup', handleUp);
+                };
+
+                const handleTouchResizeStart = (e: React.TouchEvent) => {
+                  e.stopPropagation();
+                  const startY = e.touches[0].clientY;
+                  const startSize = size;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: TouchEvent) => {
+                    moveEvent.preventDefault();
+                    const deltaY = (moveEvent.touches[0].clientY - startY) / sc;
+                    const newSize = Math.max(20, Math.min(200, startSize + deltaY));
+                    setLogoSizes(prev => ({ ...prev, [s.id]: Math.round(newSize) }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('touchmove', handleMove);
+                    document.removeEventListener('touchend', handleUp);
+                  };
+                  document.addEventListener('touchmove', handleMove, { passive: false });
+                  document.addEventListener('touchend', handleUp);
+                };
+
                 return (
                   <div key={s.id} style={{ position: 'relative', display: 'inline-block' }}>
-                    {isSelected && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: -36,
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          background: 'rgba(0,0,0,0.75)',
-                          borderRadius: 6,
-                          padding: '3px 8px',
-                          whiteSpace: 'nowrap',
-                          zIndex: 30,
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="range"
-                          min={20}
-                          max={140}
-                          value={size}
-                          onChange={e => setLogoSizes(prev => ({ ...prev, [s.id]: Number(e.target.value) }))}
-                          style={{ width: 80, accentColor: '#ff393a' }}
-                        />
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{size}</span>
-                      </div>
-                    )}
                     <img
                       src={s.logoUrl!}
                       alt={s.name}
@@ -786,6 +797,22 @@ export function FlyerGenerator() {
                         outlineOffset: isSelected ? 4 : 0,
                       }}
                     />
+                    {/* Corner resize handle */}
+                    <div
+                      onMouseDown={handleResizeStart}
+                      onTouchStart={handleTouchResizeStart}
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        width: 14,
+                        height: 14,
+                        cursor: 'nwse-resize',
+                        zIndex: 35,
+                        background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
+                        borderRadius: '0 0 4px 0',
+                      }}
+                    />
                   </div>
                 );
               })}
@@ -798,6 +825,47 @@ export function FlyerGenerator() {
           const pos = poppedLogos[s.id];
           const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
           const isDragging = draggingLogo === s.id;
+
+          const handlePoppedResizeStart = (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const startY = e.clientY;
+            const startSize = size;
+            const rect = canvasRef.current?.getBoundingClientRect();
+            const sc = rect ? rect.width / 1080 : 1;
+            const handleMove = (moveEvent: MouseEvent) => {
+              const deltaY = (moveEvent.clientY - startY) / sc;
+              const newSize = Math.max(20, Math.min(200, startSize + deltaY));
+              setLogoSizes(prev => ({ ...prev, [s.id]: Math.round(newSize) }));
+            };
+            const handleUp = () => {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            };
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+          };
+
+          const handlePoppedTouchResizeStart = (e: React.TouchEvent) => {
+            e.stopPropagation();
+            const startY = e.touches[0].clientY;
+            const startSize = size;
+            const rect = canvasRef.current?.getBoundingClientRect();
+            const sc = rect ? rect.width / 1080 : 1;
+            const handleMove = (moveEvent: TouchEvent) => {
+              moveEvent.preventDefault();
+              const deltaY = (moveEvent.touches[0].clientY - startY) / sc;
+              const newSize = Math.max(20, Math.min(200, startSize + deltaY));
+              setLogoSizes(prev => ({ ...prev, [s.id]: Math.round(newSize) }));
+            };
+            const handleUp = () => {
+              document.removeEventListener('touchmove', handleMove);
+              document.removeEventListener('touchend', handleUp);
+            };
+            document.addEventListener('touchmove', handleMove, { passive: false });
+            document.addEventListener('touchend', handleUp);
+          };
+
           return (
             <div
               key={`popped-${s.id}`}
@@ -810,33 +878,6 @@ export function FlyerGenerator() {
                 WebkitUserSelect: 'none',
               }}
             >
-              {/* Floating size slider above the logo — anchored to left edge */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: -36,
-                  left: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: 'rgba(0,0,0,0.75)',
-                  borderRadius: 6,
-                  padding: '3px 8px',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="range"
-                  min={20}
-                  max={140}
-                  value={size}
-                  onChange={e => setLogoSizes(prev => ({ ...prev, [s.id]: Number(e.target.value) }))}
-                  style={{ width: 80, accentColor: '#ff393a' }}
-                />
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{size}</span>
-              </div>
               <img
                 src={s.logoUrl!}
                 alt={s.name}
@@ -854,6 +895,22 @@ export function FlyerGenerator() {
                   outlineOffset: 4,
                 }}
               />
+              {/* Corner resize handle */}
+              <div
+                onMouseDown={handlePoppedResizeStart}
+                onTouchStart={handlePoppedTouchResizeStart}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: 14,
+                  height: 14,
+                  cursor: 'nwse-resize',
+                  zIndex: 35,
+                  background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
+                  borderRadius: '0 0 4px 0',
+                }}
+              />
             </div>
           );
         })}
@@ -865,7 +922,7 @@ export function FlyerGenerator() {
     <div className="space-y-6">
       {/* Drag hint */}
       <p className="text-center text-xs text-white/40">
-        Drag text elements to reposition. Double-click a sponsor logo to freely move it.
+        Drag text elements to reposition. Double-click a sponsor logo to freely move it. Drag a logo corner to resize.
       </p>
 
       {/* Editable address fields */}
@@ -891,25 +948,6 @@ export function FlyerGenerator() {
           placeholder="Street Address"
           className="w-full bg-transparent text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:border-white/50 focus:outline-none placeholder-white/30"
         />
-        {sponsors.length > 0 && (
-          <div className="space-y-1.5 pt-1">
-            <span className="text-xs text-white/40">Logo Sizes</span>
-            {sponsors.slice(0, 8).map(s => (
-              <div key={s.id} className="flex items-center gap-3">
-                <span className="text-xs text-white/50 w-24 truncate">{s.name}</span>
-                <input
-                  type="range"
-                  min={20}
-                  max={140}
-                  value={logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize)}
-                  onChange={e => setLogoSizes(prev => ({ ...prev, [s.id]: Number(e.target.value) }))}
-                  className="flex-1 accent-[#ff393a]"
-                />
-                <span className="text-xs text-white/40 w-6 text-right">{logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize)}</span>
-              </div>
-            ))}
-          </div>
-        )}
         <button
           onClick={() => setShowAddSponsor(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
