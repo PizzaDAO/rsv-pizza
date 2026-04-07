@@ -2864,3 +2864,30 @@ export async function deleteSponsorUser(id: string): Promise<void> {
   await apiRequest(`/api/sponsor-users/${id}`, { method: 'DELETE' });
 }
 
+// ============================================
+// User Sponsorship Profile
+// ============================================
+
+export interface UserSponsorshipEntry {
+  id: string;
+  brandName: string;
+  brandLogo: string | null;
+  brandDescription: string | null;
+  brandInstagram: string | null;
+  sponsorshipType: string | null;
+  amount: number | null;
+  status: string;
+  intakeSubmittedAt: string;
+  party: {
+    id: string;
+    name: string;
+    customUrl: string | null;
+    date: string | null;
+    eventImageUrl: string | null;
+  };
+}
+
+export async function getUserSponsorships(): Promise<UserSponsorshipEntry[]> {
+  return apiRequest<UserSponsorshipEntry[]>('/api/user/sponsorships');
+}
+
