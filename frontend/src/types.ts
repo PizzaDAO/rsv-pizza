@@ -428,6 +428,8 @@ export interface Sponsor {
   name: string;
   website: string | null;
   brandTwitter: string | null;
+  brandInstagram: string | null;
+  brandDescription: string | null;
   pointPerson: string | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -974,6 +976,9 @@ export interface UnderbossEvent {
   address: string | null;
   venueName: string | null;
   region?: string | null;
+  eventImageUrl: string | null;
+  timezone: string | null;
+  duration: number | null;
   host: { name: string | null; email: string | null };
   coHosts: any[];
   progress: UnderbossEventProgress;

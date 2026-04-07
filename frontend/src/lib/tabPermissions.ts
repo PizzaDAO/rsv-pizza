@@ -36,6 +36,7 @@ export type TabId =
   | 'checklist'
   | 'gpp'
   | 'promo'
+  | 'flyer'
   | 'apps';
 
 export interface HostTab {

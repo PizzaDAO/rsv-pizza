@@ -1,0 +1,1 @@
+export { FlyerTab } from './FlyerTab';
