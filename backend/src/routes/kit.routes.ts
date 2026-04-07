@@ -1,8 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab, isSuperAdmin } from '../helpers/partyAccess.js';
 
 // Valid kit tiers
 const VALID_TIERS = ['basic', 'large', 'deluxe'];
@@ -21,6 +21,12 @@ router.get('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Response,
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to gpp tab
+    const canAccessGpp = await canUserAccessTab(partyId, req.userEmail, req.userId, 'gpp');
+    if (!canAccessGpp) {
+      throw new AppError('You do not have access to the party kit tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get party to check kit settings
@@ -69,6 +75,12 @@ router.post('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Response
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to gpp tab
+    const canAccessGpp = await canUserAccessTab(partyId, req.userEmail, req.userId, 'gpp');
+    if (!canAccessGpp) {
+      throw new AppError('You do not have access to the party kit tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate required fields

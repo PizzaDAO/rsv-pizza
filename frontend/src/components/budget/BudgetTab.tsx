@@ -223,6 +223,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       {showForm && (
         <BudgetItemForm
           item={editingItem}
+          partyId={partyId}
           onSave={handleSaveItem}
           onClose={handleCloseForm}
           saving={saving}

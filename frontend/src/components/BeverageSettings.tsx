@@ -2,13 +2,19 @@ import React, { useState } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Beer, Plus, X } from 'lucide-react';
 import { Checkbox } from './Checkbox';
+import { IconInput } from './IconInput';
 
 export const BeverageSettings: React.FC = () => {
   const { party, availableBeverages, updatePartyBeverages } = usePizza();
   const [selectedBeverages, setSelectedBeverages] = useState<string[]>(
-    party?.availableBeverages || []
+    // Filter out old opaque custom-{timestamp} IDs on load — their names are lost
+    (party?.availableBeverages || []).filter(id => !id.startsWith('custom-'))
   );
-  const [customBeverages, setCustomBeverages] = useState<string[]>([]);
+  const [customBeverages, setCustomBeverages] = useState<string[]>(() => {
+    return (party?.availableBeverages || [])
+      .filter(id => id.startsWith('custom:'))
+      .map(id => id.slice('custom:'.length));
+  });
   const [customInput, setCustomInput] = useState('');
 
   const toggleBeverage = (beverageId: string) => {
@@ -20,18 +26,25 @@ export const BeverageSettings: React.FC = () => {
   };
 
   const addCustomBeverage = () => {
-    if (customInput.trim()) {
-      const customId = `custom-${Date.now()}`;
-      setCustomBeverages(prev => [...prev, customInput.trim()]);
-      const newSelection = [...selectedBeverages, customId];
-      setSelectedBeverages(newSelection);
-      updatePartyBeverages(newSelection);
-      setCustomInput('');
-    }
+    const name = customInput.trim();
+    if (!name) return;
+    // Duplicate check (case-insensitive)
+    if (customBeverages.some(b => b.toLowerCase() === name.toLowerCase())) return;
+    const customId = `custom:${name}`;
+    setCustomBeverages(prev => [...prev, name]);
+    const newSelection = [...selectedBeverages, customId];
+    setSelectedBeverages(newSelection);
+    updatePartyBeverages(newSelection);
+    setCustomInput('');
   };
 
   const removeCustomBeverage = (index: number) => {
+    const name = customBeverages[index];
+    const customId = `custom:${name}`;
     setCustomBeverages(prev => prev.filter((_, i) => i !== index));
+    const newSelection = selectedBeverages.filter(id => id !== customId);
+    setSelectedBeverages(newSelection);
+    updatePartyBeverages(newSelection);
   };
 
   return (
@@ -52,7 +65,7 @@ export const BeverageSettings: React.FC = () => {
         ))}
         {customBeverages.map((custom, index) => (
           <Checkbox
-            key={`custom-${index}`}
+            key={`custom:${custom}`}
             checked={true}
             onChange={() => {}}
             label={custom}
@@ -70,7 +83,8 @@ export const BeverageSettings: React.FC = () => {
       </div>
 
       <div className="flex gap-2">
-        <input
+        <IconInput
+          icon={Beer}
           type="text"
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Pizza, Plus, X } from 'lucide-react';
 import { Checkbox } from './Checkbox';
+import { IconInput } from './IconInput';
 
 interface PizzaStyleAndToppingsProps {
   children?: React.ReactNode;
@@ -26,20 +27,31 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
     }
   };
 
-  // Toppings
+  // Toppings — filter out old opaque custom-{timestamp} IDs on load
   const [selectedToppings, setSelectedToppings] = useState<string[]>(() => {
     if (party?.availableToppings && party.availableToppings.length > 0) {
-      return party.availableToppings;
+      return party.availableToppings.filter(id => !id.startsWith('custom-'));
     }
     return availableToppings.map(t => t.id);
   });
 
-  const [customToppings, setCustomToppings] = useState<string[]>([]);
+  const [customToppings, setCustomToppings] = useState<string[]>(() => {
+    return (party?.availableToppings || [])
+      .filter(id => id.startsWith('custom:'))
+      .map(id => id.slice('custom:'.length));
+  });
   const [customInput, setCustomInput] = useState('');
 
   useEffect(() => {
     if (party?.availableToppings && party.availableToppings.length > 0) {
-      setSelectedToppings(party.availableToppings);
+      // Filter out old opaque custom-{timestamp} IDs
+      setSelectedToppings(party.availableToppings.filter(id => !id.startsWith('custom-')));
+      // Re-derive custom toppings from new format
+      setCustomToppings(
+        party.availableToppings
+          .filter(id => id.startsWith('custom:'))
+          .map(id => id.slice('custom:'.length))
+      );
     }
   }, [party?.availableToppings]);
 
@@ -52,18 +64,25 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
   };
 
   const addCustomTopping = () => {
-    if (customInput.trim()) {
-      const customId = `custom-${Date.now()}`;
-      setCustomToppings(prev => [...prev, customInput.trim()]);
-      const newSelection = [...selectedToppings, customId];
-      setSelectedToppings(newSelection);
-      updatePartyToppings(newSelection);
-      setCustomInput('');
-    }
+    const name = customInput.trim();
+    if (!name) return;
+    // Duplicate check (case-insensitive)
+    if (customToppings.some(t => t.toLowerCase() === name.toLowerCase())) return;
+    const customId = `custom:${name}`;
+    setCustomToppings(prev => [...prev, name]);
+    const newSelection = [...selectedToppings, customId];
+    setSelectedToppings(newSelection);
+    updatePartyToppings(newSelection);
+    setCustomInput('');
   };
 
   const removeCustomTopping = (index: number) => {
+    const name = customToppings[index];
+    const customId = `custom:${name}`;
     setCustomToppings(prev => prev.filter((_, i) => i !== index));
+    const newSelection = selectedToppings.filter(id => id !== customId);
+    setSelectedToppings(newSelection);
+    updatePartyToppings(newSelection);
   };
 
   return (
@@ -121,7 +140,7 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
           ))}
           {customToppings.map((custom, index) => (
             <Checkbox
-              key={`custom-${index}`}
+              key={`custom:${custom}`}
               checked={true}
               onChange={() => {}}
               label={custom}
@@ -139,7 +158,8 @@ export const PizzaStyleAndToppings: React.FC<PizzaStyleAndToppingsProps> = ({ ch
         </div>
 
         <div className="flex gap-2">
-          <input
+          <IconInput
+            icon={Pizza}
             type="text"
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}

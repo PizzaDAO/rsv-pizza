@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, Clock, MoreVertical, Pencil, Trash2, ExternalLink, User } from 'lucide-react';
+import { CheckCircle, Clock, MoreVertical, Pencil, Trash2, Receipt, FileText, User } from 'lucide-react';
 import { BudgetItem, BUDGET_CATEGORIES } from '../../types';
 
 interface BudgetItemRowProps {
@@ -22,6 +22,10 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
       style: 'currency',
       currency: 'USD',
     }).format(amount);
+  };
+
+  const isPdfUrl = (url: string) => {
+    return /\.pdf(\?.*)?$/i.test(url);
   };
 
   const categoryInfo = BUDGET_CATEGORIES.find(c => c.id === item.category);
@@ -58,10 +62,15 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
               href={item.receiptUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-theme-text-muted hover:text-theme-text-secondary"
+              className="flex-shrink-0 text-theme-text-muted hover:text-theme-text-secondary transition-colors"
               onClick={(e) => e.stopPropagation()}
+              title="View receipt"
             >
-              <ExternalLink size={14} />
+              {isPdfUrl(item.receiptUrl) ? (
+                <FileText size={16} />
+              ) : (
+                <Receipt size={16} />
+              )}
             </a>
           )}
         </div>

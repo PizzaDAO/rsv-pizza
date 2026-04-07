@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -61,6 +61,12 @@ router.post('/:partyId/raffles', requireAuth, async (req: AuthRequest, res: Resp
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -137,6 +143,12 @@ router.patch('/:partyId/raffles/:raffleId', requireAuth, async (req: AuthRequest
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Check if raffle exists
     const existingRaffle = await prisma.raffle.findFirst({
       where: { id: raffleId, partyId },
@@ -194,6 +206,12 @@ router.delete('/:partyId/raffles/:raffleId', requireAuth, async (req: AuthReques
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     await prisma.raffle.delete({
       where: { id: raffleId },
     });
@@ -214,6 +232,12 @@ router.post('/:partyId/raffles/:raffleId/prizes', requireAuth, async (req: AuthR
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if raffle exists
@@ -257,6 +281,12 @@ router.patch('/:partyId/raffles/:raffleId/prizes/:prizeId', requireAuth, async (
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Check if prize exists
     const existingPrize = await prisma.rafflePrize.findFirst({
       where: { id: prizeId, raffleId },
@@ -291,6 +321,12 @@ router.delete('/:partyId/raffles/:raffleId/prizes/:prizeId', requireAuth, async 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     await prisma.rafflePrize.delete({
@@ -372,6 +408,12 @@ router.delete('/:partyId/raffles/:raffleId/entries/:entryId', requireAuth, async
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     await prisma.raffleEntry.delete({
       where: { id: entryId },
     });
@@ -391,6 +433,12 @@ router.post('/:partyId/raffles/:raffleId/draw', requireAuth, async (req: AuthReq
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get raffle with prizes and entries
@@ -496,6 +544,12 @@ router.post('/:partyId/raffles/:raffleId/winners/:winnerId/claim', requireAuth, 
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const winner = await prisma.raffleWinner.update({
       where: { id: winnerId },
       data: { claimedAt: new Date() },
@@ -520,6 +574,12 @@ router.delete('/:partyId/raffles/:raffleId/winners/:winnerId/claim', requireAuth
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to raffle tab
+    const canAccessRaffle = await canUserAccessTab(partyId, req.userEmail, req.userId, 'raffle');
+    if (!canAccessRaffle) {
+      throw new AppError('You do not have access to the raffle tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const winner = await prisma.raffleWinner.update({

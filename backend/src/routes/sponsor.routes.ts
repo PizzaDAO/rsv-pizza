@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -16,6 +16,12 @@ router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Resp
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Build query filters
@@ -50,6 +56,12 @@ router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get party with fundraising goal
@@ -142,6 +154,12 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Validate status if provided
     const validStatuses = ['todo', 'asked', 'yes', 'billed', 'paid', 'stuck', 'alum', 'skip'];
     if (status && !validStatuses.includes(status)) {
@@ -196,6 +214,12 @@ router.get('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequest
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const sponsor = await prisma.sponsor.findFirst({
       where: { id: sponsorId, partyId },
     });
@@ -240,6 +264,12 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if sponsor exists
@@ -303,6 +333,12 @@ router.delete('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequ
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if sponsor exists

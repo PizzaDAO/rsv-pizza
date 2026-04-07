@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 // Generate a unique slug for public venue reports
 function generateSlug(): string {
@@ -20,6 +20,12 @@ router.get('/:partyId/venue-report', requireAuth, async (req: AuthRequest, res: 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const party = await prisma.party.findUnique({
@@ -79,6 +85,12 @@ router.patch('/:partyId/venue-report', requireAuth, async (req: AuthRequest, res
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     await prisma.party.update({
       where: { id: partyId },
       data: {
@@ -101,6 +113,12 @@ router.post('/:partyId/venue-report/publish', requireAuth, async (req: AuthReque
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const existingParty = await prisma.party.findUnique({
@@ -148,6 +166,12 @@ router.delete('/:partyId/venue-report/publish', requireAuth, async (req: AuthReq
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     await prisma.party.update({

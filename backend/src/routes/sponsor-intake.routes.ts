@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 // Sponsor-facing fields that the intake form is allowed to read/write
 const SPONSOR_FACING_FIELDS = [
@@ -34,6 +34,12 @@ router.post('/generate-token/:partyId/:sponsorId', requireAuth, async (req: Auth
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify sponsor exists and belongs to this party
@@ -79,6 +85,12 @@ router.delete('/revoke-token/:partyId/:sponsorId', requireAuth, async (req: Auth
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify sponsor exists and belongs to this party

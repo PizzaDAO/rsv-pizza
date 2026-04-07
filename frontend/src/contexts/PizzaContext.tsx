@@ -121,6 +121,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventType: dbParty.event_type || null,
     eventTags: dbParty.event_tags || [],
     canEdit: dbParty.can_edit || false,
+    allowedTabs: dbParty.allowed_tabs,
     guests,
   };
 }

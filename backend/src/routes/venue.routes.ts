@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { canUserEditParty } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -18,6 +18,12 @@ router.get('/:partyId/venues', async (req: AuthRequest, res: Response, next: Nex
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const venues = await prisma.venue.findMany({
@@ -53,6 +59,12 @@ router.post('/:partyId/venues', async (req: AuthRequest, res: Response, next: Ne
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -99,6 +111,12 @@ router.patch('/:partyId/venues/:venueId', async (req: AuthRequest, res: Response
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party
@@ -152,6 +170,12 @@ router.delete('/:partyId/venues/:venueId', async (req: AuthRequest, res: Respons
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Verify venue belongs to party
     const existingVenue = await prisma.venue.findFirst({
       where: { id: venueId, partyId },
@@ -180,6 +204,12 @@ router.patch('/:partyId/venues/:venueId/select', async (req: AuthRequest, res: R
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party
@@ -231,6 +261,12 @@ router.patch('/:partyId/venues/:venueId/deselect', async (req: AuthRequest, res:
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to venue tab
+    const canAccessVenue = await canUserAccessTab(partyId, req.userEmail, req.userId, 'venue');
+    if (!canAccessVenue) {
+      throw new AppError('You do not have access to the venue tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Verify venue belongs to party

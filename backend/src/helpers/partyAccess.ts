@@ -2,6 +2,32 @@ import { prisma } from '../config/database.js';
 import { isSuperAdmin } from '../middleware/auth.js';
 
 /**
+ * Valid tab IDs that can appear in a co-host's allowedTabs array.
+ * Used for validation when saving co-host permissions.
+ */
+export const VALID_TAB_IDS = [
+  'dashboard',
+  'details',
+  'guests',
+  'pizza',
+  'photos',
+  'sponsors',
+  'venue',
+  'music',
+  'report',
+  'staff',
+  'displays',
+  'raffle',
+  'budget',
+  'checklist',
+  'gpp',
+  'promo',
+  'apps',
+] as const;
+
+export type TabId = typeof VALID_TAB_IDS[number];
+
+/**
  * Check if a user can edit a party.
  * Returns true if the user is:
  *   1. A super admin
@@ -41,6 +67,71 @@ export async function canUserEditParty(
       );
       if (isEditor) {
         return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if a user can access a specific tab on a party.
+ * Returns true if the user is:
+ *   1. The party owner
+ *   2. A super admin
+ *   3. A co-host with allowedTabs === undefined (all tabs, legacy behavior)
+ *   4. A co-host with allowedTabs array that includes the specified tabName
+ * Returns false otherwise.
+ *
+ * Note: This should be called AFTER canUserEditParty has already confirmed
+ * the user has edit access to the party.
+ */
+export async function canUserAccessTab(
+  partyId: string,
+  userEmail: string | undefined,
+  userId: string | undefined,
+  tabName: string
+): Promise<boolean> {
+  // Super admin can access all tabs
+  if (await isSuperAdmin(userEmail)) {
+    return true;
+  }
+
+  // Fetch the party to check ownership and co-host permissions
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { userId: true, coHosts: true },
+  });
+
+  if (!party) {
+    return false;
+  }
+
+  // Party owner can access all tabs
+  if (party.userId === userId) {
+    return true;
+  }
+
+  // Check co-host tab permissions
+  if (userEmail) {
+    const coHosts = party.coHosts as Array<{
+      email?: string;
+      canEdit?: boolean;
+      allowedTabs?: string[];
+    }> | null;
+
+    if (coHosts) {
+      const coHost = coHosts.find(
+        (h) => h.email?.toLowerCase() === userEmail.toLowerCase() && h.canEdit === true
+      );
+
+      if (coHost) {
+        // No allowedTabs field = legacy behavior, all tabs allowed
+        if (!Array.isArray(coHost.allowedTabs)) {
+          return true;
+        }
+        // Check if the specific tab is in the allowed list
+        return coHost.allowedTabs.includes(tabName);
       }
     }
   }
