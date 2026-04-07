@@ -123,14 +123,38 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
   const allFilteredSelected = filteredGroups.length > 0 && filteredGroups.every(g => selectedIds.has(g.groupId));
 
-  // Build selected groups array for API
+  // Build selected groups array for API (dedup by groupId to prevent spam)
   const selectedGroups = useMemo(() => {
-    return groups.filter(g => selectedIds.has(g.groupId)).map(g => ({
-      chatId: g.groupId,
-      city: g.city,
-      country: g.country,
-    }));
+    const seen = new Set<string>();
+    return groups
+      .filter(g => selectedIds.has(g.groupId))
+      .filter(g => {
+        if (seen.has(g.groupId)) return false;
+        seen.add(g.groupId);
+        return true;
+      })
+      .map(g => ({
+        chatId: g.groupId,
+        city: g.city,
+        country: g.country,
+      }));
   }, [groups, selectedIds]);
+
+  // Detect duplicate groupIds in loaded data
+  const duplicateGroupWarnings = useMemo(() => {
+    const groupIdToCities = new Map<string, string[]>();
+    for (const g of groups) {
+      if (!g.groupId || g.groupId === 'tbd' || g.groupId === 'x') continue;
+      const cities = groupIdToCities.get(g.groupId) || [];
+      cities.push(g.city);
+      groupIdToCities.set(g.groupId, cities);
+    }
+    const dupes: { groupId: string; cities: string[] }[] = [];
+    for (const [groupId, cities] of groupIdToCities) {
+      if (cities.length > 1) dupes.push({ groupId, cities });
+    }
+    return dupes;
+  }, [groups]);
 
   // Send broadcast
   const handleSend = async () => {
@@ -221,6 +245,28 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
           {/* Compose view */}
           {!loadingGroups && !loadError && viewState === 'compose' && (
             <div className="space-y-6">
+              {/* Duplicate groupId warning */}
+              {duplicateGroupWarnings.length > 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-600">Duplicate Telegram groups detected</p>
+                      <p className="text-xs text-yellow-600/80 mt-1">
+                        These cities share the same group ID in the sheet — only the first city per group will receive a message:
+                      </p>
+                      <ul className="text-xs text-yellow-600/80 mt-1 space-y-0.5">
+                        {duplicateGroupWarnings.map(d => (
+                          <li key={d.groupId}>
+                            {d.cities.join(', ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Group Selector Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
