@@ -81,8 +81,8 @@ const apps: AppItem[] = [
   },
   {
     id: 'sponsor-crm',
-    name: 'Sponsor CRM',
-    description: 'Manage event sponsors and partnerships',
+    name: 'Partners',
+    description: 'Manage event partners and sponsorships',
     icon: Handshake,
     status: 'live',
     tab: 'sponsors',

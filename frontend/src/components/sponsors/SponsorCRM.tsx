@@ -156,7 +156,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-theme-text">Sponsor CRM</h2>
+        <h2 className="text-lg font-semibold text-theme-text">Partners</h2>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"

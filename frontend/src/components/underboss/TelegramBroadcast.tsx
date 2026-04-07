@@ -205,7 +205,8 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
       onClick={onClose}
     >
       <div
-        className="bg-theme-card border border-theme-stroke rounded-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        className="border border-theme-stroke rounded-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        style={{ background: 'var(--bg-main)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
