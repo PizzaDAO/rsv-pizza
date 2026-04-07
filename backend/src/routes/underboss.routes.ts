@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
+import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -629,6 +630,51 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
         data: { eventTags: newTags },
       });
       updated++;
+
+      // Sync partner co-hosts based on tag changes
+      try {
+        if (action === 'add') {
+          // Find partners for the added tags and add them as co-hosts
+          const partners = await getAutoCoHostPartners(cleanTags);
+          const updatedParty = await prisma.party.findUnique({
+            where: { id: party.id },
+            select: { id: true, coHosts: true, eventTags: true },
+          });
+          if (updatedParty) {
+            for (const partner of partners) {
+              await addPartnerToParty(updatedParty, partner);
+            }
+          }
+        } else if (action === 'remove') {
+          // Remove partner co-hosts for the removed tags
+          for (const tag of cleanTags) {
+            await removePartnerFromParty(party.id, tag);
+          }
+        } else if (action === 'set') {
+          // Diff: find tags removed and added
+          const removedTags = existing.filter((t: string) => !cleanTags.includes(t));
+          const addedTags = cleanTags.filter((t: string) => !existing.includes(t));
+
+          for (const tag of removedTags) {
+            await removePartnerFromParty(party.id, tag);
+          }
+
+          if (addedTags.length > 0) {
+            const partners = await getAutoCoHostPartners(addedTags);
+            const updatedParty = await prisma.party.findUnique({
+              where: { id: party.id },
+              select: { id: true, coHosts: true, eventTags: true },
+            });
+            if (updatedParty) {
+              for (const partner of partners) {
+                await addPartnerToParty(updatedParty, partner);
+              }
+            }
+          }
+        }
+      } catch (syncError) {
+        console.error(`Failed to sync partner co-hosts for party ${party.id}:`, syncError);
+      }
     }
 
     res.json({ updated });

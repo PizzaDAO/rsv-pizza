@@ -1094,6 +1094,16 @@ model SponsorUser {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Co-host profile fields (for auto co-hosting via tag)
+  coHostName      String?   @map("co_host_name")
+  coHostWebsite   String?   @map("co_host_website")
+  coHostTwitter   String?   @map("co_host_twitter")
+  coHostInstagram String?   @map("co_host_instagram")
+  coHostAvatarUrl String?   @map("co_host_avatar_url")
+  coHostLogoUrl   String?   @map("co_host_logo_url")
+  autoCoHost      Boolean   @default(false) @map("auto_co_host")
+  autoSponsor     Boolean   @default(false) @map("auto_sponsor")
+
   checklistItems SponsorChecklistItem[]
 
   @@index([tag])

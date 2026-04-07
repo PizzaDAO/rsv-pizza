@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X } from 'lucide-react';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { updateHostStatus, updateHostTags } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
@@ -10,6 +10,7 @@ interface EventRowProps {
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
+  partnerTags?: string[];
 }
 
 // Relative time formatting
@@ -227,7 +228,7 @@ function HostTagsPills({
   );
 }
 
-export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect }: EventRowProps) {
+export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
   // Local state for optimistic updates
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
@@ -325,7 +326,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             {event.eventTags.map((tag) => (
               <span
                 key={tag}
-                className={`text-[10px] px-1.5 py-0.5 rounded-md border ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-md border inline-flex items-center gap-0.5 ${
                   tag === 'swc'
                     ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
                     : tag === 'global pizza party'
@@ -333,6 +334,9 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                       : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
                 }`}
               >
+                {partnerTags.includes(tag) && (
+                  <Handshake size={9} className="shrink-0" />
+                )}
                 {tag}
               </span>
             ))}

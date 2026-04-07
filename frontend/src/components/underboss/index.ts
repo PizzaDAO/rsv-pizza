@@ -4,3 +4,4 @@ export { EventRow } from './EventRow';
 export { ProgressIndicator } from './ProgressIndicator';
 export { TelegramBroadcast } from './TelegramBroadcast';
 export { CitiesTable } from './CitiesTable';
+export { PartnerManager } from './PartnerManager';

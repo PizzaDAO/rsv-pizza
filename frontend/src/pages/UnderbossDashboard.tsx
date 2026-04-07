@@ -5,8 +5,8 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable } from '../components/underboss';
-import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss } from '../lib/api';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager } from '../components/underboss';
+import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 // GPP theme applied directly — Underboss dashboard is always GPP
@@ -63,11 +63,14 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners'>('events');
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
+
+  // Partner tags for EventRow indicator
+  const [partnerTags, setPartnerTags] = useState<string[]>([]);
 
   // Add underboss modal state
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
@@ -109,6 +112,17 @@ export function UnderbossDashboard() {
     try {
       const result = await fetchUnderbossDashboard('all');
       setAllData(result);
+
+      // Load partner tags for EventRow indicator (admin only, non-blocking)
+      try {
+        const { sponsorUsers } = await fetchSponsorUsers();
+        const tags = sponsorUsers
+          .filter(su => su.autoCoHost && su.isActive)
+          .map(su => su.tag);
+        setPartnerTags(tags);
+      } catch {
+        // Non-critical — partner tags indicator won't show
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
@@ -392,14 +406,33 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('partners')}
+                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                  activeTab === 'partners'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
+                }`}
+              >
+                Partners
+                {activeTab === 'partners' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                )}
+              </button>
+            )}
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
           )}
 
           {activeTab === 'cities' && (
             <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
+          )}
+
+          {activeTab === 'partners' && isAdmin && (
+            <PartnerManager onSyncComplete={loadDashboard} />
           )}
         </section>
         </div>

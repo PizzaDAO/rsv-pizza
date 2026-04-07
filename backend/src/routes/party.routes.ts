@@ -398,7 +398,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
-    // Protect underboss co-host entries: preserve them on co-hosts update
+    // Protect underboss and partner co-host entries: preserve them on co-hosts update
     let mergedCoHosts = coHosts;
     if (coHosts !== undefined) {
       const existingParty = await prisma.party.findUnique({
@@ -406,19 +406,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         select: { coHosts: true },
       });
       const existingCoHosts = (existingParty?.coHosts as any[]) || [];
-      // Extract underboss entries from existing data
-      const underbossEntries = existingCoHosts.filter((h: any) => h.isUnderboss === true);
-      const underbossIds = new Set(underbossEntries.map((h: any) => h.id));
-      // Strip isUnderboss from client-submitted entries (prevent spoofing)
-      // and remove any client entries that duplicate an underboss (to prevent duplicates)
+      // Extract protected entries (underboss + partner) from existing data
+      const protectedEntries = existingCoHosts.filter(
+        (h: any) => h.isUnderboss === true || h.isPartner === true
+      );
+      const protectedIds = new Set(protectedEntries.map((h: any) => h.id));
+      // Strip isUnderboss and isPartner from client-submitted entries (prevent spoofing)
+      // and remove any client entries that duplicate a protected entry (to prevent duplicates)
       const clientCoHosts = (coHosts as any[])
         .map((h: any) => {
-          const { isUnderboss: _, ...rest } = h;
+          const { isUnderboss: _ub, isPartner: _p, partnerTag: _pt, ...rest } = h;
           return rest;
         })
-        .filter((h: any) => !underbossIds.has(h.id));
-      // Merge: client entries + preserved underboss entries
-      mergedCoHosts = [...clientCoHosts, ...underbossEntries];
+        .filter((h: any) => !protectedIds.has(h.id));
+      // Merge: client entries + preserved protected entries
+      mergedCoHosts = [...clientCoHosts, ...protectedEntries];
     }
 
     const party = await prisma.party.update({
