@@ -31,7 +31,7 @@ import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
-import { getCoHostAllowedTabs } from '../lib/tabPermissions';
+// tabPermissions is used by HostsManager for the permission picker UI
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
@@ -183,28 +183,30 @@ function HostPageContent() {
     );
   }
 
-  const coreTabs = [
-    ...(isGPP ? [{ id: 'dashboard' as TabType, label: 'Dashboard', icon: Home }] : []),
-    { id: 'details' as TabType, label: 'Settings', icon: Settings },
-    { id: 'guests' as TabType, label: 'Guests', icon: Users },
-    { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-    { id: 'photos' as TabType, label: 'Photos', icon: Camera },
-  ];
+  const tabs = useMemo(() => {
+    const coreTabs = [
+      ...(isGPP ? [{ id: 'dashboard' as TabType, label: 'Dashboard', icon: Home }] : []),
+      { id: 'details' as TabType, label: 'Settings', icon: Settings },
+      { id: 'guests' as TabType, label: 'Guests', icon: Users },
+      { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
+      { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+    ];
 
-  // Build pinned tabs from party.pinnedApps
-  const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
-    const appDef = PINNABLE_APPS.find(a => a.id === appId);
-    if (!appDef) return null;
-    return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
-  }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
+    // Build pinned tabs from party.pinnedApps
+    const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
+      const appDef = PINNABLE_APPS.find(a => a.id === appId);
+      if (!appDef) return null;
+      return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
+    }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
 
-  const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
+    const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
 
-  // Filter tabs based on co-host permissions
-  // 'apps' tab is always visible so co-hosts can see the hub
-  const tabs = allowedTabs === 'all'
-    ? allTabs
-    : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
+    // Filter tabs based on co-host permissions
+    // 'apps' tab is always visible so co-hosts can see the hub
+    return allowedTabs === 'all'
+      ? allTabs
+      : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
+  }, [isGPP, party?.pinnedApps, allowedTabs]);
 
   // Redirect to first allowed tab if current tab is not permitted
   useEffect(() => {

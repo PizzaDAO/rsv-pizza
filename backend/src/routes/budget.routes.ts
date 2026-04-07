@@ -1,21 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { Decimal } from '@prisma/client/runtime/library';
-
-// Helper function to check if user can edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -48,6 +36,12 @@ router.get('/:partyId/budget', async (req: AuthRequest, res: Response, next: Nex
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get party budget settings
@@ -127,6 +121,12 @@ router.patch('/:partyId/budget/settings', async (req: AuthRequest, res: Response
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const party = await prisma.party.update({
       where: { id: partyId },
       data: {
@@ -160,6 +160,12 @@ router.post('/:partyId/budget/items', async (req: AuthRequest, res: Response, ne
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate required fields
@@ -215,6 +221,12 @@ router.patch('/:partyId/budget/items/:itemId', async (req: AuthRequest, res: Res
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Validate category if provided
     if (category !== undefined && !BUDGET_CATEGORIES.includes(category)) {
       throw new AppError(`Category must be one of: ${BUDGET_CATEGORIES.join(', ')}`, 400, 'VALIDATION_ERROR');
@@ -265,6 +277,12 @@ router.delete('/:partyId/budget/items/:itemId', async (req: AuthRequest, res: Re
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     await prisma.budgetItem.delete({
       where: { id: itemId, partyId },
     });
@@ -284,6 +302,12 @@ router.post('/:partyId/budget/items/:itemId/toggle-status', async (req: AuthRequ
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to budget tab
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'budget');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get current status

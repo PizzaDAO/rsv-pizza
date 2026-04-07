@@ -1,20 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-
-// Helper function to check if user can edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -30,6 +18,12 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get all checklist items
@@ -139,6 +133,12 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Read template from checklist_defaults
     const defaults = await prisma.$queryRaw<Array<{
       name: string;
@@ -220,6 +220,12 @@ router.post('/:partyId/checklist/items', async (req: AuthRequest, res: Response,
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
@@ -260,6 +266,12 @@ router.patch('/:partyId/checklist/items/:itemId', async (req: AuthRequest, res: 
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const item = await prisma.checklistItem.update({
       where: { id: itemId, partyId },
       data: {
@@ -284,6 +296,12 @@ router.delete('/:partyId/checklist/items/:itemId', async (req: AuthRequest, res:
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if it's a default item
@@ -319,6 +337,12 @@ router.post('/:partyId/checklist/items/:itemId/toggle', async (req: AuthRequest,
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to checklist tab
+    const canAccessTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'checklist');
+    if (!canAccessTab) {
+      throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Get current state

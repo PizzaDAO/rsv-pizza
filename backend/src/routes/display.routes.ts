@@ -1,22 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-
-// Helper function to check if user can access/edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  // Super admin can edit any party
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  // Otherwise, must be the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 // Helper to generate a URL-safe slug
 function generateSlug(name: string): string {
@@ -38,6 +24,12 @@ router.get('/:partyId/displays', requireAuth, async (req: AuthRequest, res: Resp
     const canAccess = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canAccess) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to displays tab
+    const canAccessDisplays = await canUserAccessTab(partyId, req.userEmail, req.userId, 'displays');
+    if (!canAccessDisplays) {
+      throw new AppError('You do not have access to the displays tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const displays = await prisma.display.findMany({
@@ -70,6 +62,12 @@ router.post('/:partyId/displays', requireAuth, async (req: AuthRequest, res: Res
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to displays tab
+    const canAccessDisplaysTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'displays');
+    if (!canAccessDisplaysTab) {
+      throw new AppError('You do not have access to the displays tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate required fields
@@ -130,6 +128,12 @@ router.get('/:partyId/displays/:displayId', requireAuth, async (req: AuthRequest
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to displays tab
+    const canAccessDisplays = await canUserAccessTab(partyId, req.userEmail, req.userId, 'displays');
+    if (!canAccessDisplays) {
+      throw new AppError('You do not have access to the displays tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const display = await prisma.display.findFirst({
       where: { id: displayId, partyId },
     });
@@ -164,6 +168,12 @@ router.patch('/:partyId/displays/:displayId', requireAuth, async (req: AuthReque
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to displays tab
+    const canAccessDisplaysTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'displays');
+    if (!canAccessDisplaysTab) {
+      throw new AppError('You do not have access to the displays tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if display exists
@@ -234,6 +244,12 @@ router.delete('/:partyId/displays/:displayId', requireAuth, async (req: AuthRequ
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to displays tab
+    const canAccessDisplaysTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'displays');
+    if (!canAccessDisplaysTab) {
+      throw new AppError('You do not have access to the displays tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if display exists

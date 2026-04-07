@@ -1,23 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
-
-// Helper function to check if user can access/edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  // Super admin can edit any party
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  // Otherwise, must be the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty, canUserAccessTab, isSuperAdmin } from '../helpers/partyAccess.js';
 
 // Helper: extends canUserEditParty to also allow sponsors tagged on the event (read-only access)
 async function canUserViewReport(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
@@ -211,6 +197,12 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Helper: convert value to integer or null (handles string, number, null)
     const toIntOrNull = (val: any): number | null => {
       if (val === null || val === undefined || val === '') return null;
@@ -254,6 +246,12 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if already published
@@ -304,6 +302,12 @@ router.delete('/:partyId/report/publish', requireAuth, async (req: AuthRequest, 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     await prisma.party.update({
@@ -692,6 +696,12 @@ router.post('/:partyId/report/social-posts', requireAuth, async (req: AuthReques
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     if (!platform || !url) {
       throw new AppError('Platform and URL are required', 400, 'VALIDATION_ERROR');
     }
@@ -731,6 +741,12 @@ router.delete('/:partyId/report/social-posts/:id', requireAuth, async (req: Auth
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Verify the social post belongs to this party
     const socialPost = await prisma.socialPost.findFirst({
       where: { id, partyId },
@@ -765,6 +781,12 @@ router.get('/:partyId/report/notable-attendees', requireAuth, async (req: AuthRe
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const notableAttendees = await prisma.notableAttendee.findMany({
       where: { partyId },
       orderBy: { sortOrder: 'asc' },
@@ -786,6 +808,12 @@ router.post('/:partyId/report/notable-attendees', requireAuth, async (req: AuthR
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (!name) {
@@ -835,6 +863,12 @@ router.delete('/:partyId/report/notable-attendees/:id', requireAuth, async (req:
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Verify the notable attendee belongs to this party
     const notableAttendee = await prisma.notableAttendee.findFirst({
       where: { id, partyId },
@@ -865,6 +899,12 @@ router.delete('/:partyId/report/notable-attendees/by-guest/:guestId', requireAut
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Find the notable attendee by guest ID
     const notableAttendee = await prisma.notableAttendee.findFirst({
       where: { partyId, guestId },
@@ -893,6 +933,12 @@ router.get('/:partyId/report/notable-attendees/guest-ids', requireAuth, async (r
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to report tab
+    const canAccessReport = await canUserAccessTab(partyId, req.userEmail, req.userId, 'report');
+    if (!canAccessReport) {
+      throw new AppError('You do not have access to the report tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const notableAttendees = await prisma.notableAttendee.findMany({

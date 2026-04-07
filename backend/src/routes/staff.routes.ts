@@ -1,22 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-
-// Helper function to check if user can access/edit a party
-async function canUserEditParty(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  // Super admin can edit any party
-  if (await isSuperAdmin(userEmail)) {
-    return true;
-  }
-
-  // Otherwise, must be the party owner
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, userId },
-  });
-
-  return !!party;
-}
+import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -30,6 +16,12 @@ router.get('/:partyId/staff', requireAuth, async (req: AuthRequest, res: Respons
     const canAccess = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canAccess) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to staff tab
+    const canAccessStaff = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaff) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Build query filters
@@ -78,6 +70,12 @@ router.get('/:partyId/staff/stats', requireAuth, async (req: AuthRequest, res: R
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to staff tab
+    const canAccessStaff = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaff) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     // Get counts by status
     const totalStaff = await prisma.staff.count({ where: { partyId } });
     const invitedCount = await prisma.staff.count({ where: { partyId, status: 'invited' } });
@@ -117,6 +115,12 @@ router.post('/:partyId/staff', requireAuth, async (req: AuthRequest, res: Respon
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to staff tab
+    const canAccessStaffTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaffTab) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate required fields
@@ -171,6 +175,12 @@ router.get('/:partyId/staff/:staffId', requireAuth, async (req: AuthRequest, res
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
+    // Verify co-host has access to staff tab
+    const canAccessStaff = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaff) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
     const staff = await prisma.staff.findFirst({
       where: { id: staffId, partyId },
     });
@@ -195,6 +205,12 @@ router.patch('/:partyId/staff/:staffId', requireAuth, async (req: AuthRequest, r
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to staff tab
+    const canAccessStaffTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaffTab) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if staff exists
@@ -257,6 +273,12 @@ router.delete('/:partyId/staff/:staffId', requireAuth, async (req: AuthRequest, 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to staff tab
+    const canAccessStaffTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'staff');
+    if (!canAccessStaffTab) {
+      throw new AppError('You do not have access to the staff tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Check if staff exists
