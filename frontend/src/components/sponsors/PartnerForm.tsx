@@ -28,10 +28,12 @@ export interface PartnerFormData {
   name: string;
   website: string;
   brandTwitter: string;
+  brandInstagram: string;
   logoUrl: string;
   notes: string;
 
   // CRM-only
+  brandDescription: string;
   pointPerson: string;
   contactName: string;
   contactEmail: string;
@@ -49,7 +51,6 @@ export interface PartnerFormData {
   tag: string;
   contactPersonName: string;
   coHostAvatarUrl: string;
-  brandInstagram: string;
   autoCoHost: boolean;
   autoSponsor: boolean;
 }
@@ -60,6 +61,8 @@ export function extractSponsorData(data: PartnerFormData): CreateSponsorData {
     name: data.name.trim(),
     website: data.website || undefined,
     brandTwitter: data.brandTwitter || undefined,
+    brandInstagram: data.brandInstagram || undefined,
+    brandDescription: data.brandDescription || undefined,
     pointPerson: data.pointPerson || undefined,
     contactName: data.contactName || undefined,
     contactEmail: data.contactEmail || undefined,
@@ -102,12 +105,12 @@ const TYPE_OPTIONS: { value: SponsorshipType; label: string }[] = [
 
 function getDefaultFormData(): PartnerFormData {
   return {
-    name: '', website: '', brandTwitter: '', logoUrl: '', notes: '',
-    pointPerson: '', contactName: '', contactEmail: '', contactPhone: '',
+    name: '', website: '', brandTwitter: '', brandInstagram: '', logoUrl: '', notes: '',
+    brandDescription: '', pointPerson: '', contactName: '', contactEmail: '', contactPhone: '',
     contactTwitter: '', telegram: '', status: 'todo' as SponsorStatus,
     amount: null, sponsorshipType: null, productService: '', lastContactedAt: null,
     email: '', tag: '', contactPersonName: '', coHostAvatarUrl: '',
-    brandInstagram: '', autoCoHost: false, autoSponsor: false,
+    autoCoHost: false, autoSponsor: false,
   };
 }
 
@@ -117,6 +120,8 @@ function sponsorToFormData(s: Sponsor): PartnerFormData {
     name: s.name,
     website: s.website || '',
     brandTwitter: s.brandTwitter || '',
+    brandInstagram: s.brandInstagram || '',
+    brandDescription: s.brandDescription || '',
     logoUrl: s.logoUrl || '',
     notes: s.notes || '',
     pointPerson: s.pointPerson || '',
@@ -379,16 +384,24 @@ export function PartnerForm({
                 onChange={e => handleChange('brandTwitter', e.target.value)}
                 placeholder={isPartner ? 'Twitter (no @)' : 'Brand X Handle'}
               />
-              {isPartner && (
-                <IconInput
-                  icon={Instagram}
-                  type="text"
-                  value={formData.brandInstagram}
-                  onChange={e => handleChange('brandInstagram', e.target.value)}
-                  placeholder="Instagram (no @)"
-                />
-              )}
+              <IconInput
+                icon={Instagram}
+                type="text"
+                value={formData.brandInstagram}
+                onChange={e => handleChange('brandInstagram', e.target.value)}
+                placeholder={isPartner ? 'Instagram (no @)' : 'Brand Instagram Handle'}
+              />
             </div>
+            {isCrm && (
+              <IconInput
+                icon={FileText}
+                multiline
+                rows={2}
+                value={formData.brandDescription}
+                onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
+                placeholder="1-2 sentences about your brand"
+              />
+            )}
           </div>
 
           {/* Co-Host Profile (avatar) — Partner mode only */}

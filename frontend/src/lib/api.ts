@@ -659,6 +659,8 @@ export interface CreateSponsorData {
   name: string;
   website?: string;
   brandTwitter?: string;
+  brandInstagram?: string;
+  brandDescription?: string;
   pointPerson?: string;
   contactName?: string;
   contactEmail?: string;
@@ -929,6 +931,8 @@ export interface SponsorIntakeData {
   name?: string;
   website?: string;
   brandTwitter?: string;
+  brandInstagram?: string;
+  brandDescription?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
