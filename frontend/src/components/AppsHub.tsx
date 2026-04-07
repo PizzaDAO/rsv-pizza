@@ -12,6 +12,7 @@ import {
   Calculator,
   Package,
   Megaphone,
+  Shield,
   Printer,
   FileImage,
   CreditCard,
@@ -126,6 +127,14 @@ const apps: AppItem[] = [
     icon: BarChart3,
     status: 'live',
     tab: 'report',
+  },
+  {
+    id: 'swc',
+    name: 'Stand With Crypto',
+    description: 'Find and contact crypto-friendly candidates near your event',
+    icon: Shield,
+    status: 'live',
+    tab: 'swc',
   },
 
   // Coming Soon features
@@ -328,10 +337,12 @@ export function AppsHub({
   inviteCode,
   pinnedApps: initialPinnedApps,
   partyId,
+  eventTags = [],
 }: {
   inviteCode: string;
   pinnedApps: string[];
   partyId: string;
+  eventTags?: string[];
 }) {
   const navigate = useNavigate();
   const { loadParty } = usePizza();
@@ -355,9 +366,11 @@ export function AppsHub({
     }
   };
 
-  const liveApps = apps.filter((a) => a.status === 'live');
-  const previewApps = apps.filter((a) => a.status === 'preview');
-  const comingSoonApps = apps.filter((a) => a.status === 'coming-soon');
+  const hasSwcTag = eventTags.some(t => t.toLowerCase() === 'swc');
+  const visibleApps = hasSwcTag ? apps : apps.filter(a => a.id !== 'swc');
+  const liveApps = visibleApps.filter((a) => a.status === 'live');
+  const previewApps = visibleApps.filter((a) => a.status === 'preview');
+  const comingSoonApps = visibleApps.filter((a) => a.status === 'coming-soon');
 
   return (
     <div className="space-y-8">

@@ -29,15 +29,16 @@ import { BudgetTab } from '../components/budget';
 import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
+import { SWCWidget } from '../components/swc';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'swc' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'swc', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -172,7 +173,10 @@ function HostPageContent() {
   ];
 
   // Build pinned tabs from party.pinnedApps
+  const hasSwcTag = (party?.eventTags ?? []).some(t => t.toLowerCase() === 'swc');
   const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
+    // Only show SWC tab if event is tagged "swc"
+    if (appId === 'swc' && !hasSwcTag) return null;
     const appDef = PINNABLE_APPS.find(a => a.id === appId);
     if (!appDef) return null;
     return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
@@ -211,7 +215,7 @@ function HostPageContent() {
         {activeTab === 'dashboard' && party ? (
           <GPPDashboardTab />
         ) : activeTab === 'apps' && party ? (
-          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
+          <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} eventTags={party.eventTags ?? []} />
         ) : activeTab !== 'apps' && activeTab !== 'dashboard' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">
@@ -373,6 +377,18 @@ function HostPageContent() {
 
               {activeTab === 'promo' && (
                 <PromoWidget />
+              )}
+
+              {activeTab === 'swc' && party && (
+                <SWCWidget
+                  partyId={party.id}
+                  address={party.address}
+                  eventName={party.name}
+                  eventDate={party.date ? new Date(party.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                  eventLocation={party.venueName ? `${party.venueName}${party.address ? `, ${party.address}` : ''}` : (party.address || '')}
+                  rsvpUrl={party.customUrl ? `${window.location.origin}/${party.customUrl}` : `${window.location.origin}/rsvp/${party.inviteCode}`}
+                  hostName={party.hostName || user?.name || 'Event Host'}
+                />
               )}
 
               {activeTab === 'gpp' && party && (
