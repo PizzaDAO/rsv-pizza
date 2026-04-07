@@ -146,43 +146,7 @@ function HostPageContent() {
     }
   }, [party, guests.length, orderExpectedGuests, guestsWithRequests, generateRecommendations]);
 
-  if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
-    return (
-      <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error || !party) {
-    return (
-      <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center p-4">
-          <div className="card p-8 max-w-md text-center">
-            <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
-            <p className="text-theme-text-secondary mb-6">{error || 'Unable to load party.'}</p>
-            <button onClick={() => navigate('/')} className="btn-primary">
-              Go to Home
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!canEdit) {
-    return (
-      <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
-      </Layout>
-    );
-  }
-
+  // All hooks must be called before any conditional returns (React Rules of Hooks)
   const tabs = useMemo(() => {
     const coreTabs = [
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: 'Dashboard', icon: Home }] : []),
@@ -219,6 +183,43 @@ function HostPageContent() {
       }
     }
   }, [activeTab, allowedTabs, party, tabs]);
+
+  if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
+    return (
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !party) {
+    return (
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center p-4">
+          <div className="card p-8 max-w-md text-center">
+            <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
+            <p className="text-theme-text-secondary mb-6">{error || 'Unable to load party.'}</p>
+            <button onClick={() => navigate('/')} className="btn-primary">
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!canEdit) {
+    return (
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
