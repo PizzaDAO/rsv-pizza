@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Loader2, Upload, FileText, Link, Receipt } from 'lucide-react';
 import { BudgetItem, BudgetCategory, BudgetStatus, BUDGET_CATEGORIES } from '../../types';
+import { IconInput } from '../IconInput';
+import { uploadReceipt } from '../../lib/supabase';
 
 interface BudgetItemFormProps {
   item?: BudgetItem | null;
+  partyId: string;
   onSave: (data: {
     name: string;
     category: BudgetCategory;
@@ -19,6 +22,7 @@ interface BudgetItemFormProps {
 
 export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
   item,
+  partyId,
   onSave,
   onClose,
   saving = false,
@@ -31,6 +35,10 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
   const [notes, setNotes] = useState('');
   const [receiptUrl, setReceiptUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (item) {
@@ -41,8 +49,50 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
       setPointPerson(item.pointPerson || '');
       setNotes(item.notes || '');
       setReceiptUrl(item.receiptUrl || '');
+      if (item.receiptUrl) {
+        setReceiptPreview(item.receiptUrl);
+      }
     }
   }, [item]);
+
+  const isImageUrl = (url: string) => {
+    return /\.(jpe?g|png|webp)(\?.*)?$/i.test(url);
+  };
+
+  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please select an image (JPEG, PNG, WebP) or PDF file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File must be less than 10MB');
+      return;
+    }
+
+    setReceiptFile(file);
+    setError(null);
+
+    if (file.type.startsWith('image/')) {
+      const objectUrl = URL.createObjectURL(file);
+      setReceiptPreview(objectUrl);
+    } else {
+      setReceiptPreview('pdf');
+    }
+  };
+
+  const removeReceipt = () => {
+    if (receiptPreview && receiptPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(receiptPreview);
+    }
+    setReceiptFile(null);
+    setReceiptPreview(null);
+    setReceiptUrl('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,15 +109,35 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
       return;
     }
 
-    await onSave({
-      name: name.trim(),
-      category,
-      cost: costValue,
-      status,
-      pointPerson: pointPerson.trim() || undefined,
-      notes: notes.trim() || undefined,
-      receiptUrl: receiptUrl.trim() || undefined,
-    });
+    try {
+      let finalReceiptUrl = receiptUrl.trim() || undefined;
+
+      // Upload receipt file if one was selected
+      if (receiptFile) {
+        setUploadingReceipt(true);
+        const uploadedUrl = await uploadReceipt(receiptFile, partyId);
+        if (uploadedUrl) {
+          finalReceiptUrl = uploadedUrl;
+        } else {
+          setError('Failed to upload receipt. Please try again.');
+          setUploadingReceipt(false);
+          return;
+        }
+        setUploadingReceipt(false);
+      }
+
+      await onSave({
+        name: name.trim(),
+        category,
+        cost: costValue,
+        status,
+        pointPerson: pointPerson.trim() || undefined,
+        notes: notes.trim() || undefined,
+        receiptUrl: finalReceiptUrl,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    }
   };
 
   return (
@@ -87,26 +157,19 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Description *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Pizza from Joe's"
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              autoFocus
-            />
-          </div>
+          <IconInput
+            icon={FileText}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Description"
+            required
+            autoFocus
+          />
 
           {/* Category and Cost */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-theme-text mb-1">
-                Category
-              </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as BudgetCategory)}
@@ -120,9 +183,6 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-theme-text mb-1">
-                Cost *
-              </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted">$</span>
                 <input
@@ -140,9 +200,6 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Status
-            </label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -170,45 +227,97 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
           </div>
 
           {/* Point Person */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Point Person
-            </label>
-            <input
-              type="text"
-              value={pointPerson}
-              onChange={(e) => setPointPerson(e.target.value)}
-              placeholder="Who's handling this?"
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
-          </div>
+          <IconInput
+            icon={FileText}
+            type="text"
+            value={pointPerson}
+            onChange={(e) => setPointPerson(e.target.value)}
+            placeholder="Point Person"
+          />
 
           {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional details..."
-              rows={2}
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] resize-none"
-            />
-          </div>
+          <IconInput
+            icon={FileText}
+            multiline
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes((e.target as HTMLTextAreaElement).value)}
+            placeholder="Additional details..."
+          />
 
-          {/* Receipt URL */}
-          <div>
-            <label className="block text-sm font-medium text-theme-text mb-1">
-              Receipt URL
-            </label>
-            <input
-              type="url"
-              value={receiptUrl}
-              onChange={(e) => setReceiptUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-            />
+          {/* Receipt Upload */}
+          <div className="space-y-2">
+            <p className="text-xs text-theme-text-muted">Receipt</p>
+            {receiptPreview ? (
+              <div className="flex items-center gap-3 p-3 bg-theme-surface rounded-lg border border-theme-stroke">
+                {receiptPreview === 'pdf' ? (
+                  <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20">
+                    <FileText size={24} className="text-red-400" />
+                  </div>
+                ) : (
+                  <img
+                    src={receiptPreview}
+                    alt="Receipt preview"
+                    className="w-12 h-12 object-cover rounded-lg border border-theme-stroke"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  {receiptFile ? (
+                    <p className="text-sm text-theme-text truncate">{receiptFile.name}</p>
+                  ) : receiptUrl ? (
+                    <a
+                      href={receiptUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 truncate block"
+                    >
+                      View receipt
+                    </a>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={removeReceipt}
+                  className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={handleReceiptChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
+                >
+                  <Upload size={16} />
+                  Upload
+                </button>
+                <div className="flex-1">
+                  <IconInput
+                    icon={Link}
+                    type="url"
+                    value={receiptUrl}
+                    onChange={(e) => {
+                      setReceiptUrl(e.target.value);
+                      if (e.target.value.trim()) {
+                        if (isImageUrl(e.target.value.trim())) {
+                          setReceiptPreview(e.target.value.trim());
+                        }
+                      }
+                    }}
+                    placeholder="Or paste URL"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Error */}
@@ -221,20 +330,20 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || uploadingReceipt}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploadingReceipt}
               className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
-              {saving ? (
+              {saving || uploadingReceipt ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Saving...
+                  {uploadingReceipt ? 'Uploading...' : 'Saving...'}
                 </>
               ) : item ? (
                 'Save Changes'
