@@ -176,7 +176,7 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
       <div className="bg-theme-header rounded-xl border border-theme-stroke max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <h2 className="text-lg font-semibold text-theme-text">
-            {sponsor ? 'Edit Sponsor' : 'Add Sponsor'}
+            {sponsor ? 'Edit Partner' : 'Add Partner'}
           </h2>
           <button
             onClick={onClose}
@@ -197,7 +197,7 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <Building2 size={16} />
-              Sponsor Info
+              Partner Info
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <IconInput
@@ -205,7 +205,7 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
                 type="text"
                 value={formData.name}
                 onChange={e => handleChange('name', e.target.value)}
-                placeholder="Sponsor Name *"
+                placeholder="Partner Name *"
                 required
               />
               <IconInput
@@ -463,7 +463,7 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
               disabled={isLoading || uploadingLogo}
               className="px-4 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading || uploadingLogo ? 'Saving...' : sponsor ? 'Update Sponsor' : 'Add Sponsor'}
+              {isLoading || uploadingLogo ? 'Saving...' : sponsor ? 'Update Partner' : 'Add Partner'}
             </button>
           </div>
         </form>
