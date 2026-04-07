@@ -135,8 +135,8 @@ export function PartnerDashboardPage() {
           // Also fetch all sponsor users to get all tags
           try {
             const { fetchSponsorUsers } = await import('../lib/api');
-            const sponsorUsers = await fetchSponsorUsers();
-            sponsorUsers.forEach(su => tags.add(su.tag));
+            const result = await fetchSponsorUsers();
+            result.sponsorUsers.forEach(su => tags.add(su.tag));
           } catch { /* admin-only, ok to fail */ }
           setAvailableTags(Array.from(tags).sort());
         }
