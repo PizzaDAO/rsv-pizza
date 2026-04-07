@@ -101,6 +101,8 @@ export function FlyerGenerator() {
   const logoOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   // Selected logo in group (double-clicked, shows sizing bar, ready to drag out)
   const [selectedGroupLogo, setSelectedGroupLogo] = useState<string | null>(null);
+  // Inline text editing on the flyer
+  const [editingField, setEditingField] = useState<'city' | 'venue' | 'street' | null>(null);
 
   // Draggable element positions (in 1080px canvas coordinates)
   const [positions, setPositions] = useState<FlyerPositions>(
@@ -534,18 +536,21 @@ export function FlyerGenerator() {
     const getDragProps = (key: keyof FlyerPositions) => {
       const isDragging = dragging === key;
       const isHovered = hoveredElement === key;
+      // Disable drag when inline-editing a text field on this element
+      const isEditing = (key === 'city' && editingField === 'city') ||
+        (key === 'venue' && (editingField === 'venue' || editingField === 'street'));
       return {
-        onMouseDown: (e: React.MouseEvent) => handleMouseDown(e, key),
-        onTouchStart: (e: React.TouchEvent) => handleTouchStart(e, key),
+        onMouseDown: isEditing ? undefined : (e: React.MouseEvent) => handleMouseDown(e, key),
+        onTouchStart: isEditing ? undefined : (e: React.TouchEvent) => handleTouchStart(e, key),
         onMouseEnter: () => setHoveredElement(key),
         onMouseLeave: () => setHoveredElement(null),
         style: {
-          cursor: isDragging ? 'grabbing' : 'grab',
-          outline: isHovered && !isDragging ? '2px dashed rgba(255,255,255,0.5)' : 'none',
+          cursor: isEditing ? 'text' : isDragging ? 'grabbing' : 'grab',
+          outline: isHovered && !isDragging && !isEditing ? '2px dashed rgba(255,255,255,0.5)' : 'none',
           outlineOffset: 4,
           zIndex: isDragging ? 20 : 10,
-          userSelect: 'none' as const,
-          WebkitUserSelect: 'none' as const,
+          userSelect: isEditing ? ('auto' as const) : ('none' as const),
+          WebkitUserSelect: isEditing ? ('auto' as const) : ('none' as const),
         },
       };
     };
@@ -577,6 +582,7 @@ export function FlyerGenerator() {
               onTouchStart={dragProps.onTouchStart}
               onMouseEnter={dragProps.onMouseEnter}
               onMouseLeave={dragProps.onMouseLeave}
+              onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('city'); }}
               style={{
                 position: 'absolute',
                 top: positions.city.y,
@@ -593,7 +599,7 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {hoveredElement === 'city' && dragging !== 'city' && (
+              {hoveredElement === 'city' && dragging !== 'city' && editingField !== 'city' && (
                 <Move
                   size={16}
                   style={{
@@ -605,7 +611,30 @@ export function FlyerGenerator() {
                   }}
                 />
               )}
-              {city.toUpperCase()}
+              {editingField === 'city' ? (
+                <input
+                  autoFocus
+                  value={city}
+                  onChange={e => setEditCity(e.target.value)}
+                  onBlur={() => setEditingField(null)}
+                  onKeyDown={e => { if (e.key === 'Enter') setEditingField(null); }}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'inherit',
+                    fontSize: 'inherit',
+                    fontFamily: 'inherit',
+                    textTransform: 'inherit' as any,
+                    lineHeight: 'inherit',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                />
+              ) : (
+                city.toUpperCase()
+              )}
             </div>
           );
         })()}
@@ -632,7 +661,7 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {hoveredElement === 'venue' && dragging !== 'venue' && (
+              {hoveredElement === 'venue' && dragging !== 'venue' && editingField !== 'venue' && editingField !== 'street' && (
                 <Move
                   size={16}
                   style={{
@@ -644,14 +673,64 @@ export function FlyerGenerator() {
                   }}
                 />
               )}
-              <div style={{ fontSize: venueNameFontSize, lineHeight: 1, marginBottom: 4, whiteSpace: 'nowrap' }}>
-                {venueName.toUpperCase()}
+              <div
+                onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('venue'); }}
+                style={{ fontSize: venueNameFontSize, lineHeight: 1, marginBottom: 4, whiteSpace: 'nowrap' }}
+              >
+                {editingField === 'venue' ? (
+                  <input
+                    autoFocus
+                    value={venueName}
+                    onChange={e => setEditVenueName(e.target.value)}
+                    onBlur={() => setEditingField(null)}
+                    onKeyDown={e => { if (e.key === 'Enter') setEditingField(null); }}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'inherit',
+                      fontSize: 'inherit',
+                      fontFamily: 'inherit',
+                      textTransform: 'inherit' as any,
+                      lineHeight: 'inherit',
+                      padding: 0,
+                      margin: 0,
+                    }}
+                  />
+                ) : (
+                  venueName.toUpperCase()
+                )}
               </div>
-              {streetAddress && (
-                <div style={{ fontSize: streetFontSize, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                  {streetAddress.toUpperCase()}
-                </div>
-              )}
+              <div
+                onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('street'); }}
+                style={{ fontSize: streetFontSize, lineHeight: 1, whiteSpace: 'nowrap' }}
+              >
+                {editingField === 'street' ? (
+                  <input
+                    autoFocus
+                    value={streetAddress}
+                    onChange={e => setEditStreetAddress(e.target.value)}
+                    onBlur={() => setEditingField(null)}
+                    onKeyDown={e => { if (e.key === 'Enter') setEditingField(null); }}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'inherit',
+                      fontSize: 'inherit',
+                      fontFamily: 'inherit',
+                      textTransform: 'inherit' as any,
+                      lineHeight: 'inherit',
+                      padding: 0,
+                      margin: 0,
+                    }}
+                  />
+                ) : (
+                  (streetAddress || 'STREET ADDRESS').toUpperCase()
+                )}
+              </div>
             </div>
           );
         })()}
@@ -734,6 +813,81 @@ export function FlyerGenerator() {
                   }}
                 />
               )}
+              {/* Group box corner resize handle — scales all group logos together */}
+              {(() => {
+                const handleGroupResizeStart = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startY = e.clientY;
+                  // Capture current sizes for all group logos
+                  const startSizes: Record<string, number> = {};
+                  groupLogos.forEach(s => {
+                    startSizes[s.id] = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
+                  });
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: MouseEvent) => {
+                    const deltaY = (moveEvent.clientY - startY) / sc;
+                    setLogoSizes(prev => {
+                      const next = { ...prev };
+                      groupLogos.forEach(s => {
+                        next[s.id] = Math.round(Math.max(20, Math.min(200, startSizes[s.id] + deltaY)));
+                      });
+                      return next;
+                    });
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                  };
+                  document.addEventListener('mousemove', handleMove);
+                  document.addEventListener('mouseup', handleUp);
+                };
+                const handleGroupTouchResizeStart = (e: React.TouchEvent) => {
+                  e.stopPropagation();
+                  const startY = e.touches[0].clientY;
+                  const startSizes: Record<string, number> = {};
+                  groupLogos.forEach(s => {
+                    startSizes[s.id] = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
+                  });
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: TouchEvent) => {
+                    moveEvent.preventDefault();
+                    const deltaY = (moveEvent.touches[0].clientY - startY) / sc;
+                    setLogoSizes(prev => {
+                      const next = { ...prev };
+                      groupLogos.forEach(s => {
+                        next[s.id] = Math.round(Math.max(20, Math.min(200, startSizes[s.id] + deltaY)));
+                      });
+                      return next;
+                    });
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('touchmove', handleMove);
+                    document.removeEventListener('touchend', handleUp);
+                  };
+                  document.addEventListener('touchmove', handleMove, { passive: false });
+                  document.addEventListener('touchend', handleUp);
+                };
+                return (
+                  <div
+                    onMouseDown={handleGroupResizeStart}
+                    onTouchStart={handleGroupTouchResizeStart}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: 18,
+                      height: 18,
+                      cursor: 'nwse-resize',
+                      zIndex: 35,
+                      background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.4) 50%)',
+                      borderRadius: '0 0 4px 0',
+                    }}
+                  />
+                );
+              })()}
               {groupLogos.map(s => {
                 const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
                 const isSelected = selectedGroupLogo === s.id;
@@ -922,32 +1076,11 @@ export function FlyerGenerator() {
     <div className="space-y-6">
       {/* Drag hint */}
       <p className="text-center text-xs text-white/40">
-        Drag text elements to reposition. Double-click a sponsor logo to freely move it. Drag a logo corner to resize.
+        Double-click text to edit. Drag to reposition. Double-click a logo to freely move it. Drag corners to resize.
       </p>
 
-      {/* Editable address fields */}
-      <div className="mx-auto space-y-2" style={{ maxWidth: 500 }}>
-        <input
-          type="text"
-          value={city}
-          onChange={e => setEditCity(e.target.value)}
-          placeholder="City"
-          className="w-full bg-transparent text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:border-white/50 focus:outline-none placeholder-white/30"
-        />
-        <input
-          type="text"
-          value={venueName}
-          onChange={e => setEditVenueName(e.target.value)}
-          placeholder="Venue Name"
-          className="w-full bg-transparent text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:border-white/50 focus:outline-none placeholder-white/30"
-        />
-        <input
-          type="text"
-          value={streetAddress}
-          onChange={e => setEditStreetAddress(e.target.value)}
-          placeholder="Street Address"
-          className="w-full bg-transparent text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:border-white/50 focus:outline-none placeholder-white/30"
-        />
+      {/* Add Logo button */}
+      <div className="mx-auto" style={{ maxWidth: 500 }}>
         <button
           onClick={() => setShowAddSponsor(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
