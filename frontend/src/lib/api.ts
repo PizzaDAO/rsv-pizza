@@ -2841,20 +2841,50 @@ export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item
 // Sponsor User Admin API
 // ============================================
 
-export async function fetchSponsorUsers(): Promise<SponsorUser[]> {
-  const result = await apiRequest<{ sponsorUsers: SponsorUser[] }>('/api/sponsor-users/list');
-  return result.sponsorUsers;
+export async function fetchSponsorUsers(): Promise<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }> {
+  return apiRequest<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }>('/api/sponsor-users/list');
 }
 
-export async function createSponsorUser(data: { email: string; tag: string; name?: string; notes?: string }): Promise<{ sponsorUser: SponsorUser }> {
-  return apiRequest<{ sponsorUser: SponsorUser }>('/api/sponsor-users', {
+export interface SponsorUserCreateData {
+  email: string;
+  tag: string;
+  name?: string;
+  notes?: string;
+  coHostName?: string;
+  coHostWebsite?: string;
+  coHostTwitter?: string;
+  coHostInstagram?: string;
+  coHostAvatarUrl?: string;
+  coHostLogoUrl?: string;
+  autoCoHost?: boolean;
+  autoSponsor?: boolean;
+}
+
+export async function createSponsorUser(data: SponsorUserCreateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
+  return apiRequest<{ sponsorUser: SponsorUser; syncedCount: number }>('/api/sponsor-users', {
     method: 'POST',
     body: data,
   });
 }
 
-export async function updateSponsorUser(id: string, data: { email?: string; name?: string; tag?: string; notes?: string; isActive?: boolean }): Promise<{ sponsorUser: SponsorUser }> {
-  return apiRequest<{ sponsorUser: SponsorUser }>(`/api/sponsor-users/${id}`, {
+export interface SponsorUserUpdateData {
+  email?: string;
+  name?: string;
+  tag?: string;
+  notes?: string;
+  isActive?: boolean;
+  coHostName?: string;
+  coHostWebsite?: string;
+  coHostTwitter?: string;
+  coHostInstagram?: string;
+  coHostAvatarUrl?: string;
+  coHostLogoUrl?: string;
+  autoCoHost?: boolean;
+  autoSponsor?: boolean;
+}
+
+export async function updateSponsorUser(id: string, data: SponsorUserUpdateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
+  return apiRequest<{ sponsorUser: SponsorUser; syncedCount: number }>(`/api/sponsor-users/${id}`, {
     method: 'PATCH',
     body: data,
   });

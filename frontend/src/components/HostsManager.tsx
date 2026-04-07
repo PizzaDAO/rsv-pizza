@@ -21,16 +21,16 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   initialCoHosts,
   onCoHostsChange,
 }) => {
-  // Separate underboss co-hosts (hidden, not editable) from regular co-hosts
-  const underbossCoHosts = initialCoHosts.filter(h => h.isUnderboss === true);
-  const editableInitialCoHosts = initialCoHosts.filter(h => h.isUnderboss !== true);
+  // Separate protected co-hosts (underboss + partner, hidden, not editable) from regular co-hosts
+  const protectedCoHosts = initialCoHosts.filter(h => h.isUnderboss === true || h.isPartner === true);
+  const editableInitialCoHosts = initialCoHosts.filter(h => h.isUnderboss !== true && h.isPartner !== true);
 
   // Co-hosts state (only editable ones)
   const [coHosts, setCoHosts] = useState<CoHost[]>(editableInitialCoHosts);
 
   // Sync from props when enriched data arrives asynchronously
   useEffect(() => {
-    setCoHosts(initialCoHosts.filter(h => h.isUnderboss !== true));
+    setCoHosts(initialCoHosts.filter(h => h.isUnderboss !== true && h.isPartner !== true));
   }, [initialCoHosts]);
 
   const [newCoHostName, setNewCoHostName] = useState('');
@@ -90,9 +90,9 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
   const saveCoHostsArray = async (coHostsToSave: CoHost[]) => {
     try {
-      // Merge underboss entries back before sending to API
+      // Merge protected entries (underboss + partner) back before sending to API
       // (server also protects these, but this avoids unnecessary churn)
-      const allCoHosts = [...coHostsToSave, ...underbossCoHosts];
+      const allCoHosts = [...coHostsToSave, ...protectedCoHosts];
       const success = await updateParty(partyId, { co_hosts: allCoHosts });
       if (success) {
         for (const coHost of coHostsToSave) {

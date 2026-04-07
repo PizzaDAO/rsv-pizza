@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
+import { syncPartnerToAllEvents, removePartnerFromAllEvents } from '../helpers/partnerSync.js';
 
 // ============================================
 // Admin management routes (mounted at /api/sponsor-users)
@@ -29,10 +30,30 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         createdBy: true,
         createdAt: true,
         updatedAt: true,
+        coHostName: true,
+        coHostWebsite: true,
+        coHostTwitter: true,
+        coHostInstagram: true,
+        coHostAvatarUrl: true,
+        coHostLogoUrl: true,
+        autoCoHost: true,
+        autoSponsor: true,
       },
     });
 
-    res.json({ sponsorUsers });
+    // Count events per tag for admin UI
+    const tagCounts: Record<string, number> = {};
+    const uniqueTags = [...new Set(sponsorUsers.map(su => su.tag))];
+    if (uniqueTags.length > 0) {
+      for (const tag of uniqueTags) {
+        const count = await prisma.party.count({
+          where: { eventTags: { has: tag } },
+        });
+        tagCounts[tag] = count;
+      }
+    }
+
+    res.json({ sponsorUsers, tagCounts });
   } catch (error) {
     next(error);
   }
@@ -45,7 +66,11 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('Super admin access required', 403, 'FORBIDDEN');
     }
 
-    const { email, tag, name, notes } = req.body;
+    const {
+      email, tag, name, notes,
+      coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
+      coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
+    } = req.body;
 
     if (!email || !tag) {
       throw new AppError('Email and tag are required', 400, 'VALIDATION_ERROR');
@@ -67,21 +92,28 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         name: name?.trim() || null,
         notes: notes?.trim() || null,
         createdBy: req.userEmail || null,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        tag: true,
-        isActive: true,
-        notes: true,
-        createdBy: true,
-        createdAt: true,
-        updatedAt: true,
+        coHostName: coHostName?.trim() || null,
+        coHostWebsite: coHostWebsite?.trim() || null,
+        coHostTwitter: coHostTwitter?.trim() || null,
+        coHostInstagram: coHostInstagram?.trim() || null,
+        coHostAvatarUrl: coHostAvatarUrl?.trim() || null,
+        coHostLogoUrl: coHostLogoUrl?.trim() || null,
+        autoCoHost: autoCoHost || false,
+        autoSponsor: autoSponsor || false,
       },
     });
 
-    res.status(201).json({ sponsorUser });
+    // If autoCoHost is enabled, sync partner to all existing events with this tag
+    let syncedCount = 0;
+    if (sponsorUser.autoCoHost) {
+      try {
+        syncedCount = await syncPartnerToAllEvents(sponsorUser);
+      } catch (syncError) {
+        console.error('Failed to sync partner to events on create:', syncError);
+      }
+    }
+
+    res.status(201).json({ sponsorUser, syncedCount });
   } catch (error) {
     next(error);
   }
@@ -95,7 +127,19 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     }
 
     const { id } = req.params;
-    const { email, name, tag, notes, isActive } = req.body;
+    const {
+      email, name, tag, notes, isActive,
+      coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
+      coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
+    } = req.body;
+
+    // Fetch old state for sync reconciliation
+    const oldSponsorUser = await prisma.sponsorUser.findUnique({
+      where: { id },
+    });
+    if (!oldSponsorUser) {
+      throw new AppError('Sponsor user not found', 404, 'NOT_FOUND');
+    }
 
     const updateData: any = {};
     if (email !== undefined) updateData.email = email.toLowerCase();
@@ -103,24 +147,54 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (tag !== undefined) updateData.tag = tag.trim().toLowerCase();
     if (notes !== undefined) updateData.notes = notes?.trim() || null;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (coHostName !== undefined) updateData.coHostName = coHostName?.trim() || null;
+    if (coHostWebsite !== undefined) updateData.coHostWebsite = coHostWebsite?.trim() || null;
+    if (coHostTwitter !== undefined) updateData.coHostTwitter = coHostTwitter?.trim() || null;
+    if (coHostInstagram !== undefined) updateData.coHostInstagram = coHostInstagram?.trim() || null;
+    if (coHostAvatarUrl !== undefined) updateData.coHostAvatarUrl = coHostAvatarUrl?.trim() || null;
+    if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
+    if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
+    if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
 
     const sponsorUser = await prisma.sponsorUser.update({
       where: { id },
       data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        tag: true,
-        isActive: true,
-        notes: true,
-        createdBy: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
 
-    res.json({ sponsorUser });
+    // Sync partner co-hosts based on changes
+    let syncedCount = 0;
+    try {
+      const oldTag = oldSponsorUser.tag;
+      const newTag = sponsorUser.tag;
+      const wasAutoCoHost = oldSponsorUser.autoCoHost;
+      const isAutoCoHost = sponsorUser.autoCoHost;
+      const wasActive = oldSponsorUser.isActive;
+      const isActive_ = sponsorUser.isActive;
+
+      // Case 1: Deactivated or autoCoHost turned off — remove from all events
+      if ((!isActive_ && wasActive) || (!isAutoCoHost && wasAutoCoHost)) {
+        await removePartnerFromAllEvents(oldTag);
+      }
+      // Case 2: Tag changed — remove from old, add to new
+      else if (oldTag !== newTag && isAutoCoHost && isActive_) {
+        await removePartnerFromAllEvents(oldTag);
+        syncedCount = await syncPartnerToAllEvents(sponsorUser);
+      }
+      // Case 3: autoCoHost just turned on — sync to all events
+      else if (isAutoCoHost && !wasAutoCoHost && isActive_) {
+        syncedCount = await syncPartnerToAllEvents(sponsorUser);
+      }
+      // Case 4: Profile fields updated but still autoCoHost — update co-host entries
+      else if (isAutoCoHost && isActive_ && wasAutoCoHost) {
+        // Remove old entries and re-add with updated profile
+        await removePartnerFromAllEvents(newTag);
+        syncedCount = await syncPartnerToAllEvents(sponsorUser);
+      }
+    } catch (syncError) {
+      console.error('Failed to sync partner on update:', syncError);
+    }
+
+    res.json({ sponsorUser, syncedCount });
   } catch (error) {
     next(error);
   }
@@ -135,10 +209,24 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
 
     const { id } = req.params;
 
+    // Fetch sponsor user to get tag before deactivating
+    const sponsorUser = await prisma.sponsorUser.findUnique({
+      where: { id },
+    });
+
     await prisma.sponsorUser.update({
       where: { id },
       data: { isActive: false },
     });
+
+    // Remove partner co-hosts from all events
+    if (sponsorUser?.autoCoHost) {
+      try {
+        await removePartnerFromAllEvents(sponsorUser.tag);
+      } catch (syncError) {
+        console.error('Failed to remove partner co-hosts on deactivate:', syncError);
+      }
+    }
 
     res.json({ success: true, message: 'Sponsor user deactivated' });
   } catch (error) {

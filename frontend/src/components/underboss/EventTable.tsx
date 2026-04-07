@@ -13,6 +13,7 @@ interface EventTableProps {
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
   onBulkAction?: () => void;
   onTelegramBroadcast?: (cities: string[]) => void;
+  partnerTags?: string[];
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
@@ -82,7 +83,7 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [] }: EventTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -588,7 +589,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               </tr>
             ) : (
               filteredEvents.map((event) => (
-                <EventRow key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} isSelected={selectedIds.has(event.id)} onToggleSelect={toggleSelect} />
+                <EventRow key={event.id} event={event} showRegion={showRegion} onEventUpdate={onEventUpdate} isSelected={selectedIds.has(event.id)} onToggleSelect={toggleSelect} partnerTags={partnerTags} />
               ))
             )}
           </tbody>

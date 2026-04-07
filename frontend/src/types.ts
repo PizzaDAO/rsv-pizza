@@ -107,6 +107,8 @@ export interface CoHost {
   showOnEvent?: boolean;
   canEdit?: boolean;
   isUnderboss?: boolean;
+  isPartner?: boolean;
+  partnerTag?: string;
   allowedTabs?: string[];
 }
 
@@ -1111,6 +1113,14 @@ export interface SponsorUser {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+  coHostName: string | null;
+  coHostWebsite: string | null;
+  coHostTwitter: string | null;
+  coHostInstagram: string | null;
+  coHostAvatarUrl: string | null;
+  coHostLogoUrl: string | null;
+  autoCoHost: boolean;
+  autoSponsor: boolean;
 }
 
 export interface SponsorChecklistItem {
