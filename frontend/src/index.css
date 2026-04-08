@@ -418,6 +418,7 @@ body.gpp-theme-active .card:hover {
 .gpp-theme .hover\:text-white\/60:hover, body.gpp-theme-active .hover\:text-white\/60:hover { color: #444 !important; }
 
 /* Inputs */
+.gpp-theme input:not([type]), body.gpp-theme-active input:not([type]),
 .gpp-theme input[type="text"], body.gpp-theme-active input[type="text"],
 .gpp-theme input[type="email"], body.gpp-theme-active input[type="email"],
 .gpp-theme input[type="number"], body.gpp-theme-active input[type="number"],
