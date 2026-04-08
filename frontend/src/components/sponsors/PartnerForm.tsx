@@ -163,6 +163,7 @@ interface PartnerFormProps {
   onSubmit: (data: PartnerFormData) => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
+  defaultStatus?: SponsorStatus;
   // CRM mode
   sponsor?: Sponsor | null;
   partyId?: string;
@@ -179,6 +180,7 @@ export function PartnerForm({
   onSubmit,
   onClose,
   isLoading,
+  defaultStatus = 'todo',
   sponsor,
   partyId,
   onSponsorUpdate,
@@ -192,7 +194,7 @@ export function PartnerForm({
   const [formData, setFormData] = useState<PartnerFormData>(() => {
     if (isCrm && sponsor) return sponsorToFormData(sponsor);
     if (isPartner && partnerData) return sponsorUserToFormData(partnerData);
-    return getDefaultFormData();
+    return { ...getDefaultFormData(), status: defaultStatus };
   });
   const [error, setError] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
