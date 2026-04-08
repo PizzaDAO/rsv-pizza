@@ -401,7 +401,7 @@ export function PartnerForm({
                 rows={2}
                 value={formData.brandDescription}
                 onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-                placeholder="1-2 sentences about your brand"
+                placeholder="1-2 sentence description"
               />
             )}
           </div>
@@ -447,7 +447,7 @@ export function PartnerForm({
                   type="text"
                   value={formData.pointPerson}
                   onChange={e => handleChange('pointPerson', e.target.value)}
-                  placeholder="Point Person (Your Team)"
+                  placeholder="Point Person (Event Team)"
                 />
                 <IconInput
                   icon={User}
