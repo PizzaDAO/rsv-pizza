@@ -8,11 +8,11 @@ import {
   updateSponsor,
   deleteSponsor,
   updateFundraisingGoal,
-  CreateSponsorData,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
-import { SponsorForm } from './SponsorForm';
+import { PartnerForm, extractSponsorData } from './PartnerForm';
+import type { PartnerFormData } from './PartnerForm';
 
 interface SponsorCRMProps {
   partyId: string;
@@ -60,7 +60,8 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   }, [loadData]);
 
   // Handle form submission
-  const handleFormSubmit = async (data: CreateSponsorData) => {
+  const handleFormSubmit = async (formData: PartnerFormData) => {
+    const data = extractSponsorData(formData);
     setIsSubmitting(true);
     try {
       if (editingSponsor) {
@@ -185,7 +186,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
 
       {/* Form Modal */}
       {showForm && (
-        <SponsorForm
+        <PartnerForm
           sponsor={editingSponsor}
           partyId={partyId}
           onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
