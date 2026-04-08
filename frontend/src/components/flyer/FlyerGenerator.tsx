@@ -1080,17 +1080,6 @@ export function FlyerGenerator() {
         Double-click text to edit. Drag to reposition. Double-click a logo to freely move it. Drag corners to resize.
       </p>
 
-      {/* Add Logo button */}
-      <div className="mx-auto" style={{ maxWidth: 500 }}>
-        <button
-          onClick={() => setShowAddSponsor(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Add Logo
-        </button>
-      </div>
-
       {/* Scaled preview */}
       <div className="relative mx-auto" style={{ maxWidth: 500 }}>
         <div
@@ -1121,8 +1110,15 @@ export function FlyerGenerator() {
         </div>
       </div>
 
-      {/* Download + Reset buttons */}
+      {/* Action buttons */}
       <div className="flex justify-center gap-3">
+        <button
+          onClick={() => setShowAddSponsor(true)}
+          className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Add Logo
+        </button>
         <button
           onClick={handleDownload}
           disabled={downloading}
