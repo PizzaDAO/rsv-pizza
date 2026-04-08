@@ -42,6 +42,7 @@ export function AccountPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -170,12 +171,15 @@ export function AccountPage() {
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
 
     if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file (JPEG, PNG, WebP, or GIF)');
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Image must be under 2 MB');
       return;
     }
 
@@ -240,6 +244,8 @@ export function AccountPage() {
         const uploadedUrl = await uploadProfilePicture(profilePictureFile, user.id);
         if (uploadedUrl) {
           newProfilePictureUrl = uploadedUrl;
+        } else {
+          setUploadError('Failed to upload photo. Try a smaller image (under 2 MB).');
         }
       } else if (
         profilePicture &&
@@ -407,6 +413,9 @@ export function AccountPage() {
                   </label>
                 </div>
               </div>
+              {uploadError && (
+                <p className="text-xs text-red-400 mt-1">{uploadError}</p>
+              )}
             </div>
 
             {/* Bio */}
