@@ -129,9 +129,9 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
     return (
       <div className="card p-8 bg-theme-header border-theme-stroke text-center">
         <Building2 size={48} className="mx-auto text-theme-text-faint mb-4" />
-        <h3 className="text-lg font-medium text-theme-text mb-2">No sponsors yet</h3>
+        <h3 className="text-lg font-medium text-theme-text mb-2">No partners yet</h3>
         <p className="text-theme-text-secondary text-sm">
-          Add your first sponsor to start tracking your fundraising pipeline.
+          Add your first partner to start tracking your fundraising pipeline.
         </p>
       </div>
     );
@@ -159,7 +159,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
           })}
         </select>
         <span className="text-sm text-theme-text-muted ml-auto">
-          {filteredAndSortedSponsors.length} sponsor{filteredAndSortedSponsors.length !== 1 ? 's' : ''}
+          {filteredAndSortedSponsors.length} partner{filteredAndSortedSponsors.length !== 1 ? 's' : ''}
         </span>
       </div>
 
@@ -181,7 +181,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   onClick={() => handleSort('name')}
                   className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
-                  Sponsor <SortIcon field="name" />
+                  Partner <SortIcon field="name" />
                 </button>
               </th>
               <th className="text-left p-3 hidden md:table-cell">

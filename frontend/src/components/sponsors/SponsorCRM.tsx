@@ -162,7 +162,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
           className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"
         >
           <Plus size={18} />
-          Add Sponsor
+          Add Partner
         </button>
       </div>
 
