@@ -105,7 +105,7 @@ export function AdminPage() {
         setGppNftEnabled(nftSettings.nftEnabled);
         setGppNftChain(nftSettings.nftChain || 'base');
         setChecklistItems(clDefaults.items);
-        setSponsorUsers(spList);
+        setSponsorUsers(spList.sponsorUsers);
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
       } finally {
