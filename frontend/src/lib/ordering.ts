@@ -51,32 +51,37 @@ export function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-// Geocode an address to coordinates
-export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  // Using a simple geocoding approach with Nominatim (free, no API key)
-  // In production, you might want to use Google Geocoding API
+// Strip secondary address components (floor, suite, apt, etc.) that confuse Nominatim
+function stripSecondaryAddress(address: string): string {
+  return address
+    .replace(/,?\s*\b\d+(?:st|nd|rd|th)\s+(?:floor|fl)\b\.?/gi, '')  // "3rd Floor"
+    .replace(/,?\s*\b(?:floor|fl)\b\.?\s*\d+/gi, '')                  // "Floor 2"
+    .replace(/[,\s]+\b(?:suite|ste|apt|apartment|unit|rm|room|bldg|building)\b\.?\s*\w{0,5}\b/gi, '') // "Suite 200", "Apt 3B"
+    .replace(/,?\s*#\s*\w+/g, '')                                      // "#500"
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function nominatimGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
   const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-    {
-      headers: {
-        'User-Agent': 'RSV.Pizza/1.0',
-      },
-    }
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+    { headers: { 'User-Agent': 'RSV.Pizza/1.0' } }
   );
-
-  if (!response.ok) {
-    return null;
-  }
-
+  if (!response.ok) return null;
   const results = await response.json();
-  if (results.length === 0) {
-    return null;
-  }
+  if (results.length === 0) return null;
+  return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+}
 
-  return {
-    lat: parseFloat(results[0].lat),
-    lng: parseFloat(results[0].lon),
-  };
+// Geocode an address to coordinates — tries original first, then stripped version
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const result = await nominatimGeocode(address);
+  if (result) return result;
+
+  const cleaned = stripSecondaryAddress(address);
+  if (cleaned !== address) return nominatimGeocode(cleaned);
+
+  return null;
 }
 
 // Create a Square order
