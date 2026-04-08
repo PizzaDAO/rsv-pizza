@@ -1153,6 +1153,7 @@ export function FlyerGenerator() {
           onSubmit={handleAddSponsor}
           onClose={() => setShowAddSponsor(false)}
           isLoading={isSubmitting}
+          defaultStatus="yes"
         />
       )}
     </div>
