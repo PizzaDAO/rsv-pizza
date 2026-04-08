@@ -225,6 +225,57 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
             </div>
           </div>
 
+          {/* Logo Upload */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
+              <Image size={16} />
+              Logo
+            </h3>
+            {logoPreview ? (
+              <div className="flex items-center gap-4">
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
+                />
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+                >
+                  <Upload size={16} />
+                  Upload Logo
+                </button>
+                <div className="flex-1">
+                  <IconInput
+                    icon={Globe}
+                    type="url"
+                    value={formData.logoUrl || ''}
+                    onChange={e => handleChange('logoUrl', e.target.value)}
+                    placeholder="Or paste logo URL"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Contact Info */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
@@ -350,57 +401,6 @@ export function SponsorForm({ sponsor, partyId, onSponsorUpdate, onSubmit, onClo
                 placeholder="Product/Service (if non-monetary)"
               />
             </div>
-          </div>
-
-          {/* Logo Upload */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
-              <Image size={16} />
-              Logo
-            </h3>
-            {logoPreview ? (
-              <div className="flex items-center gap-4">
-                <img
-                  src={logoPreview}
-                  alt="Logo preview"
-                  className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-                />
-                <button
-                  type="button"
-                  onClick={removeLogo}
-                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-                >
-                  <Upload size={16} />
-                  Upload Logo
-                </button>
-                <div className="flex-1">
-                  <IconInput
-                    icon={Globe}
-                    type="url"
-                    value={formData.logoUrl || ''}
-                    onChange={e => handleChange('logoUrl', e.target.value)}
-                    placeholder="Or paste logo URL"
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Sponsor Message (from intake form — read-only for host context) */}
