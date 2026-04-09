@@ -11,7 +11,7 @@ export interface FlyerPositions {
 export const DEFAULT_POSITIONS: FlyerPositions = {
   city: { x: 50, y: 608 },
   time: { x: 203, y: 805 },
-  venue: { x: 48, y: 711 },
+  venue: { x: 48, y: 709 },
   sponsors: { x: 27, y: 884 },
 };
 
