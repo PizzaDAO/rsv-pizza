@@ -16,6 +16,7 @@ import {
   FileImage,
   CreditCard,
   ShoppingBag,
+  Newspaper,
   ExternalLink,
   Pin,
   PinOff,
@@ -126,6 +127,14 @@ const apps: AppItem[] = [
     icon: BarChart3,
     status: 'live',
     tab: 'report',
+  },
+  {
+    id: 'press-release',
+    name: 'Press Release',
+    description: 'Generate press releases for local media',
+    icon: Newspaper,
+    status: 'live',
+    tab: 'press-release',
   },
 
   // Coming Soon features

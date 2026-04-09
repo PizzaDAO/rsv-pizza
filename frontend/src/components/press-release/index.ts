@@ -1,0 +1,1 @@
+export { PressReleaseWidget } from './PressReleaseWidget';
