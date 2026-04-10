@@ -17,7 +17,7 @@ interface PizzeriaSelectionProps {
 }
 
 export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
-  const { party, loadParty, guests, recommendations } = usePizza();
+  const { party, guests, recommendations } = usePizza();
 
   // AI order state
   const [orderPizzeria, setOrderPizzeria] = useState<Pizzeria | null>(null);
@@ -93,7 +93,8 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     fetchNearbyPizzerias();
   }, [party?.address]);
 
-  // Save field helper
+  // Save field helper — optimistic: caller updates local state first, we only persist.
+  // On failure, revert local selectedPizzerias to whatever party has.
   const saveField = async (fieldName: string, updates: Record<string, any>) => {
     if (!party) return false;
 
@@ -102,15 +103,14 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     try {
       const success = await updateParty(party.id, updates);
       if (success) {
-        if (party?.inviteCode) {
-          await loadParty(party.inviteCode);
-        }
         return true;
       } else {
         throw new Error('Failed to save');
       }
     } catch (error) {
       console.error(`Error saving ${fieldName}:`, error);
+      // Revert optimistic local state on failure
+      setSelectedPizzerias(party?.selectedPizzerias || []);
       return false;
     } finally {
       setSavingField(null);
