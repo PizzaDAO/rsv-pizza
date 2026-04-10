@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getSponsors, createSponsor } from '../../lib/api';
+import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
@@ -101,6 +101,8 @@ export function FlyerGenerator() {
   const logoOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   // Selected logo in group (double-clicked, shows sizing bar, ready to drag out)
   const [selectedGroupLogo, setSelectedGroupLogo] = useState<string | null>(null);
+  // Hovered group logo (shows left/right reorder arrows)
+  const [hoveredLogoId, setHoveredLogoId] = useState<string | null>(null);
   // Inline text editing on the flyer
   const [editingField, setEditingField] = useState<'city' | 'venue' | 'street' | null>(null);
 
@@ -301,6 +303,33 @@ export function FlyerGenerator() {
   useEffect(() => {
     loadSponsors();
   }, [loadSponsors]);
+
+  /** Move a group logo left or right by swapping it with its neighbor in the group view. */
+  const handleReorderLogo = useCallback(async (sponsorId: string, direction: -1 | 1, groupLogos: Sponsor[]) => {
+    if (!party?.id) return;
+    const groupIdx = groupLogos.findIndex(s => s.id === sponsorId);
+    if (groupIdx < 0) return;
+    const neighborIdx = groupIdx + direction;
+    if (neighborIdx < 0 || neighborIdx >= groupLogos.length) return;
+
+    const neighborId = groupLogos[neighborIdx].id;
+
+    // Swap within the full sponsors array by id (so popped-out logos stay in place)
+    const prev = sponsors;
+    const swapped = [...sponsors];
+    const fullIdxA = swapped.findIndex(s => s.id === sponsorId);
+    const fullIdxB = swapped.findIndex(s => s.id === neighborId);
+    if (fullIdxA < 0 || fullIdxB < 0) return;
+    [swapped[fullIdxA], swapped[fullIdxB]] = [swapped[fullIdxB], swapped[fullIdxA]];
+
+    setSponsors(swapped);
+    try {
+      await reorderSponsors(party.id, swapped.map(s => s.id));
+    } catch (err) {
+      console.error('Failed to reorder sponsors:', err);
+      setSponsors(prev);
+    }
+  }, [party?.id, sponsors]);
 
   const handleAddSponsor = async (formData: PartnerFormData) => {
     if (!party?.id) return;
@@ -933,8 +962,18 @@ export function FlyerGenerator() {
                   document.addEventListener('touchend', handleUp);
                 };
 
+                const groupIdx = groupLogos.findIndex(g => g.id === s.id);
+                const canMoveLeft = groupIdx > 0;
+                const canMoveRight = groupIdx < groupLogos.length - 1;
+                const showArrows = hoveredLogoId === s.id && groupLogos.length > 1;
+
                 return (
-                  <div key={s.id} style={{ position: 'relative', display: 'inline-block' }}>
+                  <div
+                    key={s.id}
+                    onMouseEnter={() => setHoveredLogoId(s.id)}
+                    onMouseLeave={() => setHoveredLogoId(prev => (prev === s.id ? null : prev))}
+                    style={{ position: 'relative', display: 'inline-block' }}
+                  >
                     <img
                       src={s.logoUrl!}
                       alt={s.name}
@@ -952,6 +991,75 @@ export function FlyerGenerator() {
                         outlineOffset: isSelected ? 4 : 0,
                       }}
                     />
+                    {/* Reorder arrows (on hover) */}
+                    {showArrows && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={!canMoveLeft}
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!canMoveLeft) return;
+                            handleReorderLogo(s.id, -1, groupLogos);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: -10,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: 22,
+                            height: 22,
+                            padding: 0,
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: 'rgba(0,0,0,0.75)',
+                            color: canMoveLeft ? '#fff' : 'rgba(255,255,255,0.3)',
+                            cursor: canMoveLeft ? 'pointer' : 'not-allowed',
+                            zIndex: 40,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          aria-label="Move logo left"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canMoveRight}
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!canMoveRight) return;
+                            handleReorderLogo(s.id, 1, groupLogos);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: -10,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: 22,
+                            height: 22,
+                            padding: 0,
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: 'rgba(0,0,0,0.75)',
+                            color: canMoveRight ? '#fff' : 'rgba(255,255,255,0.3)',
+                            cursor: canMoveRight ? 'pointer' : 'not-allowed',
+                            zIndex: 40,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          aria-label="Move logo right"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </>
+                    )}
                     {/* Corner resize handle */}
                     <div
                       onMouseDown={handleResizeStart}

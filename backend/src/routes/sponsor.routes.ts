@@ -10,7 +10,7 @@ const router = Router();
 router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { status, sortBy, sortDir = 'desc' } = req.query;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -31,14 +31,21 @@ router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Resp
       where.status = status;
     }
 
-    // Valid sort fields
+    // Default order: sortOrder asc (for flyer logo row), then newest first as tiebreaker.
+    // If caller passes an explicit sortBy, honor it with sortDir (asc/desc).
     const validSortFields = ['createdAt', 'name', 'amount', 'lastContactedAt', 'status'];
-    const sortField = validSortFields.includes(sortBy as string) ? sortBy : 'createdAt';
-    const order = sortOrder === 'asc' ? 'asc' : 'desc';
+    const order = sortDir === 'asc' ? 'asc' : 'desc';
+
+    let orderBy: any;
+    if (sortBy && validSortFields.includes(sortBy as string)) {
+      orderBy = { [sortBy as string]: order };
+    } else {
+      orderBy = [{ sortOrder: 'asc' }, { createdAt: 'desc' }];
+    }
 
     const sponsors = await prisma.sponsor.findMany({
       where,
-      orderBy: { [sortField as string]: order },
+      orderBy,
     });
 
     res.json({ sponsors });
@@ -172,6 +179,14 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // Append to the end of the sort order for this party
+    const lastSponsor = await prisma.sponsor.findFirst({
+      where: { partyId },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+    const nextSortOrder = (lastSponsor?.sortOrder ?? -1) + 1;
+
     const sponsor = await prisma.sponsor.create({
       data: {
         partyId,
@@ -194,10 +209,69 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
         notes: notes?.trim() || null,
         lastContactedAt: lastContactedAt ? new Date(lastContactedAt) : null,
         sponsorMessage: sponsorMessage?.trim() || null,
+        sortOrder: nextSortOrder,
       },
     });
 
     res.status(201).json({ sponsor });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/parties/:partyId/sponsors/reorder - Reorder sponsors (host only)
+router.patch('/:partyId/sponsors/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { sponsorIds } = req.body;
+
+    // Verify ownership
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    // Validate sponsorIds
+    if (!Array.isArray(sponsorIds) || sponsorIds.length === 0) {
+      throw new AppError('sponsorIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    // Verify all sponsors belong to this party
+    const sponsors = await prisma.sponsor.findMany({
+      where: { partyId },
+      select: { id: true },
+    });
+
+    const existingIds = new Set(sponsors.map(s => s.id));
+    for (const id of sponsorIds) {
+      if (!existingIds.has(id)) {
+        throw new AppError(`Sponsor ${id} not found in this party`, 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    // Update sort orders
+    await prisma.$transaction(
+      sponsorIds.map((id: string, index: number) =>
+        prisma.sponsor.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    // Return updated sponsors
+    const updatedSponsors = await prisma.sponsor.findMany({
+      where: { partyId },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    res.json({ sponsors: updatedSponsors });
   } catch (error) {
     next(error);
   }
