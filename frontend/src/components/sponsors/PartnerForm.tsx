@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check } from 'lucide-react';
+import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, Tag } from 'lucide-react';
 import { Sponsor, SponsorStatus, SponsorshipType, SponsorUser } from '../../types';
 import { CreateSponsorData } from '../../lib/api';
 import { IconInput } from '../IconInput';
@@ -198,11 +198,20 @@ export function PartnerForm({
   });
   const [error, setError] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(
-    isCrm && sponsor?.logoUrl ? sponsor.logoUrl : null
-  );
+  const [logoPreview, setLogoPreview] = useState<string | null>(() => {
+    if (isCrm && sponsor?.logoUrl) return sponsor.logoUrl;
+    if (isPartner && partnerData?.coHostLogoUrl) return partnerData.coHostLogoUrl;
+    return null;
+  });
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    isPartner && partnerData?.coHostAvatarUrl ? partnerData.coHostAvatarUrl : null
+  );
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Re-initialize when sponsor changes (CRM mode)
   useEffect(() => {
@@ -216,6 +225,8 @@ export function PartnerForm({
   useEffect(() => {
     if (isPartner && partnerData) {
       setFormData(sponsorUserToFormData(partnerData));
+      setLogoPreview(partnerData.coHostLogoUrl || null);
+      setAvatarPreview(partnerData.coHostAvatarUrl || null);
     }
   }, [partnerData, isPartner]);
 
@@ -251,6 +262,34 @@ export function PartnerForm({
     handleChange('logoUrl', '');
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
+      return;
+    }
+
+    setAvatarFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreview(objectUrl);
+    setError(null);
+  };
+
+  const removeAvatar = () => {
+    if (avatarPreview && avatarPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    handleChange('coHostAvatarUrl', '');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -266,9 +305,10 @@ export function PartnerForm({
 
     try {
       let logoUrl = formData.logoUrl;
+      let coHostAvatarUrl = formData.coHostAvatarUrl;
 
-      // Upload logo if a new file was selected (CRM mode only)
-      if (isCrm && logoFile) {
+      // Upload logo if a new file was selected
+      if (logoFile) {
         setUploadingLogo(true);
         const uploadedUrl = await uploadSponsorLogo(logoFile);
         if (uploadedUrl) {
@@ -281,10 +321,25 @@ export function PartnerForm({
         setUploadingLogo(false);
       }
 
+      // Upload avatar if a new file was selected (partner mode)
+      if (isPartner && avatarFile) {
+        setUploadingAvatar(true);
+        const uploadedUrl = await uploadSponsorLogo(avatarFile);
+        if (uploadedUrl) {
+          coHostAvatarUrl = uploadedUrl;
+        } else {
+          setError('Failed to upload avatar. Please try again.');
+          setUploadingAvatar(false);
+          return;
+        }
+        setUploadingAvatar(false);
+      }
+
       await onSubmit({
         ...formData,
         name: formData.name.trim(),
         logoUrl,
+        coHostAvatarUrl,
         lastContactedAt: formData.lastContactedAt || null,
       });
     } catch (err) {
@@ -339,7 +394,7 @@ export function PartnerForm({
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <IconInput
-                  icon={FileText}
+                  icon={Tag}
                   type="text"
                   value={formData.tag}
                   onChange={e => handleChange('tag', e.target.value)}
@@ -369,7 +424,7 @@ export function PartnerForm({
                 type="text"
                 value={formData.name}
                 onChange={e => handleChange('name', e.target.value)}
-                placeholder={isPartner ? 'Display name (shown on events)' : 'Partner Name'}
+                placeholder="Partner Name"
                 required={isCrm}
               />
               <IconInput
@@ -384,26 +439,24 @@ export function PartnerForm({
                 type="text"
                 value={formData.brandTwitter}
                 onChange={e => handleChange('brandTwitter', e.target.value)}
-                placeholder={isPartner ? 'Twitter (no @)' : 'Brand X Handle'}
+                placeholder="X Handle"
               />
               <IconInput
                 icon={Instagram}
                 type="text"
                 value={formData.brandInstagram}
                 onChange={e => handleChange('brandInstagram', e.target.value)}
-                placeholder={isPartner ? 'Instagram (no @)' : 'Brand Instagram Handle'}
+                placeholder="Instagram Profile"
               />
             </div>
-            {isCrm && (
-              <IconInput
-                icon={FileText}
-                multiline
-                rows={2}
-                value={formData.brandDescription}
-                onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-                placeholder="1-2 sentence description"
-              />
-            )}
+            <IconInput
+              icon={FileText}
+              multiline
+              rows={2}
+              value={formData.brandDescription}
+              onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
+              placeholder="1-2 sentence description"
+            />
           </div>
 
           {/* Co-Host Profile (avatar) — Partner mode only */}
@@ -413,22 +466,47 @@ export function PartnerForm({
                 <User size={16} />
                 Co-Host Profile
               </h3>
-              <IconInput
-                icon={Image}
-                type="url"
-                value={formData.coHostAvatarUrl}
-                onChange={e => handleChange('coHostAvatarUrl', e.target.value)}
-                placeholder="Avatar URL"
-              />
-              {formData.coHostAvatarUrl && (
-                <div className="flex items-center gap-2">
+              {avatarPreview ? (
+                <div className="flex items-center gap-4">
                   <img
-                    src={formData.coHostAvatarUrl}
-                    alt=""
-                    className="w-8 h-8 rounded-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    src={avatarPreview}
+                    alt="Avatar preview"
+                    className="w-16 h-16 object-cover rounded-full border border-theme-stroke bg-theme-surface"
                   />
-                  <span className="text-xs text-theme-text-muted">Avatar preview</span>
+                  <button
+                    type="button"
+                    onClick={removeAvatar}
+                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+                  >
+                    <Upload size={16} />
+                    Upload Avatar
+                  </button>
+                  <div className="flex-1">
+                    <IconInput
+                      icon={Image}
+                      type="url"
+                      value={formData.coHostAvatarUrl}
+                      onChange={e => handleChange('coHostAvatarUrl', e.target.value)}
+                      placeholder="Or paste avatar URL"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -580,74 +658,54 @@ export function PartnerForm({
             </div>
           )}
 
-          {/* Logo — Both modes (file upload + URL in CRM, URL only in partner) */}
+          {/* Logo — Both modes (file upload + URL) */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
               <Image size={16} />
               Logo
             </h3>
-            {isCrm ? (
-              logoPreview ? (
-                <div className="flex items-center gap-4">
-                  <img
-                    src={logoPreview}
-                    alt="Logo preview"
-                    className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeLogo}
-                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-3">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-                  >
-                    <Upload size={16} />
-                    Upload Logo
-                  </button>
-                  <div className="flex-1">
-                    <IconInput
-                      icon={Globe}
-                      type="url"
-                      value={formData.logoUrl}
-                      onChange={e => handleChange('logoUrl', e.target.value)}
-                      placeholder="Or paste logo URL"
-                    />
-                  </div>
-                </div>
-              )
-            ) : (
-              <>
-                <IconInput
-                  icon={Globe}
-                  type="url"
-                  value={formData.logoUrl}
-                  onChange={e => handleChange('logoUrl', e.target.value)}
-                  placeholder="Logo URL (for sponsor records)"
+            {logoPreview ? (
+              <div className="flex items-center gap-4">
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
                 />
-                {formData.logoUrl && (
-                  <img
-                    src={formData.logoUrl}
-                    alt="Logo preview"
-                    className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+                >
+                  <Upload size={16} />
+                  Upload Logo
+                </button>
+                <div className="flex-1">
+                  <IconInput
+                    icon={Globe}
+                    type="url"
+                    value={formData.logoUrl}
+                    onChange={e => handleChange('logoUrl', e.target.value)}
+                    placeholder="Or paste logo URL"
                   />
-                )}
-              </>
+                </div>
+              </div>
             )}
           </div>
 
