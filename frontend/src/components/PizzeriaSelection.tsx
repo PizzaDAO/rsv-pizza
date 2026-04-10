@@ -167,14 +167,29 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
     if (!customPizzeriaName.trim()) return;
     if (selectedPizzerias.length >= 3) return;
 
+    // Resolve lat/lng:
+    // 1. If LocationAutocomplete already captured it, use that.
+    // 2. Else geocode the entered address string via Nominatim fallback.
+    // 3. Else fall back to {0,0} (the existing pre-fix behavior — pizzeria
+    //    will show in the list but not on the public map).
+    let resolvedLocation = customPizzeriaLocation;
+    const trimmedAddress = customPizzeriaAddress.trim();
+    if (!resolvedLocation && trimmedAddress) {
+      try {
+        resolvedLocation = await geocodeAddress(trimmedAddress);
+      } catch (err) {
+        console.error('Failed to geocode manual pizzeria address:', err);
+      }
+    }
+
     const customPizzeria: Pizzeria = {
       id: `custom-${uuid()}`,
       placeId: '',
       name: customPizzeriaName.trim(),
-      address: customPizzeriaAddress.trim() || '',
+      address: trimmedAddress || '',
       phone: customPizzeriaPhone.trim() || undefined,
       url: customPizzeriaUrl.trim() || undefined,
-      location: customPizzeriaLocation || { lat: 0, lng: 0 },
+      location: resolvedLocation || { lat: 0, lng: 0 },
       orderingOptions: [],
     };
 
@@ -627,10 +642,17 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
 
                 <LocationAutocomplete
                   value={customPizzeriaAddress}
-                  onChange={setCustomPizzeriaAddress}
+                  onChange={(addr) => {
+                    setCustomPizzeriaAddress(addr);
+                    // User is typing freely — invalidate any previously captured lat/lng
+                    if (customPizzeriaLocation) setCustomPizzeriaLocation(null);
+                  }}
                   placeholder="Address"
                   onPlaceSelected={(address) => {
                     setCustomPizzeriaAddress(address);
+                  }}
+                  onLocationSelected={(loc) => {
+                    setCustomPizzeriaLocation(loc);
                   }}
                 />
 

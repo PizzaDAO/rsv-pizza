@@ -17,6 +17,7 @@ interface LocationAutocompleteProps {
   onVenueNameChange?: (venueName: string | null) => void;
   onTimezoneChange?: (timezone: string) => void;
   onPlaceSelected?: (address: string, venueName: string | null) => void;
+  onLocationSelected?: (location: { lat: number; lng: number } | null) => void;
   onCitySelected?: (cityData: CityData) => void;
   types?: string[];
   fields?: string[];
@@ -31,6 +32,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   onVenueNameChange,
   onTimezoneChange,
   onPlaceSelected,
+  onLocationSelected,
   onCitySelected,
   types,
   fields,
@@ -47,6 +49,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const onVenueNameChangeRef = useRef(onVenueNameChange);
   const onTimezoneChangeRef = useRef(onTimezoneChange);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+  const onLocationSelectedRef = useRef(onLocationSelected);
   const onCitySelectedRef = useRef(onCitySelected);
 
   useEffect(() => {
@@ -54,8 +57,9 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     onVenueNameChangeRef.current = onVenueNameChange;
     onTimezoneChangeRef.current = onTimezoneChange;
     onPlaceSelectedRef.current = onPlaceSelected;
+    onLocationSelectedRef.current = onLocationSelected;
     onCitySelectedRef.current = onCitySelected;
-  }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected, onCitySelected]);
+  }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected, onLocationSelected, onCitySelected]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -206,6 +210,11 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             const lat = place.geometry.location.lat();
             const lng = place.geometry.location.lng();
             fetchTimezone(lat, lng);
+            if (onLocationSelectedRef.current) {
+              onLocationSelectedRef.current({ lat, lng });
+            }
+          } else if (onLocationSelectedRef.current) {
+            onLocationSelectedRef.current(null);
           }
         });
 

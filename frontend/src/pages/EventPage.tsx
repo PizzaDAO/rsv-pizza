@@ -29,6 +29,7 @@ import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
+import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -1114,6 +1115,15 @@ export function EventPage() {
 
                 {/* Music Lineup Section */}
                 <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
+
+                {/* Participating Pizzerias Section */}
+                {event.selectedPizzerias && event.selectedPizzerias.length > 0 && (
+                  <ParticipatingPizzerias
+                    pizzerias={event.selectedPizzerias}
+                    venueAddress={event.address}
+                    eventSlug={slug}
+                  />
+                )}
 
                 {/* Photo Gallery Section - only for confirmed guests */}
                 {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
