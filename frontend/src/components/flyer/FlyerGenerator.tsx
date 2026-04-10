@@ -991,9 +991,19 @@ export function FlyerGenerator() {
                         outlineOffset: isSelected ? 4 : 0,
                       }}
                     />
-                    {/* Reorder arrows (on hover) */}
+                    {/* Reorder arrows (on hover) — top center of the logo */}
                     {showArrows && (
-                      <>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: -12,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          display: 'flex',
+                          gap: 4,
+                          zIndex: 40,
+                        }}
+                      >
                         <button
                           type="button"
                           disabled={!canMoveLeft}
@@ -1005,10 +1015,6 @@ export function FlyerGenerator() {
                             handleReorderLogo(s.id, -1, groupLogos);
                           }}
                           style={{
-                            position: 'absolute',
-                            left: -10,
-                            top: '50%',
-                            transform: 'translateY(-50%)',
                             width: 22,
                             height: 22,
                             padding: 0,
@@ -1017,7 +1023,6 @@ export function FlyerGenerator() {
                             background: 'rgba(0,0,0,0.75)',
                             color: canMoveLeft ? '#fff' : 'rgba(255,255,255,0.3)',
                             cursor: canMoveLeft ? 'pointer' : 'not-allowed',
-                            zIndex: 40,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1037,10 +1042,6 @@ export function FlyerGenerator() {
                             handleReorderLogo(s.id, 1, groupLogos);
                           }}
                           style={{
-                            position: 'absolute',
-                            right: -10,
-                            top: '50%',
-                            transform: 'translateY(-50%)',
                             width: 22,
                             height: 22,
                             padding: 0,
@@ -1049,7 +1050,6 @@ export function FlyerGenerator() {
                             background: 'rgba(0,0,0,0.75)',
                             color: canMoveRight ? '#fff' : 'rgba(255,255,255,0.3)',
                             cursor: canMoveRight ? 'pointer' : 'not-allowed',
-                            zIndex: 40,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1058,7 +1058,7 @@ export function FlyerGenerator() {
                         >
                           <ChevronRight size={14} />
                         </button>
-                      </>
+                      </div>
                     )}
                     {/* Corner resize handle */}
                     <div
