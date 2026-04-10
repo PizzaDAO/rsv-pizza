@@ -562,20 +562,23 @@ export function FlyerGenerator() {
 
   /** Render flyer content with drag handlers for the preview. */
   const renderFlyerContent = () => {
+    // City, venue, and time are positionally locked — only sponsors can be dragged.
+    const LOCKED_KEYS: ReadonlySet<keyof FlyerPositions> = new Set(['city', 'venue', 'time']);
     const getDragProps = (key: keyof FlyerPositions) => {
+      const isLocked = LOCKED_KEYS.has(key);
       const isDragging = dragging === key;
       const isHovered = hoveredElement === key;
       // Disable drag when inline-editing a text field on this element
       const isEditing = (key === 'city' && editingField === 'city') ||
         (key === 'venue' && (editingField === 'venue' || editingField === 'street'));
       return {
-        onMouseDown: isEditing ? undefined : (e: React.MouseEvent) => handleMouseDown(e, key),
-        onTouchStart: isEditing ? undefined : (e: React.TouchEvent) => handleTouchStart(e, key),
+        onMouseDown: isEditing || isLocked ? undefined : (e: React.MouseEvent) => handleMouseDown(e, key),
+        onTouchStart: isEditing || isLocked ? undefined : (e: React.TouchEvent) => handleTouchStart(e, key),
         onMouseEnter: () => setHoveredElement(key),
         onMouseLeave: () => setHoveredElement(null),
         style: {
-          cursor: isEditing ? 'text' : isDragging ? 'grabbing' : 'grab',
-          outline: isHovered && !isDragging && !isEditing ? '2px dashed rgba(255,255,255,0.5)' : 'none',
+          cursor: isEditing ? 'text' : isLocked ? 'default' : isDragging ? 'grabbing' : 'grab',
+          outline: isHovered && !isDragging && !isEditing && !isLocked ? '2px dashed rgba(255,255,255,0.5)' : 'none',
           outlineOffset: 4,
           zIndex: isDragging ? 20 : 10,
           userSelect: isEditing ? ('auto' as const) : ('none' as const),
@@ -628,18 +631,6 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {hoveredElement === 'city' && dragging !== 'city' && editingField !== 'city' && (
-                <Move
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    top: -20,
-                    left: 0,
-                    color: 'rgba(255,255,255,0.7)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
               {editingField === 'city' ? (
                 <input
                   autoFocus
@@ -690,18 +681,6 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {hoveredElement === 'venue' && dragging !== 'venue' && editingField !== 'venue' && editingField !== 'street' && (
-                <Move
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    top: -20,
-                    left: 0,
-                    color: 'rgba(255,255,255,0.7)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
               <div
                 onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('venue'); }}
                 style={{ fontSize: venueNameFontSize, lineHeight: 1, marginBottom: 4, whiteSpace: 'nowrap' }}
@@ -789,18 +768,6 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {hoveredElement === 'time' && dragging !== 'time' && (
-                <Move
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    top: -20,
-                    left: 0,
-                    color: 'rgba(255,255,255,0.7)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
               {timeDisplay}
             </div>
           );
