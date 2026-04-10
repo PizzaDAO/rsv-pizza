@@ -2862,6 +2862,9 @@ export interface SponsorUserCreateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: string[] | null;
 }
 
 export async function createSponsorUser(data: SponsorUserCreateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
@@ -2885,6 +2888,9 @@ export interface SponsorUserUpdateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: string[] | null;
 }
 
 export async function updateSponsorUser(id: string, data: SponsorUserUpdateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {

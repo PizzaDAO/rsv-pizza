@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, Tag } from 'lucide-react';
+import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { Sponsor, SponsorStatus, SponsorshipType, SponsorUser } from '../../types';
 import { CreateSponsorData } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { uploadSponsorLogo } from '../../lib/supabase';
 import { SponsorIntakeButton } from './SponsorIntakeButton';
+import { ALL_HOST_TABS } from '../../lib/tabPermissions';
 
 // X (Twitter) icon component
 const XIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
@@ -53,6 +54,9 @@ export interface PartnerFormData {
   coHostAvatarUrl: string;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  coHostShowOnEvent: boolean;
+  coHostCanEdit: boolean;
+  coHostAllowedTabs: string[] | null;
 }
 
 /** Extract CRM sponsor data from the unified form */
@@ -111,6 +115,7 @@ function getDefaultFormData(): PartnerFormData {
     amount: null, sponsorshipType: null, productService: '', lastContactedAt: null,
     email: '', tag: '', contactPersonName: '', coHostAvatarUrl: '',
     autoCoHost: false, autoSponsor: false,
+    coHostShowOnEvent: true, coHostCanEdit: false, coHostAllowedTabs: null,
   };
 }
 
@@ -152,6 +157,9 @@ function sponsorUserToFormData(su: SponsorUser): PartnerFormData {
     logoUrl: su.coHostLogoUrl || '',
     autoCoHost: su.autoCoHost,
     autoSponsor: su.autoSponsor,
+    coHostShowOnEvent: su.coHostShowOnEvent ?? true,
+    coHostCanEdit: su.coHostCanEdit ?? false,
+    coHostAllowedTabs: Array.isArray(su.coHostAllowedTabs) ? su.coHostAllowedTabs : null,
     notes: su.notes || '',
   };
 }
@@ -212,6 +220,10 @@ export function PartnerForm({
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [permissionsExpanded, setPermissionsExpanded] = useState(false);
+
+  // Available tabs for the permission picker (exclude 'apps', matching HostsManager)
+  const permissionTabs = ALL_HOST_TABS.filter(t => t.id !== 'apps');
 
   // Re-initialize when sponsor changes (CRM mode)
   useEffect(() => {
@@ -232,6 +244,37 @@ export function PartnerForm({
 
   const handleChange = (field: keyof PartnerFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Toggle a single tab in coHostAllowedTabs.
+  // null = all tabs allowed (legacy default). Clicking a tab off starts an explicit list.
+  const toggleTabPermission = (tabId: string) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.coHostAllowedTabs)
+        ? prev.coHostAllowedTabs
+        : permissionTabs.map(t => t.id);
+      const updated = current.includes(tabId)
+        ? current.filter(id => id !== tabId)
+        : [...current, tabId];
+      // If user re-checks every tab, collapse back to null (all-access)
+      if (updated.length >= permissionTabs.length) {
+        return { ...prev, coHostAllowedTabs: null };
+      }
+      return { ...prev, coHostAllowedTabs: updated };
+    });
+  };
+
+  const toggleAllTabs = () => {
+    setFormData(prev => {
+      const hasAll = !Array.isArray(prev.coHostAllowedTabs);
+      return { ...prev, coHostAllowedTabs: hasAll ? [] : null };
+    });
+  };
+
+  const getPermissionSummary = (): string => {
+    if (!Array.isArray(formData.coHostAllowedTabs)) return 'All tabs';
+    if (formData.coHostAllowedTabs.length === 0) return `0 of ${permissionTabs.length} tabs`;
+    return `${formData.coHostAllowedTabs.length} of ${permissionTabs.length} tabs`;
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -723,6 +766,80 @@ export function PartnerForm({
                   label="Auto co-host: Add as co-host to all events with this tag"
                   labelClassName="text-sm text-theme-text-secondary"
                 />
+
+                {/* Co-host permission sub-options (only when autoCoHost is on) */}
+                {formData.autoCoHost && (
+                  <div className="pl-6 space-y-2 border-l border-theme-stroke">
+                    <Checkbox
+                      checked={formData.coHostShowOnEvent}
+                      onChange={() => handleChange('coHostShowOnEvent', !formData.coHostShowOnEvent)}
+                      label="Show on event page"
+                      labelClassName="text-sm text-theme-text-secondary"
+                    />
+                    <Checkbox
+                      checked={formData.coHostCanEdit}
+                      onChange={() => {
+                        const next = !formData.coHostCanEdit;
+                        setFormData(prev => ({
+                          ...prev,
+                          coHostCanEdit: next,
+                          // Collapse tab restrictions when editor rights turn off
+                          coHostAllowedTabs: next ? prev.coHostAllowedTabs : null,
+                        }));
+                        if (!next) setPermissionsExpanded(false);
+                      }}
+                      label="Can edit the event"
+                      labelClassName="text-sm text-theme-text-secondary"
+                    />
+
+                    {/* Tab permissions expander (only when canEdit is on) */}
+                    {formData.coHostCanEdit && (
+                      <div className="pl-6">
+                        <button
+                          type="button"
+                          onClick={() => setPermissionsExpanded(!permissionsExpanded)}
+                          className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
+                        >
+                          {permissionsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span>Permissions: {getPermissionSummary()}</span>
+                        </button>
+
+                        {permissionsExpanded && (
+                          <div className="mt-2 p-3 bg-theme-surface rounded-lg border border-theme-stroke">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-theme-text-secondary">Allowed tabs</span>
+                              <button
+                                type="button"
+                                onClick={toggleAllTabs}
+                                className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
+                              >
+                                {!Array.isArray(formData.coHostAllowedTabs) ? 'Deselect all' : 'Select all'}
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {permissionTabs.map(tab => {
+                                const isAllowed =
+                                  !Array.isArray(formData.coHostAllowedTabs) ||
+                                  formData.coHostAllowedTabs.includes(tab.id);
+                                return (
+                                  <Checkbox
+                                    key={tab.id}
+                                    checked={isAllowed}
+                                    onChange={() => toggleTabPermission(tab.id)}
+                                    label={tab.label}
+                                    size={14}
+                                    labelClassName="text-xs text-theme-text-muted"
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Checkbox
                   checked={formData.autoSponsor}
                   onChange={() => handleChange('autoSponsor', !formData.autoSponsor)}
