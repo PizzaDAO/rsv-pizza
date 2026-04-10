@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
@@ -38,6 +39,9 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostLogoUrl: true,
         autoCoHost: true,
         autoSponsor: true,
+        coHostShowOnEvent: true,
+        coHostCanEdit: true,
+        coHostAllowedTabs: true,
       },
     });
 
@@ -70,6 +74,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       email, tag, name, notes,
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
+      coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
     } = req.body;
 
     if (!email || !tag) {
@@ -100,6 +105,9 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         coHostLogoUrl: coHostLogoUrl?.trim() || null,
         autoCoHost: autoCoHost || false,
         autoSponsor: autoSponsor || false,
+        coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
+        coHostCanEdit: !!coHostCanEdit,
+        coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
       },
     });
 
@@ -131,6 +139,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       email, name, tag, notes, isActive,
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
+      coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -155,6 +164,11 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
+    if (coHostShowOnEvent !== undefined) updateData.coHostShowOnEvent = !!coHostShowOnEvent;
+    if (coHostCanEdit !== undefined) updateData.coHostCanEdit = !!coHostCanEdit;
+    if (coHostAllowedTabs !== undefined) {
+      updateData.coHostAllowedTabs = Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull;
+    }
 
     const sponsorUser = await prisma.sponsorUser.update({
       where: { id },

@@ -20,6 +20,9 @@ interface SponsorUserLike {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: any;
   name: string | null;
   email: string;
 }
@@ -31,18 +34,22 @@ interface PartyLike {
 }
 
 function buildPartnerCoHost(sponsorUser: SponsorUserLike): Record<string, any> {
-  return {
+  const entry: Record<string, any> = {
     id: `partner-${crypto.randomUUID()}`,
     name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
     website: sponsorUser.coHostWebsite || undefined,
     twitter: sponsorUser.coHostTwitter || undefined,
     instagram: sponsorUser.coHostInstagram || undefined,
     avatar_url: sponsorUser.coHostAvatarUrl || undefined,
-    showOnEvent: true,
-    canEdit: false,
+    showOnEvent: sponsorUser.coHostShowOnEvent !== false,
+    canEdit: !!sponsorUser.coHostCanEdit,
     isPartner: true,
     partnerTag: sponsorUser.tag,
   };
+  if (Array.isArray(sponsorUser.coHostAllowedTabs)) {
+    entry.allowedTabs = sponsorUser.coHostAllowedTabs;
+  }
+  return entry;
 }
 
 /**
