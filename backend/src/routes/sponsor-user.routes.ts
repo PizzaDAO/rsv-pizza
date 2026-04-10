@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
-import { syncPartnerToAllEvents, removePartnerFromAllEvents } from '../helpers/partnerSync.js';
+import { syncPartnerToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
 
 // ============================================
 // Admin management routes (mounted at /api/sponsor-users)
@@ -174,10 +174,24 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       // Case 1: Deactivated or autoCoHost turned off — remove from all events
       if ((!isActive_ && wasActive) || (!isAutoCoHost && wasAutoCoHost)) {
         await removePartnerFromAllEvents(oldTag);
+        if (oldSponsorUser.autoSponsor) {
+          await removeAutoSponsorsFromAllEvents(oldTag, oldSponsorUser.email);
+        }
+      }
+      // Case 1b: autoSponsor turned off but partner still active — clean up auto sponsors
+      else if (!sponsorUser.autoSponsor && oldSponsorUser.autoSponsor && isActive_) {
+        await removeAutoSponsorsFromAllEvents(oldTag, oldSponsorUser.email);
+        // Still sync co-host if autoCoHost remains on (profile might have changed)
+        if (isAutoCoHost) {
+          syncedCount = await syncPartnerToAllEvents(sponsorUser);
+        }
       }
       // Case 2: Tag changed — remove from old, add to new
       else if (oldTag !== newTag && isAutoCoHost && isActive_) {
         await removePartnerFromAllEvents(oldTag);
+        if (oldSponsorUser.autoSponsor) {
+          await removeAutoSponsorsFromAllEvents(oldTag, oldSponsorUser.email);
+        }
         syncedCount = await syncPartnerToAllEvents(sponsorUser);
       }
       // Case 3: autoCoHost just turned on — sync to all events
@@ -223,6 +237,14 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
         await removePartnerFromAllEvents(sponsorUser.tag);
       } catch (syncError) {
         console.error('Failed to remove partner co-hosts on deactivate:', syncError);
+      }
+    }
+    // Remove auto-created sponsor rows from all events
+    if (sponsorUser?.autoSponsor) {
+      try {
+        await removeAutoSponsorsFromAllEvents(sponsorUser.tag, sponsorUser.email);
+      } catch (syncError) {
+        console.error('Failed to remove auto sponsors on deactivate:', syncError);
       }
     }
 

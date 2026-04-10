@@ -188,6 +188,35 @@ export async function removePartnerFromAllEvents(tag: string): Promise<number> {
 }
 
 /**
+ * Remove auto-created sponsor rows for a given partner (by tag + contactEmail).
+ * Only deletes rows whose notes match the auto-created pattern, so it never
+ * touches sponsors that were manually added or edited out of auto status.
+ */
+export async function removeAutoSponsorsFromAllEvents(
+  tag: string,
+  contactEmail: string
+): Promise<number> {
+  const autoNote = `Auto-created from partner tag "${tag}"`;
+
+  const events = await prisma.party.findMany({
+    where: { eventTags: { has: tag } },
+    select: { id: true },
+  });
+
+  if (events.length === 0) return 0;
+
+  const result = await prisma.sponsor.deleteMany({
+    where: {
+      partyId: { in: events.map(e => e.id) },
+      contactEmail,
+      notes: autoNote,
+    },
+  });
+
+  return result.count;
+}
+
+/**
  * Get all SponsorUsers that have autoCoHost enabled for a given set of tags.
  */
 export async function getAutoCoHostPartners(tags: string[]): Promise<SponsorUserLike[]> {
