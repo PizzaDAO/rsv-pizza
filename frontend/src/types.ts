@@ -443,6 +443,7 @@ export interface Sponsor {
   sponsorshipType: SponsorshipType | null;
   productService: string | null;
   logoUrl: string | null;
+  sortOrder: number;
   notes: string | null;
   lastContactedAt: string | null;
   intakeToken: string | null;

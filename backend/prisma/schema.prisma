@@ -844,6 +844,9 @@ model Sponsor {
   // Assets (for confirmed sponsors)
   logoUrl String? @map("logo_url")
 
+  // Display order (for flyer sponsor row reordering)
+  sortOrder Int @default(0) @map("sort_order")
+
   // Tracking
   notes           String? // Communication history, notes
   lastContactedAt DateTime? @map("last_contacted_at") @db.Timestamptz

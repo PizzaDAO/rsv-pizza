@@ -681,7 +681,7 @@ export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
 export interface SponsorFilters {
   status?: SponsorStatus;
   sortBy?: 'createdAt' | 'name' | 'amount' | 'lastContactedAt' | 'status';
-  sortOrder?: 'asc' | 'desc';
+  sortDir?: 'asc' | 'desc';
 }
 
 // Get all sponsors for a party
@@ -693,7 +693,7 @@ export async function getSponsors(
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
-    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
     const queryString = params.toString();
     const url = `/api/parties/${partyId}/sponsors${queryString ? `?${queryString}` : ''}`;
@@ -705,6 +705,26 @@ export async function getSponsors(
   } catch (error) {
     console.error('Error fetching sponsors:', error);
     return null;
+  }
+}
+
+// Reorder sponsors (host only) — persists sortOrder for flyer logo row
+export async function reorderSponsors(
+  partyId: string,
+  sponsorIds: string[]
+): Promise<{ sponsors: Sponsor[] } | null> {
+  try {
+    return await apiRequest<{ sponsors: Sponsor[] }>(
+      `/api/parties/${partyId}/sponsors/reorder`,
+      {
+        method: 'PATCH',
+        body: { sponsorIds },
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error reordering sponsors:', error);
+    throw error;
   }
 }
 
