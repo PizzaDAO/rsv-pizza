@@ -184,10 +184,8 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       else if (isAutoCoHost && !wasAutoCoHost && isActive_) {
         syncedCount = await syncPartnerToAllEvents(sponsorUser);
       }
-      // Case 4: Profile fields updated but still autoCoHost — update co-host entries
+      // Case 4: Profile fields updated but still autoCoHost — upsert co-host entries in place
       else if (isAutoCoHost && isActive_ && wasAutoCoHost) {
-        // Remove old entries and re-add with updated profile
-        await removePartnerFromAllEvents(newTag);
         syncedCount = await syncPartnerToAllEvents(sponsorUser);
       }
     } catch (syncError) {

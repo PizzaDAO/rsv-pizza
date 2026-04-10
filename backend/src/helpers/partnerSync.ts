@@ -46,48 +46,63 @@ function buildPartnerCoHost(sponsorUser: SponsorUserLike): Record<string, any> {
 }
 
 /**
- * Add a partner as co-host (and optionally sponsor) to a single party.
- * Idempotent: skips if a partner entry with the same tag already exists.
+ * Add or update a partner as co-host (and optionally sponsor) on a single party.
+ * Idempotent: upserts co-host entry and sponsor row keyed by stable identifiers
+ * so repeated calls don't create duplicates when partner details change.
  */
 export async function addPartnerToParty(
   party: PartyLike,
   sponsorUser: SponsorUserLike
 ): Promise<void> {
   const existingCoHosts: any[] = Array.isArray(party.coHosts) ? party.coHosts : [];
+  const partnerEntry = buildPartnerCoHost(sponsorUser);
 
-  // Check if partner co-host already exists for this tag
-  const alreadyPresent = existingCoHosts.some(
+  // Upsert co-host: replace existing entry with same partnerTag, preserving id
+  const existingIdx = existingCoHosts.findIndex(
     (h: any) => h.isPartner === true && h.partnerTag === sponsorUser.tag
   );
-  if (alreadyPresent) return;
 
-  const partnerEntry = buildPartnerCoHost(sponsorUser);
-  const updatedCoHosts = [...existingCoHosts, partnerEntry];
+  let updatedCoHosts: any[];
+  if (existingIdx >= 0) {
+    const existing = existingCoHosts[existingIdx];
+    updatedCoHosts = [...existingCoHosts];
+    updatedCoHosts[existingIdx] = { ...partnerEntry, id: existing.id };
+  } else {
+    updatedCoHosts = [...existingCoHosts, partnerEntry];
+  }
 
   await prisma.party.update({
     where: { id: party.id },
     data: { coHosts: updatedCoHosts },
   });
 
-  // Optionally create a Sponsor record
+  // Optionally upsert a Sponsor record (keyed by contactEmail, which is stable)
   if (sponsorUser.autoSponsor) {
-    // Check if a sponsor with this name already exists on this event
+    const sponsorData = {
+      name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
+      website: sponsorUser.coHostWebsite || null,
+      brandTwitter: sponsorUser.coHostTwitter || null,
+      brandInstagram: sponsorUser.coHostInstagram || null,
+      logoUrl: sponsorUser.coHostLogoUrl || null,
+    };
+
     const existingSponsor = await prisma.sponsor.findFirst({
       where: {
         partyId: party.id,
-        name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
+        contactEmail: sponsorUser.email,
       },
     });
 
-    if (!existingSponsor) {
+    if (existingSponsor) {
+      await prisma.sponsor.update({
+        where: { id: existingSponsor.id },
+        data: sponsorData,
+      });
+    } else {
       await prisma.sponsor.create({
         data: {
+          ...sponsorData,
           partyId: party.id,
-          name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
-          website: sponsorUser.coHostWebsite || null,
-          brandTwitter: sponsorUser.coHostTwitter || null,
-          brandInstagram: sponsorUser.coHostInstagram || null,
-          logoUrl: sponsorUser.coHostLogoUrl || null,
           contactEmail: sponsorUser.email,
           status: 'yes',
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
@@ -139,14 +154,8 @@ export async function syncPartnerToAllEvents(
 
   let synced = 0;
   for (const event of events) {
-    const existingCoHosts: any[] = Array.isArray(event.coHosts) ? event.coHosts : [];
-    const alreadyPresent = existingCoHosts.some(
-      (h: any) => h.isPartner === true && h.partnerTag === sponsorUser.tag
-    );
-    if (!alreadyPresent) {
-      await addPartnerToParty(event as PartyLike, sponsorUser);
-      synced++;
-    }
+    await addPartnerToParty(event as PartyLike, sponsorUser);
+    synced++;
   }
 
   return synced;
