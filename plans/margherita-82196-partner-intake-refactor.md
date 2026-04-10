@@ -248,41 +248,15 @@ None. No new component files. This is pure refactoring + renaming.
 - Mobile-width (< 768px) layout test for intake page.
 - Legacy `/sponsor-intake/:token` redirect doesn't break existing copied URLs.
 
-## Decisions (locked in 2026-04-11 with Snax)
-
-1. **Backend route rename** `/api/sponsor-intake` → `/api/partner-intake`: **YES**
-2. **`lib/api.ts` internal function names** → partner-named: **YES** (follows #1)
-3. **File renames** `SponsorIntakePage.tsx` → `PartnerIntakePage.tsx`, `SponsorIntakeButton.tsx` → `PartnerIntakeButton.tsx`: **YES** (use `git mv`)
-4. **`SponsorIntakeButton` visible label** "Intake Link": **KEEP** (already generic)
-5. **`PartnerForm` CRM-mode section title** "Intake Form" → "Partner Intake Form": **YES**
-6. **`brandDescription` placeholder**: **STANDARDIZE** to `"1-2 sentence description"` everywhere
-7. **PartnerForm smoke test** for intake mode: **YES** — use existing vitest + React Testing Library infra. Reference `frontend/src/components/RSVPModal.test.tsx` for component-test patterns. Test should render `PartnerForm mode="intake"` with a stub `intakeInitialData`, assert intake-specific fields are present (name, brandDescription, sponsorMessage writable), assert non-intake sections are hidden (status, amount, notes, intake link widget, partner/automation), and call `onSubmit` with a shaped payload.
-
-## Deploy strategy: TWO PRs
-
-Because backend renames require master-deploy before preview frontends can hit them:
-
-### PR #1 (backend-only)
-- Branch: `margherita-82196-backend-rename` off `master`
-- Scope:
-  - Rename `backend/src/routes/sponsor-intake.routes.ts` → `partner-intake.routes.ts` (`git mv`)
-  - Rename exported router var if any (`sponsorIntakeRoutes` → `partnerIntakeRoutes`)
-  - Update `backend/src/index.ts` to mount `/api/partner-intake` (and KEEP `/api/sponsor-intake` as an ALIAS mounting the same handler, so in-flight frontend on master still works during the brief window between PR #1 merge and PR #2 merge)
-  - Update `frontend/src/lib/api.ts`:
-    - Rename types: `SponsorIntakeData` → `PartnerIntakeData`, `SponsorIntakeResponse` → `PartnerIntakeResponse`
-    - Rename functions: `getSponsorIntake` → `getPartnerIntake`, `submitSponsorIntake` → `submitPartnerIntake`, `generateSponsorIntakeToken` → `generatePartnerIntakeToken`, `revokeSponsorIntakeToken` → `revokePartnerIntakeToken`
-    - Update hardcoded fetch paths from `/api/sponsor-intake` → `/api/partner-intake`
-    - Re-export old names as deprecated aliases pointing to the new ones to avoid breaking the frontend callsites that ship in PR #2
-  - Update any frontend callsites that break from the type renames — should be ONLY `SponsorIntakePage.tsx` since that's the one consumer of these helpers. Minimal churn: just swap import names.
-- Merge PR #1 to master → manually deploy backend (`cd backend && vercel --prod --scope pizza-dao`) → verify `/api/partner-intake` returns 200 on prod.
-- Legacy alias `/api/sponsor-intake` stays in backend code for now; removed in a follow-up.
-
-### PR #2 (frontend refactor)
-- Branch: `margherita-82196-partner-intake` off `master` (after PR #1 is merged + deployed)
-- Scope: everything else in this plan — file renames, routes, `PartnerForm` intake mode, redirect, smoke test, copy updates.
-
 ## Open questions
-All resolved. See Decisions section above.
+
+1. **Backend route rename** `/api/sponsor-intake` → `/api/partner-intake`? **Default: no** (internal only, forces backend redeploy).
+2. **`lib/api.ts` internal function names** (`getSponsorIntake` etc.) → partner-named? **Default: no**, tied to #1.
+3. **File renames** `SponsorIntakePage.tsx` → `PartnerIntakePage.tsx` and `SponsorIntakeButton.tsx` → `PartnerIntakeButton.tsx`? **Default: yes**.
+4. **`SponsorIntakeButton` visible label** "Intake Link" — keep or change to "Partner Intake Link"? **Default: keep generic**.
+5. **`PartnerForm` CRM-mode section title** "Intake Form" → "Partner Intake Form"? **Default: yes**.
+6. **`brandDescription` placeholder** mode-specific ("1-2 sentences about your brand" on intake, "1-2 sentence description" in modal) or standardize? **Default: mode-specific**.
+7. **PartnerForm smoke test** for intake mode? **Default: no** (no existing form tests).
 
 ## Gotchas
 
