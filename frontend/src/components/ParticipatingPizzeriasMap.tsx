@@ -3,19 +3,17 @@ import { Pizzeria } from '../types';
 
 interface ParticipatingPizzeriasMapProps {
   pizzerias: Pizzeria[];
-  venueLocation: { lat: number; lng: number } | null;
   height?: number;
 }
 
 /**
- * Renders a Google Map with red pins for each pizzeria and a blue pin for the
- * event venue. Follows the same dynamic-loader + script-tag-collision pattern
- * as GPPMap.tsx. Returns null if no pizzerias have valid coordinates (and the
- * parent can then collapse the grid to a single column).
+ * Renders a Google Map with red pins for each pizzeria. Follows the same
+ * dynamic-loader + script-tag-collision pattern as GPPMap.tsx. Returns null if
+ * no pizzerias have valid coordinates (and the parent can then collapse the
+ * grid to a single column).
  */
 export default function ParticipatingPizzeriasMap({
   pizzerias,
-  venueLocation,
   height = 320,
 }: ParticipatingPizzeriasMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,7 +38,7 @@ export default function ParticipatingPizzeriasMap({
     }
 
     // Nothing to draw — don't even try to load the map
-    if (validPizzerias.length === 0 && !venueLocation) {
+    if (validPizzerias.length === 0) {
       return;
     }
 
@@ -53,7 +51,7 @@ export default function ParticipatingPizzeriasMap({
 
       if (!mapRef.current) {
         mapRef.current = new google.maps.Map(containerRef.current, {
-          center: venueLocation || validPizzerias[0]?.location || { lat: 40, lng: -100 },
+          center: validPizzerias[0]?.location || { lat: 40, lng: -100 },
           zoom: 14,
           mapTypeId: 'roadmap',
           disableDefaultUI: true,
@@ -98,27 +96,6 @@ export default function ParticipatingPizzeriasMap({
         bounds.extend(position);
       }
 
-      // Venue pin (blue)
-      if (venueLocation) {
-        const venueMarker = new google.maps.Marker({
-          position: venueLocation,
-          map,
-          title: 'Event venue',
-          icon: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-          zIndex: 999,
-        });
-        venueMarker.addListener('click', () => {
-          infoWindow.setContent(
-            `<div style="font-family: sans-serif;">
-              <div style="font-weight: 600;">Event venue</div>
-            </div>`
-          );
-          infoWindow.open({ anchor: venueMarker, map });
-        });
-        markersRef.current.push(venueMarker);
-        bounds.extend(venueLocation);
-      }
-
       // Fit bounds — if only one marker, center with zoom 14 instead of
       // fitBounds (which can over-zoom on a single point).
       if (markersRef.current.length === 1) {
@@ -160,7 +137,7 @@ export default function ParticipatingPizzeriasMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validPizzerias, venueLocation]);
+  }, [validPizzerias]);
 
   // If we have nothing to show on the map, render nothing and let the parent
   // collapse the grid.

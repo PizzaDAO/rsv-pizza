@@ -63,7 +63,7 @@ export function ParticipatingPizzerias({
 }: ParticipatingPizzeriasProps) {
   const [venueLocation, setVenueLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Geocode the venue address for distance badges + venue pin on map.
+  // Geocode the venue address for distance badges on the pizzeria list.
   useEffect(() => {
     let cancelled = false;
     if (!venueAddress) {
@@ -114,10 +114,7 @@ export function ParticipatingPizzerias({
         <div className={hasAnyCoords ? 'grid md:grid-cols-2 gap-4' : ''}>
           {hasAnyCoords && (
             <div>
-              <ParticipatingPizzeriasMap
-                pizzerias={pizzerias}
-                venueLocation={venueLocation}
-              />
+              <ParticipatingPizzeriasMap pizzerias={pizzerias} />
             </div>
           )}
 
