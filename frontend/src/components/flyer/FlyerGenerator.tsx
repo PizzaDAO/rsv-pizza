@@ -3,11 +3,12 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, MoveHorizontal, MoveVertical } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, MoveHorizontal, MoveVertical, ImagePlus, Check } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 import { IconInput } from '../IconInput';
+import { uploadEventImage, updateParty } from '../../lib/supabase';
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -70,10 +71,11 @@ const SPONSOR_BOX_MIN = 100;
 const SPONSOR_BOX_MAX = 1080;
 
 export function FlyerGenerator() {
-  const { party } = usePizza();
+  const { party, loadParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [setImageState, setSetImageState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [containerWidth, setContainerWidth] = useState(500);
   const [hoveredElement, setHoveredElement] = useState<keyof FlyerPositions | null>(null);
@@ -450,119 +452,124 @@ export function FlyerGenerator() {
 
   const scale = containerWidth / 1080;
 
-  const handleDownload = async () => {
-    // Use native Canvas 2D API instead of html2canvas — html2canvas mangles custom fonts.
-    setDownloading(true);
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1080;
-      canvas.height = 1080;
-      const ctx = canvas.getContext('2d')!;
+  // Shared canvas render — used by both Download and Use-as-event-image.
+  // Uses native Canvas 2D API instead of html2canvas — html2canvas mangles custom fonts.
+  const renderFlyerToCanvas = async (): Promise<HTMLCanvasElement> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext('2d')!;
 
-      // 1) Draw template image
-      const templateImg = await loadImg('/gpp-flyer-2026-template.png');
-      ctx.drawImage(templateImg, 0, 0, 1080, 1080);
+    // 1) Draw template image
+    const templateImg = await loadImg('/gpp-flyer-2026-template.png');
+    ctx.drawImage(templateImg, 0, 0, 1080, 1080);
 
-      ctx.textBaseline = 'top';
+    ctx.textBaseline = 'top';
 
-      // 2) City name — Hub 191 Display
-      ctx.fillStyle = CITY_COLOR;
-      ctx.font = `${cityFontSize}px "Hub 191 Display"`;
-      ctx.fillText(city.toUpperCase(), positions.city.x, positions.city.y);
+    // 2) City name — Hub 191 Display
+    ctx.fillStyle = CITY_COLOR;
+    ctx.font = `${cityFontSize}px "Hub 191 Display"`;
+    ctx.fillText(city.toUpperCase(), positions.city.x, positions.city.y);
 
-      // 3) Venue name + street address — Hub 191 Regular, black
-      //    x locked to city.x so venue always left-aligns with city
-      const venueX = positions.city.x;
-      ctx.fillStyle = '#000000';
-      ctx.font = `${venueNameFontSize}px "Hub 191"`;
-      ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y);
-      if (streetAddress) {
-        ctx.font = `${streetFontSize}px "Hub 191"`;
-        ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y + venueNameFontSize + 4);
-      }
+    // 3) Venue name + street address — Hub 191 Regular, black
+    //    x locked to city.x so venue always left-aligns with city
+    const venueX = positions.city.x;
+    ctx.fillStyle = '#000000';
+    ctx.font = `${venueNameFontSize}px "Hub 191"`;
+    ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y);
+    if (streetAddress) {
+      ctx.font = `${streetFontSize}px "Hub 191"`;
+      ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y + venueNameFontSize + 4);
+    }
 
-      // 4) Time — Hub 191 Regular, white
-      if (timeDisplay) {
-        ctx.fillStyle = TIME_COLOR;
-        ctx.font = `${timeFontSize}px "Hub 191"`;
-        ctx.fillText(timeDisplay, positions.time.x, positions.time.y);
-      }
+    // 4) Time — Hub 191 Regular, white
+    if (timeDisplay) {
+      ctx.fillStyle = TIME_COLOR;
+      ctx.font = `${timeFontSize}px "Hub 191"`;
+      ctx.fillText(timeDisplay, positions.time.x, positions.time.y);
+    }
 
-      // 5) Sponsor logos — group logos in flex layout, popped logos at custom positions
-      if (sponsors.length > 0) {
-        const gap = 16;
-        const boxX = positions.sponsors.x;
-        const boxW = sponsorBoxSize.width;
-        const boxH = sponsorBoxSize.height;
+    // 5) Sponsor logos — group logos in flex layout, popped logos at custom positions
+    if (sponsors.length > 0) {
+      const gap = 16;
+      const boxX = positions.sponsors.x;
+      const boxW = sponsorBoxSize.width;
+      const boxH = sponsorBoxSize.height;
 
-        // Separate group logos from popped-out logos
-        const groupSponsors = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
-        const poppedSponsors = sponsors.slice(0, 8).filter(s => poppedLogos[s.id]);
+      // Separate group logos from popped-out logos
+      const groupSponsors = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
+      const poppedSponsors = sponsors.slice(0, 8).filter(s => poppedLogos[s.id]);
 
-        // Draw group logos in flex layout
-        if (groupSponsors.length > 0) {
-          type LogoItem = { img: HTMLImageElement; w: number; h: number };
-          const items: LogoItem[] = [];
-          for (const s of groupSponsors) {
-            const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
-            try {
-              const logoImg = await loadImg(s.logoUrl!);
-              const maxW = size * 2.5;
-              const maxH = size;
-              const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
-              items.push({ img: logoImg, w: logoImg.width * fitScale, h: logoImg.height * fitScale });
-            } catch {
-              // Skip logos that fail to load
-            }
-          }
-
-          type Row = { items: LogoItem[]; width: number; height: number };
-          const rows: Row[] = [];
-          let currentRow: Row = { items: [], width: 0, height: 0 };
-          for (const item of items) {
-            const neededW = currentRow.items.length > 0 ? currentRow.width + gap + item.w : item.w;
-            if (neededW > boxW && currentRow.items.length > 0) {
-              rows.push(currentRow);
-              currentRow = { items: [item], width: item.w, height: item.h };
-            } else {
-              currentRow.items.push(item);
-              currentRow.width = neededW;
-              currentRow.height = Math.max(currentRow.height, item.h);
-            }
-          }
-          if (currentRow.items.length > 0) rows.push(currentRow);
-
-          const totalH = rows.reduce((sum, r) => sum + r.height, 0) + Math.max(0, rows.length - 1) * gap;
-          let drawY = positions.sponsors.y + (boxH - totalH) / 2;
-
-          for (const row of rows) {
-            let drawX = boxX + (boxW - row.width) / 2;
-            for (const item of row.items) {
-              const itemY = drawY + (row.height - item.h) / 2;
-              ctx.drawImage(item.img, drawX, itemY, item.w, item.h);
-              drawX += item.w + gap;
-            }
-            drawY += row.height + gap;
-          }
-        }
-
-        // Draw popped-out logos at their custom absolute positions
-        for (const s of poppedSponsors) {
-          const pos = poppedLogos[s.id];
+      // Draw group logos in flex layout
+      if (groupSponsors.length > 0) {
+        type LogoItem = { img: HTMLImageElement; w: number; h: number };
+        const items: LogoItem[] = [];
+        for (const s of groupSponsors) {
           const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
           try {
             const logoImg = await loadImg(s.logoUrl!);
             const maxW = size * 2.5;
             const maxH = size;
             const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
-            ctx.drawImage(logoImg, pos.x, pos.y, logoImg.width * fitScale, logoImg.height * fitScale);
+            items.push({ img: logoImg, w: logoImg.width * fitScale, h: logoImg.height * fitScale });
           } catch {
             // Skip logos that fail to load
           }
         }
+
+        type Row = { items: LogoItem[]; width: number; height: number };
+        const rows: Row[] = [];
+        let currentRow: Row = { items: [], width: 0, height: 0 };
+        for (const item of items) {
+          const neededW = currentRow.items.length > 0 ? currentRow.width + gap + item.w : item.w;
+          if (neededW > boxW && currentRow.items.length > 0) {
+            rows.push(currentRow);
+            currentRow = { items: [item], width: item.w, height: item.h };
+          } else {
+            currentRow.items.push(item);
+            currentRow.width = neededW;
+            currentRow.height = Math.max(currentRow.height, item.h);
+          }
+        }
+        if (currentRow.items.length > 0) rows.push(currentRow);
+
+        const totalH = rows.reduce((sum, r) => sum + r.height, 0) + Math.max(0, rows.length - 1) * gap;
+        let drawY = positions.sponsors.y + (boxH - totalH) / 2;
+
+        for (const row of rows) {
+          let drawX = boxX + (boxW - row.width) / 2;
+          for (const item of row.items) {
+            const itemY = drawY + (row.height - item.h) / 2;
+            ctx.drawImage(item.img, drawX, itemY, item.w, item.h);
+            drawX += item.w + gap;
+          }
+          drawY += row.height + gap;
+        }
       }
 
-      // Export
+      // Draw popped-out logos at their custom absolute positions
+      for (const s of poppedSponsors) {
+        const pos = poppedLogos[s.id];
+        const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
+        try {
+          const logoImg = await loadImg(s.logoUrl!);
+          const maxW = size * 2.5;
+          const maxH = size;
+          const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+          ctx.drawImage(logoImg, pos.x, pos.y, logoImg.width * fitScale, logoImg.height * fitScale);
+        } catch {
+          // Skip logos that fail to load
+        }
+      }
+    }
+
+    return canvas;
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const canvas = await renderFlyerToCanvas();
       const link = document.createElement('a');
       link.download = `gpp-flyer-${party.inviteCode || 'event'}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -571,6 +578,41 @@ export function FlyerGenerator() {
       console.error('Failed to generate flyer:', err);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleUseAsEventImage = async () => {
+    if (!party) return;
+    setSetImageState('uploading');
+    try {
+      const canvas = await renderFlyerToCanvas();
+      const blob: Blob | null = await new Promise(resolve =>
+        canvas.toBlob(b => resolve(b), 'image/png')
+      );
+      if (!blob) throw new Error('Failed to encode flyer as PNG');
+
+      const file = new File(
+        [blob],
+        `gpp-flyer-${party.inviteCode || 'event'}.png`,
+        { type: 'image/png' }
+      );
+
+      const uploadedUrl = await uploadEventImage(file);
+      if (!uploadedUrl) throw new Error('Upload failed');
+
+      const success = await updateParty(party.id, { event_image_url: uploadedUrl });
+      if (!success) throw new Error('Failed to update party');
+
+      if (party.inviteCode) {
+        await loadParty(party.inviteCode);
+      }
+
+      setSetImageState('success');
+      setTimeout(() => setSetImageState('idle'), 2000);
+    } catch (err) {
+      console.error('Failed to set flyer as event image:', err);
+      setSetImageState('error');
+      setTimeout(() => setSetImageState('idle'), 2500);
     }
   };
 
@@ -1268,6 +1310,40 @@ export function FlyerGenerator() {
             <>
               <Download className="w-5 h-5" />
               Download Flyer
+            </>
+          )}
+        </button>
+        <button
+          onClick={handleUseAsEventImage}
+          disabled={setImageState === 'uploading'}
+          className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm ${
+            setImageState === 'success'
+              ? 'bg-green-500/20 text-green-300'
+              : setImageState === 'error'
+              ? 'bg-red-500/20 text-red-300'
+              : 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white'
+          }`}
+          title="Use this flyer as the event image"
+        >
+          {setImageState === 'uploading' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading...
+            </>
+          ) : setImageState === 'success' ? (
+            <>
+              <Check className="w-4 h-4" />
+              Set!
+            </>
+          ) : setImageState === 'error' ? (
+            <>
+              <ImagePlus className="w-4 h-4" />
+              Upload failed
+            </>
+          ) : (
+            <>
+              <ImagePlus className="w-4 h-4" />
+              Use as Event Image
             </>
           )}
         </button>
