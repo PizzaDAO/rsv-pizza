@@ -21,7 +21,7 @@ import venueRoutes from './routes/venue.routes.js';
 import venuePhotoRoutes from './routes/venue-photo.routes.js';
 import venueReportRoutes from './routes/venue-report.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
-import sponsorIntakeRoutes from './routes/sponsor-intake.routes.js';
+import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
@@ -111,7 +111,8 @@ app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)
 app.use('/api/parties', venueReportRoutes); // Venue report routes (includes public)
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
-app.use('/api/sponsor-intake', sponsorIntakeRoutes); // Public sponsor intake form routes
+app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake form routes
+app.use('/api/sponsor-intake', partnerIntakeRoutes); // LEGACY: removed in margherita-82196 follow-up after full frontend cutover
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)

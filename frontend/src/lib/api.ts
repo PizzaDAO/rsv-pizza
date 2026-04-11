@@ -922,10 +922,10 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
 }
 
 // ============================================
-// Sponsor Intake Form API functions
+// Partner Intake Form API functions
 // ============================================
 
-export interface SponsorIntakeData {
+export interface PartnerIntakeData {
   name?: string;
   website?: string;
   brandTwitter?: string;
@@ -940,7 +940,7 @@ export interface SponsorIntakeData {
   sponsorMessage?: string;
 }
 
-export interface SponsorIntakeResponse {
+export interface PartnerIntakeResponse {
   sponsor: {
     name: string;
     website: string | null;
@@ -959,24 +959,24 @@ export interface SponsorIntakeResponse {
   eventName: string;
 }
 
-// Public: Get sponsor intake data by token (no auth)
-export async function getSponsorIntake(token: string): Promise<SponsorIntakeResponse | null> {
+// Public: Get partner intake data by token (no auth)
+export async function getPartnerIntake(token: string): Promise<PartnerIntakeResponse | null> {
   try {
-    const response = await fetch(`${API_URL}/api/sponsor-intake/${token}`);
+    const response = await fetch(`${API_URL}/api/partner-intake/${token}`);
     if (!response.ok) {
       if (response.status === 404) return null;
       throw new Error('Failed to fetch intake data');
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching sponsor intake:', error);
+    console.error('Error fetching partner intake:', error);
     return null;
   }
 }
 
-// Public: Submit sponsor intake form (no auth)
-export async function submitSponsorIntake(token: string, data: SponsorIntakeData): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/sponsor-intake/${token}`, {
+// Public: Submit partner intake form (no auth)
+export async function submitPartnerIntake(token: string, data: PartnerIntakeData): Promise<boolean> {
+  const response = await fetch(`${API_URL}/api/partner-intake/${token}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -988,14 +988,14 @@ export async function submitSponsorIntake(token: string, data: SponsorIntakeData
   return true;
 }
 
-// Auth: Generate sponsor intake token
-export async function generateSponsorIntakeToken(
+// Auth: Generate partner intake token
+export async function generatePartnerIntakeToken(
   partyId: string,
   sponsorId: string
 ): Promise<{ token: string; url: string } | null> {
   try {
     return await apiRequest<{ token: string; url: string }>(
-      `/api/sponsor-intake/generate-token/${partyId}/${sponsorId}`,
+      `/api/partner-intake/generate-token/${partyId}/${sponsorId}`,
       { method: 'POST', requireAuth: true }
     );
   } catch (error) {
@@ -1004,14 +1004,14 @@ export async function generateSponsorIntakeToken(
   }
 }
 
-// Auth: Revoke sponsor intake token
-export async function revokeSponsorIntakeToken(
+// Auth: Revoke partner intake token
+export async function revokePartnerIntakeToken(
   partyId: string,
   sponsorId: string
 ): Promise<boolean> {
   try {
     await apiRequest<{ success: boolean }>(
-      `/api/sponsor-intake/revoke-token/${partyId}/${sponsorId}`,
+      `/api/partner-intake/revoke-token/${partyId}/${sponsorId}`,
       { method: 'DELETE', requireAuth: true }
     );
     return true;
@@ -1020,6 +1020,14 @@ export async function revokeSponsorIntakeToken(
     return false;
   }
 }
+
+// LEGACY aliases — removed in margherita-82196 PR #2
+export type SponsorIntakeData = PartnerIntakeData;
+export type SponsorIntakeResponse = PartnerIntakeResponse;
+export const getSponsorIntake = getPartnerIntake;
+export const submitSponsorIntake = submitPartnerIntake;
+export const generateSponsorIntakeToken = generatePartnerIntakeToken;
+export const revokeSponsorIntakeToken = revokePartnerIntakeToken;
 
 // Update fundraising goal for a party
 export async function updateFundraisingGoal(
