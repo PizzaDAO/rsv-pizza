@@ -311,6 +311,33 @@ export interface DonationPublicStats {
 // Ordering types
 export type OrderingProvider = 'square' | 'toast' | 'chownow' | 'doordash' | 'ubereats' | 'slice' | 'phone' | 'ai_phone';
 
+/**
+ * A single photo attached to a Pizzeria.
+ *
+ * For `source: 'google'`, `name` is a Google Places photo resource name of the
+ * form `places/{place_id}/photos/{photo_id}` and must be proxied through our
+ * `pizzeria-photo` edge function at render time. `authorAttribution` must be
+ * displayed proximal to the photo per Google Maps Platform ToS.
+ *
+ * For `source: 'host-upload'` (reserved for v2), `name` is a public Supabase
+ * storage URL and no attribution is required. v1 only emits `source: 'google'`.
+ *
+ * NOTE: photos that come from the legacy `google.maps.places.Autocomplete`
+ * widget use a pre-resolved URL (from `photo.getUrl()`) as `name` — these
+ * expire after a short TTL. This is acceptable for v1; on the next save they
+ * get refreshed.
+ */
+export interface PizzeriaPhoto {
+  name: string;
+  source: 'google' | 'host-upload';
+  authorAttribution?: {
+    displayName: string;
+    uri: string;
+  };
+  widthPx?: number;
+  heightPx?: number;
+}
+
 export interface Pizzeria {
   id: string;
   placeId: string; // Google Places ID
@@ -327,7 +354,7 @@ export interface Pizzeria {
     lat: number;
     lng: number;
   };
-  photos?: string[];
+  photos?: PizzeriaPhoto[];
   orderingOptions: OrderingOption[];
 }
 

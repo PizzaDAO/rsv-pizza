@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { Pizzeria, OrderingOption } from '../_shared/types.ts';
+import { Pizzeria, OrderingOption, PizzeriaPhoto } from '../_shared/types.ts';
 
 const GOOGLE_PLACES_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY') || '';
 const SQUARE_ACCESS_TOKEN = Deno.env.get('SQUARE_ACCESS_TOKEN') || '';
@@ -36,7 +36,9 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber,places.websiteUri'
+      // NOTE: Including `places.photos` upgrades this SKU from Essentials
+      // to Pro (~2x per-search cost). Accepted trade-off for sicilian-25988.
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber,places.websiteUri,places.photos'
     },
     body: JSON.stringify(requestBody)
   });
@@ -65,6 +67,30 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
       'PRICE_LEVEL_VERY_EXPENSIVE': 4,
     };
 
+    // Extract up to 3 Google Places photo references + author attribution.
+    // We only persist the `name` (opaque resource reference) — never the
+    // short-lived `photoUri`. Photos are resolved at render time via the
+    // `pizzeria-photo` edge function.
+    const photos: PizzeriaPhoto[] = (place.photos || []).slice(0, 3).map((p: any) => {
+      const attribution = Array.isArray(p.authorAttributions) && p.authorAttributions.length > 0
+        ? p.authorAttributions[0]
+        : null;
+      return {
+        name: p.name,
+        source: 'google' as const,
+        widthPx: p.widthPx,
+        heightPx: p.heightPx,
+        ...(attribution && attribution.displayName && attribution.uri
+          ? {
+              authorAttribution: {
+                displayName: attribution.displayName,
+                uri: attribution.uri,
+              },
+            }
+          : {}),
+      };
+    });
+
     return {
       id: place.id,
       placeId: place.id,
@@ -81,6 +107,7 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
         lat: place.location.latitude,
         lng: place.location.longitude,
       },
+      photos: photos.length > 0 ? photos : undefined,
       orderingOptions: [], // Will be populated by checkOrderingOptions
     };
   });

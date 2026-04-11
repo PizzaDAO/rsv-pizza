@@ -1,2 +1,9 @@
 [functions.mint-nft]
 verify_jwt = false
+
+# pizzeria-photo is served via `<img src>` on public event pages, which cannot
+# set an Authorization header. We make the function publicly accessible and
+# rely on strict SSRF validation (see supabase/functions/pizzeria-photo/index.ts)
+# + our Google Places API key living server-side.
+[functions.pizzeria-photo]
+verify_jwt = false

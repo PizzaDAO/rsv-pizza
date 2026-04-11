@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
-import { Pizzeria } from '../types';
+import { Pizzeria, PizzeriaPhoto } from '../types';
 import { uuid } from '../lib/utils';
 
 interface PlaceAutocompleteProps {
@@ -8,6 +8,15 @@ interface PlaceAutocompleteProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+}
+
+/**
+ * Strip HTML tags from a Google Places legacy API `html_attributions` string
+ * (typically a single `<a href="...">Name</a>`). Used only for attribution
+ * display text when mapping legacy Autocomplete photos.
+ */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
 }
 
 export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
@@ -53,6 +62,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
               'price_level',
               'opening_hours',
               'url',
+              'photos',
             ],
           }
         );
@@ -69,6 +79,51 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           const lat = place.geometry?.location?.lat() ?? 0;
           const lng = place.geometry?.location?.lng() ?? 0;
 
+          // Map legacy Autocomplete PlacePhoto objects to our PizzeriaPhoto shape.
+          //
+          // CAVEAT: `photo.getUrl()` returns a pre-resolved image URL — NOT
+          // an opaque `places/.../photos/...` resource name like the New
+          // Places API. These URLs expire on a short TTL, so custom-added
+          // pizzeria photos will eventually 404 and fall through to the
+          // SVG placeholder until the event is re-saved. Acceptable for v1;
+          // see sicilian-25988 plan section 5.3(d) for the long-term fix.
+          interface LegacyPlacePhoto {
+            getUrl: (opts: { maxWidth?: number; maxHeight?: number }) => string;
+            html_attributions?: string[];
+          }
+          const rawPhotos = (place.photos || []) as unknown as LegacyPlacePhoto[];
+          const mappedPhotos: PizzeriaPhoto[] | undefined = rawPhotos
+            .slice(0, 3)
+            .map((p): PizzeriaPhoto => {
+              let name = '';
+              try {
+                name = p.getUrl({ maxWidth: 800, maxHeight: 800 });
+              } catch {
+                name = '';
+              }
+              const attributionHtml =
+                Array.isArray(p.html_attributions) && p.html_attributions.length > 0
+                  ? p.html_attributions[0]
+                  : undefined;
+              return {
+                name,
+                source: 'google' as const,
+                // html_attributions is a raw HTML anchor string; we surface
+                // it as the display name and link it back to the pizzeria's
+                // website (the legacy API doesn't give us a structured
+                // author profile URI).
+                ...(attributionHtml
+                  ? {
+                      authorAttribution: {
+                        displayName: stripHtml(attributionHtml),
+                        uri: place.website || (place as unknown as { url?: string }).url || '#',
+                      },
+                    }
+                  : {}),
+              };
+            })
+            .filter((p) => p.name.length > 0);
+
           const pizzeria: Partial<Pizzeria> = {
             id: `custom-${uuid()}`,
             placeId: place.place_id || '',
@@ -81,6 +136,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
             priceLevel: place.price_level || undefined,
             isOpen: place.opening_hours?.isOpen?.() ?? undefined,
             location: { lat, lng },
+            photos: mappedPhotos && mappedPhotos.length > 0 ? mappedPhotos : undefined,
             orderingOptions: [],
           };
 

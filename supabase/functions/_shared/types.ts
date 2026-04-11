@@ -1,11 +1,26 @@
 export type OrderingProvider = 'square' | 'toast' | 'chownow' | 'doordash' | 'ubereats' | 'slice' | 'phone' | 'ai_phone';
 
+/**
+ * Mirrors frontend/src/types.ts PizzeriaPhoto. Keep in sync.
+ */
+export interface PizzeriaPhoto {
+  name: string;
+  source: 'google' | 'host-upload';
+  authorAttribution?: {
+    displayName: string;
+    uri: string;
+  };
+  widthPx?: number;
+  heightPx?: number;
+}
+
 export interface Pizzeria {
   id: string;
   placeId: string;
   name: string;
   address: string;
   phone?: string;
+  url?: string;
   rating?: number;
   reviewCount?: number;
   priceLevel?: number;
@@ -15,7 +30,7 @@ export interface Pizzeria {
     lat: number;
     lng: number;
   };
-  photos?: string[];
+  photos?: PizzeriaPhoto[];
   orderingOptions: OrderingOption[];
 }
 

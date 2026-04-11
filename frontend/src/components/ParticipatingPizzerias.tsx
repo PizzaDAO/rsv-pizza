@@ -8,6 +8,7 @@ import {
 } from '../lib/ordering';
 import { trackLinkClick } from '../lib/api';
 import ParticipatingPizzeriasMap from './ParticipatingPizzeriasMap';
+import PizzeriaPhoto from './PizzeriaPhoto';
 
 interface ParticipatingPizzeriasProps {
   pizzerias: Pizzeria[];
@@ -128,8 +129,12 @@ export function ParticipatingPizzerias({
                   key={pizzeria.id}
                   className="flex items-start gap-3 p-3 bg-theme-surface rounded-xl border border-theme-stroke"
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-[#ff393a]" />
+                  <div className="flex-shrink-0 w-20">
+                    <PizzeriaPhoto
+                      photo={pizzeria.photos?.[0]}
+                      pizzeriaName={pizzeria.name}
+                      className="w-20 h-20 rounded-lg object-cover bg-[#ff393a]/10"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
