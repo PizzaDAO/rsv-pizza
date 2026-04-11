@@ -4,7 +4,7 @@ import {
   Mail, Phone, User, Building2, Calendar
 } from 'lucide-react';
 import { Sponsor, SponsorStatus } from '../../types';
-import { SponsorIntakeButton } from './SponsorIntakeButton';
+import { PartnerIntakeButton } from './PartnerIntakeButton';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
@@ -325,7 +325,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   {/* Actions */}
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
-                      <SponsorIntakeButton
+                      <PartnerIntakeButton
                         sponsor={sponsor}
                         partyId={partyId}
                         onUpdate={onSponsorUpdate}

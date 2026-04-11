@@ -112,7 +112,6 @@ app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)
 app.use('/api/parties', venueReportRoutes); // Venue report routes (includes public)
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake form routes
-app.use('/api/sponsor-intake', partnerIntakeRoutes); // LEGACY: removed in margherita-82196 follow-up after full frontend cutover
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
