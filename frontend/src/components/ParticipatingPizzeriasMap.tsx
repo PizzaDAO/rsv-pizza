@@ -66,13 +66,20 @@ export default function ParticipatingPizzeriasMap({
       const bounds = new google.maps.LatLngBounds();
       const infoWindow = new google.maps.InfoWindow();
 
-      // Pizzeria pins (default red)
+      // Pizzeria pins (default red) with name labels drawn below the pin
       for (const pizzeria of validPizzerias) {
         const position = { lat: pizzeria.location.lat, lng: pizzeria.location.lng };
         const marker = new google.maps.Marker({
           position,
           map,
           title: pizzeria.name,
+          label: {
+            text: pizzeria.name,
+            color: '#ffffff',
+            fontSize: '12px',
+            fontWeight: '600',
+            className: 'pizzeria-pin-label',
+          },
         });
 
         marker.addListener('click', () => {
