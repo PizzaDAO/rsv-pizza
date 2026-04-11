@@ -3,10 +3,11 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, MoveHorizontal, MoveVertical } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
+import { IconInput } from '../IconInput';
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -62,7 +63,11 @@ const TIME_COLOR = '#FFFFFF';
 const CITY_BOX = { width: 587, height: 72 };
 const VENUE_BOX = { width: 600, height: 110 };
 const TIME_BOX = { width: 300, height: 60 }; // sized to match MAY 22 text height
-const SPONSOR_BOX = { width: 759, height: 171 };
+/** Default sponsor logo bounding box. Width/height are user-resizable at runtime. */
+const DEFAULT_SPONSOR_BOX = { width: 759, height: 171 };
+/** Min/max sponsor box dimensions in 1080px canvas units. */
+const SPONSOR_BOX_MIN = 100;
+const SPONSOR_BOX_MAX = 1080;
 
 export function FlyerGenerator() {
   const { party } = usePizza();
@@ -111,6 +116,11 @@ export function FlyerGenerator() {
     () => savedState?.positions || { ...DEFAULT_POSITIONS }
   );
 
+  // User-resizable sponsor logo bounding box (in 1080px canvas coordinates)
+  const [sponsorBoxSize, setSponsorBoxSize] = useState<{ width: number; height: number }>(
+    () => savedState?.sponsorBoxSize || { ...DEFAULT_SPONSOR_BOX }
+  );
+
   const handlePositionChange = useCallback((key: keyof FlyerPositions, pos: { x: number; y: number }) => {
     setPositions(prev => {
       // When dragging venue, only allow vertical movement (x locked to city)
@@ -132,6 +142,7 @@ export function FlyerGenerator() {
     setPoppedLogos({});
     setSelectedGroupLogo(null);
     setLogoSizes({});
+    setSponsorBoxSize({ ...DEFAULT_SPONSOR_BOX });
     setEditVenueName(null);
     setEditStreetAddress(null);
     setEditCity(null);
@@ -139,6 +150,24 @@ export function FlyerGenerator() {
       try { localStorage.removeItem(storageKey); } catch {}
     }
   }, [storageKey]);
+
+  const handleSponsorBoxWidthChange = useCallback((value: string) => {
+    const n = parseInt(value, 10);
+    if (Number.isNaN(n)) return;
+    setSponsorBoxSize(prev => ({
+      ...prev,
+      width: Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, n)),
+    }));
+  }, []);
+
+  const handleSponsorBoxHeightChange = useCallback((value: string) => {
+    const n = parseInt(value, 10);
+    if (Number.isNaN(n)) return;
+    setSponsorBoxSize(prev => ({
+      ...prev,
+      height: Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, n)),
+    }));
+  }, []);
 
   /** Convert a client (screen) coordinate to 1080px canvas coordinate */
   const clientToCanvas = useCallback((clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -374,9 +403,9 @@ export function FlyerGenerator() {
   // Persist flyer customizations to localStorage
   useEffect(() => {
     if (!storageKey) return;
-    const state = { positions, poppedLogos, logoSizes, editVenueName, editStreetAddress, editCity };
+    const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity };
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
-  }, [storageKey, positions, poppedLogos, logoSizes, editVenueName, editStreetAddress, editCity]);
+  }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity]);
 
   if (!party) return null;
 
@@ -415,8 +444,8 @@ export function FlyerGenerator() {
   const sponsorCount = Math.min(sponsors.length, 8);
   const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
   const sponsorRows = sponsorCount <= 4 ? 1 : 2;
-  const maxLogoWidth = sponsorCols > 0 ? (SPONSOR_BOX.width - (sponsorCols - 1) * 16) / sponsorCols : 0;
-  const maxLogoHeight = sponsorRows > 0 ? (SPONSOR_BOX.height - (sponsorRows - 1) * 12) / sponsorRows : 0;
+  const maxLogoWidth = sponsorCols > 0 ? (sponsorBoxSize.width - (sponsorCols - 1) * 16) / sponsorCols : 0;
+  const maxLogoHeight = sponsorRows > 0 ? (sponsorBoxSize.height - (sponsorRows - 1) * 12) / sponsorRows : 0;
   const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight);
 
   const scale = containerWidth / 1080;
@@ -463,8 +492,8 @@ export function FlyerGenerator() {
       if (sponsors.length > 0) {
         const gap = 16;
         const boxX = positions.sponsors.x;
-        const boxW = SPONSOR_BOX.width;
-        const boxH = SPONSOR_BOX.height;
+        const boxW = sponsorBoxSize.width;
+        const boxH = sponsorBoxSize.height;
 
         // Separate group logos from popped-out logos
         const groupSponsors = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
@@ -558,7 +587,9 @@ export function FlyerGenerator() {
     positions.venue.x !== DEFAULT_POSITIONS.venue.x ||
     positions.venue.y !== DEFAULT_POSITIONS.venue.y ||
     positions.sponsors.x !== DEFAULT_POSITIONS.sponsors.x ||
-    positions.sponsors.y !== DEFAULT_POSITIONS.sponsors.y;
+    positions.sponsors.y !== DEFAULT_POSITIONS.sponsors.y ||
+    sponsorBoxSize.width !== DEFAULT_SPONSOR_BOX.width ||
+    sponsorBoxSize.height !== DEFAULT_SPONSOR_BOX.height;
 
   /** Render flyer content with drag handlers for the preview. */
   const renderFlyerContent = () => {
@@ -787,8 +818,8 @@ export function FlyerGenerator() {
                 position: 'absolute',
                 top: positions.sponsors.y,
                 left: positions.sponsors.x,
-                width: SPONSOR_BOX.width,
-                height: SPONSOR_BOX.height,
+                width: sponsorBoxSize.width,
+                height: sponsorBoxSize.height,
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
@@ -1182,6 +1213,35 @@ export function FlyerGenerator() {
           >
             {renderFlyerContent()}
           </div>
+        </div>
+      </div>
+
+      {/* Sponsor logo area size controls */}
+      <div className="mx-auto" style={{ maxWidth: 500 }}>
+        <p className="text-center text-xs text-white/40 mb-2">Sponsor logo area size (px)</p>
+        <div className="grid grid-cols-2 gap-3">
+          <IconInput
+            icon={MoveHorizontal}
+            type="number"
+            min={SPONSOR_BOX_MIN}
+            max={SPONSOR_BOX_MAX}
+            step={10}
+            value={sponsorBoxSize.width}
+            onChange={(e) => handleSponsorBoxWidthChange(e.target.value)}
+            placeholder="Width"
+            aria-label="Sponsor logo area width"
+          />
+          <IconInput
+            icon={MoveVertical}
+            type="number"
+            min={SPONSOR_BOX_MIN}
+            max={SPONSOR_BOX_MAX}
+            step={10}
+            value={sponsorBoxSize.height}
+            onChange={(e) => handleSponsorBoxHeightChange(e.target.value)}
+            placeholder="Height"
+            aria-label="Sponsor logo area height"
+          />
         </div>
       </div>
 
