@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { IconInput } from '../components/IconInput';
 import { uploadSponsorLogo } from '../lib/supabase';
-import { getSponsorIntake, submitSponsorIntake, SponsorIntakeData } from '../lib/api';
+import { getPartnerIntake, submitPartnerIntake, PartnerIntakeData } from '../lib/api';
 import { SponsorshipType } from '../types';
 
 // X (Twitter) icon component
@@ -41,7 +41,7 @@ export function SponsorIntakePage() {
   const [error, setError] = useState<string | null>(null);
   const [previouslySubmitted, setPreviouslySubmitted] = useState(false);
 
-  const [formData, setFormData] = useState<SponsorIntakeData>({
+  const [formData, setFormData] = useState<PartnerIntakeData>({
     name: '',
     website: '',
     brandTwitter: '',
@@ -70,7 +70,7 @@ export function SponsorIntakePage() {
     }
 
     async function loadData() {
-      const result = await getSponsorIntake(token!);
+      const result = await getPartnerIntake(token!);
       if (!result) {
         setNotFound(true);
         setLoading(false);
@@ -105,7 +105,7 @@ export function SponsorIntakePage() {
     loadData();
   }, [token]);
 
-  const handleChange = (field: keyof SponsorIntakeData, value: any) => {
+  const handleChange = (field: keyof PartnerIntakeData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -167,7 +167,7 @@ export function SponsorIntakePage() {
         setUploadingLogo(false);
       }
 
-      await submitSponsorIntake(token!, {
+      await submitPartnerIntake(token!, {
         ...formData,
         name: formData.name?.trim(),
         logoUrl,

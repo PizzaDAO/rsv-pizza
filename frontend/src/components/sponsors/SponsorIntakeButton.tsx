@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from 'lucide-react';
 import { Sponsor } from '../../types';
-import { generateSponsorIntakeToken, revokeSponsorIntakeToken } from '../../lib/api';
+import { generatePartnerIntakeToken, revokePartnerIntakeToken } from '../../lib/api';
 
 interface SponsorIntakeButtonProps {
   sponsor: Sponsor;
@@ -21,7 +21,7 @@ export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntak
   const handleGenerateToken = async () => {
     setLoading(true);
     try {
-      const result = await generateSponsorIntakeToken(partyId, sponsor.id);
+      const result = await generatePartnerIntakeToken(partyId, sponsor.id);
       if (result) {
         onUpdate({
           ...sponsor,
@@ -61,7 +61,7 @@ export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntak
   const handleRevoke = async () => {
     setLoading(true);
     try {
-      const success = await revokeSponsorIntakeToken(partyId, sponsor.id);
+      const success = await revokePartnerIntakeToken(partyId, sponsor.id);
       if (success) {
         onUpdate({
           ...sponsor,

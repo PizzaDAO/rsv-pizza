@@ -25,7 +25,7 @@ const SPONSOR_FACING_FIELDS = [
 
 const router = Router();
 
-// POST /api/sponsor-intake/generate-token/:partyId/:sponsorId — generate intake token (auth required)
+// POST /api/partner-intake/generate-token/:partyId/:sponsorId — generate intake token (auth required)
 router.post('/generate-token/:partyId/:sponsorId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, sponsorId } = req.params;
@@ -55,7 +55,7 @@ router.post('/generate-token/:partyId/:sponsorId', requireAuth, async (req: Auth
     if (sponsor.intakeToken) {
       return res.json({
         token: sponsor.intakeToken,
-        url: `https://rsv.pizza/sponsor-intake/${sponsor.intakeToken}`,
+        url: `https://rsv.pizza/partner-intake/${sponsor.intakeToken}`,
       });
     }
 
@@ -69,14 +69,14 @@ router.post('/generate-token/:partyId/:sponsorId', requireAuth, async (req: Auth
 
     res.json({
       token,
-      url: `https://rsv.pizza/sponsor-intake/${token}`,
+      url: `https://rsv.pizza/partner-intake/${token}`,
     });
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE /api/sponsor-intake/revoke-token/:partyId/:sponsorId — revoke intake token (auth required)
+// DELETE /api/partner-intake/revoke-token/:partyId/:sponsorId — revoke intake token (auth required)
 router.delete('/revoke-token/:partyId/:sponsorId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, sponsorId } = req.params;
@@ -116,7 +116,7 @@ router.delete('/revoke-token/:partyId/:sponsorId', requireAuth, async (req: Auth
   }
 });
 
-// GET /api/sponsor-intake/:token — public, fetch sponsor data for intake form
+// GET /api/partner-intake/:token — public, fetch sponsor data for intake form
 router.get('/:token', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { token } = req.params;
@@ -164,7 +164,7 @@ router.get('/:token', async (req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
-// POST /api/sponsor-intake/:token — public, submit intake form
+// POST /api/partner-intake/:token — public, submit intake form
 router.post('/:token', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { token } = req.params;
