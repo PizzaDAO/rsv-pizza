@@ -253,21 +253,32 @@ export function formatTimeDisplay(time: string): string {
 }
 
 /**
- * Format a timezone for display matching the timepicker modal.
- * e.g., "America/Denver" → "GMT-7 / Denver"
+ * Format a timezone for display as "{abbreviation} / {offset}".
+ * e.g., "America/New_York" → "EDT / GMT-4" (or "EST / GMT-5" in winter)
+ * Falls back to just the offset when the zone has no real letter abbreviation
+ * (e.g., "Asia/Kolkata" → "GMT+5:30").
  */
 export function formatTimezoneDisplay(timezone: string): string {
   if (!timezone) return '';
   try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const now = new Date();
+    const shortFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'short',
+    });
+    const offsetFmt = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       timeZoneName: 'shortOffset',
     });
-    const parts = formatter.formatToParts(new Date());
-    const offsetPart = parts.find(p => p.type === 'timeZoneName');
-    const offset = offsetPart?.value || '';
-    const city = timezone.split('/').pop()?.replace(/_/g, ' ') || '';
-    return city ? `${offset} / ${city}` : offset;
+    const short = shortFmt.formatToParts(now).find(p => p.type === 'timeZoneName')?.value ?? '';
+    const offset = offsetFmt.formatToParts(now).find(p => p.type === 'timeZoneName')?.value ?? '';
+
+    // If "short" is just a GMT offset or equals the shortOffset value, it's not a real
+    // letter abbreviation (e.g., Asia/Kolkata → "GMT+5:30"). Fall back to just the offset
+    // so we don't render a duplicate like "GMT+5:30 / GMT+5:30".
+    const hasRealAbbrev = short && !short.startsWith('GMT') && short !== offset;
+    if (hasRealAbbrev) return `${short} / ${offset}`;
+    return offset;
   } catch {
     return '';
   }
