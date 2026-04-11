@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -21,8 +21,15 @@ import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
-import { SponsorIntakePage } from './pages/SponsorIntakePage';
+import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
+
+// Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
+// <Navigate> doesn't forward path params, so we wrap useParams().
+function SponsorIntakeRedirect() {
+  const { token } = useParams<{ token: string }>();
+  return <Navigate to={`/partner-intake/${token}`} replace />;
+}
 
 function App() {
   return (
@@ -52,7 +59,8 @@ function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/partner-dashboard" element={<PartnerDashboardPage />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner-dashboard" replace />} />
-            <Route path="/sponsor-intake/:token" element={<SponsorIntakePage />} />
+            <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
+            <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

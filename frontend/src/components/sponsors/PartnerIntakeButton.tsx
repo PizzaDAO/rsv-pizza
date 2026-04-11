@@ -3,19 +3,19 @@ import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from
 import { Sponsor } from '../../types';
 import { generatePartnerIntakeToken, revokePartnerIntakeToken } from '../../lib/api';
 
-interface SponsorIntakeButtonProps {
+interface PartnerIntakeButtonProps {
   sponsor: Sponsor;
   partyId: string;
   onUpdate: (sponsor: Sponsor) => void;
 }
 
-export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntakeButtonProps) {
+export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntakeButtonProps) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   const intakeUrl = sponsor.intakeToken
-    ? `https://rsv.pizza/sponsor-intake/${sponsor.intakeToken}`
+    ? `https://rsv.pizza/partner-intake/${sponsor.intakeToken}`
     : null;
 
   const handleGenerateToken = async () => {
@@ -92,7 +92,7 @@ export function SponsorIntakeButton({ sponsor, partyId, onUpdate }: SponsorIntak
       <button
         onClick={handleGenerateToken}
         className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-theme-text-muted hover:text-theme-text bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded transition-colors"
-        title="Generate intake form link"
+        title="Generate partner intake form link"
       >
         <Link2 size={12} />
         Intake Link

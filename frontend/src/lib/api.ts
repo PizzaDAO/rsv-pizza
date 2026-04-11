@@ -659,6 +659,8 @@ export interface CreateSponsorData {
   name: string;
   website?: string;
   brandTwitter?: string;
+  brandInstagram?: string;
+  brandDescription?: string;
   pointPerson?: string;
   contactName?: string;
   contactEmail?: string;
@@ -929,6 +931,8 @@ export interface PartnerIntakeData {
   name?: string;
   website?: string;
   brandTwitter?: string;
+  brandInstagram?: string;
+  brandDescription?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -945,6 +949,8 @@ export interface PartnerIntakeResponse {
     name: string;
     website: string | null;
     brandTwitter: string | null;
+    brandInstagram: string | null;
+    brandDescription: string | null;
     contactName: string | null;
     contactEmail: string | null;
     contactPhone: string | null;
@@ -1020,14 +1026,6 @@ export async function revokePartnerIntakeToken(
     return false;
   }
 }
-
-// LEGACY aliases — removed in margherita-82196 PR #2
-export type SponsorIntakeData = PartnerIntakeData;
-export type SponsorIntakeResponse = PartnerIntakeResponse;
-export const getSponsorIntake = getPartnerIntake;
-export const submitSponsorIntake = submitPartnerIntake;
-export const generateSponsorIntakeToken = generatePartnerIntakeToken;
-export const revokeSponsorIntakeToken = revokePartnerIntakeToken;
 
 // Update fundraising goal for a party
 export async function updateFundraisingGoal(
