@@ -678,3 +678,20 @@ body.gpp-theme-active .pac-item-query {
     opacity: 0;
   }
 }
+
+/* Pizzeria name label next to red pins on the Participating Pizzerias map.
+   Google Maps applies this class to the label container that sits centered on
+   the marker anchor — we offset it downward so it sits below the pin with a
+   dark readable background that contrasts well on both roadmap and satellite. */
+.pizzeria-pin-label {
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffffff !important;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+  transform: translateY(28px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.1px;
+  pointer-events: none;
+}

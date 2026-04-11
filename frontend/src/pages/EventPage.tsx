@@ -29,6 +29,8 @@ import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
+import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
+import VenueMap from '../components/VenueMap';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -465,11 +467,7 @@ export function EventPage() {
 
   const isFutureEvent = eventDate ? eventDate.getTime() > Date.now() : false;
 
-  // Google Maps static map for location thumbnail
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const staticMapUrl = googleMapsApiKey && event.address
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(event.address)}&zoom=18&size=480x400&scale=2&markers=color:red%7C${encodeURIComponent(event.address)}&key=${googleMapsApiKey}`
-    : null;
+  // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
   const googleMapsUrl = event.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
     : null;
@@ -722,28 +720,14 @@ export function EventPage() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                ) : event.address && googleMapsUrl ? (
-                  <a
-                    href={googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="relative aspect-square block overflow-hidden"
-                  >
-                    {staticMapUrl ? (
-                      <img
-                        src={staticMapUrl}
-                        alt="Event location map"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center">
-                        <div className="text-center">
-                          <MapPin className="w-16 h-16 text-theme-text mx-auto mb-2" />
-                          <p className="text-theme-text text-sm font-medium">View on Google Maps</p>
-                        </div>
-                      </div>
-                    )}
-                  </a>
+                ) : event.address ? (
+                  <div className="relative aspect-square overflow-hidden">
+                    <VenueMap
+                      address={event.address}
+                      venueName={event.venueName}
+                      className="w-full h-full"
+                    />
+                  </div>
                 ) : (
                   <div className="relative aspect-square bg-gradient-to-br from-[#ff393a] to-[#ff6b35] flex items-center justify-center">
                     <Pizza className="w-32 h-32 text-white/30" />
@@ -873,27 +857,16 @@ export function EventPage() {
                   </div>
 
                   {/* Map Thumbnail - Desktop (absolutely positioned to match left column height) */}
-                  {event.address && googleMapsUrl && (
-                    <a
-                      href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute right-0 top-0 bottom-0 w-[40%] bg-theme-surface-hover rounded-lg border border-theme-stroke hover:bg-theme-surface-hover transition-colors group overflow-hidden"
-                      title="View on Google Maps"
+                  {event.address && (
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-[40%] bg-theme-surface-hover rounded-lg border border-theme-stroke overflow-hidden"
                     >
-                      {staticMapUrl ? (
-                        <img
-                          src={staticMapUrl}
-                          alt="Map"
-                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center">
-                          <MapPin size={24} className="text-[#ff393a] mb-1 group-hover:scale-110 transition-transform" />
-                          <span className="text-[10px] uppercase font-bold text-theme-text-secondary">View Map</span>
-                        </div>
-                      )}
-                    </a>
+                      <VenueMap
+                        address={event.address}
+                        venueName={event.venueName}
+                        className="w-full h-full"
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -1051,34 +1024,20 @@ export function EventPage() {
                 )}
 
                 {/* Mobile: Location Section */}
-                {event.address && googleMapsUrl && (
+                {event.address && (
                   <div className="md:hidden border-t border-theme-stroke pt-6 mt-6">
                     {event.venueName && (
                       <p className="text-theme-text font-medium mb-1">{event.venueName}</p>
                     )}
                     <p className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3`}>{event.address}</p>
-                    {/* Google Maps Link */}
-                    <a
-                      href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative group hover:opacity-90 transition-opacity"
-                    >
-                      {staticMapUrl ? (
-                        <img
-                          src={staticMapUrl}
-                          alt="Event location map"
-                          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20">
-                          <div className="text-center">
-                            <MapPin className="w-12 h-12 text-theme-text mx-auto mb-2" />
-                            <p className="text-theme-text text-sm font-medium">View on Google Maps</p>
-                          </div>
-                        </div>
-                      )}
-                    </a>
+                    {/* Interactive venue map */}
+                    <div className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative">
+                      <VenueMap
+                        address={event.address}
+                        venueName={event.venueName}
+                        className="w-full h-full"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -1114,6 +1073,15 @@ export function EventPage() {
 
                 {/* Music Lineup Section */}
                 <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
+
+                {/* Participating Pizzerias Section */}
+                {event.selectedPizzerias && event.selectedPizzerias.length > 0 && (
+                  <ParticipatingPizzerias
+                    pizzerias={event.selectedPizzerias}
+                    venueAddress={event.address}
+                    eventSlug={slug}
+                  />
+                )}
 
                 {/* Photo Gallery Section - only for confirmed guests */}
                 {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
