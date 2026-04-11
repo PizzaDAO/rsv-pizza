@@ -36,7 +36,7 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber'
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber,places.websiteUri'
     },
     body: JSON.stringify(requestBody)
   });
@@ -71,6 +71,7 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
       name: place.displayName?.text || 'Unknown',
       address: place.formattedAddress || '',
       phone: place.nationalPhoneNumber,
+      url: place.websiteUri,
       rating: place.rating,
       reviewCount: place.userRatingCount,
       priceLevel: priceLevelMap[place.priceLevel] || undefined,
