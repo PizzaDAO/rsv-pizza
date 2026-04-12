@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
-import { Sponsor, SponsorStats } from '../../types';
+import { Sponsor, SponsorStats, SponsorStatus } from '../../types';
 import {
   getSponsors,
   getSponsorStats,
@@ -123,6 +123,34 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     setEditingSponsor(null);
   };
 
+  // Handle inline status change with optimistic update
+  const handleStatusChange = async (sponsor: Sponsor, newStatus: SponsorStatus) => {
+    const oldStatus = sponsor.status;
+
+    // Optimistic update
+    setSponsors(prev =>
+      prev.map(s => (s.id === sponsor.id ? { ...s, status: newStatus } : s))
+    );
+
+    try {
+      const result = await updateSponsor(partyId, sponsor.id, { status: newStatus });
+      if (result) {
+        // Use server response
+        setSponsors(prev =>
+          prev.map(s => (s.id === sponsor.id ? result.sponsor : s))
+        );
+      }
+      // Refresh stats since status change affects pipeline counts
+      const statsResult = await getSponsorStats(partyId);
+      if (statsResult) setStats(statsResult);
+    } catch {
+      // Revert on failure
+      setSponsors(prev =>
+        prev.map(s => (s.id === sponsor.id ? { ...s, status: oldStatus } : s))
+      );
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -181,6 +209,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
+        onStatusChange={handleStatusChange}
         isLoading={isRefreshing}
       />
 

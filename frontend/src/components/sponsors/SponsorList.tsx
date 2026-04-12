@@ -12,6 +12,7 @@ interface SponsorListProps {
   onEdit: (sponsor: Sponsor) => void;
   onDelete: (sponsorId: string) => void;
   onSponsorUpdate: (sponsor: Sponsor) => void;
+  onStatusChange: (sponsor: Sponsor, newStatus: SponsorStatus) => void;
   isLoading?: boolean;
 }
 
@@ -40,7 +41,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, isLoading }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, onStatusChange, isLoading }: SponsorListProps) {
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterStatus, setFilterStatus] = useState<SponsorStatus | 'all'>('all');
@@ -227,11 +228,21 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                 >
                   {/* Status */}
                   <td className="p-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
-                    >
-                      {statusConfig.label}
-                    </span>
+                    <div className="relative inline-flex items-center">
+                      <select
+                        value={sponsor.status}
+                        onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
+                        className={`appearance-none rounded-full px-2.5 py-0.5 pr-6 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
+                        style={{ colorScheme: 'dark' }}
+                      >
+                        {Object.entries(STATUS_CONFIG).map(([status, config]) => (
+                          <option key={status} value={status} className="bg-theme-header text-theme-text">
+                            {config.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </td>
 
                   {/* Sponsor Name & Organization */}
