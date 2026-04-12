@@ -75,7 +75,7 @@ function uses12Hour(tz: string): boolean {
 
 /**
  * Format a 24-hour "HH:MM" time string to the appropriate display format.
- * - 12-hour mode: "6:00 PM"
+ * - 12-hour mode: "6 PM" (or "6:30 PM" when minutes are non-zero)
  * - 24-hour mode: "18:00"
  */
 function formatFlyerTime(timeStr: string, is12h: boolean): string {
@@ -83,7 +83,9 @@ function formatFlyerTime(timeStr: string, is12h: boolean): string {
   const [hours, minutes] = timeStr.split(':').map(Number);
   const period = hours >= 12 ? 'PM' : 'AM';
   const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  return minutes === 0
+    ? `${hours12} ${period}`
+    : `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';
@@ -95,7 +97,7 @@ const VENUE_COLOR = '#0497C1';
 // Bounding box dimensions (measured from boxes overlay at 1080px)
 const CITY_BOX = { width: 587, height: 72 };
 const VENUE_BOX = { width: 600, height: 110 };
-const TIME_BOX = { width: 600, height: 60 }; // sized for "MAY 22  6:00 PM - 9:00 PM"
+const TIME_BOX = { width: 600, height: 60 }; // sized for "MAY 22  6 PM - 9 PM"
 /** Default sponsor logo bounding box. Width/height are user-resizable at runtime. */
 const DEFAULT_SPONSOR_BOX = { width: 759, height: 171 };
 /** Min/max sponsor box dimensions in 1080px canvas units. */
