@@ -3,11 +3,10 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, MoveHorizontal, MoveVertical, ImagePlus, Check } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { IconInput } from '../IconInput';
 import { uploadEventImage, updateParty } from '../../lib/supabase';
 
 function parseCityFromAddress(address: string): string {
@@ -153,24 +152,6 @@ export function FlyerGenerator() {
       try { localStorage.removeItem(storageKey); } catch {}
     }
   }, [storageKey]);
-
-  const handleSponsorBoxWidthChange = useCallback((value: string) => {
-    const n = parseInt(value, 10);
-    if (Number.isNaN(n)) return;
-    setSponsorBoxSize(prev => ({
-      ...prev,
-      width: Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, n)),
-    }));
-  }, []);
-
-  const handleSponsorBoxHeightChange = useCallback((value: string) => {
-    const n = parseInt(value, 10);
-    if (Number.isNaN(n)) return;
-    setSponsorBoxSize(prev => ({
-      ...prev,
-      height: Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, n)),
-    }));
-  }, []);
 
   /** Convert a client (screen) coordinate to 1080px canvas coordinate */
   const clientToCanvas = useCallback((clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -904,27 +885,23 @@ export function FlyerGenerator() {
                   }}
                 />
               )}
-              {/* Group box corner resize handle — scales all group logos together */}
+              {/* Sponsor box resize handle — corner (resizes box width + height) */}
               {(() => {
-                const handleGroupResizeStart = (e: React.MouseEvent) => {
+                const handleBoxResizeStart = (e: React.MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  const startX = e.clientX;
                   const startY = e.clientY;
-                  // Capture current sizes for all group logos
-                  const startSizes: Record<string, number> = {};
-                  groupLogos.forEach(s => {
-                    startSizes[s.id] = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
-                  });
+                  const startW = sponsorBoxSize.width;
+                  const startH = sponsorBoxSize.height;
                   const rect = canvasRef.current?.getBoundingClientRect();
                   const sc = rect ? rect.width / 1080 : 1;
                   const handleMove = (moveEvent: MouseEvent) => {
+                    const deltaX = (moveEvent.clientX - startX) / sc;
                     const deltaY = (moveEvent.clientY - startY) / sc;
-                    setLogoSizes(prev => {
-                      const next = { ...prev };
-                      groupLogos.forEach(s => {
-                        next[s.id] = Math.round(Math.max(20, Math.min(200, startSizes[s.id] + deltaY)));
-                      });
-                      return next;
+                    setSponsorBoxSize({
+                      width: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startW + deltaX))),
+                      height: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startH + deltaY))),
                     });
                   };
                   const handleUp = () => {
@@ -934,24 +911,21 @@ export function FlyerGenerator() {
                   document.addEventListener('mousemove', handleMove);
                   document.addEventListener('mouseup', handleUp);
                 };
-                const handleGroupTouchResizeStart = (e: React.TouchEvent) => {
+                const handleBoxTouchResizeStart = (e: React.TouchEvent) => {
                   e.stopPropagation();
+                  const startX = e.touches[0].clientX;
                   const startY = e.touches[0].clientY;
-                  const startSizes: Record<string, number> = {};
-                  groupLogos.forEach(s => {
-                    startSizes[s.id] = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
-                  });
+                  const startW = sponsorBoxSize.width;
+                  const startH = sponsorBoxSize.height;
                   const rect = canvasRef.current?.getBoundingClientRect();
                   const sc = rect ? rect.width / 1080 : 1;
                   const handleMove = (moveEvent: TouchEvent) => {
                     moveEvent.preventDefault();
+                    const deltaX = (moveEvent.touches[0].clientX - startX) / sc;
                     const deltaY = (moveEvent.touches[0].clientY - startY) / sc;
-                    setLogoSizes(prev => {
-                      const next = { ...prev };
-                      groupLogos.forEach(s => {
-                        next[s.id] = Math.round(Math.max(20, Math.min(200, startSizes[s.id] + deltaY)));
-                      });
-                      return next;
+                    setSponsorBoxSize({
+                      width: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startW + deltaX))),
+                      height: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startH + deltaY))),
                     });
                   };
                   const handleUp = () => {
@@ -963,18 +937,146 @@ export function FlyerGenerator() {
                 };
                 return (
                   <div
-                    onMouseDown={handleGroupResizeStart}
-                    onTouchStart={handleGroupTouchResizeStart}
+                    onMouseDown={handleBoxResizeStart}
+                    onTouchStart={handleBoxTouchResizeStart}
+                    title="Drag to resize sponsor area"
                     style={{
                       position: 'absolute',
-                      bottom: 0,
-                      right: 0,
-                      width: 18,
-                      height: 18,
+                      bottom: -4,
+                      right: -4,
+                      width: 14,
+                      height: 14,
                       cursor: 'nwse-resize',
-                      zIndex: 35,
-                      background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.4) 50%)',
-                      borderRadius: '0 0 4px 0',
+                      zIndex: 36,
+                      background: 'rgba(255,255,255,0.6)',
+                      border: '1.5px solid rgba(255,255,255,0.9)',
+                      borderRadius: 2,
+                    }}
+                  />
+                );
+              })()}
+              {/* Sponsor box resize handle — right edge (width only) */}
+              {(() => {
+                const handleRightEdgeStart = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startX = e.clientX;
+                  const startW = sponsorBoxSize.width;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: MouseEvent) => {
+                    const deltaX = (moveEvent.clientX - startX) / sc;
+                    setSponsorBoxSize(prev => ({
+                      ...prev,
+                      width: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startW + deltaX))),
+                    }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                  };
+                  document.addEventListener('mousemove', handleMove);
+                  document.addEventListener('mouseup', handleUp);
+                };
+                const handleRightEdgeTouchStart = (e: React.TouchEvent) => {
+                  e.stopPropagation();
+                  const startX = e.touches[0].clientX;
+                  const startW = sponsorBoxSize.width;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: TouchEvent) => {
+                    moveEvent.preventDefault();
+                    const deltaX = (moveEvent.touches[0].clientX - startX) / sc;
+                    setSponsorBoxSize(prev => ({
+                      ...prev,
+                      width: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startW + deltaX))),
+                    }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('touchmove', handleMove);
+                    document.removeEventListener('touchend', handleUp);
+                  };
+                  document.addEventListener('touchmove', handleMove, { passive: false });
+                  document.addEventListener('touchend', handleUp);
+                };
+                return (
+                  <div
+                    onMouseDown={handleRightEdgeStart}
+                    onTouchStart={handleRightEdgeTouchStart}
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      right: -4,
+                      width: 6,
+                      height: 28,
+                      transform: 'translateY(-50%)',
+                      cursor: 'ew-resize',
+                      zIndex: 36,
+                      background: 'rgba(255,255,255,0.5)',
+                      borderRadius: 3,
+                    }}
+                  />
+                );
+              })()}
+              {/* Sponsor box resize handle — bottom edge (height only) */}
+              {(() => {
+                const handleBottomEdgeStart = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startY = e.clientY;
+                  const startH = sponsorBoxSize.height;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: MouseEvent) => {
+                    const deltaY = (moveEvent.clientY - startY) / sc;
+                    setSponsorBoxSize(prev => ({
+                      ...prev,
+                      height: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startH + deltaY))),
+                    }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                  };
+                  document.addEventListener('mousemove', handleMove);
+                  document.addEventListener('mouseup', handleUp);
+                };
+                const handleBottomEdgeTouchStart = (e: React.TouchEvent) => {
+                  e.stopPropagation();
+                  const startY = e.touches[0].clientY;
+                  const startH = sponsorBoxSize.height;
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  const sc = rect ? rect.width / 1080 : 1;
+                  const handleMove = (moveEvent: TouchEvent) => {
+                    moveEvent.preventDefault();
+                    const deltaY = (moveEvent.touches[0].clientY - startY) / sc;
+                    setSponsorBoxSize(prev => ({
+                      ...prev,
+                      height: Math.round(Math.max(SPONSOR_BOX_MIN, Math.min(SPONSOR_BOX_MAX, startH + deltaY))),
+                    }));
+                  };
+                  const handleUp = () => {
+                    document.removeEventListener('touchmove', handleMove);
+                    document.removeEventListener('touchend', handleUp);
+                  };
+                  document.addEventListener('touchmove', handleMove, { passive: false });
+                  document.addEventListener('touchend', handleUp);
+                };
+                return (
+                  <div
+                    onMouseDown={handleBottomEdgeStart}
+                    onTouchStart={handleBottomEdgeTouchStart}
+                    style={{
+                      position: 'absolute',
+                      bottom: -4,
+                      left: '50%',
+                      width: 28,
+                      height: 6,
+                      transform: 'translateX(-50%)',
+                      cursor: 'ns-resize',
+                      zIndex: 36,
+                      background: 'rgba(255,255,255,0.5)',
+                      borderRadius: 3,
                     }}
                   />
                 );
@@ -1276,35 +1378,6 @@ export function FlyerGenerator() {
           >
             {renderFlyerContent()}
           </div>
-        </div>
-      </div>
-
-      {/* Sponsor logo area size controls */}
-      <div className="mx-auto" style={{ maxWidth: 500 }}>
-        <p className="text-center text-xs text-white/40 mb-2">Sponsor logo area size (px)</p>
-        <div className="grid grid-cols-2 gap-3">
-          <IconInput
-            icon={MoveHorizontal}
-            type="number"
-            min={SPONSOR_BOX_MIN}
-            max={SPONSOR_BOX_MAX}
-            step={10}
-            value={sponsorBoxSize.width}
-            onChange={(e) => handleSponsorBoxWidthChange(e.target.value)}
-            placeholder="Width"
-            aria-label="Sponsor logo area width"
-          />
-          <IconInput
-            icon={MoveVertical}
-            type="number"
-            min={SPONSOR_BOX_MIN}
-            max={SPONSOR_BOX_MAX}
-            step={10}
-            value={sponsorBoxSize.height}
-            onChange={(e) => handleSponsorBoxHeightChange(e.target.value)}
-            placeholder="Height"
-            aria-label="Sponsor logo area height"
-          />
         </div>
       </div>
 
