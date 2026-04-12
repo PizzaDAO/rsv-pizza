@@ -1403,7 +1403,7 @@ export function FlyerGenerator() {
           ) : (
             <>
               <Download className="w-5 h-5" />
-              Download Flyer
+              Download
             </>
           )}
         </button>
@@ -1437,7 +1437,7 @@ export function FlyerGenerator() {
           ) : (
             <>
               <ImagePlus className="w-4 h-4" />
-              Use as Event Image
+              Use for Event
             </>
           )}
         </button>
@@ -1448,7 +1448,7 @@ export function FlyerGenerator() {
             title="Reset element positions to defaults"
           >
             <RotateCcw className="w-4 h-4" />
-            Reset Positions
+            Reset
           </button>
         )}
       </div>
