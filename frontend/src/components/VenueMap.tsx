@@ -89,17 +89,15 @@ export default function VenueMap({
         markerRef.current = null;
       }
 
+      const pinSvg = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48"><path d="M18 0C8.06 0 0 8.06 0 18c0 12.6 18 30 18 30s18-17.4 18-30C36 8.06 27.94 0 18 0z" fill="white" stroke="black" stroke-opacity="0.15"/><circle cx="18" cy="17" r="11" fill="#ff393a"/><g transform="translate(11,10) scale(0.583)" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="M22 2l-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="M22 13l-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="M11 2l.33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/></g></svg>')}`;
       markerRef.current = new google.maps.Marker({
         position: location,
         map: mapRef.current,
         title: venueName || address,
-        label: {
-          text: '\u{1F388}',
-          fontSize: '28px',
-        },
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 0,
+          url: pinSvg,
+          scaledSize: new google.maps.Size(36, 48),
+          anchor: new google.maps.Point(18, 48),
         },
       });
     };
