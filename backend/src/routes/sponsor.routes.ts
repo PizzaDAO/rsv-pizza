@@ -19,7 +19,7 @@ router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Resp
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
@@ -59,7 +59,7 @@ router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
@@ -155,7 +155,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
@@ -215,7 +215,7 @@ router.get('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequest
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
@@ -267,7 +267,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }
@@ -336,7 +336,7 @@ router.delete('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequ
     }
 
     // Verify co-host has access to sponsors tab
-    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
     if (!canAccessSponsors) {
       throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
     }

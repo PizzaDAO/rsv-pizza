@@ -99,7 +99,7 @@ export const GPPDashboardTab: React.FC = () => {
       {
         label: 'Find Partners',
         done: false,
-        tab: 'sponsors',
+        tab: 'partners',
         icon: Handshake,
         dueDate: dueDateMap.get('Find Partners') ?? null,
       },

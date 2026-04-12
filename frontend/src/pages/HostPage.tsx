@@ -36,9 +36,9 @@ import { GPPDashboardTab } from '../components/gpp-dashboard';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'sponsors' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'sponsors', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'apps'];
 
 function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
@@ -385,7 +385,7 @@ function HostPageContent() {
                 </div>
               )}
 
-              {activeTab === 'sponsors' && party && (
+              {activeTab === 'partners' && party && (
                 <SponsorCRM partyId={party.id} />
               )}
 

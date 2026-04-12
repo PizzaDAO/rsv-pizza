@@ -25,7 +25,7 @@ export interface PinnableApp {
 }
 
 export const PINNABLE_APPS: PinnableApp[] = [
-  { id: 'sponsor-crm', name: 'Partners', tab: 'sponsors', icon: Handshake },
+  { id: 'sponsor-crm', name: 'Partners', tab: 'partners', icon: Handshake },
   { id: 'venue', name: 'Venue', tab: 'venue', icon: MapPin },
   { id: 'music-dj', name: 'Music', tab: 'music', icon: Music },
   { id: 'reports', name: 'Reports', tab: 'report', icon: BarChart3 },

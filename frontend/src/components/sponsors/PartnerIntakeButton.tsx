@@ -95,7 +95,7 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
         title="Generate partner intake form link"
       >
         <Link2 size={12} />
-        Intake Link
+        Form
       </button>
     );
   }

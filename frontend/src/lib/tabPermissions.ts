@@ -25,7 +25,7 @@ export type TabId =
   | 'guests'
   | 'pizza'
   | 'photos'
-  | 'sponsors'
+  | 'partners'
   | 'venue'
   | 'music'
   | 'report'
@@ -55,7 +55,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'guests', label: 'Guests', icon: Users },
   { id: 'pizza', label: 'Pizza & Drinks', icon: Pizza },
   { id: 'photos', label: 'Photos', icon: Camera },
-  { id: 'sponsors', label: 'Sponsors', icon: Handshake },
+  { id: 'partners', label: 'Partners', icon: Handshake },
   { id: 'venue', label: 'Venue', icon: MapPin },
   { id: 'music', label: 'Music', icon: Music },
   { id: 'report', label: 'Reports', icon: BarChart3 },

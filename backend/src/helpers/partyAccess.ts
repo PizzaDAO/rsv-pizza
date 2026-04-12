@@ -11,7 +11,7 @@ export const VALID_TAB_IDS = [
   'guests',
   'pizza',
   'photos',
-  'sponsors',
+  'partners',
   'venue',
   'music',
   'report',
@@ -131,6 +131,10 @@ export async function canUserAccessTab(
           return true;
         }
         // Check if the specific tab is in the allowed list
+        // Accept both 'sponsors' and 'partners' for backwards compatibility
+        if (tabName === 'partners' || tabName === 'sponsors') {
+          return coHost.allowedTabs.includes('partners') || coHost.allowedTabs.includes('sponsors');
+        }
         return coHost.allowedTabs.includes(tabName);
       }
     }
