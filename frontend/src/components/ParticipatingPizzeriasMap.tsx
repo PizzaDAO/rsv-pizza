@@ -81,7 +81,26 @@ export default function ParticipatingPizzeriasMap({
           },
         });
 
-        markersRef.current.push(marker);
+        // Name label below the emoji pin
+        const nameLabel = new google.maps.Marker({
+          position,
+          map,
+          clickable: false,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
+            labelOrigin: new google.maps.Point(0, 2.2),
+          },
+          label: {
+            text: pizzeria.name,
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: '600',
+            className: 'pizzeria-pin-label',
+          },
+        });
+
+        markersRef.current.push(marker, nameLabel);
         bounds.extend(position);
       }
 

@@ -92,9 +92,7 @@ export function ParticipatingPizzerias({
 
   if (!pizzerias || pizzerias.length === 0) return null;
 
-  const sectionLabel = cityLabel
-    ? `Participating ${cityLabel} Pizzerias`
-    : 'Participating Pizzerias';
+  const sectionLabel = 'Featured Pizzerias';
 
   const handleLinkClick = (url: string, pizzeriaName: string) => {
     if (eventSlug) {
