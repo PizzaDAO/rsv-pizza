@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, Star, Phone, Link as LinkIcon } from 'lucide-react';
+import { Star, Phone } from 'lucide-react';
 import { Pizzeria } from '../types';
 import {
   geocodeAddress,
@@ -125,12 +125,21 @@ export function ParticipatingPizzerias({
                   key={pizzeria.id}
                   className="flex items-start gap-3 p-3 bg-theme-surface rounded-xl border border-theme-stroke"
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-[#ff393a]" />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-theme-text font-medium truncate">{pizzeria.name}</p>
+                      {pizzeria.url ? (
+                        <a
+                          href={pizzeria.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-theme-text font-medium truncate hover:text-[#ff393a] transition-colors"
+                          onClick={() => handleLinkClick(pizzeria.url!, pizzeria.name)}
+                        >
+                          {pizzeria.name}
+                        </a>
+                      ) : (
+                        <p className="text-theme-text font-medium truncate">{pizzeria.name}</p>
+                      )}
                       {pizzeria.rating && (
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
                           <Star size={12} className="fill-yellow-400" />
@@ -153,32 +162,18 @@ export function ParticipatingPizzerias({
                     {pizzeria.address && (
                       <p className="text-theme-text-muted text-xs mt-0.5">{pizzeria.address}</p>
                     )}
-                    {(pizzeria.url || pizzeria.phone) && (
+                    {pizzeria.phone && (
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        {pizzeria.url && (
-                          <a
-                            href={pizzeria.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#ff393a]/80 hover:text-[#ff393a] text-xs flex items-center gap-1"
-                            onClick={() => handleLinkClick(pizzeria.url!, pizzeria.name)}
-                          >
-                            <LinkIcon size={10} />
-                            Website
-                          </a>
-                        )}
-                        {pizzeria.phone && (
-                          <a
-                            href={`tel:${pizzeria.phone}`}
-                            className="text-theme-text-muted hover:text-theme-text text-xs flex items-center gap-1"
-                            onClick={() =>
-                              handleLinkClick(`tel:${pizzeria.phone}`, pizzeria.name)
-                            }
-                          >
-                            <Phone size={10} />
-                            {pizzeria.phone}
-                          </a>
-                        )}
+                        <a
+                          href={`tel:${pizzeria.phone}`}
+                          className="text-theme-text-muted hover:text-theme-text text-xs flex items-center gap-1"
+                          onClick={() =>
+                            handleLinkClick(`tel:${pizzeria.phone}`, pizzeria.name)
+                          }
+                        >
+                          <Phone size={10} />
+                          {pizzeria.phone}
+                        </a>
                       </div>
                     )}
                   </div>
