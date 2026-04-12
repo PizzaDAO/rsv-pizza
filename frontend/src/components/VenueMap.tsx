@@ -94,7 +94,7 @@ export default function VenueMap({
         map: mapRef.current,
         title: venueName || address,
         label: {
-          text: '\u{1F973}',
+          text: '\u{1F388}',
           fontSize: '28px',
         },
         icon: {

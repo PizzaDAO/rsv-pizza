@@ -116,7 +116,7 @@ export default function ParticipatingPizzeriasMap({
           title: venueName || 'Venue',
           clickable: false,
           label: {
-            text: '\u{1F973}',
+            text: '\u{1F388}',
             fontSize: '24px',
           },
           icon: {
