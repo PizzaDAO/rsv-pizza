@@ -62,7 +62,6 @@ export default function ParticipatingPizzeriasMap({
 
       const map = mapRef.current;
       const bounds = new google.maps.LatLngBounds();
-      const infoWindow = new google.maps.InfoWindow();
 
       // Pizzeria pins (default red) with name labels drawn below the pin
       for (const pizzeria of validPizzerias) {
@@ -71,6 +70,7 @@ export default function ParticipatingPizzeriasMap({
           position,
           map,
           title: pizzeria.name,
+          clickable: false,
           label: {
             text: pizzeria.name,
             color: '#ffffff',
@@ -78,18 +78,6 @@ export default function ParticipatingPizzeriasMap({
             fontWeight: '600',
             className: 'pizzeria-pin-label',
           },
-        });
-
-        marker.addListener('click', () => {
-          const safeName = (pizzeria.name || '').replace(/</g, '&lt;');
-          const safeAddress = (pizzeria.address || '').replace(/</g, '&lt;');
-          infoWindow.setContent(
-            `<div style="font-family: sans-serif; max-width: 220px;">
-              <div style="font-weight: 600; margin-bottom: 4px;">${safeName}</div>
-              ${safeAddress ? `<div style="font-size: 12px; color: #555;">${safeAddress}</div>` : ''}
-            </div>`
-          );
-          infoWindow.open({ anchor: marker, map });
         });
 
         markersRef.current.push(marker);
