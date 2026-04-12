@@ -59,6 +59,7 @@ const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';
 const TEXT_FONT = '"Hub 191", "Comic Sans MS", "Comic Sans", cursive';
 const CITY_COLOR = '#FE332C';
 const TIME_COLOR = '#FFFFFF';
+const VENUE_COLOR = '#0497C1';
 
 // Bounding box dimensions (measured from boxes overlay at 1080px)
 const CITY_BOX = { width: 587, height: 72 };
@@ -484,7 +485,7 @@ export function FlyerGenerator() {
     // 3) Venue name + street address — Hub 191 Regular, black
     //    x locked to city.x so venue always left-aligns with city
     const venueX = positions.city.x;
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = VENUE_COLOR;
     ctx.font = `${venueNameFontSize}px "Hub 191"`;
     ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y);
     if (streetAddress) {
@@ -767,7 +768,7 @@ export function FlyerGenerator() {
                 left: positions.city.x,
                 width: VENUE_BOX.width,
                 height: VENUE_BOX.height,
-                color: '#000000',
+                color: VENUE_COLOR,
                 textTransform: 'uppercase',
                 fontFamily: TEXT_FONT,
                 overflow: 'hidden',
