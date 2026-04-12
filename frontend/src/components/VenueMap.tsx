@@ -93,6 +93,14 @@ export default function VenueMap({
         position: location,
         map: mapRef.current,
         title: venueName || address,
+        label: {
+          text: '\u{1F389}',
+          fontSize: '28px',
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 0,
+        },
       });
     };
 

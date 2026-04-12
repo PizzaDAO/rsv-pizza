@@ -72,11 +72,12 @@ export default function ParticipatingPizzeriasMap({
           title: pizzeria.name,
           clickable: false,
           label: {
-            text: pizzeria.name,
-            color: '#ffffff',
-            fontSize: '12px',
-            fontWeight: '600',
-            className: 'pizzeria-pin-label',
+            text: '\u{1F355}',
+            fontSize: '24px',
+          },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
           },
         });
 
