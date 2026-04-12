@@ -95,6 +95,7 @@ function HostPageContent() {
 
   useEffect(() => {
     async function load() {
+      if (authLoading) return; // Wait for auth to resolve before loading party
       if (inviteCode && inviteCode !== loadedCode) {
         setError(null);
         const success = await loadParty(inviteCode);
@@ -105,7 +106,7 @@ function HostPageContent() {
       }
     }
     load();
-  }, [inviteCode, loadParty, loadedCode]);
+  }, [inviteCode, loadParty, loadedCode, authLoading]);
 
   const guestsWithRequests = useMemo(() => {
     return guests.filter(g =>
