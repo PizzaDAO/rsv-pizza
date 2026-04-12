@@ -381,52 +381,56 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         </select>
       </div>
 
-      {/* Bulk action bar */}
-      {selectedKeys.size > 0 && (
-        <div className="flex items-center gap-3 py-2 px-3 bg-theme-surface border border-theme-stroke rounded-lg text-sm">
-          <span className="text-theme-text-secondary font-medium">
-            {selectedKeys.size} selected
-          </span>
-          <div className="relative">
+      {/* Bulk action bar — always visible */}
+      <div className="flex items-center gap-3 py-2 px-3 bg-theme-surface border border-theme-stroke rounded-lg text-sm">
+        {selectedKeys.size > 0 ? (
+          <>
+            <span className="text-theme-text-secondary font-medium">
+              {selectedKeys.size} selected
+            </span>
+            <div className="relative">
+              <button
+                onClick={() => setShowActionDropdown(!showActionDropdown)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
+              >
+                Actions <ChevronDown size={12} />
+              </button>
+              {showActionDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
+                    <button onClick={() => handleBulkStatus('created')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-theme-surface transition-colors">
+                      Set Created
+                    </button>
+                    <button onClick={() => handleBulkStatus('todo')} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-theme-surface transition-colors">
+                      Set To Do
+                    </button>
+                    <button onClick={() => handleBulkStatus('skip')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-theme-surface transition-colors">
+                      Set Skip
+                    </button>
+                    {onTelegramBroadcast && (
+                      <>
+                        <div className="border-t border-theme-stroke my-1" />
+                        <button onClick={handleBulkTelegram} className="w-full text-left px-4 py-2 text-sm text-blue-500 hover:bg-theme-surface transition-colors">
+                          Send Telegram Message
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             <button
-              onClick={() => setShowActionDropdown(!showActionDropdown)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
+              onClick={() => { setSelectedKeys(new Set()); setShowActionDropdown(false); }}
+              className="text-theme-text-faint hover:text-theme-text-secondary text-xs"
             >
-              Actions <ChevronDown size={12} />
+              Clear
             </button>
-            {showActionDropdown && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
-                <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
-                  <button onClick={() => handleBulkStatus('created')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-theme-surface transition-colors">
-                    Set Created
-                  </button>
-                  <button onClick={() => handleBulkStatus('todo')} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-theme-surface transition-colors">
-                    Set To Do
-                  </button>
-                  <button onClick={() => handleBulkStatus('skip')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-theme-surface transition-colors">
-                    Set Skip
-                  </button>
-                  {onTelegramBroadcast && (
-                    <>
-                      <div className="border-t border-theme-stroke my-1" />
-                      <button onClick={handleBulkTelegram} className="w-full text-left px-4 py-2 text-sm text-blue-500 hover:bg-theme-surface transition-colors">
-                        Send Telegram Message
-                      </button>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={() => { setSelectedKeys(new Set()); setShowActionDropdown(false); }}
-            className="text-theme-text-faint hover:text-theme-text-secondary text-xs"
-          >
-            Clear
-          </button>
-        </div>
-      )}
+          </>
+        ) : (
+          <span className="text-theme-text-faint text-sm">No cities selected</span>
+        )}
+      </div>
 
       {/* Table (desktop) */}
       <div className="hidden md:block overflow-x-auto">
