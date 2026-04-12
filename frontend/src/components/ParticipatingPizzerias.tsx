@@ -107,7 +107,6 @@ export function ParticipatingPizzerias({
       <div className="card p-4 sm:p-6">
         {/* Header — matches MusicWidget header style */}
         <div className="flex items-center gap-3 mb-4">
-          <MapPin size={20} className="text-[#ff393a]" />
           <h2 className="text-lg font-semibold text-theme-text">{sectionLabel}</h2>
         </div>
 
