@@ -3,6 +3,8 @@ import { Pizzeria } from '../types';
 
 interface ParticipatingPizzeriasMapProps {
   pizzerias: Pizzeria[];
+  venueLocation?: { lat: number; lng: number } | null;
+  venueName?: string;
   height?: number;
 }
 
@@ -14,6 +16,8 @@ interface ParticipatingPizzeriasMapProps {
  */
 export default function ParticipatingPizzeriasMap({
   pizzerias,
+  venueLocation,
+  venueName,
   height = 320,
 }: ParticipatingPizzeriasMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +108,29 @@ export default function ParticipatingPizzeriasMap({
         bounds.extend(position);
       }
 
+      // Venue pin (gray teardrop + party emoji)
+      if (venueLocation) {
+        const pinSvg = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#9ca3af"/></svg>')}`;
+        const venueMarker = new google.maps.Marker({
+          position: venueLocation,
+          map,
+          title: venueName || 'Venue',
+          clickable: false,
+          label: {
+            text: '\u{1F389}',
+            fontSize: '16px',
+          },
+          icon: {
+            url: pinSvg,
+            scaledSize: new google.maps.Size(40, 52),
+            anchor: new google.maps.Point(20, 52),
+            labelOrigin: new google.maps.Point(20, 18),
+          },
+        });
+        markersRef.current.push(venueMarker);
+        bounds.extend(venueLocation);
+      }
+
       // Fit bounds — if only one marker, center with zoom 14 instead of
       // fitBounds (which can over-zoom on a single point).
       if (markersRef.current.length === 1) {
@@ -145,7 +172,7 @@ export default function ParticipatingPizzeriasMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validPizzerias]);
+  }, [validPizzerias, venueLocation, venueName]);
 
   // If we have nothing to show on the map, render nothing and let the parent
   // collapse the grid.

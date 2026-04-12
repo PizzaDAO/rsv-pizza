@@ -111,7 +111,7 @@ export function ParticipatingPizzerias({
         <div className={hasAnyCoords ? 'grid md:grid-cols-2 gap-4' : ''}>
           {hasAnyCoords && (
             <div>
-              <ParticipatingPizzeriasMap pizzerias={pizzerias} />
+              <ParticipatingPizzeriasMap pizzerias={pizzerias} venueLocation={venueLocation} venueName={venueAddress ?? undefined} />
             </div>
           )}
 
