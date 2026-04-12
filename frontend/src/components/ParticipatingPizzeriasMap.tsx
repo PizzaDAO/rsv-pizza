@@ -108,23 +108,20 @@ export default function ParticipatingPizzeriasMap({
         bounds.extend(position);
       }
 
-      // Venue pin (gray teardrop + party emoji)
+      // Venue pin (party face emoji, no background)
       if (venueLocation) {
-        const pinSvg = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#d1d5db"/></svg>')}`;
         const venueMarker = new google.maps.Marker({
           position: venueLocation,
           map,
           title: venueName || 'Venue',
           clickable: false,
           label: {
-            text: '\u{1F389}',
-            fontSize: '16px',
+            text: '\u{1F973}',
+            fontSize: '24px',
           },
           icon: {
-            url: pinSvg,
-            scaledSize: new google.maps.Size(40, 52),
-            anchor: new google.maps.Point(20, 52),
-            labelOrigin: new google.maps.Point(20, 18),
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
           },
         });
         markersRef.current.push(venueMarker);
