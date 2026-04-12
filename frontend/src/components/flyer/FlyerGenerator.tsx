@@ -452,7 +452,8 @@ export function FlyerGenerator() {
 
   const defaultVenueName = party.venueName || 'YOUR VENUE';
   const defaultAddress = party.address || '';
-  const defaultCity = defaultAddress ? parseCityFromAddress(defaultAddress) : 'YOUR CITY';
+  const cityFromTitle = party.name?.replace(/^Global Pizza Party\s*/i, '').trim();
+  const defaultCity = cityFromTitle || (defaultAddress ? parseCityFromAddress(defaultAddress) : 'YOUR CITY');
   const defaultStreetAddress = defaultAddress ? defaultAddress.split(',')[0].trim() : '';
 
   // Use edited values if set, otherwise defaults
