@@ -3,7 +3,7 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check, Pencil } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
@@ -766,7 +766,14 @@ export function FlyerGenerator() {
                   }}
                 />
               ) : (
-                city.toUpperCase()
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {city.toUpperCase()}
+                  <Pencil
+                    size={14}
+                    style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                    onClick={(e) => { e.stopPropagation(); setEditingField('city'); }}
+                  />
+                </span>
               )}
             </div>
           );
@@ -820,7 +827,14 @@ export function FlyerGenerator() {
                     }}
                   />
                 ) : (
-                  venueName.toUpperCase()
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {venueName.toUpperCase()}
+                    <Pencil
+                      size={11}
+                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                      onClick={(e) => { e.stopPropagation(); setEditingField('venue'); }}
+                    />
+                  </span>
                 )}
               </div>
               <div
@@ -849,7 +863,14 @@ export function FlyerGenerator() {
                     }}
                   />
                 ) : (
-                  (streetAddress || 'STREET ADDRESS').toUpperCase()
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {(streetAddress || 'STREET ADDRESS').toUpperCase()}
+                    <Pencil
+                      size={11}
+                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                      onClick={(e) => { e.stopPropagation(); setEditingField('street'); }}
+                    />
+                  </span>
                 )}
               </div>
             </div>
