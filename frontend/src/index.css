@@ -695,3 +695,20 @@ body.gpp-theme-active .pac-item-query {
   letter-spacing: 0.1px;
   pointer-events: none;
 }
+
+/* VenueMap thumbnails — shrink Google attribution so it stays legible without
+   dominating the small (~120-200px) map area on the public event page. The
+   Google logo sits at bottom-left as an <a href="https://maps.google.com/...">
+   and the "Map Data / Terms / Report a map error" links are inside
+   .gm-style-cc at bottom-right. We scale both to 70% toward their anchor
+   corners so attribution remains visible + clickable per Google Maps ToS 10.5.
+   Scoped to .venue-map-thumbnail so the larger ParticipatingPizzeriasMap is
+   unaffected. */
+.venue-map-thumbnail .gm-style-cc {
+  transform: scale(0.7);
+  transform-origin: bottom right;
+}
+.venue-map-thumbnail a[href^="https://maps.google.com/maps"] {
+  transform: scale(0.7);
+  transform-origin: bottom left;
+}

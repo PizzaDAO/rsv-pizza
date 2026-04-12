@@ -132,7 +132,7 @@ export default function VenueMap({
   if (!address) {
     return (
       <div
-        className={`${className ?? ''} rounded-[inherit] bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center`}
+        className={`${className ?? ''} venue-map-thumbnail rounded-[inherit] bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center`}
       >
         <MapPin className="w-12 h-12 text-theme-text" />
       </div>
@@ -144,7 +144,7 @@ export default function VenueMap({
   if (error) {
     return (
       <div
-        className={`${className ?? ''} rounded-[inherit] bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center`}
+        className={`${className ?? ''} venue-map-thumbnail rounded-[inherit] bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center`}
       >
         <div className="text-center">
           <MapPin className="w-12 h-12 text-theme-text mx-auto mb-2" />
@@ -158,7 +158,7 @@ export default function VenueMap({
     <div
       ref={containerRef}
       data-testid="venue-map"
-      className={`${className ?? ''} rounded-[inherit] overflow-hidden bg-theme-surface`}
+      className={`${className ?? ''} venue-map-thumbnail rounded-[inherit] overflow-hidden bg-theme-surface`}
     />
   );
 }
