@@ -962,9 +962,10 @@ export const EventDetailsTab: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  disabled={party?.eventType === 'gpp'}
-                  onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
-                  className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  min={startDate || undefined}
+                  max={party?.eventType === 'gpp' ? '2026-05-23' : undefined}
+                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
