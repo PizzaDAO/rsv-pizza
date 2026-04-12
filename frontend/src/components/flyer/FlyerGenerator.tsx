@@ -54,6 +54,38 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Determine whether the given IANA timezone's country conventionally uses
+ * 12-hour time (e.g. "6:00 PM") or 24-hour time (e.g. "18:00").
+ */
+function uses12Hour(tz: string): boolean {
+  const TWELVE_HOUR_ZONES = new Set([
+    'Asia/Kolkata', 'Asia/Calcutta',  // India
+    'Asia/Manila',                     // Philippines
+    'Asia/Riyadh', 'Asia/Jeddah',     // Saudi Arabia
+    'Asia/Dubai',                      // UAE
+  ]);
+  if (TWELVE_HOUR_ZONES.has(tz)) return true;
+  // America/ covers US, Canada, Mexico, Colombia, etc. — all 12-hour
+  // Australia/ — 12-hour
+  if (tz.startsWith('America/') || tz.startsWith('Australia/')) return true;
+  // Default: 24-hour (Europe, most of Asia, Africa)
+  return false;
+}
+
+/**
+ * Format a 24-hour "HH:MM" time string to the appropriate display format.
+ * - 12-hour mode: "6:00 PM"
+ * - 24-hour mode: "18:00"
+ */
+function formatFlyerTime(timeStr: string, is12h: boolean): string {
+  if (!is12h) return timeStr; // already "HH:MM"
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
 const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';
 const TEXT_FONT = '"Hub 191", "Comic Sans MS", "Comic Sans", cursive';
 const CITY_COLOR = '#FE332C';
@@ -397,12 +429,15 @@ export function FlyerGenerator() {
   let timeDisplay = '';
   let dateDisplay = 'MAY 22'; // fallback if no event date
   if (party.date && party.timezone) {
+    const is12h = uses12Hour(party.timezone);
     const start = getDateTimeInTimezone(party.date, party.timezone);
-    timeDisplay = start.timeStr;
+    const startFormatted = formatFlyerTime(start.timeStr, is12h);
+    timeDisplay = startFormatted;
     if (party.duration) {
       const endDate = new Date(new Date(party.date).getTime() + party.duration * 3600000);
       const end = getDateTimeInTimezone(endDate, party.timezone);
-      timeDisplay = `${start.timeStr} - ${end.timeStr}`;
+      const endFormatted = formatFlyerTime(end.timeStr, is12h);
+      timeDisplay = `${startFormatted} - ${endFormatted}`;
     }
     // Derive "MAY 22" style date from event date in the event's timezone
     const eventDate = new Date(party.date);
