@@ -7,7 +7,6 @@ import {
   formatDistanceMiles,
 } from '../lib/ordering';
 import { trackLinkClick } from '../lib/api';
-import ParticipatingPizzeriasMap from './ParticipatingPizzeriasMap';
 
 interface ParticipatingPizzeriasProps {
   pizzerias: Pizzeria[];
@@ -85,10 +84,6 @@ export function ParticipatingPizzerias({
 
   const cityLabel = useMemo(() => extractCityFromAddress(venueAddress), [venueAddress]);
 
-  const hasAnyCoords = useMemo(
-    () => pizzerias.some((p) => p.location && p.location.lat !== 0 && p.location.lng !== 0),
-    [pizzerias]
-  );
 
   if (!pizzerias || pizzerias.length === 0) return null;
 
@@ -108,12 +103,7 @@ export function ParticipatingPizzerias({
           <h2 className="text-lg font-semibold text-theme-text">{sectionLabel}</h2>
         </div>
 
-        <div className={hasAnyCoords ? 'grid md:grid-cols-2 gap-4' : ''}>
-          {hasAnyCoords && (
-            <div>
-              <ParticipatingPizzeriasMap pizzerias={pizzerias} venueLocation={venueLocation} venueName={venueAddress ?? undefined} />
-            </div>
-          )}
+        <div>
 
           <div className="space-y-3">
             {pizzerias.map((pizzeria) => {
