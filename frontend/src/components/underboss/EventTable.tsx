@@ -292,9 +292,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         )}
       </div>
 
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+      {/* Bulk action bar — always visible */}
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+        {selectedIds.size > 0 ? (
+          <>
           <span className="text-sm text-theme-text-secondary font-medium">
             {selectedIds.size} selected
           </span>
@@ -492,8 +493,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           >
             Deselect all
           </button>
-        </div>
-      )}
+          </>
+        ) : (
+          <span className="text-theme-text-faint text-sm">No events selected</span>
+        )}
+      </div>
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && createPortal(
