@@ -9,9 +9,9 @@ export interface FlyerPositions {
 
 /** Default positions (in 1080px canvas coordinates) matching the 2026 template layout */
 export const DEFAULT_POSITIONS: FlyerPositions = {
-  city: { x: 50, y: 608 },
-  time: { x: 50, y: 700 },
-  venue: { x: 50, y: 795 },
+  city: { x: 50, y: 600 },
+  time: { x: 50, y: 680 },
+  venue: { x: 50, y: 750 },
   sponsors: { x: 27, y: 884 },
 };
 
