@@ -63,7 +63,7 @@ const TIME_COLOR = '#FFFFFF';
 // Bounding box dimensions (measured from boxes overlay at 1080px)
 const CITY_BOX = { width: 587, height: 72 };
 const VENUE_BOX = { width: 600, height: 110 };
-const TIME_BOX = { width: 300, height: 60 }; // sized to match MAY 22 text height
+const TIME_BOX = { width: 600, height: 60 }; // sized for "MAY 22  6:00 PM - 9:00 PM"
 /** Default sponsor logo bounding box. Width/height are user-resizable at runtime. */
 const DEFAULT_SPONSOR_BOX = { width: 759, height: 171 };
 /** Min/max sponsor box dimensions in 1080px canvas units. */
@@ -413,6 +413,7 @@ export function FlyerGenerator() {
 
   // Format date and time
   let timeDisplay = '';
+  let dateDisplay = 'MAY 22'; // fallback if no event date
   if (party.date && party.timezone) {
     const start = getDateTimeInTimezone(party.date, party.timezone);
     timeDisplay = start.timeStr;
@@ -421,6 +422,13 @@ export function FlyerGenerator() {
       const end = getDateTimeInTimezone(endDate, party.timezone);
       timeDisplay = `${start.timeStr} - ${end.timeStr}`;
     }
+    // Derive "MAY 22" style date from event date in the event's timezone
+    const eventDate = new Date(party.date);
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { timeZone: party.timezone, month: 'short' });
+    const dayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: party.timezone, day: 'numeric' });
+    const monthStr = monthFormatter.format(eventDate).toUpperCase();
+    const dayStr = dayFormatter.format(eventDate);
+    dateDisplay = `${monthStr} ${dayStr}`;
   }
 
   const defaultVenueName = party.venueName || 'YOUR VENUE';
@@ -440,7 +448,9 @@ export function FlyerGenerator() {
   const cityFontSize = fitText(city, 'Hub 191 Display', 64, CITY_BOX.width);
   const venueNameFontSize = fitText(venueName, 'Hub 191', 46, VENUE_BOX.width);
   const streetFontSize = streetAddress ? fitText(streetAddress, 'Hub 191', 46, VENUE_BOX.width) : 46;
-  const timeFontSize = fitText(timeDisplay || '6PM - 9PM', 'Hub 191', 55, TIME_BOX.width);
+  // Fit the combined "MAY 22  6:00 PM - 9:00 PM" string within TIME_BOX
+  const fullTimeDisplay = `${dateDisplay}  ${timeDisplay || '6PM - 9PM'}`;
+  const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
 
   // Compute sponsor logo sizing to fit within bounding box
   const sponsorCount = Math.min(sponsors.length, 8);
@@ -482,11 +492,21 @@ export function FlyerGenerator() {
       ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y + venueNameFontSize + 4);
     }
 
-    // 4) Time — Hub 191 Regular, white
-    if (timeDisplay) {
-      ctx.fillStyle = TIME_COLOR;
+    // 4) Date + Time — "MAY 22" in red, then time in white
+    {
       ctx.font = `${timeFontSize}px "Hub 191"`;
-      ctx.fillText(timeDisplay, positions.time.x, positions.time.y);
+      // Draw date (e.g. "MAY 22") in red
+      ctx.fillStyle = CITY_COLOR;
+      const dateStr = dateDisplay.toUpperCase();
+      ctx.fillText(dateStr, positions.time.x, positions.time.y);
+      // Measure date width to position time to its right
+      const dateWidth = ctx.measureText(dateStr).width;
+      const gap = 15;
+      // Draw time in white
+      if (timeDisplay) {
+        ctx.fillStyle = TIME_COLOR;
+        ctx.fillText(timeDisplay, positions.time.x + dateWidth + gap, positions.time.y);
+      }
     }
 
     // 5) Sponsor logos — group logos in flex layout, popped logos at custom positions
@@ -816,8 +836,8 @@ export function FlyerGenerator() {
           );
         })()}
 
-        {/* Time - Hub 191 Regular, next to "MAY 22" on template */}
-        {timeDisplay && (() => {
+        {/* Date + Time - "MAY 22" in red, time in white, Hub 191 Regular */}
+        {(() => {
           const dragProps = getDragProps('time');
           return (
             <div
@@ -831,7 +851,6 @@ export function FlyerGenerator() {
                 left: positions.time.x,
                 width: TIME_BOX.width,
                 height: TIME_BOX.height,
-                color: TIME_COLOR,
                 fontSize: timeFontSize,
                 fontFamily: TEXT_FONT,
                 textTransform: 'uppercase',
@@ -841,7 +860,8 @@ export function FlyerGenerator() {
                 ...dragProps.style,
               }}
             >
-              {timeDisplay}
+              <span style={{ color: CITY_COLOR }}>{dateDisplay}</span>
+              {timeDisplay && <span style={{ marginLeft: '0.4em', color: TIME_COLOR }}>{timeDisplay}</span>}
             </div>
           );
         })()}
