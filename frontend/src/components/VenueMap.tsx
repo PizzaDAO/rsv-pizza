@@ -95,8 +95,8 @@ export default function VenueMap({
         title: venueName || address,
         icon: {
           url: '/molto-benny.png',
-          scaledSize: new google.maps.Size(48, 48),
-          anchor: new google.maps.Point(24, 48),
+          scaledSize: new google.maps.Size(72, 72),
+          anchor: new google.maps.Point(36, 72),
         },
       });
     };
