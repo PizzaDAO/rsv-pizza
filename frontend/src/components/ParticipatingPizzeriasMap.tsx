@@ -117,8 +117,8 @@ export default function ParticipatingPizzeriasMap({
           clickable: false,
           icon: {
             url: '/molto-benny.png',
-            scaledSize: new google.maps.Size(60, 60),
-            anchor: new google.maps.Point(30, 60),
+            scaledSize: new google.maps.Size(45, 45),
+            anchor: new google.maps.Point(22, 45),
           },
         });
         markersRef.current.push(venueMarker);
