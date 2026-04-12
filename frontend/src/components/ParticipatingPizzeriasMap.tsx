@@ -110,7 +110,7 @@ export default function ParticipatingPizzeriasMap({
 
       // Venue pin (gray teardrop + party emoji)
       if (venueLocation) {
-        const pinSvg = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#9ca3af"/></svg>')}`;
+        const pinSvg = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#d1d5db"/></svg>')}`;
         const venueMarker = new google.maps.Marker({
           position: venueLocation,
           map,
