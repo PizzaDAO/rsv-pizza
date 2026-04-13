@@ -1,21 +1,19 @@
 /**
  * One-time import script: DOW Pizza Party photos → RSVPizza
  *
- * Reads photos.json from the DOW project, optimizes images with sharp,
- * uploads to Supabase Storage (dow-photos bucket), and inserts rows
- * into the dow_photos table.
+ * Reads photos.json from the DOW project, maps cities to GPP events,
+ * and inserts rows into the dow_photos table using app.gpp.day URLs
+ * (photos are already hosted there — no upload needed).
  *
  * Usage:
  *   npx tsx scripts/import-dow-photos.ts
  *
  * Requires:
  *   - SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env (project root)
- *   - `dow-photos` Storage bucket created in Supabase Dashboard (public)
- *   - sharp, @supabase/supabase-js, dotenv installed
+ *   - @supabase/supabase-js, dotenv installed
  */
 
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
@@ -33,14 +31,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Paths
+// Photos are already hosted on app.gpp.day
+const PHOTO_BASE_URL = 'https://app.gpp.day';
+
+// Manifest path
 const DOW_PROJECT_ROOT = 'C:/Users/samgo/OneDrive/Documents/PizzaDAO/Code/dow-pizza-party';
 const PHOTOS_JSON_PATH = path.join(DOW_PROJECT_ROOT, 'src', 'data', 'photos.json');
-const DOW_PUBLIC_DIR = path.join(DOW_PROJECT_ROOT, 'public');
-
-const STORAGE_BUCKET = 'dow-photos';
-const MAX_DIMENSION = 1600;
-const JPEG_QUALITY = 80;
 
 interface DowPhoto {
   src: string;
@@ -91,7 +87,7 @@ async function main() {
   }
   console.log(`Found ${urlToPartyId.size} GPP parties with custom URLs\n`);
 
-  // 3. Check existing uploads to skip duplicates
+  // 3. Check existing imports to skip duplicates
   const { data: existingPhotos, error: existingError } = await supabase
     .from('dow_photos')
     .select('city_slug, photo_index, year');
@@ -107,18 +103,18 @@ async function main() {
   }
   console.log(`Found ${existingSet.size} already-imported photos (will skip)\n`);
 
-  // Stats tracking
+  // Stats
   let totalPhotos = 0;
-  let uploadedPhotos = 0;
+  let insertedPhotos = 0;
   let skippedPhotos = 0;
   let failedPhotos = 0;
-  let totalBytes = 0;
   const matchedCities: string[] = [];
   const unmatchedCities: string[] = [];
 
-  // 4. Process each city
+  // 4. Build batch of rows to insert
+  const rows: any[] = [];
+
   for (const city of manifest.cities) {
-    // Compute expected customUrl: city name → lowercase, no spaces
     const expectedUrl = city.name.toLowerCase().replace(/\s+/g, '');
     const partyId = urlToPartyId.get(expectedUrl) || null;
 
@@ -141,115 +137,53 @@ async function main() {
           continue;
         }
 
-        try {
-          // Build source path (photo.src starts with /photos/...)
-          const srcRelative = photo.src.startsWith('/') ? photo.src.slice(1) : photo.src;
-          const srcPath = path.join(DOW_PUBLIC_DIR, srcRelative);
+        // photo.src is like "/photos/austin/2025/01.jpg"
+        const storageUrl = `${PHOTO_BASE_URL}${photo.src}`;
+        const originalFilename = path.basename(photo.src);
 
-          if (!fs.existsSync(srcPath)) {
-            console.warn(`  SKIP (missing): ${srcPath}`);
-            failedPhotos++;
-            continue;
-          }
-
-          // Read and optimize with sharp
-          const inputBuffer = fs.readFileSync(srcPath);
-          const image = sharp(inputBuffer);
-          const metadata = await image.metadata();
-
-          const optimized = await image
-            .resize({
-              width: MAX_DIMENSION,
-              height: MAX_DIMENSION,
-              fit: 'inside',
-              withoutEnlargement: true,
-            })
-            .jpeg({ quality: JPEG_QUALITY })
-            .toBuffer();
-
-          const optimizedMeta = await sharp(optimized).metadata();
-
-          // Storage path: {city-slug}/{year}/{nn}.jpg
-          const paddedIndex = String(photoIndex).padStart(2, '0');
-          const storagePath = `${city.slug}/${yearData.year}/${paddedIndex}.jpg`;
-
-          // Upload to storage
-          const { error: uploadError } = await supabase.storage
-            .from(STORAGE_BUCKET)
-            .upload(storagePath, optimized, {
-              contentType: 'image/jpeg',
-              cacheControl: '31536000', // 1 year
-              upsert: false,
-            });
-
-          if (uploadError) {
-            // If file already exists, get the URL anyway
-            if (uploadError.message?.includes('already exists') || uploadError.message?.includes('Duplicate')) {
-              console.log(`  EXISTS: ${storagePath}`);
-            } else {
-              console.warn(`  UPLOAD FAIL: ${storagePath} — ${uploadError.message}`);
-              failedPhotos++;
-              continue;
-            }
-          }
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(storagePath);
-
-          const storageUrl = urlData.publicUrl;
-
-          // Original filename from source path
-          const originalFilename = path.basename(photo.src);
-
-          // Insert DB row
-          const { error: insertError } = await supabase
-            .from('dow_photos')
-            .insert({
-              party_id: partyId,
-              city_slug: city.slug,
-              city_name: city.name,
-              country_code: city.countryCode || null,
-              year: yearData.year,
-              photo_index: photoIndex,
-              storage_url: storageUrl,
-              original_filename: originalFilename,
-              file_size: optimized.length,
-              width: optimizedMeta.width || null,
-              height: optimizedMeta.height || null,
-            });
-
-          if (insertError) {
-            console.warn(`  DB FAIL: ${storagePath} — ${insertError.message}`);
-            failedPhotos++;
-            continue;
-          }
-
-          uploadedPhotos++;
-          totalBytes += optimized.length;
-
-          // Progress log every 50 photos
-          if (uploadedPhotos % 50 === 0) {
-            console.log(`  Progress: ${uploadedPhotos} uploaded, ${totalPhotos} total processed`);
-          }
-        } catch (err: any) {
-          console.warn(`  ERROR: ${city.slug}/${yearData.year}/${i + 1} — ${err.message}`);
-          failedPhotos++;
-        }
+        rows.push({
+          party_id: partyId,
+          city_slug: city.slug,
+          city_name: city.name,
+          country_code: city.countryCode || null,
+          year: yearData.year,
+          photo_index: photoIndex,
+          storage_url: storageUrl,
+          original_filename: originalFilename,
+          file_size: null,
+          width: null,
+          height: null,
+        });
       }
     }
   }
 
-  // 5. Print summary
+  // 5. Insert in batches of 100
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const { error: insertError } = await supabase
+      .from('dow_photos')
+      .insert(batch);
+
+    if (insertError) {
+      console.warn(`  BATCH FAIL (rows ${i}-${i + batch.length}): ${insertError.message}`);
+      failedPhotos += batch.length;
+    } else {
+      insertedPhotos += batch.length;
+      console.log(`  Inserted ${insertedPhotos}/${rows.length} rows`);
+    }
+  }
+
+  // 6. Print summary
   console.log('\n=== Import Summary ===');
   console.log(`Total photos in manifest: ${totalPhotos}`);
-  console.log(`Uploaded:  ${uploadedPhotos}`);
+  console.log(`Inserted:  ${insertedPhotos}`);
   console.log(`Skipped (already imported): ${skippedPhotos}`);
   console.log(`Failed:    ${failedPhotos}`);
-  console.log(`Storage used: ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
   console.log(`\nCities matched to GPP events: ${matchedCities.length}`);
   console.log(`Cities with no match: ${unmatchedCities.length}`);
+  console.log(`\nPhoto URLs use: ${PHOTO_BASE_URL}/photos/{city}/{year}/{nn}.jpg`);
 
   if (unmatchedCities.length > 0 && unmatchedCities.length <= 30) {
     console.log('\nUnmatched cities:');
@@ -260,7 +194,7 @@ async function main() {
     console.log(`  ... and ${unmatchedCities.length - 30} more`);
   }
 
-  // List GPP events that have NO photos
+  // List GPP events with no photos
   const matchedPartyIds = new Set(matchedCities.map((c) => {
     const url = c.split(' → ')[1];
     return urlToPartyId.get(url);
