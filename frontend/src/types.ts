@@ -265,6 +265,8 @@ export interface Party {
   region?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
 }
 
 export interface Donation {

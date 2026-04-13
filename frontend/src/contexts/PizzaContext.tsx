@@ -122,6 +122,8 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventTags: dbParty.event_tags || [],
     canEdit: dbParty.can_edit || false,
     allowedTabs: dbParty.allowed_tabs,
+    hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],
+    extraGppPhotos: (dbParty.extra_gpp_photos as string[]) || [],
     guests,
   };
 }

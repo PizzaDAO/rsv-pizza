@@ -157,6 +157,10 @@ model Party {
   hostTags          Json     @default("[]") @map("host_tags")
   underbossNotes    String?  @map("underboss_notes")
 
+  // GPP (Global Pizza Party/Previous year) photo management
+  hiddenGppPhotos  Json  @default("[]") @map("hidden_gpp_photos")  // Array of hidden app.gpp.day photo src paths
+  extraGppPhotos   Json  @default("[]") @map("extra_gpp_photos")   // Array of host-uploaded previous year photo URLs
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

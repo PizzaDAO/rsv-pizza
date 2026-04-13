@@ -48,6 +48,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         nftChain: true,
         photosEnabled: true,
         photosPublic: true,
+        hiddenGppPhotos: true,
+        extraGppPhotos: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -222,6 +224,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         nftChain: party.nftChain,
         photosEnabled: party.photosEnabled,
         photosPublic: party.photosPublic,
+        hiddenGppPhotos: party.hiddenGppPhotos || [],
+        extraGppPhotos: party.extraGppPhotos || [],
         hasPassword: !!party.password,
         hostName: party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         hostProfile,
