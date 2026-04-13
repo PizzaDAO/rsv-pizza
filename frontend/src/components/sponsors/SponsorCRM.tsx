@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
-import { Sponsor, SponsorStats } from '../../types';
+import { Sponsor, SponsorStats, Invoice } from '../../types';
 import {
   getSponsors,
   getSponsorStats,
@@ -8,6 +8,7 @@ import {
   updateSponsor,
   deleteSponsor,
   updateFundraisingGoal,
+  getInvoices,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
@@ -21,6 +22,7 @@ interface SponsorCRMProps {
 export function SponsorCRM({ partyId }: SponsorCRMProps) {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +38,10 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     setError(null);
 
     try {
-      const [sponsorsResult, statsResult] = await Promise.all([
+      const [sponsorsResult, statsResult, invoicesResult] = await Promise.all([
         getSponsors(partyId),
         getSponsorStats(partyId),
+        getInvoices(partyId),
       ]);
 
       if (sponsorsResult) {
@@ -46,6 +49,9 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       }
       if (statsResult) {
         setStats(statsResult);
+      }
+      if (invoicesResult) {
+        setInvoices(invoicesResult.invoices);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sponsors');
@@ -178,9 +184,17 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       <SponsorList
         sponsors={sponsors}
         partyId={partyId}
+        invoices={invoices}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
+        onInvoiceUpdate={(invoice) => setInvoices(prev => {
+          const existing = prev.findIndex(i => i.id === invoice.id);
+          if (existing >= 0) {
+            return prev.map(i => i.id === invoice.id ? invoice : i);
+          }
+          return [invoice, ...prev];
+        })}
         isLoading={isRefreshing}
       />
 

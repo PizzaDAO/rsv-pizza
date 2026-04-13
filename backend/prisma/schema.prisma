@@ -179,6 +179,7 @@ model Party {
   performers       Performer[]
   venues           Venue[]
   sponsors         Sponsor[]
+  invoices         Invoice[]
   budgetItems      BudgetItem[]
   checklistItems   ChecklistItem[]
   socialPosts      SocialPost[]
@@ -866,6 +867,8 @@ model Sponsor {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  invoices          Invoice[]
+
   @@index([partyId, status])
   @@index([partyId, createdAt])
   @@map("sponsors")
@@ -1142,4 +1145,54 @@ model SponsorChecklistItem {
   @@index([sponsorUserId])
   @@index([partyId])
   @@map("sponsor_checklist_items")
+}
+
+// ============================================
+// Invoice Models
+// ============================================
+
+model Invoice {
+  id             String    @id @default(uuid()) @db.Uuid
+  partyId        String    @map("party_id") @db.Uuid
+  party          Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  sponsorId      String    @map("sponsor_id") @db.Uuid
+  sponsor        Sponsor   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  invoiceNumber  String    @map("invoice_number")
+  viewToken      String    @unique @map("view_token")
+
+  billToCompany  String?   @map("bill_to_company")
+  billToContact  String?   @map("bill_to_contact")
+  billToAddress  String?   @map("bill_to_address")
+  billToEmail    String    @map("bill_to_email")
+  ccEmails       String[]  @map("cc_emails")
+
+  lineItems      Json      @default("[]") @map("line_items")
+  total          Int       @default(0)
+  currency       String    @default("usd")
+
+  paymentTerms   String?   @map("payment_terms")
+  paymentInstructions String? @map("payment_instructions")
+  dueDate        DateTime? @map("due_date") @db.Date
+  memo           String?
+
+  status         String    @default("draft")
+
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz
+  paidAmount     Int?      @map("paid_amount")
+  paymentMethod  String?   @map("payment_method")
+  paymentRef     String?   @map("payment_ref")
+
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz
+  viewedAt       DateTime? @map("viewed_at") @db.Timestamptz
+
+  attachments    Json      @default("[]")
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([sponsorId])
+  @@index([partyId, status])
+  @@map("invoices")
 }
