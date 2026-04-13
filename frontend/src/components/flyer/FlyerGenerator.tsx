@@ -769,7 +769,7 @@ export function FlyerGenerator() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {city.toUpperCase()}
                   <Pencil
-                    size={14}
+                    size={22}
                     style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                     onClick={(e) => { e.stopPropagation(); setEditingField('city'); }}
                   />
@@ -830,7 +830,7 @@ export function FlyerGenerator() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     {venueName.toUpperCase()}
                     <Pencil
-                      size={11}
+                      size={18}
                       style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('venue'); }}
                     />
@@ -866,7 +866,7 @@ export function FlyerGenerator() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     {(streetAddress || 'STREET ADDRESS').toUpperCase()}
                     <Pencil
-                      size={11}
+                      size={18}
                       style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('street'); }}
                     />
