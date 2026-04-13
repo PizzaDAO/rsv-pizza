@@ -740,7 +740,6 @@ export function FlyerGenerator() {
                 textTransform: 'uppercase',
                 lineHeight: 1.2,
                 whiteSpace: 'nowrap',
-                overflow: 'hidden',
                 ...dragProps.style,
               }}
             >
@@ -769,7 +768,7 @@ export function FlyerGenerator() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {city.toUpperCase()}
                   <Pencil
-                    size={22}
+                    size={44}
                     style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                     onClick={(e) => { e.stopPropagation(); setEditingField('city'); }}
                   />
@@ -797,7 +796,6 @@ export function FlyerGenerator() {
                 color: VENUE_COLOR,
                 textTransform: 'uppercase',
                 fontFamily: TEXT_FONT,
-                overflow: 'hidden',
                 ...dragProps.style,
               }}
             >
@@ -830,7 +828,7 @@ export function FlyerGenerator() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     {venueName.toUpperCase()}
                     <Pencil
-                      size={18}
+                      size={36}
                       style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('venue'); }}
                     />
@@ -866,7 +864,7 @@ export function FlyerGenerator() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     {(streetAddress || 'STREET ADDRESS').toUpperCase()}
                     <Pencil
-                      size={18}
+                      size={36}
                       style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('street'); }}
                     />
