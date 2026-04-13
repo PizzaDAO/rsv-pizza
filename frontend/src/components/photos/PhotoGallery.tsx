@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
 import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
@@ -384,7 +385,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       )}
 
       {/* Upload Modal */}
-      {showUpload && (
+      {showUpload && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50 overflow-y-auto">
           <div className="max-w-lg w-full pb-8" onClick={(e) => e.stopPropagation()}>
             <PhotoUpload
@@ -398,7 +399,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               onClose={() => setShowUpload(false)}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Photo Grid */}
