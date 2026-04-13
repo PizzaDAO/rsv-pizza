@@ -87,7 +87,7 @@ export function ParticipatingPizzerias({
 
   if (!pizzerias || pizzerias.length === 0) return null;
 
-  const sectionLabel = 'Featured Pizzerias';
+  const sectionLabel = 'On the Menu';
 
   const handleLinkClick = (url: string, pizzeriaName: string) => {
     if (eventSlug) {
