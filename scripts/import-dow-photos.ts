@@ -1,9 +1,9 @@
 /**
  * One-time import script: DOW Pizza Party photos → RSVPizza
  *
- * Reads photos.json from the DOW project, maps cities to GPP events,
- * and inserts rows into the dow_photos table using app.gpp.day URLs
- * (photos are already hosted there — no upload needed).
+ * Fetches photos.json from app.gpp.day/api/photos.json, maps cities
+ * to GPP events, and inserts rows into the gpp_photos table using
+ * app.gpp.day URLs (photos are already hosted there — no upload needed).
  *
  * Usage:
  *   npx tsx scripts/import-dow-photos.ts
@@ -14,7 +14,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
 
@@ -31,12 +30,9 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Photos are already hosted on app.gpp.day
+// Photos manifest and images are hosted on app.gpp.day
 const PHOTO_BASE_URL = 'https://app.gpp.day';
-
-// Manifest path
-const DOW_PROJECT_ROOT = 'C:/Users/samgo/OneDrive/Documents/PizzaDAO/Code/dow-pizza-party';
-const PHOTOS_JSON_PATH = path.join(DOW_PROJECT_ROOT, 'src', 'data', 'photos.json');
+const PHOTOS_JSON_URL = 'https://app.gpp.day/api/photos.json';
 
 interface DowPhoto {
   src: string;
@@ -64,8 +60,14 @@ interface DowManifest {
 async function main() {
   console.log('=== DOW Photos Import ===\n');
 
-  // 1. Load manifest
-  const manifest: DowManifest = JSON.parse(fs.readFileSync(PHOTOS_JSON_PATH, 'utf-8'));
+  // 1. Fetch manifest from app.gpp.day
+  console.log(`Fetching manifest from ${PHOTOS_JSON_URL}...`);
+  const res = await fetch(PHOTOS_JSON_URL);
+  if (!res.ok) {
+    console.error(`Failed to fetch photos.json: ${res.status} ${res.statusText}`);
+    process.exit(1);
+  }
+  const manifest: DowManifest = await res.json();
   console.log(`Loaded manifest: ${manifest.cities.length} cities`);
 
   // 2. Query all GPP parties to build customUrl → partyId map
@@ -89,7 +91,7 @@ async function main() {
 
   // 3. Check existing imports to skip duplicates
   const { data: existingPhotos, error: existingError } = await supabase
-    .from('dow_photos')
+    .from('gpp_photos')
     .select('city_slug, photo_index, year');
 
   if (existingError) {
@@ -163,7 +165,7 @@ async function main() {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
     const { error: insertError } = await supabase
-      .from('dow_photos')
+      .from('gpp_photos')
       .insert(batch);
 
     if (insertError) {

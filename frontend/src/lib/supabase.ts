@@ -1606,7 +1606,7 @@ export async function saveUserPreferences(
 // DOW (Day of Wonder) Photos
 // ============================================
 
-export interface DowPhoto {
+export interface GppPhoto {
   id: string;
   party_id: string | null;
   city_slug: string;
@@ -1618,9 +1618,9 @@ export interface DowPhoto {
   original_filename: string;
 }
 
-export async function getDowPhotos(partyId: string): Promise<DowPhoto[]> {
+export async function getGppPhotos(partyId: string): Promise<GppPhoto[]> {
   const { data, error } = await supabase
-    .from('dow_photos')
+    .from('gpp_photos')
     .select('*')
     .eq('party_id', partyId)
     .order('year', { ascending: false })

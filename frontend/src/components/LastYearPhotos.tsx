@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { getDowPhotos, DowPhoto } from '../lib/supabase';
+import { getGppPhotos, GppPhoto } from '../lib/supabase';
 
 interface LastYearPhotosProps {
   partyId: string;
 }
 
 export function LastYearPhotos({ partyId }: LastYearPhotosProps) {
-  const [photos, setPhotos] = useState<DowPhoto[]>([]);
+  const [photos, setPhotos] = useState<GppPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -16,7 +16,7 @@ export function LastYearPhotos({ partyId }: LastYearPhotosProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const data = await getDowPhotos(partyId);
+      const data = await getGppPhotos(partyId);
       if (!cancelled) {
         setPhotos(data);
         setLoading(false);
