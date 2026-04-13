@@ -2409,6 +2409,17 @@ export async function updateHostTags(
   });
 }
 
+// Update underboss notes on an event (underboss auth)
+export async function updateUnderbossNotes(
+  partyId: string,
+  notes: string | null
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/notes`, {
+    method: 'PATCH',
+    body: { notes },
+  });
+}
+
 // Bulk approve events (underboss auth)
 export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-approve', {

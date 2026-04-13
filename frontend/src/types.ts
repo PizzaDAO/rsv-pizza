@@ -988,6 +988,7 @@ export interface UnderbossEvent {
   underbossApproved: boolean;
   hostTags: string[];
   eventTags: string[];
+  underbossNotes: string | null;
   createdAt: string;
 }
 
