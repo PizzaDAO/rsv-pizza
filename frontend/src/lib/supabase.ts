@@ -1601,3 +1601,30 @@ export async function saveUserPreferences(
 
   return true;
 }
+
+// ============================================
+// DOW (Day of Wonder) Photos
+// ============================================
+
+export interface DowPhoto {
+  id: string;
+  party_id: string | null;
+  city_slug: string;
+  city_name: string;
+  country_code: string | null;
+  year: number;
+  photo_index: number;
+  storage_url: string;
+  original_filename: string;
+}
+
+export async function getDowPhotos(partyId: string): Promise<DowPhoto[]> {
+  const { data, error } = await supabase
+    .from('dow_photos')
+    .select('*')
+    .eq('party_id', partyId)
+    .order('year', { ascending: false })
+    .order('photo_index', { ascending: true });
+  if (error || !data) return [];
+  return data;
+}
