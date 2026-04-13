@@ -1603,28 +1603,3 @@ export async function saveUserPreferences(
 }
 
 // ============================================
-// DOW (Day of Wonder) Photos
-// ============================================
-
-export interface GppPhoto {
-  id: string;
-  party_id: string | null;
-  city_slug: string;
-  city_name: string;
-  country_code: string | null;
-  year: number;
-  photo_index: number;
-  storage_url: string;
-  original_filename: string;
-}
-
-export async function getGppPhotos(partyId: string): Promise<GppPhoto[]> {
-  const { data, error } = await supabase
-    .from('gpp_photos')
-    .select('*')
-    .eq('party_id', partyId)
-    .order('year', { ascending: false })
-    .order('photo_index', { ascending: true });
-  if (error || !data) return [];
-  return data;
-}

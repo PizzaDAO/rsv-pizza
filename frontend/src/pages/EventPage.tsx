@@ -1085,7 +1085,7 @@ export function EventPage() {
                 )}
 
                 {/* Last Year's Party Photos — GPP events only */}
-                {event.eventType === 'gpp' && <LastYearPhotos partyId={event.id} />}
+                {event.eventType === 'gpp' && event.customUrl && <LastYearPhotos customUrl={event.customUrl} />}
 
                 {/* Photo Gallery Section - only for confirmed guests */}
                 {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
