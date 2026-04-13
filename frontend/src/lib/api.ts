@@ -153,6 +153,8 @@ export interface UpdatePartyData {
   venueReportNotes?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -235,6 +237,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       venueReportNotes: data.venueReportNotes,
       pinnedApps: data.pinnedApps,
       region: data.region,
+      hiddenGppPhotos: data.hiddenGppPhotos,
+      extraGppPhotos: data.extraGppPhotos,
     },
   });
 }
@@ -362,6 +366,8 @@ export interface PublicEvent {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
 }
 
 // Public Event API (no auth required)

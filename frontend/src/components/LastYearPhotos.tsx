@@ -48,6 +48,7 @@ async function fetchManifest(): Promise<GppManifest | null> {
 }
 
 interface PhotoItem {
+  src: string; // Raw src path (manifest) or URL (extra) — used as identifier for hiding
   url: string;
   year: number;
   index: number;
@@ -55,10 +56,12 @@ interface PhotoItem {
 
 interface LastYearPhotosProps {
   customUrl: string;
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
 }
 
-export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+export function LastYearPhotos({ customUrl, hiddenGppPhotos = [], extraGppPhotos = [] }: LastYearPhotosProps) {
+  const [rawManifestPhotos, setRawManifestPhotos] = useState<PhotoItem[]>([]);
   const [cityName, setCityName] = useState('');
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -73,7 +76,7 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
         return;
       }
 
-      // Match city: normalize DOW name to lowercase-no-spaces, compare with customUrl
+      // Match city: normalize name to lowercase-no-spaces, compare with customUrl
       const normalizedCustomUrl = customUrl.toLowerCase().replace(/\s+/g, '');
       const city = manifest.cities.find(
         (c) => c.name.toLowerCase().replace(/\s+/g, '') === normalizedCustomUrl
@@ -84,19 +87,23 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
         return;
       }
 
-      // Use the most recent year's photos
+      // Collect ALL years' photos (sorted most recent first)
       const sortedYears = [...city.years].sort((a, b) => b.year - a.year);
-      const latestYear = sortedYears[0];
-
-      const photoItems: PhotoItem[] = latestYear.photos.map((p, i) => ({
-        url: `${GPP_BASE_URL}${p.src}`,
-        year: latestYear.year,
-        index: i + 1,
-      }));
+      const allPhotos: PhotoItem[] = [];
+      for (const yearData of sortedYears) {
+        for (let i = 0; i < yearData.photos.length; i++) {
+          allPhotos.push({
+            src: yearData.photos[i].src,
+            url: `${GPP_BASE_URL}${yearData.photos[i].src}`,
+            year: yearData.year,
+            index: i + 1,
+          });
+        }
+      }
 
       if (!cancelled) {
         setCityName(city.name);
-        setPhotos(photoItems);
+        setRawManifestPhotos(allPhotos);
         setLoading(false);
       }
     })();
@@ -105,6 +112,22 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
       cancelled = true;
     };
   }, [customUrl]);
+
+  // Filter at render time — avoids stale closure over hiddenGppPhotos
+  const hiddenSet = new Set(hiddenGppPhotos);
+
+  const manifestPhotos = rawManifestPhotos.filter((p) => !hiddenSet.has(p.src));
+
+  const extraPhotoItems: PhotoItem[] = extraGppPhotos
+    .filter((url) => !hiddenSet.has(url))
+    .map((url, i) => ({
+      src: url,
+      url,
+      year: 0,
+      index: i + 1,
+    }));
+
+  const photos = [...manifestPhotos, ...extraPhotoItems];
 
   // Lightbox navigation
   const openLightbox = useCallback((index: number) => {
@@ -163,7 +186,7 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
     <div className="space-y-4">
       {/* Header */}
       <h2 className="text-lg font-semibold text-theme-text">
-        Last Year's Party{cityName ? ` in ${cityName}` : ''}
+        Previous Years' Parties{cityName ? ` in ${cityName}` : ''}
         <span className="text-theme-text-muted font-normal text-sm ml-2">
           ({photos.length})
         </span>
@@ -173,13 +196,13 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {photos.map((photo, index) => (
           <div
-            key={`${photo.year}-${photo.index}`}
+            key={`${photo.year}-${photo.index}-${photo.url}`}
             className="group relative aspect-square rounded-xl overflow-hidden bg-theme-surface cursor-pointer"
             onClick={() => openLightbox(index)}
           >
             <img
               src={photo.url}
-              alt={`${cityName} pizza party ${photo.year} — photo ${photo.index}`}
+              alt={`${cityName} pizza party ${photo.year > 0 ? photo.year : 'previous year'} — photo ${photo.index}`}
               loading="lazy"
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -240,7 +263,7 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
             >
               <img
                 src={photos[lightboxIndex].url}
-                alt={`${cityName} pizza party ${photos[lightboxIndex].year} — photo ${photos[lightboxIndex].index}`}
+                alt={`${cityName} pizza party ${photos[lightboxIndex].year > 0 ? photos[lightboxIndex].year : 'previous year'} — photo ${photos[lightboxIndex].index}`}
                 className="max-w-full max-h-[85vh] object-contain rounded-lg"
               />
             </div>

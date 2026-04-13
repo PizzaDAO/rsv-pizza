@@ -431,6 +431,8 @@ export interface DbParty {
   event_tags?: string[];
   can_edit?: boolean;
   allowed_tabs?: string[];
+  hidden_gpp_photos?: string[];
+  extra_gpp_photos?: string[];
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -481,7 +483,8 @@ export const SAFE_PARTY_COLUMNS = `
   report_published, report_public_slug,
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
-  region
+  region,
+  hidden_gpp_photos, extra_gpp_photos
 `;
 
 /**
@@ -1316,6 +1319,8 @@ export async function updateParty(
     venue_report_notes?: string | null;
     pinned_apps?: string[];
     region?: string | null;
+    hidden_gpp_photos?: string[];
+    extra_gpp_photos?: string[];
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1368,6 +1373,8 @@ export async function updateParty(
         venueReportNotes: updates.venue_report_notes,
         pinnedApps: updates.pinned_apps,
         region: updates.region,
+        hiddenGppPhotos: updates.hidden_gpp_photos,
+        extraGppPhotos: updates.extra_gpp_photos,
       });
       return true;
     } catch (error) {
