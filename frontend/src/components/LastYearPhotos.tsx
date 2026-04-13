@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const GPP_PHOTOS_URL = 'https://app.gpp.day/api/photos.json';
 const GPP_BASE_URL = 'https://app.gpp.day';
@@ -62,7 +62,6 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
   const [cityName, setCityName] = useState('');
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,17 +105,6 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
       cancelled = true;
     };
   }, [customUrl]);
-
-  // Carousel scroll helpers
-  const scroll = useCallback((direction: 'left' | 'right') => {
-    const container = scrollRef.current;
-    if (!container) return;
-    const scrollAmount = container.clientWidth * 0.8;
-    container.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
-    });
-  }, []);
 
   // Lightbox navigation
   const openLightbox = useCallback((index: number) => {
@@ -172,71 +160,32 @@ export function LastYearPhotos({ customUrl }: LastYearPhotosProps) {
   if (loading || photos.length === 0) return null;
 
   return (
-    <div className="border-t border-theme-stroke pt-6 mt-6">
-      <div className="card p-4 sm:p-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <Camera className="w-5 h-5 text-[#ff393a]" />
-          <h2 className="text-lg font-semibold text-theme-text">
-            Last Year's Party{cityName ? ` in ${cityName}` : ''}
-          </h2>
-        </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <h2 className="text-lg font-semibold text-theme-text">
+        Last Year's Party{cityName ? ` in ${cityName}` : ''}
+        <span className="text-theme-text-muted font-normal text-sm ml-2">
+          ({photos.length})
+        </span>
+      </h2>
 
-        {/* Carousel */}
-        <div className="relative group">
-          {/* Left arrow — hidden on mobile */}
-          <button
-            onClick={() => scroll('left')}
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
-            aria-label="Scroll left"
-          >
-            <ChevronLeft size={24} />
-          </button>
-
-          {/* Right arrow — hidden on mobile */}
-          <button
-            onClick={() => scroll('right')}
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
-            aria-label="Scroll right"
-          >
-            <ChevronRight size={24} />
-          </button>
-
-          {/* Scrollable container */}
+      {/* Photo Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {photos.map((photo, index) => (
           <div
-            ref={scrollRef}
-            className="dow-carousel flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch',
-            }}
+            key={`${photo.year}-${photo.index}`}
+            className="group relative aspect-square rounded-xl overflow-hidden bg-theme-surface cursor-pointer"
+            onClick={() => openLightbox(index)}
           >
-            <style>{`
-              .dow-carousel::-webkit-scrollbar { display: none; }
-            `}</style>
-            {photos.map((photo, index) => (
-              <button
-                key={`${photo.year}-${photo.index}`}
-                onClick={() => openLightbox(index)}
-                className="flex-shrink-0 snap-start rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#ff393a] focus:ring-offset-2 focus:ring-offset-transparent"
-                style={{ width: 'min(280px, 75vw)', height: '200px' }}
-              >
-                <img
-                  src={photo.url}
-                  alt={`${cityName} pizza party ${photo.year} — photo ${photo.index}`}
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                />
-              </button>
-            ))}
+            <img
+              src={photo.url}
+              alt={`${cityName} pizza party ${photo.year} — photo ${photo.index}`}
+              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
           </div>
-
-          {/* Photo count */}
-          <p className="text-theme-text-muted text-xs mt-2 text-center">
-            {photos.length} photo{photos.length !== 1 ? 's' : ''} from {photos[0]?.year}
-          </p>
-        </div>
+        ))}
       </div>
 
       {/* Lightbox Modal */}
