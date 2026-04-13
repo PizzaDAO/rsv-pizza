@@ -765,11 +765,11 @@ export function FlyerGenerator() {
                   }}
                 />
               ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, position: 'relative', paddingRight: 50 }}>
                   {city.toUpperCase()}
                   <Pencil
                     size={44}
-                    style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                    style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
                     onClick={(e) => { e.stopPropagation(); setEditingField('city'); }}
                   />
                 </span>
@@ -825,11 +825,11 @@ export function FlyerGenerator() {
                     }}
                   />
                 ) : (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative', paddingRight: 40 }}>
                     {venueName.toUpperCase()}
                     <Pencil
                       size={36}
-                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('venue'); }}
                     />
                   </span>
@@ -861,11 +861,11 @@ export function FlyerGenerator() {
                     }}
                   />
                 ) : (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative', paddingRight: 40 }}>
                     {(streetAddress || 'STREET ADDRESS').toUpperCase()}
                     <Pencil
                       size={36}
-                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0 }}
+                      style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
                       onClick={(e) => { e.stopPropagation(); setEditingField('street'); }}
                     />
                   </span>
