@@ -96,17 +96,11 @@ export function ParticipatingPizzerias({
   };
 
   return (
-    <div className="border-t border-theme-stroke pt-6 mt-6">
-      <div className="card p-4 sm:p-6">
-        {/* Header — matches MusicWidget header style */}
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-lg font-semibold text-theme-text">{sectionLabel}</h2>
-        </div>
+    <div className="border-t border-theme-stroke pt-6 mt-6 space-y-4">
+      <h2 className="text-lg font-semibold text-theme-text">{sectionLabel}</h2>
 
-        <div>
-
-          <div className="space-y-3">
-            {pizzerias.map((pizzeria) => {
+      <div className="space-y-3">
+        {pizzerias.map((pizzeria) => {
               const hasCoords =
                 pizzeria.location && pizzeria.location.lat !== 0 && pizzeria.location.lng !== 0;
               const showDistance = venueLocation && hasCoords;
@@ -170,8 +164,6 @@ export function ParticipatingPizzerias({
                 </div>
               );
             })}
-          </div>
-        </div>
       </div>
     </div>
   );
