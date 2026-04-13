@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
-import { updateHostStatus, updateHostTags } from '../../lib/api';
+import { IconInput } from '../IconInput';
+import { updateHostStatus, updateHostTags, updateUnderbossNotes } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface EventRowProps {
@@ -232,6 +233,39 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   // Local state for optimistic updates
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveNotes = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    const newValue = trimmed || null;
+    setNotesSaving(true);
+    onEventUpdate?.(event.id, { underbossNotes: newValue });
+    try {
+      await updateUnderbossNotes(event.id, newValue);
+    } catch {
+      // Revert on error
+      setNotesValue(event.underbossNotes || '');
+      onEventUpdate?.(event.id, { underbossNotes: event.underbossNotes });
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [event.id, event.underbossNotes, onEventUpdate]);
+
+  const handleNotesChange = useCallback((value: string) => {
+    setNotesValue(value);
+    // Debounce auto-save
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => saveNotes(value), 1000);
+  }, [saveNotes]);
+
+  const handleNotesBlur = useCallback(() => {
+    // Save immediately on blur
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveNotes(notesValue);
+  }, [notesValue, saveNotes]);
 
   const eventUrl = event.customUrl
     ? `https://rsv.pizza/${event.customUrl}`
@@ -239,6 +273,8 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
 
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
+
+  const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
   return (
     <tr className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
@@ -276,6 +312,17 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                   <ExternalLink size={12} />
                 </a>
               )}
+              <button
+                onClick={() => setNotesOpen(!notesOpen)}
+                className={`transition-colors shrink-0 ${
+                  hasNotes
+                    ? 'text-amber-400 hover:text-amber-300'
+                    : 'text-theme-text-faint hover:text-theme-text-secondary'
+                }`}
+                title={hasNotes ? 'Edit notes' : 'Add notes'}
+              >
+                <StickyNote size={12} />
+              </button>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5" title={fullDate}>
               <Calendar size={10} className="text-theme-text-faint" />
@@ -283,6 +330,35 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 {relTime.text}
               </span>
             </div>
+            {/* Inline notes editor */}
+            {notesOpen && (
+              <div className="mt-1.5">
+                <IconInput
+                  icon={StickyNote}
+                  iconSize={12}
+                  placeholder="Underboss notes..."
+                  value={notesValue}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
+                  onBlur={handleNotesBlur}
+                  multiline
+                  rows={2}
+                  className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
+                />
+                {notesSaving && (
+                  <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+                )}
+              </div>
+            )}
+            {/* Show notes preview when collapsed */}
+            {!notesOpen && hasNotes && (
+              <button
+                onClick={() => setNotesOpen(true)}
+                className="text-[11px] text-amber-400/70 truncate max-w-[180px] mt-0.5 text-left hover:text-amber-400 transition-colors block"
+                title={notesValue}
+              >
+                {notesValue}
+              </button>
+            )}
           </div>
         </div>
       </td>

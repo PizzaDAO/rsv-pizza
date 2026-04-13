@@ -203,6 +203,7 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     underbossApproved: party.underbossApproved || false,
     hostTags: party.hostTags || [],
     eventTags: party.eventTags || [],
+    underbossNotes: party.underbossNotes || null,
     createdAt: party.createdAt,
   };
 }
@@ -752,6 +753,28 @@ router.patch('/event/:partyId/tags', requireAuth, requireUnderbossAuth, async (r
       where: { id: partyId },
       data: { hostTags: cleanTags },
       select: { id: true, hostTags: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/notes - Set underboss notes
+router.patch('/event/:partyId/notes', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { notes } = req.body;
+
+    if (notes !== null && typeof notes !== 'string') {
+      throw new AppError('notes must be a string or null', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { underbossNotes: notes || null },
+      select: { id: true, underbossNotes: true },
     });
 
     res.json({ party });
