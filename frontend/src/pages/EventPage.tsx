@@ -30,6 +30,7 @@ import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
+import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 
 export function EventPage() {
@@ -1082,6 +1083,9 @@ export function EventPage() {
                     eventSlug={slug}
                   />
                 )}
+
+                {/* Last Year's Party Photos — GPP events only */}
+                {event.eventType === 'gpp' && event.customUrl && <LastYearPhotos customUrl={event.customUrl} />}
 
                 {/* Photo Gallery Section - only for confirmed guests */}
                 {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
