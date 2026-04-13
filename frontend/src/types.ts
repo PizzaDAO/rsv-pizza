@@ -327,6 +327,7 @@ export interface Pizzeria {
     lat: number;
     lng: number;
   };
+  description?: string;
   photos?: string[];
   orderingOptions: OrderingOption[];
 }

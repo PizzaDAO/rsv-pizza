@@ -36,7 +36,7 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber,places.websiteUri'
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.nationalPhoneNumber,places.websiteUri,places.editorialSummary'
     },
     body: JSON.stringify(requestBody)
   });
@@ -81,6 +81,7 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
         lat: place.location.latitude,
         lng: place.location.longitude,
       },
+      description: place.editorialSummary?.text || undefined,
       orderingOptions: [], // Will be populated by checkOrderingOptions
     };
   });
