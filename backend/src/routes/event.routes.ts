@@ -110,6 +110,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           nftChain: true,
           photosEnabled: true,
           photosPublic: true,
+          hiddenGppPhotos: true,
+          extraGppPhotos: true,
           password: true,
           userId: true,
           user: {
