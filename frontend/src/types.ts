@@ -1053,6 +1053,9 @@ export interface ShippingKit {
   region: string | null;
   hostName: string | null;
   hostEmail: string | null;
+  eventAddress: string | null;
+  eventVenue: string | null;
+  underbossApproved: boolean;
   requestedTier: KitTier;
   allocatedTier: KitTier | null;
   recipientName: string;

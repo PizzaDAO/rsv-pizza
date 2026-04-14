@@ -69,10 +69,16 @@ export function KitRow({
 
       {/* Event */}
       <td className="px-3 py-3">
-        <div className="text-sm font-medium text-theme-text truncate max-w-[180px]" title={kit.partyName}>
-          {kit.partyName}
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${kit.underbossApproved ? 'bg-green-500' : 'bg-yellow-500'}`}
+            title={kit.underbossApproved ? 'Event Approved' : 'Pending Approval'}
+          />
+          <span className="text-sm font-medium text-theme-text truncate max-w-[168px]" title={kit.partyName}>
+            {kit.partyName}
+          </span>
         </div>
-        <div className="text-xs text-theme-text-muted">{eventDate}</div>
+        <div className="text-xs text-theme-text-muted ml-3.5">{eventDate}</div>
       </td>
 
       {/* Region */}

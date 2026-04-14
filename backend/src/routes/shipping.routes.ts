@@ -180,6 +180,9 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
             name: true,
             region: true,
             date: true,
+            address: true,
+            venueName: true,
+            underbossApproved: true,
             user: { select: { name: true, email: true } },
           },
         },
@@ -200,7 +203,7 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
     }
 
     // Build CSV
-    const headers = ['Event Name', 'Region', 'Host Name', 'Host Email', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes'];
+    const headers = ['Event Name', 'Region', 'Host Name', 'Host Email', 'Event Venue', 'Event Address', 'Event Approved', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes'];
     const csvRows = [headers.join(',')];
 
     for (const kit of filtered) {
@@ -209,6 +212,9 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
         escapeCSV(kit.party.region || ''),
         escapeCSV(kit.party.user?.name || ''),
         escapeCSV(kit.party.user?.email || ''),
+        escapeCSV(kit.party.venueName || ''),
+        escapeCSV(kit.party.address || ''),
+        escapeCSV(kit.party.underbossApproved ? 'Yes' : 'No'),
         escapeCSV(kit.recipientName),
         escapeCSV(kit.addressLine1),
         escapeCSV(kit.addressLine2 || ''),
@@ -337,6 +343,9 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
             name: true,
             region: true,
             date: true,
+            address: true,
+            venueName: true,
+            underbossApproved: true,
             user: { select: { name: true, email: true } },
           },
         },
@@ -366,6 +375,9 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
       region: kit.party.region || null,
       hostName: kit.party.user?.name || null,
       hostEmail: kit.party.user?.email || null,
+      eventAddress: kit.party.address || null,
+      eventVenue: kit.party.venueName || null,
+      underbossApproved: kit.party.underbossApproved || false,
       requestedTier: kit.requestedTier,
       allocatedTier: kit.allocatedTier,
       recipientName: kit.recipientName,
@@ -412,6 +424,7 @@ router.get('/kits/:kitId', requireAuth, requireShippingAuth, async (req: Shippin
             date: true,
             address: true,
             venueName: true,
+            underbossApproved: true,
             user: { select: { name: true, email: true } },
           },
         },
@@ -433,6 +446,7 @@ router.get('/kits/:kitId', requireAuth, requireShippingAuth, async (req: Shippin
         hostEmail: kit.party.user?.email || null,
         eventAddress: kit.party.address || null,
         eventVenue: kit.party.venueName || null,
+        underbossApproved: kit.party.underbossApproved || false,
         requestedTier: kit.requestedTier,
         allocatedTier: kit.allocatedTier,
         recipientName: kit.recipientName,
@@ -515,6 +529,9 @@ router.patch('/kits/:kitId', requireAuth, requireShippingAuth, async (req: Shipp
             name: true,
             region: true,
             date: true,
+            address: true,
+            venueName: true,
+            underbossApproved: true,
             user: { select: { name: true, email: true } },
           },
         },
@@ -530,6 +547,9 @@ router.patch('/kits/:kitId', requireAuth, requireShippingAuth, async (req: Shipp
         region: updatedKit.party.region || null,
         hostName: updatedKit.party.user?.name || null,
         hostEmail: updatedKit.party.user?.email || null,
+        eventAddress: updatedKit.party.address || null,
+        eventVenue: updatedKit.party.venueName || null,
+        underbossApproved: updatedKit.party.underbossApproved || false,
         requestedTier: updatedKit.requestedTier,
         allocatedTier: updatedKit.allocatedTier,
         recipientName: updatedKit.recipientName,
