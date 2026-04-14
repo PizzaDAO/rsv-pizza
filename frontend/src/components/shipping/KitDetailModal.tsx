@@ -101,7 +101,27 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
               <p className="text-sm text-theme-text">{kit.hostName || '--'}</p>
               {kit.hostEmail && <p className="text-xs text-theme-text-faint">{kit.hostEmail}</p>}
             </div>
+            <div>
+              <p className="text-xs text-theme-text-muted mb-1">Event Approved</p>
+              <p className={`text-sm font-medium ${kit.underbossApproved ? 'text-green-500' : 'text-yellow-500'}`}>
+                {kit.underbossApproved ? 'Yes' : 'Pending'}
+              </p>
+            </div>
           </div>
+
+          {/* Event Location */}
+          {(kit.eventVenue || kit.eventAddress) && (
+            <div className="bg-theme-surface rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin size={16} className="text-theme-text-muted" />
+                <p className="text-sm font-medium text-theme-text">Event Location</p>
+              </div>
+              <div className="text-sm text-theme-text space-y-0.5">
+                {kit.eventVenue && <p className="font-medium">{kit.eventVenue}</p>}
+                {kit.eventAddress && <p className="text-theme-text-muted">{kit.eventAddress}</p>}
+              </div>
+            </div>
+          )}
 
           {/* Shipping address */}
           <div className="bg-theme-surface rounded-xl p-4">
