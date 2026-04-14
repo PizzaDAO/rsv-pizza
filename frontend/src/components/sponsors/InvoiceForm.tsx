@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Plus, Trash2, FileText, Send, Save, DollarSign, Building2,
   User, Mail, MapPin, Calendar, Loader2, AlertCircle
@@ -209,7 +210,7 @@ export function InvoiceForm({ sponsor, partyId, existingInvoice, onClose, onSave
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto py-8">
       <div ref={modalRef} className="bg-theme-header border border-theme-stroke rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
         {/* Header */}
@@ -412,6 +413,7 @@ export function InvoiceForm({ sponsor, partyId, existingInvoice, onClose, onSave
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
