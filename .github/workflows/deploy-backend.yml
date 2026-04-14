@@ -25,14 +25,6 @@ jobs:
       - name: Install Vercel CLI
         run: npm i -g vercel
 
-      - name: Pull Vercel Environment
+      - name: Deploy to Production
         working-directory: backend
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} --scope=pizza-dao
-
-      - name: Build
-        working-directory: backend
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy
-        working-directory: backend
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --scope=pizza-dao
+        run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --scope=pizza-dao
