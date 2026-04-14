@@ -76,7 +76,6 @@ export function ShippingDashboard() {
       if (countryFilter) filters.country = countryFilter;
       if (searchTerm) filters.search = searchTerm;
       if (selectedRegion) filters.region = selectedRegion;
-      filters.sort = `${sortField}${sortDir === 'desc' ? '_desc' : ''}`;
 
       const [kitsResult, statsResult] = await Promise.all([
         fetchShippingKits(filters),
@@ -88,7 +87,7 @@ export function ShippingDashboard() {
     } catch (err: any) {
       console.error('Failed to load shipping data:', err);
     }
-  }, [statusFilter, countryFilter, searchTerm, selectedRegion, sortField, sortDir]);
+  }, [statusFilter, countryFilter, searchTerm, selectedRegion]);
 
   // Initial access check
   useEffect(() => {
@@ -145,6 +144,19 @@ export function ShippingDashboard() {
       setSortDir('asc');
     }
   };
+
+  // Client-side sort
+  const sortedKits = useMemo(() => {
+    const sorted = [...kits];
+    sorted.sort((a, b) => {
+      const aVal = (a as any)[sortField] ?? '';
+      const bVal = (b as any)[sortField] ?? '';
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [kits, sortField, sortDir]);
 
   // Handle single kit status change
   const handleStatusChange = async (kitId: string, status: string) => {
@@ -421,7 +433,7 @@ export function ShippingDashboard() {
               Kit Requests ({kits.length})
             </h2>
             <KitTable
-              kits={kits}
+              kits={sortedKits}
               onStatusChange={handleStatusChange}
               onTierChange={handleTierChange}
               onTrackingChange={handleTrackingChange}
