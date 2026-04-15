@@ -9,6 +9,7 @@ import { DonationStep } from './DonationStep';
 import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/useRSVPForm';
 import { RSVPFormStep1 } from './RSVPFormStep1';
 import { RSVPFormStep2 } from './RSVPFormStep2';
+import { ShareRSVP } from './ShareRSVP';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 import { useAccount } from 'wagmi';
@@ -261,6 +262,15 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <p className="text-theme-text-secondary mb-4">
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
+          )}
+          {/* Share Section */}
+          {(!form.alreadyRegistered || form.wasUpdated) && !form.pendingApproval && (
+            <ShareRSVP
+              eventName={event.name}
+              eventImageUrl={event.eventImageUrl}
+              customUrl={event.customUrl}
+              inviteCode={event.inviteCode}
+            />
           )}
           {/* NFT Minting Status */}
           {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && (
