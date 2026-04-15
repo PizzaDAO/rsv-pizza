@@ -708,6 +708,7 @@ export interface CreateSponsorData {
   logoUrl?: string;
   notes?: string;
   lastContactedAt?: string | null;
+  category?: string;
 }
 
 export interface UpdateSponsorData extends Partial<CreateSponsorData> {}

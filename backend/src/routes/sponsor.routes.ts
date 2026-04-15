@@ -141,6 +141,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       notes,
       lastContactedAt,
       sponsorMessage,
+      category,
     } = req.body;
 
     // Validate required fields
@@ -172,6 +173,12 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // Validate category if provided
+    const validCategories = ['hardware_wallet', 'software_wallet', 'cex', 'blockchain', 'dex', 'community', 'custom'];
+    if (category && !validCategories.includes(category)) {
+      throw new AppError(`Invalid category. Must be one of: ${validCategories.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
     const sponsor = await prisma.sponsor.create({
       data: {
         partyId,
@@ -194,6 +201,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
         notes: notes?.trim() || null,
         lastContactedAt: lastContactedAt ? new Date(lastContactedAt) : null,
         sponsorMessage: sponsorMessage?.trim() || null,
+        category: category?.trim() || null,
       },
     });
 
@@ -258,6 +266,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       notes,
       lastContactedAt,
       sponsorMessage,
+      category,
     } = req.body;
 
     // Verify ownership or super admin
@@ -293,6 +302,12 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // Validate category if provided
+    const validCategories = ['hardware_wallet', 'software_wallet', 'cex', 'blockchain', 'dex', 'community', 'custom'];
+    if (category && !validCategories.includes(category)) {
+      throw new AppError(`Invalid category. Must be one of: ${validCategories.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
     const sponsor = await prisma.sponsor.update({
       where: { id: sponsorId },
       data: {
@@ -315,6 +330,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
         ...(notes !== undefined && { notes: notes?.trim() || null }),
         ...(lastContactedAt !== undefined && { lastContactedAt: lastContactedAt ? new Date(lastContactedAt) : null }),
         ...(sponsorMessage !== undefined && { sponsorMessage: sponsorMessage?.trim() || null }),
+        ...(category !== undefined && { category: category?.trim() || null }),
       },
     });
 
