@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
@@ -96,6 +96,20 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showTagSubmenu, setShowTagSubmenu] = useState<'add' | 'remove' | null>(null);
   const [customTag, setCustomTag] = useState('');
+  const [showCopyCitiesModal, setShowCopyCitiesModal] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+
+  // Alphabetized city names from the currently-selected events.
+  // Reuses the same extraction logic as the Send Telegram action: strip
+  // the "Global Pizza Party " prefix from event names, fall back to the
+  // customUrl slug, then the raw name.
+  const selectedCitiesSorted = useMemo(() => {
+    const prefix = 'Global Pizza Party ';
+    return events
+      .filter(e => selectedIds.has(e.id))
+      .map(e => e.name.startsWith(prefix) ? e.name.slice(prefix.length) : (e.customUrl || e.name))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [events, selectedIds]);
 
   // Three-state progress filters: includes (must have) and excludes (must NOT have)
   const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
@@ -357,6 +371,15 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   >
                     Send Telegram
                   </button>
+                  <button
+                    onClick={() => {
+                      setShowActionDropdown(false);
+                      setShowCopyCitiesModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                  >
+                    Copy Cities
+                  </button>
 
                   {/* Divider */}
                   <div className="border-t border-theme-stroke my-1" />
@@ -525,6 +548,84 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                 className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
               >
                 Delete {selectedIds.size} Event{selectedIds.size > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Copy Cities modal */}
+      {showCopyCitiesModal && createPortal(
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowCopyCitiesModal(false)}
+        >
+          <div
+            className="bg-theme-header border border-theme-stroke rounded-2xl p-5 max-w-md w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-theme-text">
+                Copy Cities ({selectedCitiesSorted.length} selected)
+              </h3>
+              <button
+                onClick={() => setShowCopyCitiesModal(false)}
+                className="text-theme-text-faint hover:text-theme-text transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <textarea
+              readOnly
+              value={selectedCitiesSorted.join('\n')}
+              onFocus={e => e.currentTarget.select()}
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text font-mono resize-none focus:outline-none focus:border-theme-stroke-hover"
+              style={{ maxHeight: '40vh', minHeight: '8rem', height: `${Math.min(Math.max(selectedCitiesSorted.length, 4), 16) * 1.5}rem`, overflowY: 'auto' }}
+            />
+
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowCopyCitiesModal(false)}
+                className="px-4 py-2 text-sm text-theme-text-muted hover:text-theme-text transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(selectedCitiesSorted.join('\n'));
+                    setCopiedToClipboard(true);
+                    setTimeout(() => setCopiedToClipboard(false), 2000);
+                  } catch (err) {
+                    console.error('Copy to clipboard failed', err);
+                  }
+                }}
+                disabled={selectedCitiesSorted.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: copiedToClipboard ? '#39d98a' : '#ff393a',
+                }}
+                onMouseEnter={e => {
+                  if (!copiedToClipboard && selectedCitiesSorted.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#ff5a5b';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!copiedToClipboard) {
+                    e.currentTarget.style.backgroundColor = '#ff393a';
+                  }
+                }}
+              >
+                {copiedToClipboard ? (
+                  <>
+                    <Check size={14} /> Copied!
+                  </>
+                ) : (
+                  'Copy to Clipboard'
+                )}
               </button>
             </div>
           </div>
