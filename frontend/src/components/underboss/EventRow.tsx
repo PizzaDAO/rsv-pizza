@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, updateHostTags, updateUnderbossNotes } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface EventRowProps {
@@ -124,15 +124,19 @@ function HostStatusBadge({
   );
 }
 
-// Host tags pills with inline editor
+// Event tags pills with inline editor.
+// Writes to `parties.event_tags` via `bulkUpdateEventTags` so partner co-host /
+// sponsor sync runs (matches the bulk action menu's behavior).
 function HostTagsPills({
   tags,
   eventId,
   onUpdate,
+  partnerTags = [],
 }: {
   tags: string[];
   eventId: string;
   onUpdate: (tags: string[]) => void;
+  partnerTags?: string[];
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
@@ -147,7 +151,7 @@ function HostTagsPills({
     setNewTag('');
     setIsAdding(false);
     try {
-      await updateHostTags(eventId, newTags);
+      await bulkUpdateEventTags([eventId], [cleaned], 'add');
     } catch {
       onUpdate(tags);
     }
@@ -157,15 +161,17 @@ function HostTagsPills({
     const newTags = tags.filter((t) => t !== tag);
     onUpdate(newTags);
     try {
-      await updateHostTags(eventId, newTags);
+      await bulkUpdateEventTags([eventId], [tag], 'remove');
     } catch {
       onUpdate(tags);
     }
   }
 
-  const tagColors: Record<string, string> = {
-    swc: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  };
+  function colorForTag(tag: string): string {
+    if (tag === 'swc') return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    if (tag === 'global pizza party') return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+    return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1 mt-0.5">
@@ -173,11 +179,12 @@ function HostTagsPills({
         <button
           key={tag}
           onClick={() => removeTag(tag)}
-          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors hover:opacity-70 ${
-            tagColors[tag] || 'bg-theme-surface text-theme-text-muted border-theme-stroke'
-          }`}
+          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors hover:opacity-70 inline-flex items-center gap-0.5 ${colorForTag(tag)}`}
           title={`Click to remove "${tag}"`}
         >
+          {partnerTags.includes(tag) && (
+            <Handshake size={9} className="shrink-0" />
+          )}
           {tag}
         </button>
       ))}
@@ -232,7 +239,7 @@ function HostTagsPills({
 export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
   // Local state for optimistic updates
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
-  const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
+  const [eventTags, setEventTags] = useState<string[]>(event.eventTags || []);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -389,35 +396,14 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
           <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
         )}
         <HostTagsPills
-          tags={hostTags}
+          tags={eventTags}
           eventId={event.id}
+          partnerTags={partnerTags}
           onUpdate={(tags) => {
-            setHostTags(tags);
-            onEventUpdate?.(event.id, { hostTags: tags });
+            setEventTags(tags);
+            onEventUpdate?.(event.id, { eventTags: tags });
           }}
         />
-        {/* Event tags (read-only) */}
-        {(event.eventTags || []).length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mt-0.5">
-            {event.eventTags.map((tag) => (
-              <span
-                key={tag}
-                className={`text-[10px] px-1.5 py-0.5 rounded-md border inline-flex items-center gap-0.5 ${
-                  tag === 'swc'
-                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                    : tag === 'global pizza party'
-                      ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-                      : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                }`}
-              >
-                {partnerTags.includes(tag) && (
-                  <Handshake size={9} className="shrink-0" />
-                )}
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
       </td>
 
       {/* Location */}
