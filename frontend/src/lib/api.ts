@@ -287,6 +287,28 @@ export async function promoteGuestApi(partyId: string, guestId: string) {
   });
 }
 
+// Bulk CSV invites (Promo app → POST /api/v1/parties/:partyId/guests/bulk-invite)
+export interface BulkInviteResult {
+  sent: string[];
+  failed: Array<{ email: string; reason: string }>;
+  skipped: Array<{ email: string; reason: string }>;
+  createdGuestIds: string[];
+}
+
+export async function bulkInviteGuests(
+  partyId: string,
+  guests: Array<{ name: string; email: string }>,
+  customMessage?: string
+): Promise<BulkInviteResult> {
+  return apiRequest<BulkInviteResult>(
+    `/api/v1/parties/${partyId}/guests/bulk-invite`,
+    {
+      method: 'POST',
+      body: { guests, customMessage },
+    }
+  );
+}
+
 // Public RSVP API (no auth required)
 export async function submitRsvpApi(
   inviteCode: string,
