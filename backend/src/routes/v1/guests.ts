@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database.js';
 import { requireApiKey, ApiKeyRequest, SCOPES } from '../../middleware/apiKey.js';
+import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 
@@ -15,6 +16,82 @@ async function verifyPartyOwnership(partyId: string, userId: string) {
     throw new AppError('Party not found', 404, 'NOT_FOUND');
   }
   return party;
+}
+
+// Build the invite email subject + HTML for a given party + guest. Optionally
+// inject a custom host message above the CTA button. Shared by the single
+// `/send-invite` and bulk `/bulk-invite` endpoints.
+export function buildInviteEmail(
+  party: {
+    name: string;
+    date: Date | null;
+    address: string | null;
+    inviteCode: string;
+    customUrl: string | null;
+    timezone: string | null;
+  },
+  guest: { name: string; email: string },
+  customMessage?: string
+): { subject: string; html: string } {
+  const baseUrl = 'https://rsv.pizza';
+  const eventUrl = party.customUrl
+    ? `${baseUrl}/${party.customUrl}`
+    : `${baseUrl}/${party.inviteCode}`;
+
+  const dateText = party.date
+    ? new Date(party.date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'Date TBD';
+
+  // Escape user-provided content to avoid HTML injection
+  const escape = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const customMessageBlock = customMessage && customMessage.trim().length > 0
+    ? `
+          <div style="background: #fff; border-left: 4px solid #ff393a; padding: 16px 20px; border-radius: 6px; margin: 20px 0; white-space: pre-wrap;">
+            <p style="margin: 0; color: #333; font-size: 15px;">${escape(customMessage.trim()).replace(/\n/g, '<br>')}</p>
+          </div>`
+    : '';
+
+  const subject = `You're invited to ${party.name}!`;
+
+  const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>You're invited!</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #ffffff; font-size: 32px; margin: 0;">You're Invited!</h1>
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="color: #1a1a2e; margin-top: 0;">${escape(party.name)}</h2>
+            <p><strong>When:</strong> ${escape(dateText)}</p>
+            <p><strong>Where:</strong> ${escape(party.address || 'Location TBD')}</p>
+          </div>
+          ${customMessageBlock}
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">RSVP Now</a>
+          </div>
+        </body>
+      </html>
+    `;
+
+  return { subject, html };
 }
 
 /**
@@ -483,44 +560,17 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
       throw new AppError('Email service not configured', 500, 'CONFIG_ERROR');
     }
 
-    const baseUrl = 'https://rsv.pizza';
-    const eventUrl = party.customUrl
-      ? `${baseUrl}/${party.customUrl}`
-      : `${baseUrl}/${party.inviteCode}`;
-
-    const dateText = party.date
-      ? new Date(party.date).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        })
-      : 'Date TBD';
-
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>You're invited!</title>
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #ffffff; font-size: 32px; margin: 0;">You're Invited!</h1>
-          </div>
-          <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
-            <h2 style="color: #1a1a2e; margin-top: 0;">${party.name}</h2>
-            <p><strong>When:</strong> ${dateText}</p>
-            <p><strong>Where:</strong> ${party.address || 'Location TBD'}</p>
-          </div>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">RSVP Now</a>
-          </div>
-        </body>
-      </html>
-    `;
+    const { subject, html } = buildInviteEmail(
+      {
+        name: party.name,
+        date: party.date,
+        address: party.address,
+        inviteCode: party.inviteCode,
+        customUrl: party.customUrl,
+        timezone: party.timezone,
+      },
+      { name: guest.name, email: guest.email }
+    );
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -531,8 +581,8 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
       body: JSON.stringify({
         from: 'RSV.Pizza <noreply@rsv.pizza>',
         to: [guest.email],
-        subject: `You're invited to ${party.name}!`,
-        html: emailHtml,
+        subject,
+        html,
       }),
     });
 
@@ -542,6 +592,176 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
     }
 
     res.json({ success: true, message: 'Invite sent' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/parties/:partyId/guests/bulk-invite
+ *
+ * User-authenticated (Bearer token) bulk invite endpoint used by the Promo
+ * app in the host dashboard. Creates a `Guest` row per entry with status
+ * PENDING / submittedVia 'invite' and sends an invite email via Resend.
+ *
+ * Body: { guests: Array<{name, email}>, customMessage?: string }
+ * Response: { sent, failed, skipped, createdGuestIds }
+ */
+router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
+    // Verify party ownership (user must own the party to bulk-invite)
+    const party = await prisma.party.findFirst({
+      where: { id: partyId, userId },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const { guests, customMessage } = req.body as {
+      guests?: Array<{ name?: string; email?: string }>;
+      customMessage?: string;
+    };
+
+    if (!Array.isArray(guests) || guests.length === 0) {
+      throw new AppError('guests must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (guests.length > 500) {
+      throw new AppError('Max 500 guests per request', 400, 'VALIDATION_ERROR');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const results = {
+      sent: [] as string[],
+      failed: [] as Array<{ email: string; reason: string }>,
+      skipped: [] as Array<{ email: string; reason: string }>,
+      createdGuestIds: [] as string[],
+    };
+
+    // Prefetch existing guest emails for this party (case-insensitive compare)
+    const existing = await prisma.guest.findMany({
+      where: { partyId },
+      select: { email: true },
+    });
+    const existingEmails = new Set(
+      existing
+        .map((g) => (g.email ? g.email.toLowerCase() : null))
+        .filter((e): e is string => !!e)
+    );
+
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    // Process in batches of 10 with a 500ms delay between batches.
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < guests.length; i += BATCH_SIZE) {
+      const batch = guests.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(
+        batch.map(async (g) => {
+          const rawEmail = (g.email || '').trim();
+          const normalizedEmail = rawEmail.toLowerCase();
+          const displayEmail = rawEmail || '(no email)';
+
+          if (!rawEmail || !emailRegex.test(rawEmail)) {
+            results.failed.push({ email: displayEmail, reason: 'invalid email' });
+            return;
+          }
+
+          if (existingEmails.has(normalizedEmail)) {
+            results.skipped.push({ email: displayEmail, reason: 'already invited' });
+            return;
+          }
+          // Reserve this email so duplicates within the same batch are also skipped
+          existingEmails.add(normalizedEmail);
+
+          const name = (g.name || '').trim() || normalizedEmail.split('@')[0];
+
+          let newGuest;
+          try {
+            newGuest = await prisma.guest.create({
+              data: {
+                partyId,
+                name,
+                email: normalizedEmail,
+                status: 'PENDING',
+                submittedVia: 'invite',
+                approved: null,
+                roles: [],
+              },
+            });
+            results.createdGuestIds.push(newGuest.id);
+          } catch (err: any) {
+            results.failed.push({
+              email: displayEmail,
+              reason: err?.message || 'failed to create guest',
+            });
+            return;
+          }
+
+          // Send invite email (if Resend configured). If email fails, keep the
+          // guest row but report the failure so the host knows to retry.
+          if (resendApiKey) {
+            try {
+              const { subject, html } = buildInviteEmail(
+                {
+                  name: party.name,
+                  date: party.date,
+                  address: party.address,
+                  inviteCode: party.inviteCode,
+                  customUrl: party.customUrl,
+                  timezone: party.timezone,
+                },
+                { name, email: normalizedEmail },
+                customMessage
+              );
+
+              const resp = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${resendApiKey}`,
+                },
+                body: JSON.stringify({
+                  from: 'RSV.Pizza <noreply@rsv.pizza>',
+                  to: [normalizedEmail],
+                  subject,
+                  html,
+                }),
+              });
+
+              if (!resp.ok) {
+                const body = await resp.text().catch(() => '');
+                results.failed.push({
+                  email: displayEmail,
+                  reason: `resend ${resp.status}${body ? ': ' + body.slice(0, 120) : ''}`,
+                });
+                return;
+              }
+            } catch (err: any) {
+              results.failed.push({
+                email: displayEmail,
+                reason: err?.message || 'email send error',
+              });
+              return;
+            }
+          }
+
+          results.sent.push(displayEmail);
+        })
+      );
+
+      if (i + BATCH_SIZE < guests.length) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    res.json(results);
   } catch (error) {
     next(error);
   }

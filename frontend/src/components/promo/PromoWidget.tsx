@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Share2, Globe, Mail } from 'lucide-react';
+import { Share2, Globe, Mail, UserPlus } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { SocialComposer } from './SocialComposer';
 import { PlatformPublisher } from './PlatformPublisher';
 import { EmailOutreach } from './EmailOutreach';
+import { BulkInvite } from './BulkInvite';
 
-type PromoSection = 'social' | 'publish' | 'email';
+type PromoSection = 'social' | 'publish' | 'email' | 'invite';
 
 interface SectionConfig {
   id: PromoSection;
@@ -32,6 +33,12 @@ const SECTIONS: SectionConfig[] = [
     label: 'Email Guests',
     description: 'Send updates to your guest list',
     icon: Mail,
+  },
+  {
+    id: 'invite',
+    label: 'Invite Guests',
+    description: 'Upload a CSV to send bulk invites',
+    icon: UserPlus,
   },
 ];
 
@@ -90,6 +97,7 @@ export const PromoWidget: React.FC = () => {
                 {section.id === 'social' && <SocialComposer party={party} />}
                 {section.id === 'publish' && <PlatformPublisher party={party} />}
                 {section.id === 'email' && <EmailOutreach party={party} guests={guests} />}
+                {section.id === 'invite' && <BulkInvite party={party} />}
               </div>
             )}
           </div>
