@@ -409,18 +409,18 @@ export function PreviousYearPhotos() {
 
               {/* Year badge */}
               {photo.year > 0 && (
-                <span className="absolute top-2 left-2 text-[10px] font-medium bg-black/60 text-white/80 px-2 py-0.5 rounded-full">
+                <span className="absolute top-2 left-2 text-[10px] font-semibold bg-black/80 text-white px-2 py-0.5 rounded-full">
                   {photo.year}
                 </span>
               )}
               {photo.isExtra && (
-                <span className="absolute top-2 left-2 text-[10px] font-medium bg-[#ff393a]/80 text-white px-2 py-0.5 rounded-full">
+                <span className="absolute top-2 left-2 text-[10px] font-semibold bg-[#ff393a] text-white px-2 py-0.5 rounded-full">
                   Uploaded
                 </span>
               )}
 
               {/* Action buttons */}
-              <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute bottom-2 right-2 flex items-center gap-1">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -429,7 +429,7 @@ export function PreviousYearPhotos() {
                   className={`p-1.5 rounded-full transition-colors ${
                     isHidden
                       ? 'bg-red-500/80 text-white hover:bg-red-500'
-                      : 'bg-white/20 text-white hover:bg-white/30'
+                      : 'bg-black/70 text-white hover:bg-black/85'
                   }`}
                   title={isHidden ? 'Show on event page' : 'Hide from event page'}
                 >
@@ -442,7 +442,7 @@ export function PreviousYearPhotos() {
                       e.stopPropagation();
                       removeExtraPhoto(photo.url);
                     }}
-                    className="p-1.5 rounded-full bg-white/20 text-white hover:bg-red-500/80 transition-colors"
+                    className="p-1.5 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors"
                     title="Remove uploaded photo"
                   >
                     <Trash2 size={14} />
