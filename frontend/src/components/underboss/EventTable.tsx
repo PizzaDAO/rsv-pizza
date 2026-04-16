@@ -88,6 +88,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -169,6 +170,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       });
     }
 
+    // Tag filter
+    if (tagFilter !== 'all') {
+      result = result.filter((e) => e.eventTags?.includes(tagFilter));
+    }
+
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -192,7 +198,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter]);
+
+  const availableTags = useMemo(
+    () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
+    [events]
+  );
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
@@ -228,7 +239,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     );
   }
 
-  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
+  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all' || tagFilter !== 'all';
 
   return (
     <div className="space-y-3">
@@ -277,6 +288,20 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           </select>
         )}
 
+        {/* Tag filter */}
+        {availableTags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
+          >
+            <option value="all">Tag: All</option>
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>Tag: {tag}</option>
+            ))}
+          </select>
+        )}
+
         {/* Clear filters link */}
         {hasActiveFilters && (
           <button
@@ -284,6 +309,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setProgressIncludes([]);
               setProgressExcludes([]);
               setRegionFilter('all');
+              setTagFilter('all');
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
