@@ -409,7 +409,7 @@ export function PreviousYearPhotos() {
 
               {/* Year badge */}
               {photo.year > 0 && (
-                <span className="absolute top-2 left-2 text-[10px] font-semibold bg-black/80 text-white px-2 py-0.5 rounded-full">
+                <span className="absolute top-2 left-2 text-[10px] font-semibold bg-black/80 text-gray-300 px-2 py-0.5 rounded-full">
                   {photo.year}
                 </span>
               )}
@@ -429,7 +429,7 @@ export function PreviousYearPhotos() {
                   className={`p-1.5 rounded-full transition-colors ${
                     isHidden
                       ? 'bg-red-500/80 text-white hover:bg-red-500'
-                      : 'bg-black/70 text-white hover:bg-black/85'
+                      : 'bg-black/70 text-gray-300 hover:bg-black/85 hover:text-white'
                   }`}
                   title={isHidden ? 'Show on event page' : 'Hide from event page'}
                 >
@@ -442,7 +442,7 @@ export function PreviousYearPhotos() {
                       e.stopPropagation();
                       removeExtraPhoto(photo.url);
                     }}
-                    className="p-1.5 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors"
+                    className="p-1.5 rounded-full bg-black/70 text-gray-300 hover:bg-red-500 hover:text-white transition-colors"
                     title="Remove uploaded photo"
                   >
                     <Trash2 size={14} />
