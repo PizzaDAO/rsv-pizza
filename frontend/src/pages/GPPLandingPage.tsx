@@ -187,21 +187,23 @@ export function GPPLandingPage() {
           x: 12 + Math.random() * 76,
           size: sizes[i],
           delay: i * 0.4 + Math.random() * 0.2,
-          duration: 5.5 + Math.random() * 4,              // 5.5–9.5s each
+          duration: 5 + Math.random() * 2,                // 5–7s each
           swayAmount: 12 + Math.random() * 30,            // 12–42px sway
           swaySpeed: 1.2 + Math.random() * 2,             // 1.2–3.2s per sway cycle
         }));
         setParachutes(chutes);
 
-        // Delay transition to success state so user sees the full animation
+        // Delay transition to success state so user sees the full animation —
+        // wait until the last parachute lands
         const successData = {
           hostPageUrl: response.hostPageUrl,
           eventName: response.event.name,
           email: email.trim(),
         };
+        const lastEndMs = Math.max(...chutes.map(c => (c.delay + c.duration) * 1000));
         setTimeout(() => {
           setSuccess(successData);
-        }, 8000);
+        }, lastEndMs);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event. Please try again.');
