@@ -236,6 +236,7 @@ export function PartnerForm({
   const [logoPreview, setLogoPreview] = useState<string | null>(() => {
     if (isCrm && sponsor?.logoUrl) return sponsor.logoUrl;
     if (isIntake && intakeInitialData?.logoUrl) return intakeInitialData.logoUrl;
+    if (isPartner && partnerData?.coHostLogoUrl) return partnerData.coHostLogoUrl;
     return null;
   });
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -253,6 +254,7 @@ export function PartnerForm({
   useEffect(() => {
     if (isPartner && partnerData) {
       setFormData(sponsorUserToFormData(partnerData));
+      if (partnerData.coHostLogoUrl) setLogoPreview(partnerData.coHostLogoUrl);
     }
   }, [partnerData, isPartner]);
 
@@ -312,8 +314,8 @@ export function PartnerForm({
     try {
       let logoUrl = formData.logoUrl;
 
-      // Upload logo if a new file was selected (CRM and intake modes)
-      if ((isCrm || isIntake) && logoFile) {
+      // Upload logo if a new file was selected (CRM, intake, and partner modes)
+      if ((isCrm || isIntake || isPartner) && logoFile) {
         setUploadingLogo(true);
         const uploadedUrl = await uploadSponsorLogo(logoFile);
         if (uploadedUrl) {
@@ -644,74 +646,54 @@ export function PartnerForm({
         </div>
       )}
 
-      {/* Logo — CRM + Intake have file upload, partner has URL only */}
+      {/* Logo — file upload + URL fallback (shared across CRM, Intake, Partner) */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
           <Image size={16} />
           Logo
         </h3>
-        {(isCrm || isIntake) ? (
-          logoPreview ? (
-            <div className="flex items-center gap-4">
-              <img
-                src={logoPreview}
-                alt="Logo preview"
-                className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-              />
-              <button
-                type="button"
-                onClick={removeLogo}
-                className="text-sm text-red-400 hover:text-red-300 transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-              >
-                <Upload size={16} />
-                Upload Logo
-              </button>
-              <div className="flex-1">
-                <IconInput
-                  icon={Globe}
-                  type="url"
-                  value={formData.logoUrl}
-                  onChange={e => handleChange('logoUrl', e.target.value)}
-                  placeholder="Or paste logo URL"
-                />
-              </div>
-            </div>
-          )
-        ) : (
-          <>
-            <IconInput
-              icon={Globe}
-              type="url"
-              value={formData.logoUrl}
-              onChange={e => handleChange('logoUrl', e.target.value)}
-              placeholder="Logo URL (for sponsor records)"
+        {logoPreview ? (
+          <div className="flex items-center gap-4">
+            <img
+              src={logoPreview}
+              alt="Logo preview"
+              className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
             />
-            {formData.logoUrl && (
-              <img
-                src={formData.logoUrl}
-                alt="Logo preview"
-                className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            <button
+              type="button"
+              onClick={removeLogo}
+              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+            >
+              <Upload size={16} />
+              Upload Logo
+            </button>
+            <div className="flex-1">
+              <IconInput
+                icon={Globe}
+                type="url"
+                value={formData.logoUrl}
+                onChange={e => handleChange('logoUrl', e.target.value)}
+                placeholder="Or paste logo URL"
               />
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
 
