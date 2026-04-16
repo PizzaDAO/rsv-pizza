@@ -7,7 +7,7 @@ import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
 import {
-  Loader2, Shield, Tag, ExternalLink, Users,
+  Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp,
 } from 'lucide-react';
@@ -571,7 +571,17 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
         {/* Top: title + links */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-theme-text truncate">{event.name}</h2>
+            <h2 className="text-base font-semibold truncate">
+              <a
+                href={`/${event.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-theme-text hover:text-theme-text-secondary transition-colors"
+                title="View event page"
+              >
+                {event.name}
+              </a>
+            </h2>
             {event.hostName && (
               <p className="text-xs text-theme-text-muted">Hosted by {event.hostName}</p>
             )}
@@ -597,15 +607,6 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                 Report
               </span>
             )}
-            <a
-              href={`/${event.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-theme-text-faint hover:text-theme-text-secondary transition-colors"
-              title="View event page"
-            >
-              <ExternalLink size={14} />
-            </a>
           </div>
         </div>
 
