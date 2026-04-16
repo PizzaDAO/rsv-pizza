@@ -858,6 +858,9 @@ model Sponsor {
   intakeSubmittedAt DateTime? @map("intake_submitted_at") @db.Timestamptz
   sponsorMessage    String?   @map("sponsor_message")
 
+  // Per-partner expected guest count (entered on /partner dashboard)
+  expectedGuests Int? @map("expected_guests")
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz

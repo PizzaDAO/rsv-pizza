@@ -1162,6 +1162,7 @@ export interface SponsorDashboardEvent {
   rsvpCount: number;
   approvedCount: number;
   maxGuests: number | null;
+  expectedGuests?: number | null;
   budget: {
     total: number;
     spent: number;

@@ -334,6 +334,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     const queryTag = req.query.tag as string | undefined;
     const tag = queryTag?.trim().toLowerCase() || req.sponsorUser?.tag;
     const sponsorUserId = req.sponsorUser?.id;
+    const sponsorEmail = req.sponsorUser?.email?.toLowerCase() || null;
 
     // Build where clause — admins without a tag filter see all events that have any eventTags
     const where: any = {};
@@ -375,6 +376,25 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       },
       orderBy: { date: 'asc' },
     });
+
+    // Batch-fetch this partner's expectedGuests per event (matched by contactEmail)
+    let expectedGuestsByPartyId: Record<string, number | null> = {};
+    if (sponsorEmail && events.length > 0) {
+      const sponsorRows = await prisma.sponsor.findMany({
+        where: {
+          partyId: { in: events.map(e => e.id) },
+          contactEmail: sponsorEmail,
+        },
+        select: { partyId: true, expectedGuests: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      // If multiple rows exist for the same party + email, the first (oldest) wins
+      for (const row of sponsorRows) {
+        if (!(row.partyId in expectedGuestsByPartyId)) {
+          expectedGuestsByPartyId[row.partyId] = row.expectedGuests;
+        }
+      }
+    }
 
     // Batch-fetch all co-host profile data upfront (avoid await inside .map)
     const allCoHostEmails = new Set<string>();
@@ -483,6 +503,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         rsvpCount: guestCount,
         approvedCount,
         maxGuests: event.maxGuests,
+        expectedGuests: sponsorEmail ? (expectedGuestsByPartyId[event.id] ?? null) : null,
         budget,
         progress,
         sponsorStatuses,
@@ -549,6 +570,98 @@ sponsorDashboardRouter.post('/checklist/:itemId/toggle', requireAuth, requireSpo
     });
 
     res.json({ item: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/sponsor/me/events/:partyId/expected-guests - Set this partner's expected guest count for an event
+sponsorDashboardRouter.patch('/me/events/:partyId/expected-guests', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const sponsorUser = req.sponsorUser;
+
+    if (!sponsorUser) {
+      throw new AppError('Sponsor account required', 403, 'FORBIDDEN');
+    }
+
+    const sponsorEmail = sponsorUser.email?.toLowerCase();
+    if (!sponsorEmail) {
+      throw new AppError('Sponsor account missing email', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate body
+    const { expectedGuests } = req.body ?? {};
+    let normalized: number | null;
+    if (expectedGuests === null || expectedGuests === undefined || expectedGuests === '') {
+      normalized = null;
+    } else if (
+      typeof expectedGuests !== 'number' ||
+      !Number.isFinite(expectedGuests) ||
+      !Number.isInteger(expectedGuests) ||
+      expectedGuests < 0 ||
+      expectedGuests > 10000
+    ) {
+      throw new AppError('expectedGuests must be null or a non-negative integer <= 10000', 400, 'VALIDATION_ERROR');
+    } else {
+      normalized = expectedGuests;
+    }
+
+    // Find party and verify partner has access via tag
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, eventTags: true },
+    });
+    if (!party) {
+      throw new AppError('Event not found', 404, 'NOT_FOUND');
+    }
+    if (!party.eventTags?.includes(sponsorUser.tag)) {
+      throw new AppError('You do not have access to this event', 403, 'FORBIDDEN');
+    }
+
+    // Find existing Sponsor row matching this partner (by contactEmail) for this event
+    const existing = await prisma.sponsor.findFirst({
+      where: { partyId, contactEmail: sponsorEmail },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let updated;
+    if (existing) {
+      updated = await prisma.sponsor.update({
+        where: { id: existing.id },
+        data: { expectedGuests: normalized },
+      });
+    } else {
+      // Look up the full SponsorUser record to get coHostName for the display name
+      const fullSponsorUser = await prisma.sponsorUser.findUnique({
+        where: { id: sponsorUser.id },
+        select: { coHostName: true, name: true, email: true },
+      });
+      const displayName =
+        fullSponsorUser?.coHostName?.trim() ||
+        fullSponsorUser?.name?.trim() ||
+        sponsorUser.name?.trim() ||
+        sponsorEmail;
+      updated = await prisma.sponsor.create({
+        data: {
+          partyId,
+          name: displayName,
+          contactEmail: sponsorEmail,
+          status: 'yes',
+          notes: 'Auto-created from partner dashboard expected guests entry',
+          expectedGuests: normalized,
+        },
+      });
+    }
+
+    res.json({
+      sponsor: {
+        id: updated.id,
+        partyId: updated.partyId,
+        contactEmail: updated.contactEmail,
+        expectedGuests: updated.expectedGuests,
+      },
+    });
   } catch (error) {
     next(error);
   }

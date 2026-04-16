@@ -5,7 +5,7 @@ import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
+import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updateSponsorExpectedGuests } from '../lib/api';
 import {
   Loader2, Shield, Tag, ExternalLink, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
@@ -553,6 +553,26 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
+  // Per-partner expected guest count (local optimistic state)
+  const [localExpected, setLocalExpected] = useState<number | null>(event.expectedGuests ?? null);
+
+  // Keep local state in sync if the parent re-renders with a fresh value
+  useEffect(() => {
+    setLocalExpected(event.expectedGuests ?? null);
+  }, [event.expectedGuests]);
+
+  async function saveExpectedGuests() {
+    const current = event.expectedGuests ?? null;
+    if (localExpected === current) return; // no change
+    try {
+      await updateSponsorExpectedGuests(event.id, localExpected);
+      // Optimistic — don't refetch
+    } catch (err) {
+      console.error('Failed to save expected guests:', err);
+      setLocalExpected(current); // revert
+    }
+  }
+
   return (
     <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
@@ -633,6 +653,21 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             <Users size={14} className="text-theme-text-muted" />
             <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
             <span className="text-xs text-theme-text-muted">RSVPs</span>
+            <span className="text-theme-text-muted mx-1">·</span>
+            <input
+              type="number"
+              min={0}
+              max={10000}
+              value={localExpected ?? ''}
+              onChange={(e) => setLocalExpected(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+              onBlur={saveExpectedGuests}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+              placeholder="—"
+              className="w-14 bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text px-1.5 py-0.5 text-right focus:outline-none focus:border-theme-stroke-hover"
+              title="Your expected guests for this event"
+              aria-label="Your expected guests for this event"
+            />
+            <span className="text-xs text-theme-text-muted">expected</span>
           </div>
         </div>
 

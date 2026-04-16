@@ -2860,6 +2860,18 @@ export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item
   });
 }
 
+// Update this partner's expected guest count for a specific event.
+// Stored on the Sponsor table (per partner-event), upserted on first save.
+export async function updateSponsorExpectedGuests(
+  partyId: string,
+  expectedGuests: number | null,
+): Promise<{ sponsor: { id: string; partyId: string; contactEmail: string | null; expectedGuests: number | null } }> {
+  return apiRequest(`/api/sponsor/me/events/${partyId}/expected-guests`, {
+    method: 'PATCH',
+    body: { expectedGuests },
+  });
+}
+
 // ============================================
 // Sponsor User Admin API
 // ============================================
