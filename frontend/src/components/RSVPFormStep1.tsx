@@ -94,7 +94,7 @@ export function RSVPFormStep1({
                     : 'border-theme-stroke bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover/80'
                 }`}
               >
-                <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />
+                <img src={t.image} alt={t.label} className="w-7 h-7 sm:w-10 sm:h-10 object-contain flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="font-bold text-sm leading-tight">{t.label}</div>
                   <div className={`text-xs leading-tight ${selected ? 'text-theme-text-secondary' : 'opacity-60'}`}>{t.role}</div>
@@ -174,6 +174,14 @@ export function RSVPFormStep1({
                     className="text-purple-400 hover:text-purple-300 underline"
                   >
                     SWC Privacy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms &amp; Conditions
                   </a>.
                 </p>
               </div>
