@@ -179,7 +179,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     // Country filter (only when showRegion is active)
     if (showRegion && regionFilter !== 'all') {
       result = result.filter((e) => {
-        const country = e.address?.split(',').pop()?.trim() || '';
+        const country = e.country || '';
         return country === regionFilter;
       });
     }
@@ -296,7 +296,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
           >
             <option value="all">Country: All</option>
-            {[...new Set(events.map(e => e.address?.split(',').pop()?.trim()).filter(Boolean))].sort().map((c) => (
+            {[...new Set(events.map(e => e.country).filter(Boolean))].sort().map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>

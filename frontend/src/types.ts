@@ -977,6 +977,7 @@ export interface UnderbossEvent {
   address: string | null;
   venueName: string | null;
   region?: string | null;
+  country?: string | null;
   host: { name: string | null; email: string | null };
   coHosts: any[];
   progress: UnderbossEventProgress;

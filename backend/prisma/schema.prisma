@@ -150,6 +150,7 @@ model Party {
 
   // Region (for underboss dashboard)
   region  String?
+  country String?
 
   // Underboss dashboard fields
   hostStatus        String?  @map("host_status")

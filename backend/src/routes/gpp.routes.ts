@@ -321,6 +321,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         duration: 3,
         timezone: eventTimezone,
         region: inferredRegion,
+        country: country || null,
         availableBeverages: [],
         availableToppings: [],
         coHosts: [
