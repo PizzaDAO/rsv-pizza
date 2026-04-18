@@ -1034,7 +1034,7 @@ export function EventPage() {
                     {event.venueName && (
                       <p className="text-theme-text font-medium mb-1">{event.venueName}</p>
                     )}
-                    <p className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3`}>{event.address}</p>
+                    <a href={googleMapsUrl!} target="_blank" rel="noopener noreferrer" className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3 block hover:underline`}>{event.address}</a>
                     {/* Interactive venue map */}
                     <div className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative">
                       <VenueMap
