@@ -257,9 +257,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
   return (
     <div className="space-y-3">
-      {/* Search */}
-      <div className="max-w-sm">
-        <IconInput
+      {/* Search + count */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="max-w-sm flex-1">
+          <IconInput
           icon={Search}
           iconSize={14}
           type="text"
@@ -268,6 +269,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           placeholder="Search events, hosts, venues..."
           className="bg-theme-surface border border-theme-stroke rounded-lg pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
         />
+        </div>
+        <div className="text-xs text-theme-text-faint whitespace-nowrap">
+          {filteredEvents.length} of {events.length} events
+        </div>
       </div>
 
       {/* Filters — topping-style pills */}
@@ -727,10 +732,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         </table>
       </div>
 
-      {/* Count */}
-      <div className="text-xs text-theme-text-faint text-right">
-        {filteredEvents.length} of {events.length} events
-      </div>
     </div>
   );
 }
