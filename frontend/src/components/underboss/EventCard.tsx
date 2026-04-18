@@ -288,11 +288,11 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
               {relTime.text}
             </span>
-            {showRegion && event.address && (
+            {showRegion && event.country && (
               <>
                 <span className="text-theme-text-faint">·</span>
                 <span className="text-xs text-theme-text-muted">
-                  {event.address.split(',').pop()?.trim() || ''}
+                  {event.country || ''}
                 </span>
               </>
             )}

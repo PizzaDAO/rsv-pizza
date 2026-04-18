@@ -374,7 +374,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
       {showRegion && (
         <td className="py-3 px-3">
           <span className="text-xs text-theme-text-muted">
-            {event.address ? event.address.split(',').pop()?.trim() || '\u2014' : '\u2014'}
+            {event.country || '\u2014'}
           </span>
         </td>
       )}
