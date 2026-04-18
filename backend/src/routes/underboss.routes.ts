@@ -205,6 +205,7 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     hostTags: party.hostTags || [],
     eventTags: party.eventTags || [],
     underbossNotes: party.underbossNotes || null,
+    expectedGuests: party.expectedGuests || null,
     createdAt: party.createdAt,
   };
 }
@@ -754,6 +755,31 @@ router.patch('/event/:partyId/tags', requireAuth, requireUnderbossAuth, async (r
       where: { id: partyId },
       data: { hostTags: cleanTags },
       select: { id: true, hostTags: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/expected-guests - Set expected guests
+router.patch('/event/:partyId/expected-guests', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { expectedGuests } = req.body;
+
+    if (expectedGuests !== null && expectedGuests !== undefined) {
+      const num = Number(expectedGuests);
+      if (!Number.isInteger(num) || num < 0) {
+        throw new AppError('expectedGuests must be a non-negative integer or null', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { expectedGuests: expectedGuests != null ? Number(expectedGuests) : null },
+      select: { id: true, expectedGuests: true },
     });
 
     res.json({ party });

@@ -630,10 +630,19 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Users size={14} className="text-theme-text-muted" />
-            <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
-            <span className="text-xs text-theme-text-muted">RSVPs</span>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <Users size={14} className="text-theme-text-muted" />
+              <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
+              <span className="text-xs text-theme-text-muted">RSVPs</span>
+            </div>
+            {event.expectedGuests != null && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-theme-text-faint">/</span>
+                <span className="text-lg font-bold text-theme-text">{event.expectedGuests}</span>
+                <span className="text-xs text-theme-text-muted">expected</span>
+              </div>
+            )}
           </div>
         </div>
 

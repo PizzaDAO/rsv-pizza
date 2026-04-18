@@ -92,6 +92,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
     maxGuests: dbParty.max_guests,
+    expectedGuests: dbParty.expected_guests || null,
     hideGuests: dbParty.hide_guests || false,
     requireApproval: dbParty.require_approval || false,
     password: dbParty.password,

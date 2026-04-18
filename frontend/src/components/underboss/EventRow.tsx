@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface EventRowProps {
@@ -245,6 +245,38 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   const [notesSaving, setNotesSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Expected guests state
+  const [expectedGuestsValue, setExpectedGuestsValue] = useState(
+    event.expectedGuests != null ? String(event.expectedGuests) : ''
+  );
+  const expectedGuestsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveExpectedGuests = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    const numValue = trimmed === '' ? null : parseInt(trimmed, 10);
+    if (trimmed !== '' && (isNaN(numValue!) || numValue! < 0)) return;
+    onEventUpdate?.(event.id, { expectedGuests: numValue });
+    try {
+      await updateExpectedGuests(event.id, numValue);
+    } catch {
+      setExpectedGuestsValue(event.expectedGuests != null ? String(event.expectedGuests) : '');
+      onEventUpdate?.(event.id, { expectedGuests: event.expectedGuests });
+    }
+  }, [event.id, event.expectedGuests, onEventUpdate]);
+
+  const handleExpectedGuestsChange = useCallback((value: string) => {
+    // Only allow digits
+    if (value !== '' && !/^\d+$/.test(value)) return;
+    setExpectedGuestsValue(value);
+    if (expectedGuestsTimeoutRef.current) clearTimeout(expectedGuestsTimeoutRef.current);
+    expectedGuestsTimeoutRef.current = setTimeout(() => saveExpectedGuests(value), 1000);
+  }, [saveExpectedGuests]);
+
+  const handleExpectedGuestsBlur = useCallback(() => {
+    if (expectedGuestsTimeoutRef.current) clearTimeout(expectedGuestsTimeoutRef.current);
+    saveExpectedGuests(expectedGuestsValue);
+  }, [expectedGuestsValue, saveExpectedGuests]);
+
   const saveNotes = useCallback(async (value: string) => {
     const trimmed = value.trim();
     const newValue = trimmed || null;
@@ -431,6 +463,18 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
         {event.checkedInCount > 0 && (
           <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
         )}
+        <div className="mt-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={expectedGuestsValue}
+            onChange={(e) => handleExpectedGuestsChange(e.target.value)}
+            onBlur={handleExpectedGuestsBlur}
+            placeholder="exp."
+            className="w-12 bg-transparent border-b border-theme-stroke text-[10px] text-center text-theme-text-muted focus:outline-none focus:border-theme-stroke-hover placeholder:text-theme-text-faint [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            title="Expected guests"
+          />
+        </div>
       </td>
 
       {/* Photos */}

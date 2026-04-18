@@ -483,6 +483,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         rsvpCount: guestCount,
         approvedCount,
         maxGuests: event.maxGuests,
+        expectedGuests: event.expectedGuests || null,
         budget,
         progress,
         sponsorStatuses,

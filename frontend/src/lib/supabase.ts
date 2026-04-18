@@ -396,6 +396,7 @@ export interface DbParty {
   available_beverages: string[];
   available_toppings: string[];
   max_guests: number | null;
+  expected_guests?: number | null;
   hide_guests: boolean;
   require_approval: boolean;
   password?: string | null;
@@ -467,7 +468,7 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+  pizza_style, available_beverages, available_toppings, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
@@ -1294,6 +1295,7 @@ export async function updateParty(
     custom_url?: string | null;
     event_image_url?: string | null;
     max_guests?: number | null;
+    expected_guests?: number | null;
     hide_guests?: boolean;
     require_approval?: boolean;
     co_hosts?: any[];
@@ -1345,6 +1347,7 @@ export async function updateParty(
         venueWebsite: updates.venueWebsite,
         venueNotes: updates.venueNotes,
         maxGuests: updates.max_guests,
+        expectedGuests: updates.expected_guests,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,

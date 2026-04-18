@@ -221,6 +221,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   maxGuests: number | null;
+  expectedGuests?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;
@@ -993,6 +994,7 @@ export interface UnderbossEvent {
   hostTags: string[];
   eventTags: string[];
   underbossNotes: string | null;
+  expectedGuests: number | null;
   createdAt: string;
 }
 
@@ -1163,6 +1165,7 @@ export interface SponsorDashboardEvent {
   rsvpCount: number;
   approvedCount: number;
   maxGuests: number | null;
+  expectedGuests?: number | null;
   budget: {
     total: number;
     spent: number;
