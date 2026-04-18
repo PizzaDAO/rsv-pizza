@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
@@ -57,6 +57,9 @@ export const EventDetailsTab: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [toast, setToast] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+
+  // Pending lat/lng from LocationAutocomplete (fires before onPlaceSelected)
+  const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
@@ -487,9 +490,13 @@ export const EventDetailsTab: React.FC = () => {
 
   // Save location
   const saveLocation = async (newAddress: string, newVenueName: string | null) => {
+    const coords = pendingCoordsRef.current;
+    pendingCoordsRef.current = null;
     const success = await saveField('location', {
       address: newAddress.trim() || null,
       venue_name: newVenueName || null,
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
     });
     if (success) {
       setOriginalValues((prev: any) => ({
@@ -579,6 +586,10 @@ export const EventDetailsTab: React.FC = () => {
             setVenueName(newVenueName);
           }}
           onTimezoneChange={setTimezone}
+          onLocationSelected={(loc) => {
+            // Store coords in ref; saveLocation will consume them
+            pendingCoordsRef.current = loc;
+          }}
           onPlaceSelected={(newAddress, newVenueName) => {
             // Save when a place is selected from autocomplete
             saveLocation(newAddress, newVenueName);

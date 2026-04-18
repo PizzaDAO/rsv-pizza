@@ -50,6 +50,8 @@ model Party {
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
   address            String?
+  latitude           Float?
+  longitude          Float?
   venueName          String?   @map("venue_name")
   venueStatus        String?   @map("venue_status")
   venueCapacity      Int?      @map("venue_capacity")
