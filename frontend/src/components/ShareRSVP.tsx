@@ -19,11 +19,9 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  if (!eventImageUrl) return null;
-
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
-  const shareText = `I'm going to the pizza party in ${city}!`;
+  const shareText = `I'm going to the Global Pizza Party in ${city}!`;
 
   const handleShareX = () => {
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + ' \u{1F355}')}&url=${encodeURIComponent(eventUrl)}`;
@@ -31,7 +29,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
   };
 
   const handleDownload = async () => {
-    if (downloading) return;
+    if (downloading || !eventImageUrl) return;
     setDownloading(true);
     try {
       const res = await fetch(eventImageUrl);
@@ -79,13 +77,15 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
     <div className="mt-6 pt-6 border-t border-theme-stroke">
       <p className="text-theme-text-secondary text-sm mb-3 text-center">Share the vibes</p>
 
-      <div className="rounded-xl overflow-hidden mb-3">
-        <img
-          src={eventImageUrl}
-          alt={eventName}
-          className="w-full rounded-xl"
-        />
-      </div>
+      {eventImageUrl && (
+        <div className="rounded-xl overflow-hidden mb-3">
+          <img
+            src={eventImageUrl}
+            alt={eventName}
+            className="w-full rounded-xl"
+          />
+        </div>
+      )}
 
       <p className="text-theme-text font-medium text-center mb-4">
         {shareText} {'\u{1F355}'}
@@ -101,15 +101,17 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
           <span className="sm:hidden">X</span>
         </button>
 
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
-        >
-          <Download size={14} />
-          <span className="hidden sm:inline">Download</span>
-          <span className="sm:hidden">Save</span>
-        </button>
+        {eventImageUrl && (
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline">Download</span>
+            <span className="sm:hidden">Save</span>
+          </button>
+        )}
 
         <button
           onClick={handleCopyLink}
