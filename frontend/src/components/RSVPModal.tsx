@@ -227,7 +227,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
     return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center px-2 py-4 sm:p-4 bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
       >
         <div
@@ -360,7 +360,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         data-testid="rsvp-modal"
         onClick={handleClose}
       >
-        <div className="min-h-full flex items-center justify-center p-4">
+        <div className="min-h-full flex items-center justify-center px-2 py-4 sm:p-4">
           <div
             className="card p-8 max-w-lg w-full relative"
             onClick={(e) => e.stopPropagation()}
@@ -397,7 +397,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onClick={handleClose}
     >
-      <div className="min-h-full flex items-center justify-center p-4">
+      <div className="min-h-full flex items-center justify-center px-2 py-4 sm:p-4">
         <div
           className="card p-8 max-w-2xl w-full relative"
           onClick={(e) => e.stopPropagation()}
