@@ -62,6 +62,7 @@ model Party {
   venueWebsite       String?   @map("venue_website")
   venueNotes         String?   @map("venue_notes")
   maxGuests          Int?      @map("max_guests")
+  expectedGuests     Int?      @map("expected_guests")
   hideGuests         Boolean   @default(false) @map("hide_guests")
   requireApproval    Boolean   @default(false) @map("require_approval")
   coHosts            Json      @default("[]") @map("co_hosts")

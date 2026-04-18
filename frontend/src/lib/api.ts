@@ -2448,6 +2448,17 @@ export async function updateUnderbossNotes(
   });
 }
 
+// Update expected guests on an event (underboss auth)
+export async function updateExpectedGuests(
+  partyId: string,
+  expectedGuests: number | null
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/expected-guests`, {
+    method: 'PATCH',
+    body: { expectedGuests },
+  });
+}
+
 // Bulk approve events (underboss auth)
 export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-approve', {
