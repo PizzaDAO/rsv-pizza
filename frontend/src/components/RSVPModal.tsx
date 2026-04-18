@@ -264,7 +264,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             </p>
           )}
           {/* Share Section */}
-          {(!form.alreadyRegistered || form.wasUpdated) && !form.pendingApproval && (
+          {(!form.alreadyRegistered || form.wasUpdated) && (
             <ShareRSVP
               eventName={event.name}
               eventImageUrl={event.eventImageUrl}
