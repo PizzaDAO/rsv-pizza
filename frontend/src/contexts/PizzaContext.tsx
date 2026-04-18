@@ -100,6 +100,8 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventImageUrl: dbParty.event_image_url,
     description: dbParty.description,
     address: dbParty.address,
+    latitude: dbParty.latitude || null,
+    longitude: dbParty.longitude || null,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || dbParty.co_hosts_public || [],
     selectedPizzerias: dbParty.selected_pizzerias || [],

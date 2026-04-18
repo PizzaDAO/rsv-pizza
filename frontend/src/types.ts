@@ -229,6 +229,8 @@ export interface Party {
   eventImageUrl: string | null;
   description: string | null;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName: string | null;
   // Venue tracking fields
   venueStatus: VenueStatus | null;

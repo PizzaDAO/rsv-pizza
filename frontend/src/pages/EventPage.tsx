@@ -726,6 +726,8 @@ export function EventPage() {
                     <VenueMap
                       address={event.address}
                       venueName={event.venueName}
+                      latitude={event.latitude}
+                      longitude={event.longitude}
                       className="w-full h-full"
                     />
                   </div>

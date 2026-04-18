@@ -111,6 +111,8 @@ export interface UpdatePartyData {
   duration?: number | null;
   timezone?: string | null;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName?: string | null;
   // Venue tracking fields
   venueStatus?: VenueStatus | null;
@@ -195,6 +197,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       duration: data.duration,
       timezone: data.timezone,
       address: data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
       venueName: data.venueName,
       // Venue tracking fields
       venueStatus: data.venueStatus,
@@ -361,6 +365,8 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
