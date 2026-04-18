@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, updateHostTags, updateUnderbossNotes } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes } from '../../lib/api';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface EventCardProps {
@@ -135,13 +135,13 @@ function HostTagsPills({
     onUpdate(newTags);
     setNewTag('');
     setIsAdding(false);
-    try { await updateHostTags(eventId, newTags); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [cleaned], 'add'); } catch { onUpdate(tags); }
   }
 
   async function removeTag(tag: string) {
     const newTags = tags.filter((t) => t !== tag);
     onUpdate(newTags);
-    try { await updateHostTags(eventId, newTags); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [tag], 'remove'); } catch { onUpdate(tags); }
   }
 
   const tagColors: Record<string, string> = {
