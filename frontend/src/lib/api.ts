@@ -353,6 +353,14 @@ export interface HostProfile {
 }
 
 // Public event data type
+export interface PublicEventSponsor {
+  id: string;
+  name: string;
+  website: string | null;
+  brandDescription: string | null;
+  logoUrl: string | null;
+}
+
 export interface PublicEvent {
   id: string;
   name: string;
@@ -396,6 +404,7 @@ export interface PublicEvent {
   nftChain?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
+  sponsors?: PublicEventSponsor[];
 }
 
 // Public Event API (no auth required)
@@ -2920,6 +2929,7 @@ export interface SponsorUserCreateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  brandDescription?: string;
 }
 
 export async function createSponsorUser(data: SponsorUserCreateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
@@ -2943,6 +2953,7 @@ export interface SponsorUserUpdateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  brandDescription?: string;
 }
 
 export async function updateSponsorUser(id: string, data: SponsorUserUpdateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {

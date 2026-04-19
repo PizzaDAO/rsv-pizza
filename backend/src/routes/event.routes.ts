@@ -141,6 +141,23 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
+    // Fetch confirmed sponsors with descriptions for public display
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        partyId: party.id,
+        status: { in: ['yes', 'billed', 'paid'] },
+        brandDescription: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        website: true,
+        brandDescription: true,
+        logoUrl: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
     // Enrich coHosts with user profile data (avatar, socials) then strip emails
     const rawCoHosts = (party.coHosts as any[] || []);
     const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
@@ -239,6 +256,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hostProfile,
         guestCount: party._count.guests,
         userId: party.userId,
+        sponsors,
       },
     });
   } catch (error) {

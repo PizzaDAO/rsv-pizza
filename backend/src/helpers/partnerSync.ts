@@ -25,6 +25,7 @@ interface SponsorUserLike {
   coHostAllowedTabs?: any;
   name: string | null;
   email: string;
+  brandDescription: string | null;
 }
 
 interface PartyLike {
@@ -90,6 +91,7 @@ export async function addPartnerToParty(
       website: sponsorUser.coHostWebsite || null,
       brandTwitter: sponsorUser.coHostTwitter || null,
       brandInstagram: sponsorUser.coHostInstagram || null,
+      brandDescription: sponsorUser.brandDescription || null,
       logoUrl: sponsorUser.coHostLogoUrl || null,
     };
 

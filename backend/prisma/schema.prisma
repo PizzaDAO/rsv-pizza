@@ -1113,6 +1113,9 @@ model SponsorUser {
   autoCoHost      Boolean   @default(false) @map("auto_co_host")
   autoSponsor     Boolean   @default(false) @map("auto_sponsor")
 
+  // Brand info (synced to Sponsor records)
+  brandDescription String? @map("brand_description")
+
   // Granular co-host permissions (applied when autoCoHost adds them to events)
   coHostShowOnEvent Boolean @default(true)  @map("co_host_show_on_event")
   coHostCanEdit     Boolean @default(false) @map("co_host_can_edit")
