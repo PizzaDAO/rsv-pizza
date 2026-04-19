@@ -26,11 +26,11 @@ export function ParticipatingPizzerias({
     <div className="border-t border-theme-stroke pt-6 mt-6 space-y-4">
       <h2 className="text-lg font-semibold text-theme-text">{sectionLabel}</h2>
 
-      <div className="space-y-3">
+      <div className="bg-theme-surface rounded-xl border border-theme-stroke p-4 space-y-3">
         {pizzerias.map((pizzeria) => (
           <div
             key={pizzeria.id}
-            className="flex items-start gap-3 p-3"
+            className="flex items-start gap-3"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
