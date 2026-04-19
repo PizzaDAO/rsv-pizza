@@ -1133,6 +1133,7 @@ export interface SponsorUser {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  brandDescription: string | null;
 }
 
 export interface SponsorChecklistItem {

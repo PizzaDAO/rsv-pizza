@@ -42,6 +42,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostShowOnEvent: true,
         coHostCanEdit: true,
         coHostAllowedTabs: true,
+        brandDescription: true,
       },
     });
 
@@ -75,6 +76,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
+      brandDescription,
     } = req.body;
 
     if (!email || !tag) {
@@ -105,6 +107,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         coHostLogoUrl: coHostLogoUrl?.trim() || null,
         autoCoHost: autoCoHost || false,
         autoSponsor: autoSponsor || false,
+        brandDescription: brandDescription?.trim() || null,
         coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
         coHostCanEdit: !!coHostCanEdit,
         coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
@@ -140,6 +143,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
+      brandDescription,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -162,6 +166,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostInstagram !== undefined) updateData.coHostInstagram = coHostInstagram?.trim() || null;
     if (coHostAvatarUrl !== undefined) updateData.coHostAvatarUrl = coHostAvatarUrl?.trim() || null;
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
+    if (brandDescription !== undefined) updateData.brandDescription = brandDescription?.trim() || null;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
     if (coHostShowOnEvent !== undefined) updateData.coHostShowOnEvent = !!coHostShowOnEvent;

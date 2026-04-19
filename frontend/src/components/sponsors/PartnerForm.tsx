@@ -155,6 +155,7 @@ function sponsorUserToFormData(su: SponsorUser): PartnerFormData {
     website: su.coHostWebsite || '',
     brandTwitter: su.coHostTwitter || '',
     brandInstagram: su.coHostInstagram || '',
+    brandDescription: su.brandDescription || '',
     coHostAvatarUrl: su.coHostAvatarUrl || '',
     logoUrl: su.coHostLogoUrl || '',
     autoCoHost: su.autoCoHost,
@@ -423,14 +424,14 @@ export function PartnerForm({
             />
           )}
         </div>
-        {(isCrm || isIntake) && (
+        {(isCrm || isIntake || isPartner) && (
           <IconInput
             icon={FileText}
             multiline
             rows={2}
             value={formData.brandDescription}
             onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-            placeholder="1-2 sentence description"
+            placeholder="1-2 sentence brand description (shown on event page)"
           />
         )}
       </div>
