@@ -30,7 +30,7 @@ export function ParticipatingPizzerias({
         {pizzerias.map((pizzeria) => (
           <div
             key={pizzeria.id}
-            className="flex items-start gap-3 p-3 bg-theme-surface rounded-xl border border-theme-stroke"
+            className="flex items-start gap-3 p-3"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

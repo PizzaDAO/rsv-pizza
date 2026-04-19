@@ -85,7 +85,7 @@ export const HostsList: React.FC<HostsListProps> = ({
   return (
     <div>
       {showTitle && (
-        <h3 className="text-sm font-semibold text-theme-text-secondary mb-3">Hosted By</h3>
+        <h3 className="text-sm font-semibold text-theme-text-secondary mb-3">Hosted by</h3>
       )}
 
       <div className="space-y-3">
