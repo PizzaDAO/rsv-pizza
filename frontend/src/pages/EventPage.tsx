@@ -499,13 +499,16 @@ export function EventPage() {
   const themeClass = isGPP ? 'gpp-theme' : '';
   const backgroundStyle = isGPP ? { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties : undefined;
 
-  // Detect "event day" — within 12 hours of the event start time
+  // Show check-in button from 1hr before event start to 1hr after event end
   const isEventDay = (() => {
     if (!event?.date) return false;
-    const eventDate = new Date(event.date);
+    const start = new Date(event.date);
+    const end = event.duration
+      ? new Date(start.getTime() + event.duration * 3600000)
+      : start;
     const now = new Date();
-    const diffHours = Math.abs(now.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
-    return diffHours <= 12;
+    const oneHourMs = 3600000;
+    return now.getTime() >= start.getTime() - oneHourMs && now.getTime() <= end.getTime() + oneHourMs;
   })();
 
   // Show split RSVP + Check In button when all conditions are met
