@@ -694,9 +694,7 @@ export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; d
   }
 }
 
-// ============================================
 // Sponsor CRM API functions
-// ============================================
 
 export interface CreateSponsorData {
   name: string;
@@ -717,6 +715,7 @@ export interface CreateSponsorData {
   logoUrl?: string;
   notes?: string;
   lastContactedAt?: string | null;
+  category?: string;
 }
 
 export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
@@ -751,9 +750,7 @@ export async function getSponsors(
   }
 }
 
-// ============================================
 // Performer/Music API functions
-// ============================================
 
 export interface CreatePerformerData {
   name: string;
@@ -966,9 +963,7 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
   }
 }
 
-// ============================================
 // Partner Intake Form API functions
-// ============================================
 
 export interface PartnerIntakeData {
   name?: string;
@@ -1087,9 +1082,7 @@ export async function updateFundraisingGoal(
   }
 }
 
-// ============================================
 // Venue API functions
-// ============================================
 
 export interface VenueCreateData {
   name: string;
@@ -1274,9 +1267,7 @@ export async function reorderPerformers(
   }
 }
 
-// =====================
 // Report API functions
-// =====================
 
 // Get full report data (host only)
 export async function getReport(partyId: string): Promise<{ report: EventReport } | null> {
@@ -1543,9 +1534,7 @@ export async function getLinkClickStats(partyId: string): Promise<LinkClickStats
   }
 }
 
-// ============================================
 // Staff API functions (host only)
-// ============================================
 
 export interface StaffListResponse {
   staff: Staff[];
@@ -1666,9 +1655,7 @@ export async function deleteStaff(partyId: string, staffId: string): Promise<boo
   }
 }
 
-// ============================================
 // Display API functions
-// ============================================
 
 export interface CreateDisplayData {
   name: string;
@@ -1807,9 +1794,7 @@ export async function getDisplayPhotos(
   }
 }
 
-// ============================================
 // Raffle API Functions
-// ============================================
 
 export async function getRaffles(partyId: string): Promise<{ raffles: Raffle[] } | null> {
   try {
@@ -1991,7 +1976,6 @@ export async function unclaimRafflePrize(
 }
 
 // Budget API functions
-// ============================================
 
 // Get budget overview and items
 export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
@@ -2108,7 +2092,6 @@ export async function toggleBudgetItemStatus(
 }
 
 // Party Kit API functions
-// ============================================
 
 export interface KitRequestData {
   requestedTier?: KitTier;
@@ -2190,9 +2173,7 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
   }
 }
 
-// ============================================
 // Checklist API functions
-// ============================================
 
 // Get checklist items + auto-complete states
 export async function getChecklist(partyId: string): Promise<ChecklistData | null> {
@@ -2291,13 +2272,9 @@ export async function toggleChecklistItem(
   }
 }
 
-// ============================================
 // Underboss Dashboard API
-// ============================================
 
-// ============================================
 // Admin Management API
-// ============================================
 
 export async function fetchAdminMe(): Promise<{ isAdmin: boolean; role?: string; email?: string; name?: string; id?: string }> {
   return apiRequest('/api/admin/me');
@@ -2320,9 +2297,7 @@ export async function removeAdmin(id: string): Promise<void> {
   await apiRequest(`/api/admin/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
 // Underboss Admin API (management)
-// ============================================
 
 export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   const result = await apiRequest<{ underbosses: UnderbossAdmin[] }>('/api/underboss/admin/list');
@@ -2394,9 +2369,7 @@ export async function deleteChecklistDefault(name: string): Promise<{ success: b
   });
 }
 
-// ============================================
 // Underboss Dashboard API
-// ============================================
 
 // Fetch current user's underboss status
 export interface UnderbossMeResponse {
@@ -2502,9 +2475,7 @@ export async function bulkUpdateEventTags(
   });
 }
 
-// ============================================
 // City Status API (Underboss)
-// ============================================
 
 export interface CityStatusMap {
   [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
@@ -2524,9 +2495,7 @@ export async function updateCityStatus(
   });
 }
 
-// ============================================
 // Shipping Dashboard API
-// ============================================
 
 // Fetch current user's shipping role
 export async function fetchShippingMe(): Promise<ShippingMeResponse> {
@@ -2632,9 +2601,7 @@ export async function deactivateShippingCoordinator(id: string): Promise<void> {
   await apiRequest(`/api/shipping/admin/coordinators/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
 // Venue Photo API functions
-// ============================================
 
 // Create venue photo record
 export async function createVenuePhoto(
@@ -2731,9 +2698,7 @@ export async function deleteVenuePhoto(
   }
 }
 
-// ============================================
 // Venue Report API functions
-// ============================================
 
 // Get venue report data (host only)
 export async function getVenueReport(partyId: string): Promise<VenueReport | null> {
@@ -2844,9 +2809,7 @@ export async function fetchPublicVenueReport(
   }
 }
 
-// ============================================
 // Telegram broadcast API functions
-// ============================================
 
 export interface BroadcastGroup {
   chatId: string;
@@ -2889,9 +2852,7 @@ export async function sendTelegramTest(
   });
 }
 
-// ============================================
 // Sponsor Dashboard API
-// ============================================
 
 export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
   return apiRequest<SponsorMeResponse>('/api/sponsor/me');
@@ -2908,9 +2869,7 @@ export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item
   });
 }
 
-// ============================================
 // Sponsor User Admin API
-// ============================================
 
 export async function fetchSponsorUsers(): Promise<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }> {
   return apiRequest<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }>('/api/sponsor-users/list');
@@ -2929,6 +2888,7 @@ export interface SponsorUserCreateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  category?: string;
   brandDescription?: string;
 }
 
@@ -2953,6 +2913,7 @@ export interface SponsorUserUpdateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  category?: string;
   brandDescription?: string;
 }
 
@@ -2967,9 +2928,7 @@ export async function deleteSponsorUser(id: string): Promise<void> {
   await apiRequest(`/api/sponsor-users/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
 // User Sponsorship Profile
-// ============================================
 
 export interface UserSponsorshipEntry {
   id: string;

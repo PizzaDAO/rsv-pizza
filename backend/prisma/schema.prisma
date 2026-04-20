@@ -853,6 +853,9 @@ model Sponsor {
   // Assets (for confirmed sponsors)
   logoUrl String? @map("logo_url")
 
+  // Category
+  category String? // hardware_wallet, software_wallet, cex, blockchain, dex, community, custom
+
   // Tracking
   notes           String? // Communication history, notes
   lastContactedAt DateTime? @map("last_contacted_at") @db.Timestamptz
@@ -1112,6 +1115,7 @@ model SponsorUser {
   coHostLogoUrl   String?   @map("co_host_logo_url")
   autoCoHost      Boolean   @default(false) @map("auto_co_host")
   autoSponsor     Boolean   @default(false) @map("auto_sponsor")
+  category        String?
 
   // Brand info (synced to Sponsor records)
   brandDescription String? @map("brand_description")

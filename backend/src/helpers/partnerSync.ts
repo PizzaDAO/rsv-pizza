@@ -20,6 +20,7 @@ interface SponsorUserLike {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  category: string | null;
   coHostShowOnEvent?: boolean;
   coHostCanEdit?: boolean;
   coHostAllowedTabs?: any;
@@ -93,6 +94,7 @@ export async function addPartnerToParty(
       brandInstagram: sponsorUser.coHostInstagram || null,
       brandDescription: sponsorUser.brandDescription || null,
       logoUrl: sponsorUser.coHostLogoUrl || null,
+      category: sponsorUser.category || null,
     };
 
     const existingSponsor = await prisma.sponsor.findFirst({
