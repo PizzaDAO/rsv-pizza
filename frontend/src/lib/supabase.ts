@@ -1572,50 +1572,50 @@ export interface UserPreferences {
 }
 
 export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
-  const { data, error } = await supabase
-    .from('user_preferences')
-    .select('dietary_restrictions, liked_toppings, disliked_toppings, liked_beverages, disliked_beverages')
-    .eq('email', email)
-    .maybeSingle();
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/preferences?email=${encodeURIComponent(email)}`);
 
-  if (error || !data) {
+    if (!response.ok) return null;
+
+    const { preferences } = await response.json();
+    if (!preferences) return null;
+
+    return {
+      dietary_restrictions: preferences.dietary_restrictions || [],
+      liked_toppings: preferences.liked_toppings || [],
+      disliked_toppings: preferences.disliked_toppings || [],
+      liked_beverages: preferences.liked_beverages || [],
+      disliked_beverages: preferences.disliked_beverages || [],
+    };
+  } catch (error) {
+    console.error('Error loading user preferences:', error);
     return null;
   }
-
-  return {
-    dietary_restrictions: data.dietary_restrictions || [],
-    liked_toppings: data.liked_toppings || [],
-    disliked_toppings: data.disliked_toppings || [],
-    liked_beverages: data.liked_beverages || [],
-    disliked_beverages: data.disliked_beverages || [],
-  };
 }
 
 export async function saveUserPreferences(
   email: string,
   preferences: UserPreferences
 ): Promise<boolean> {
-  // Use upsert to insert or update based on email
-  const { error } = await supabase
-    .from('user_preferences')
-    .upsert({
-      email,
-      dietary_restrictions: preferences.dietary_restrictions,
-      liked_toppings: preferences.liked_toppings,
-      disliked_toppings: preferences.disliked_toppings,
-      liked_beverages: preferences.liked_beverages,
-      disliked_beverages: preferences.disliked_beverages,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'email',
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, preferences }),
     });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('Error saving user preferences:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('Error saving user preferences:', error);
     return false;
   }
-
-  return true;
 }
 
 // ============================================

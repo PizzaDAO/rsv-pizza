@@ -36,6 +36,7 @@ import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import { invoiceHostRoutes, invoicePublicRoutes } from './routes/invoice.routes.js';
+import preferencesRoutes from './routes/preferences.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -121,6 +122,7 @@ app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
+app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
 app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
