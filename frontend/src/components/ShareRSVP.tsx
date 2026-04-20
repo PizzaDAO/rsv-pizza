@@ -21,10 +21,10 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
 
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
-  const shareText = `I'm going to the Global Pizza Party in ${city}!`;
+  const shareText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
 
   const handleShareX = () => {
-    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + ' \u{1F355}')}&url=${encodeURIComponent(eventUrl)}`;
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(eventUrl)}`;
     window.open(intentUrl, '_blank');
   };
 
@@ -71,8 +71,8 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
         </div>
       )}
 
-      <p className="text-theme-text font-medium text-center mb-4">
-        {shareText} {'\u{1F355}'}
+      <p className="text-theme-text font-medium text-center mb-4 whitespace-pre-line">
+        {shareText}
       </p>
 
       <div className="flex gap-2">
