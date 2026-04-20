@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Link, Share2, Check } from 'lucide-react';
+import { Download, Link, Check } from 'lucide-react';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -59,24 +59,8 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
     }
   };
 
-  const handleNativeShare = async () => {
-    try {
-      await navigator.share({
-        title: shareText,
-        text: shareText + ' \u{1F355}',
-        url: eventUrl,
-      });
-    } catch (err) {
-      // User cancelled or share failed — ignore
-    }
-  };
-
-  const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
-
   return (
     <div className="mt-6 pt-6 border-t border-theme-stroke">
-      <p className="text-theme-text-secondary text-sm mb-3 text-center">Share the vibes</p>
-
       {eventImageUrl && (
         <div className="rounded-xl overflow-hidden mb-3">
           <img
@@ -94,7 +78,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
       <div className="flex gap-2">
         <button
           onClick={handleShareX}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
         >
           <XIcon size={14} />
           <span className="hidden sm:inline">Share on X</span>
@@ -105,7 +89,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
           >
             <Download size={14} />
             <span className="hidden sm:inline">Download</span>
@@ -115,7 +99,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
 
         <button
           onClick={handleCopyLink}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-sm"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-sm"
         >
           {copied ? (
             <>
@@ -130,16 +114,6 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
             </>
           )}
         </button>
-
-        {canNativeShare && (
-          <button
-            onClick={handleNativeShare}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
-          >
-            <Share2 size={14} />
-            <span>Share</span>
-          </button>
-        )}
       </div>
     </div>
   );
