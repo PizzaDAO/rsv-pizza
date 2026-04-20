@@ -123,7 +123,7 @@ describe('RSVPModal', () => {
 
     // Wait for submission to complete and success screen to appear
     await waitFor(() => {
-      expect(screen.getByText('RSVP Updated!')).toBeInTheDocument();
+      expect(screen.getByText('RSVP Updated')).toBeInTheDocument();
     });
 
     // Now simulate what happens in EventPage.onRSVPSuccess:
@@ -144,7 +144,7 @@ describe('RSVPModal', () => {
 
     // BUG: The modal should STILL show the success screen,
     // not reset back to step 1
-    expect(screen.getByText('RSVP Updated!')).toBeInTheDocument();
+    expect(screen.getByText('RSVP Updated')).toBeInTheDocument();
     expect(screen.queryByText('Step 1 of 2')).not.toBeInTheDocument();
   });
 });
