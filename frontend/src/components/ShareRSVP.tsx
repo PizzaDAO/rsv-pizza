@@ -71,10 +71,6 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
         </div>
       )}
 
-      <p className="text-theme-text font-medium text-center mb-4 whitespace-pre-line">
-        {shareText}
-      </p>
-
       <div className="flex gap-2">
         <button
           onClick={handleShareX}
