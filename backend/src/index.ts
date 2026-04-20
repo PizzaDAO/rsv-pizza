@@ -37,6 +37,7 @@ import adminRoutes from './routes/admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import { invoiceHostRoutes, invoicePublicRoutes } from './routes/invoice.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
+import { invoiceHostRoutes, invoicePublicRoutes } from './routes/invoice.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
