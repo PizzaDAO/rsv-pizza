@@ -61,6 +61,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: S
 
   return (
     <div className="mt-6 pt-6 border-t border-theme-stroke">
+      <p className="text-theme-text font-medium text-center mb-3">Tell your friends about the party!</p>
       {eventImageUrl && (
         <div className="rounded-xl overflow-hidden mb-3">
           <img
