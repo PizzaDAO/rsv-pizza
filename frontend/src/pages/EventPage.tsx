@@ -32,6 +32,7 @@ import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
+import { GeoCheckInButton } from '../components/GeoCheckInButton';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -498,6 +499,18 @@ export function EventPage() {
   const themeClass = isGPP ? 'gpp-theme' : '';
   const backgroundStyle = isGPP ? { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties : undefined;
 
+  // Detect "event day" — within 12 hours of the event start time
+  const isEventDay = (() => {
+    if (!event?.date) return false;
+    const eventDate = new Date(event.date);
+    const now = new Date();
+    const diffHours = Math.abs(now.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+    return diffHours <= 12;
+  })();
+
+  // Show split RSVP + Check In button when all conditions are met
+  const showCheckIn = isEventDay && userHasRSVPd && !!event?.latitude && !!event?.longitude;
+
   return (
     <ThemeProvider theme={isGPP ? 'gpp' : 'dark'}>
     <div
@@ -842,20 +855,48 @@ export function EventPage() {
 
                     {/* RSVP Button - Desktop */}
                     <div className="pt-1">
-                      <button
-                        ref={mobileRsvpRef}
-                        data-testid="rsvp-button-desktop"
-                        onClick={(e) => {
-                          if (isGPP) {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                          }
-                          handleRSVP();
-                        }}
-                        className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
-                      >
-                        {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-                      </button>
+                      {showCheckIn ? (
+                        <div className="flex gap-2">
+                          <button
+                            ref={mobileRsvpRef}
+                            data-testid="rsvp-button-desktop"
+                            onClick={(e) => {
+                              if (isGPP) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                              }
+                              handleRSVP();
+                            }}
+                            className="flex-1 btn-primary flex items-center justify-center gap-2 text-base py-3"
+                          >
+                            Edit RSVP
+                          </button>
+                          <GeoCheckInButton
+                            inviteCode={event!.customUrl || event!.inviteCode}
+                            checkedInAt={existingGuestData?.checkedInAt ?? null}
+                            onCheckIn={(checkedInAt) => {
+                              if (existingGuestData) {
+                                setExistingGuestData({ ...existingGuestData, checkedInAt });
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          ref={mobileRsvpRef}
+                          data-testid="rsvp-button-desktop"
+                          onClick={(e) => {
+                            if (isGPP) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                            }
+                            handleRSVP();
+                          }}
+                          className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
+                        >
+                          {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -926,19 +967,46 @@ export function EventPage() {
 
                 {/* RSVP Button - Mobile only (desktop version is inside the map layout above) */}
                 <div className="pt-4 md:hidden">
-                  <button
-                    data-testid="rsvp-button"
-                    onClick={(e) => {
-                      if (isGPP) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                      }
-                      handleRSVP();
-                    }}
-                    className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
-                  >
-                    {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-                  </button>
+                  {showCheckIn ? (
+                    <div className="flex gap-2 w-[85%] mx-auto">
+                      <button
+                        data-testid="rsvp-button"
+                        onClick={(e) => {
+                          if (isGPP) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                          }
+                          handleRSVP();
+                        }}
+                        className="flex-1 btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                      >
+                        Edit RSVP
+                      </button>
+                      <GeoCheckInButton
+                        inviteCode={event!.customUrl || event!.inviteCode}
+                        checkedInAt={existingGuestData?.checkedInAt ?? null}
+                        onCheckIn={(checkedInAt) => {
+                          if (existingGuestData) {
+                            setExistingGuestData({ ...existingGuestData, checkedInAt });
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      data-testid="rsvp-button"
+                      onClick={(e) => {
+                        if (isGPP) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }
+                        handleRSVP();
+                      }}
+                      className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                    >
+                      {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                    </button>
+                  )}
                 </div>
                 {event.rsvpClosedAt && (
                   <p className="text-theme-text-muted text-sm">
@@ -1183,18 +1251,44 @@ export function EventPage() {
       {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}
       {showStickyRsvp && (
         <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-theme-card/95 backdrop-blur-sm border-b border-theme-stroke px-4 py-2.5">
-          <button
-            onClick={(e) => {
-              if (isGPP) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-              }
-              handleRSVP();
-            }}
-            className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
-          >
-            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-          </button>
+          {showCheckIn ? (
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => {
+                  if (isGPP) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                  }
+                  handleRSVP();
+                }}
+                className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+              >
+                Edit RSVP
+              </button>
+              <GeoCheckInButton
+                inviteCode={event!.customUrl || event!.inviteCode}
+                checkedInAt={existingGuestData?.checkedInAt ?? null}
+                onCheckIn={(checkedInAt) => {
+                  if (existingGuestData) {
+                    setExistingGuestData({ ...existingGuestData, checkedInAt });
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                if (isGPP) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                }
+                handleRSVP();
+              }}
+              className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+            >
+              {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+            </button>
+          )}
         </div>
       )}
 

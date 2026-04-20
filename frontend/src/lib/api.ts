@@ -888,6 +888,28 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
   });
 }
 
+// Geolocation self-check-in
+export interface GeoCheckInResponse {
+  success: boolean;
+  alreadyCheckedIn: boolean;
+  checkedInAt?: string;
+  distance?: number;
+  threshold?: number;
+  message: string;
+}
+
+export async function geoCheckIn(
+  inviteCode: string,
+  latitude: number,
+  longitude: number,
+  accuracy: number
+): Promise<GeoCheckInResponse> {
+  return apiRequest<GeoCheckInResponse>(`/api/checkin/${inviteCode}/self`, {
+    method: 'POST',
+    body: { latitude, longitude, accuracy },
+  });
+}
+
 // Get sponsor pipeline statistics
 export async function getSponsorStats(partyId: string): Promise<SponsorStats | null> {
   try {

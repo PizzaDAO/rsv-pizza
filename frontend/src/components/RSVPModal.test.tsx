@@ -69,6 +69,7 @@ const makeExistingGuest = (overrides?: Partial<ExistingGuestData>): ExistingGues
   likedBeverages: [],
   dislikedBeverages: [],
   pizzeriaRankings: [],
+  checkedInAt: null,
   ...overrides,
 });
 

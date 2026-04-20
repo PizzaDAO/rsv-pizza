@@ -1013,6 +1013,7 @@ export interface ExistingGuestData {
   pizzeriaRankings: string[];
   suggestedPizzerias: any[];
   status: DbGuestStatus;
+  checkedInAt: string | null;
 }
 
 export async function getExistingGuest(
@@ -1048,6 +1049,7 @@ export async function getExistingGuest(
       pizzeriaRankings: guest.pizzeriaRankings || [],
       suggestedPizzerias: guest.suggestedPizzerias || [],
       status: guest.status || 'CONFIRMED',
+      checkedInAt: guest.checkedInAt || null,
     };
   } catch (error) {
     console.error('Error fetching guest:', error);
