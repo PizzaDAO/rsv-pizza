@@ -2921,6 +2921,7 @@ export interface SponsorUserCreateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  category?: string;
 }
 
 export async function createSponsorUser(data: SponsorUserCreateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
@@ -2944,6 +2945,7 @@ export interface SponsorUserUpdateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  category?: string;
 }
 
 export async function updateSponsorUser(id: string, data: SponsorUserUpdateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {

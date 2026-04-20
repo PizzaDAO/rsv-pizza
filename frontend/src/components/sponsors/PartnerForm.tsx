@@ -163,6 +163,7 @@ function sponsorUserToFormData(su: SponsorUser): PartnerFormData {
     autoCoHost: su.autoCoHost,
     autoSponsor: su.autoSponsor,
     notes: su.notes || '',
+    category: (su.category as SponsorCategory) || null,
   };
 }
 
@@ -463,6 +464,26 @@ export function PartnerForm({
               <span className="text-xs text-theme-text-muted">Avatar preview</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Category — Partner mode */}
+      {isPartner && (
+        <div className="relative">
+          <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
+          <select
+            value={formData.category || ''}
+            onChange={e => handleChange('category', (e.target.value as SponsorCategory) || null)}
+            className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+            {SPONSOR_CATEGORIES.map(opt => (
+              <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

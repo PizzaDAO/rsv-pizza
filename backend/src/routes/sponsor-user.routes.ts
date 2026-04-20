@@ -39,6 +39,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostLogoUrl: true,
         autoCoHost: true,
         autoSponsor: true,
+        category: true,
         coHostShowOnEvent: true,
         coHostCanEdit: true,
         coHostAllowedTabs: true,
@@ -75,6 +76,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
+      category,
     } = req.body;
 
     if (!email || !tag) {
@@ -108,6 +110,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
         coHostCanEdit: !!coHostCanEdit,
         coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
+        category: category?.trim() || null,
       },
     });
 
@@ -140,6 +143,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       coHostName, coHostWebsite, coHostTwitter, coHostInstagram,
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
+      category,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -164,6 +168,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
+    if (category !== undefined) updateData.category = category?.trim() || null;
     if (coHostShowOnEvent !== undefined) updateData.coHostShowOnEvent = !!coHostShowOnEvent;
     if (coHostCanEdit !== undefined) updateData.coHostCanEdit = !!coHostCanEdit;
     if (coHostAllowedTabs !== undefined) {

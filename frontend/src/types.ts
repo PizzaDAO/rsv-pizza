@@ -1145,6 +1145,7 @@ export interface SponsorUser {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  category: string | null;
 }
 
 export interface SponsorChecklistItem {

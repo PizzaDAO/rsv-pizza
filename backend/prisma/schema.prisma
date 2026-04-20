@@ -1115,6 +1115,7 @@ model SponsorUser {
   coHostLogoUrl   String?   @map("co_host_logo_url")
   autoCoHost      Boolean   @default(false) @map("auto_co_host")
   autoSponsor     Boolean   @default(false) @map("auto_sponsor")
+  category        String?
 
   // Granular co-host permissions (applied when autoCoHost adds them to events)
   coHostShowOnEvent Boolean @default(true)  @map("co_host_show_on_event")
