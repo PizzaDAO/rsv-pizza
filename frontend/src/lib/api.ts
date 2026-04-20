@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, Invoice, CreateInvoiceData, UpdateInvoiceData } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -963,6 +963,131 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
   }
 }
 
+// ============================================
+// Invoice API functions
+// ============================================
+
+// Get all invoices for a party
+export async function getInvoices(partyId: string): Promise<{ invoices: Invoice[] } | null> {
+  try {
+    return await apiRequest<{ invoices: Invoice[] }>(`/api/parties/${partyId}/invoices`, {
+      method: 'GET',
+    });
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    return null;
+  }
+}
+
+// Get single invoice
+export async function getInvoice(partyId: string, invoiceId: string): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}`, {
+      method: 'GET',
+    });
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
+    return null;
+  }
+}
+
+// Create a new invoice
+export async function createInvoice(partyId: string, data: CreateInvoiceData): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices`, {
+      method: 'POST',
+      body: data,
+    });
+  } catch (error) {
+    console.error('Error creating invoice:', error);
+    return null;
+  }
+}
+
+// Update an invoice
+export async function updateInvoice(partyId: string, invoiceId: string, data: UpdateInvoiceData): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}`, {
+      method: 'PATCH',
+      body: data,
+    });
+  } catch (error) {
+    console.error('Error updating invoice:', error);
+    return null;
+  }
+}
+
+// Delete a draft invoice
+export async function deleteInvoice(partyId: string, invoiceId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/invoices/${invoiceId}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    return false;
+  }
+}
+
+// Send an invoice
+export async function sendInvoice(partyId: string, invoiceId: string, resend = false): Promise<{ invoice: Invoice; emailSent: boolean } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice; emailSent: boolean }>(`/api/parties/${partyId}/invoices/${invoiceId}/send`, {
+      method: 'POST',
+      body: { resend },
+    });
+  } catch (error) {
+    console.error('Error sending invoice:', error);
+    return null;
+  }
+}
+
+// Mark invoice as paid
+export async function markInvoicePaid(
+  partyId: string,
+  invoiceId: string,
+  data: { paymentMethod?: string; paymentRef?: string; paidAmount?: number }
+): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
+      method: 'POST',
+      body: data,
+    });
+  } catch (error) {
+    console.error('Error marking invoice paid:', error);
+    return null;
+  }
+}
+
+// Get public invoice by view token (no auth required)
+export async function getPublicInvoice(viewToken: string): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/invoice/${viewToken}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching public invoice:', error);
+    return null;
+  }
+}
+
+// Record invoice view (no auth required)
+export async function recordInvoiceView(viewToken: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/invoice/${viewToken}/record-view`, {
+      method: 'POST',
+      requireAuth: false,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error recording invoice view:', error);
+    return false;
+  }
+}
+
+// ============================================
 // Partner Intake Form API functions
 
 export interface PartnerIntakeData {

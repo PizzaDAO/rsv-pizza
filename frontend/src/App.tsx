@@ -23,6 +23,7 @@ import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
+import { InvoicePage } from './pages/InvoicePage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -60,6 +61,7 @@ function App() {
             <Route path="/partner-dashboard" element={<PartnerDashboardPage />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner-dashboard" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
+            <Route path="/invoice/:viewToken" element={<InvoicePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
