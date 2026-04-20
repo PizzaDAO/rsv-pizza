@@ -206,7 +206,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     };
 
     const getSuccessTitle = () => {
-      if (form.wasUpdated) return 'RSVP Updated!';
+      if (form.wasUpdated) return 'RSVP Updated';
       if (form.alreadyRegistered) return "You're already registered!";
       if (form.waitlisted) return "You're on the Waitlist!";
       if (form.pendingApproval) return 'RSVP Submitted!';
