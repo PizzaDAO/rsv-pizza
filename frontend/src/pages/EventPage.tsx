@@ -967,63 +967,91 @@ export function EventPage() {
                   </div>
                 )}
 
-                {/* Description */}
-                {event.description && (
+                {/* Description + Sponsor Blurbs */}
+                {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
                   <div className="border-t border-theme-stroke pt-4 mt-4">
                     <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
-                        components={{
-                          a: ({ node, ...props }) => (
-                            <a
-                              {...props}
-                              className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => {
-                                if (slug && props.href) {
-                                  trackLinkClick(slug, props.href, 'description', typeof props.children === 'string' ? props.children : undefined);
-                                }
-                              }}
-                            />
-                          ),
-                          p: ({ node, ...props }) => (
-                            <p {...props} className="mb-3 last:mb-0" />
-                          ),
-                          ul: ({ node, ...props }) => (
-                            <ul {...props} className="list-disc list-inside mb-3 space-y-1" />
-                          ),
-                          ol: ({ node, ...props }) => (
-                            <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
-                          ),
-                          h1: ({ node, ...props }) => (
-                            <h1 {...props} className="text-xl font-bold text-theme-text mt-4 mb-2 first:mt-0" />
-                          ),
-                          h2: ({ node, ...props }) => (
-                            <h2 {...props} className="text-lg font-bold text-theme-text mt-4 mb-2 first:mt-0" />
-                          ),
-                          h3: ({ node, ...props }) => (
-                            <h3 {...props} className="text-base font-semibold text-theme-text mt-3 mb-2 first:mt-0" />
-                          ),
-                          strong: ({ node, ...props }) => (
-                            <strong {...props} className="font-semibold text-theme-text" />
-                          ),
-                          em: ({ node, ...props }) => (
-                            <em {...props} className="italic" />
-                          ),
-                          blockquote: ({ node, ...props }) => (
-                            <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
-                          ),
-                          code: ({ node, inline, ...props }) =>
-                            inline ? (
-                              <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
-                            ) : (
-                              <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
+                      {event.description && (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a
+                                {...props}
+                                className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  if (slug && props.href) {
+                                    trackLinkClick(slug, props.href, 'description', typeof props.children === 'string' ? props.children : undefined);
+                                  }
+                                }}
+                              />
                             ),
-                        }}
-                      >
-                        {event.description}
-                      </ReactMarkdown>
+                            p: ({ node, ...props }) => (
+                              <p {...props} className="mb-3 last:mb-0" />
+                            ),
+                            ul: ({ node, ...props }) => (
+                              <ul {...props} className="list-disc list-inside mb-3 space-y-1" />
+                            ),
+                            ol: ({ node, ...props }) => (
+                              <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
+                            ),
+                            h1: ({ node, ...props }) => (
+                              <h1 {...props} className="text-xl font-bold text-theme-text mt-4 mb-2 first:mt-0" />
+                            ),
+                            h2: ({ node, ...props }) => (
+                              <h2 {...props} className="text-lg font-bold text-theme-text mt-4 mb-2 first:mt-0" />
+                            ),
+                            h3: ({ node, ...props }) => (
+                              <h3 {...props} className="text-base font-semibold text-theme-text mt-3 mb-2 first:mt-0" />
+                            ),
+                            strong: ({ node, ...props }) => (
+                              <strong {...props} className="font-semibold text-theme-text" />
+                            ),
+                            em: ({ node, ...props }) => (
+                              <em {...props} className="italic" />
+                            ),
+                            blockquote: ({ node, ...props }) => (
+                              <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
+                            ),
+                            code: ({ node, inline, ...props }) =>
+                              inline ? (
+                                <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
+                              ) : (
+                                <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
+                              ),
+                          }}
+                        >
+                          {event.description}
+                        </ReactMarkdown>
+                      )}
+                      {event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0 && (
+                        <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
+                          {event.sponsors
+                            .filter(s => s.brandDescription)
+                            .map(sponsor => (
+                              <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
+                                <strong>
+                                  {sponsor.website ? (
+                                    <a
+                                      href={sponsor.website}
+                                      className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {sponsor.name}
+                                    </a>
+                                  ) : (
+                                    sponsor.name
+                                  )}
+                                  :
+                                </strong>{' '}
+                                {sponsor.brandDescription}
+                              </p>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

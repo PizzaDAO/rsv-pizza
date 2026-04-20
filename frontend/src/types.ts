@@ -947,9 +947,7 @@ export interface ChecklistData {
   seeded: boolean;
 }
 
-// ============================================
 // Underboss Dashboard types
-// ============================================
 
 export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'west-africa' | 'east-africa' | 'south-africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
 
@@ -1034,9 +1032,7 @@ export interface UnderbossDashboardData {
   events: UnderbossEvent[];
 }
 
-// ============================================
 // Admin Management types
-// ============================================
 
 export interface AdminUser {
   id: string;
@@ -1058,9 +1054,7 @@ export interface UnderbossAdmin {
   createdAt: string;
 }
 
-// ============================================
 // Shipping Dashboard types
-// ============================================
 
 export interface ShippingKit {
   id: string;
@@ -1123,9 +1117,7 @@ export interface ShippingMeResponse {
   email: string;
 }
 
-// ============================================
 // Sponsor Dashboard types
-// ============================================
 
 export interface SponsorUser {
   id: string;
@@ -1146,6 +1138,7 @@ export interface SponsorUser {
   autoCoHost: boolean;
   autoSponsor: boolean;
   category: string | null;
+  brandDescription: string | null;
 }
 
 export interface SponsorChecklistItem {

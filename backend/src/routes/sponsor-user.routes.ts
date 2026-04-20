@@ -6,9 +6,7 @@ import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
 
-// ============================================
 // Admin management routes (mounted at /api/sponsor-users)
-// ============================================
 
 export const sponsorUserAdminRouter = Router();
 
@@ -43,6 +41,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostShowOnEvent: true,
         coHostCanEdit: true,
         coHostAllowedTabs: true,
+        brandDescription: true,
       },
     });
 
@@ -77,6 +76,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
+      brandDescription,
     } = req.body;
 
     if (!email || !tag) {
@@ -107,6 +107,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         coHostLogoUrl: coHostLogoUrl?.trim() || null,
         autoCoHost: autoCoHost || false,
         autoSponsor: autoSponsor || false,
+        brandDescription: brandDescription?.trim() || null,
         coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
         coHostCanEdit: !!coHostCanEdit,
         coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
@@ -144,6 +145,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       coHostAvatarUrl, coHostLogoUrl, autoCoHost, autoSponsor,
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
+      brandDescription,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -166,6 +168,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostInstagram !== undefined) updateData.coHostInstagram = coHostInstagram?.trim() || null;
     if (coHostAvatarUrl !== undefined) updateData.coHostAvatarUrl = coHostAvatarUrl?.trim() || null;
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
+    if (brandDescription !== undefined) updateData.brandDescription = brandDescription?.trim() || null;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
     if (category !== undefined) updateData.category = category?.trim() || null;
@@ -273,9 +276,7 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
   }
 });
 
-// ============================================
 // Sponsor Dashboard routes (mounted at /api/sponsor)
-// ============================================
 
 export const sponsorDashboardRouter = Router();
 
