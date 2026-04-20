@@ -20,11 +20,13 @@ interface SponsorUserLike {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  category: string | null;
   coHostShowOnEvent?: boolean;
   coHostCanEdit?: boolean;
   coHostAllowedTabs?: any;
   name: string | null;
   email: string;
+  brandDescription: string | null;
 }
 
 interface PartyLike {
@@ -90,7 +92,9 @@ export async function addPartnerToParty(
       website: sponsorUser.coHostWebsite || null,
       brandTwitter: sponsorUser.coHostTwitter || null,
       brandInstagram: sponsorUser.coHostInstagram || null,
+      brandDescription: sponsorUser.brandDescription || null,
       logoUrl: sponsorUser.coHostLogoUrl || null,
+      category: sponsorUser.category || null,
     };
 
     const existingSponsor = await prisma.sponsor.findFirst({

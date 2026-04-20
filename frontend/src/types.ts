@@ -427,6 +427,17 @@ export interface PhotoStats {
 // Sponsor CRM types
 export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
 export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
+export type SponsorCategory = 'hardware_wallet' | 'software_wallet' | 'cex' | 'blockchain' | 'dex' | 'community' | 'custom';
+
+export const SPONSOR_CATEGORIES: { id: SponsorCategory; label: string }[] = [
+  { id: 'hardware_wallet', label: 'Hardware Wallet' },
+  { id: 'software_wallet', label: 'Software Wallet' },
+  { id: 'cex', label: 'CEX' },
+  { id: 'blockchain', label: 'Blockchain' },
+  { id: 'dex', label: 'DEX' },
+  { id: 'community', label: 'Community' },
+  { id: 'custom', label: 'Custom' },
+];
 
 export interface Sponsor {
   id: string;
@@ -447,6 +458,7 @@ export interface Sponsor {
   sponsorshipType: SponsorshipType | null;
   productService: string | null;
   logoUrl: string | null;
+  category: string | null;
   notes: string | null;
   lastContactedAt: string | null;
   intakeToken: string | null;
@@ -1002,9 +1014,7 @@ export interface ChecklistData {
   seeded: boolean;
 }
 
-// ============================================
 // Underboss Dashboard types
-// ============================================
 
 export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'west-africa' | 'east-africa' | 'south-africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
 
@@ -1089,9 +1099,7 @@ export interface UnderbossDashboardData {
   events: UnderbossEvent[];
 }
 
-// ============================================
 // Admin Management types
-// ============================================
 
 export interface AdminUser {
   id: string;
@@ -1113,9 +1121,7 @@ export interface UnderbossAdmin {
   createdAt: string;
 }
 
-// ============================================
 // Shipping Dashboard types
-// ============================================
 
 export interface ShippingKit {
   id: string;
@@ -1178,9 +1184,7 @@ export interface ShippingMeResponse {
   email: string;
 }
 
-// ============================================
 // Sponsor Dashboard types
-// ============================================
 
 export interface SponsorUser {
   id: string;
@@ -1200,6 +1204,8 @@ export interface SponsorUser {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  category: string | null;
+  brandDescription: string | null;
 }
 
 export interface SponsorChecklistItem {

@@ -74,6 +74,8 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         coHostLogoUrl: data.logoUrl || undefined,
         autoCoHost: data.autoCoHost,
         autoSponsor: data.autoSponsor,
+        category: data.category || undefined,
+        brandDescription: data.brandDescription || undefined,
       };
 
       let newSyncMessage: string | null = null;

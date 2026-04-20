@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, MessageSquare, Loader2 } from 'lucide-react';
-import { Sponsor, SponsorStatus, SponsorshipType, SponsorUser } from '../../types';
+import { Sponsor, SponsorStatus, SponsorshipType, SponsorCategory, SPONSOR_CATEGORIES, SponsorUser } from '../../types';
 import { CreateSponsorData, PartnerIntakeResponse } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -48,6 +48,7 @@ export interface PartnerFormData {
   status: SponsorStatus;
   amount: number | null;
   lastContactedAt: string | null;
+  category: SponsorCategory | null;
 
   // Partner-only
   email: string;
@@ -79,6 +80,7 @@ export function extractSponsorData(data: PartnerFormData): CreateSponsorData {
     logoUrl: data.logoUrl || undefined,
     notes: data.notes || undefined,
     lastContactedAt: data.lastContactedAt,
+    category: data.category || undefined,
   };
 }
 
@@ -114,7 +116,7 @@ function getDefaultFormData(): PartnerFormData {
     contactTwitter: '', telegram: '',
     sponsorshipType: null, productService: '', sponsorMessage: '',
     pointPerson: '', status: 'todo' as SponsorStatus,
-    amount: null, lastContactedAt: null,
+    amount: null, lastContactedAt: null, category: null,
     email: '', tag: '', contactPersonName: '', coHostAvatarUrl: '',
     autoCoHost: false, autoSponsor: false,
   };
@@ -142,6 +144,7 @@ function sponsorToFormData(s: Sponsor): PartnerFormData {
     productService: s.productService || '',
     sponsorMessage: s.sponsorMessage || '',
     lastContactedAt: s.lastContactedAt ? s.lastContactedAt.split('T')[0] : null,
+    category: (s.category as SponsorCategory) || null,
   };
 }
 
@@ -155,11 +158,13 @@ function sponsorUserToFormData(su: SponsorUser): PartnerFormData {
     website: su.coHostWebsite || '',
     brandTwitter: su.coHostTwitter || '',
     brandInstagram: su.coHostInstagram || '',
+    brandDescription: su.brandDescription || '',
     coHostAvatarUrl: su.coHostAvatarUrl || '',
     logoUrl: su.coHostLogoUrl || '',
     autoCoHost: su.autoCoHost,
     autoSponsor: su.autoSponsor,
     notes: su.notes || '',
+    category: (su.category as SponsorCategory) || null,
   };
 }
 
@@ -423,14 +428,14 @@ export function PartnerForm({
             />
           )}
         </div>
-        {(isCrm || isIntake) && (
+        {(isCrm || isIntake || isPartner) && (
           <IconInput
             icon={FileText}
             multiline
             rows={2}
             value={formData.brandDescription}
             onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-            placeholder="1-2 sentence description"
+            placeholder="1-2 sentence brand description (shown on event page)"
           />
         )}
       </div>
@@ -460,6 +465,26 @@ export function PartnerForm({
               <span className="text-xs text-theme-text-muted">Avatar preview</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Category — Partner mode */}
+      {isPartner && (
+        <div className="relative">
+          <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
+          <select
+            value={formData.category || ''}
+            onChange={e => handleChange('category', (e.target.value as SponsorCategory) || null)}
+            className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+            {SPONSOR_CATEGORIES.map(opt => (
+              <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -537,6 +562,22 @@ export function PartnerForm({
               >
                 {STATUS_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="relative">
+              <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
+              <select
+                value={formData.category || ''}
+                onChange={e => handleChange('category', (e.target.value as SponsorCategory) || null)}
+                className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                style={{ colorScheme: 'dark' }}
+              >
+                <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+                {SPONSOR_CATEGORIES.map(opt => (
+                  <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
                     {opt.label}
                   </option>
                 ))}
