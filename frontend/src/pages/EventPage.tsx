@@ -1045,7 +1045,6 @@ export function EventPage() {
                                   ) : (
                                     sponsor.name
                                   )}
-                                  :
                                 </strong>{' '}
                                 {sponsor.brandDescription}
                               </p>
