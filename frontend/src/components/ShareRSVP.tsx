@@ -6,6 +6,7 @@ interface ShareRSVPProps {
   eventImageUrl: string | null;
   customUrl: string | null;
   inviteCode: string;
+  twitterHandles?: string[];
 }
 
 // X (Twitter) icon
@@ -15,13 +16,48 @@ const XIcon: React.FC<{ size: number }> = ({ size }) => (
   </svg>
 );
 
-export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode }: ShareRSVPProps) {
+/** Normalize a twitter handle: strip @, strip full URL prefixes */
+function normalizeHandle(raw: string): string {
+  return raw
+    .replace(/^https?:\/\/(www\.)?(twitter\.com|x\.com)\//i, '')
+    .replace(/^@/, '')
+    .replace(/\/.*$/, '')
+    .trim();
+}
+
+/** Build share text that fits within maxLen chars */
+function buildShareText(base: string, handles: string[], maxLen: number): string {
+  let mentions = handles.map(h => `@${h}`);
+  let text = `${base}\n\n${mentions.join(' ')}`;
+  if (text.length <= maxLen) return text;
+  // Drop handles from end but always keep @Pizza_DAO (first)
+  while (mentions.length > 1 && text.length > maxLen) {
+    mentions.pop();
+    text = `${base}\n\n${mentions.join(' ')}`;
+  }
+  return text;
+}
+
+export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [] }: ShareRSVPProps) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
-  const shareText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
+  const baseText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
+
+  // Build deduplicated handles list, always starting with Pizza_DAO
+  const allHandles = ['Pizza_DAO', ...twitterHandles];
+  const seen = new Set<string>();
+  const uniqueHandles: string[] = [];
+  for (const raw of allHandles) {
+    const normalized = normalizeHandle(raw);
+    if (normalized && !seen.has(normalized.toLowerCase())) {
+      seen.add(normalized.toLowerCase());
+      uniqueHandles.push(normalized);
+    }
+  }
+  const shareText = buildShareText(baseText, uniqueHandles, 250);
 
   const handleShareX = () => {
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(eventUrl)}`;

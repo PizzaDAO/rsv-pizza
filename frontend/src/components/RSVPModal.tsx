@@ -264,14 +264,29 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             </p>
           )}
           {/* Share Section */}
-          {(!form.alreadyRegistered || form.wasUpdated) && (
-            <ShareRSVP
-              eventName={event.name}
-              eventImageUrl={event.eventImageUrl}
-              customUrl={event.customUrl}
-              inviteCode={event.inviteCode}
-            />
-          )}
+          {(!form.alreadyRegistered || form.wasUpdated) && (() => {
+            const twitterHandles: string[] = [];
+            if (event.hostProfile?.twitter) twitterHandles.push(event.hostProfile.twitter);
+            if (event.coHosts) {
+              for (const host of event.coHosts) {
+                if (host.twitter && host.showOnEvent !== false) twitterHandles.push(host.twitter);
+              }
+            }
+            if (event.sponsors) {
+              for (const sponsor of event.sponsors) {
+                if (sponsor.brandTwitter) twitterHandles.push(sponsor.brandTwitter);
+              }
+            }
+            return (
+              <ShareRSVP
+                eventName={event.name}
+                eventImageUrl={event.eventImageUrl}
+                customUrl={event.customUrl}
+                inviteCode={event.inviteCode}
+                twitterHandles={twitterHandles}
+              />
+            );
+          })()}
           {/* NFT Minting Status */}
           {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && (
             <div className="mt-4 pt-4 border-t border-theme-stroke">
