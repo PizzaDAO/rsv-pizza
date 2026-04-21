@@ -154,6 +154,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         website: true,
         brandDescription: true,
         logoUrl: true,
+        brandTwitter: true,
       },
       orderBy: { createdAt: 'asc' },
     });

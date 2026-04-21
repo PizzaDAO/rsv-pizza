@@ -303,14 +303,23 @@ export function RSVPPage() {
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
-          {!form.alreadyRegistered && !form.pendingApproval && (
-            <ShareRSVP
-              eventName={party?.name || ''}
-              eventImageUrl={party?.event_image_url || null}
-              customUrl={party?.custom_url || null}
-              inviteCode={inviteCode || ''}
-            />
-          )}
+          {!form.alreadyRegistered && !form.pendingApproval && (() => {
+            const twitterHandles: string[] = [];
+            if (party?.co_hosts) {
+              for (const host of party.co_hosts as any[]) {
+                if (host.twitter && host.showOnEvent !== false) twitterHandles.push(host.twitter);
+              }
+            }
+            return (
+              <ShareRSVP
+                eventName={party?.name || ''}
+                eventImageUrl={party?.event_image_url || null}
+                customUrl={party?.custom_url || null}
+                inviteCode={inviteCode || ''}
+                twitterHandles={twitterHandles}
+              />
+            );
+          })()}
           <button
             onClick={handleClose}
             className="btn-secondary"

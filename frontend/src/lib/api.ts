@@ -359,6 +359,7 @@ export interface PublicEventSponsor {
   website: string | null;
   brandDescription: string | null;
   logoUrl: string | null;
+  brandTwitter: string | null;
 }
 
 export interface PublicEvent {
