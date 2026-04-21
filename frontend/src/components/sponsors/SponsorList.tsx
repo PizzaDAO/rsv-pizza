@@ -3,18 +3,15 @@ import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
   Mail, Phone, User, Building2, Calendar
 } from 'lucide-react';
-import { Sponsor, SponsorStatus, Invoice, SPONSOR_CATEGORIES } from '../../types';
+import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
-import { InvoiceButton } from './InvoiceButton';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
   partyId: string;
-  invoices?: Invoice[];
   onEdit: (sponsor: Sponsor) => void;
   onDelete: (sponsorId: string) => void;
   onSponsorUpdate: (sponsor: Sponsor) => void;
-  onInvoiceUpdate?: (invoice: Invoice) => void;
   isLoading?: boolean;
 }
 
@@ -43,7 +40,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, invoices = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, isLoading }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, isLoading }: SponsorListProps) {
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterStatus, setFilterStatus] = useState<SponsorStatus | 'all'>('all');
@@ -336,13 +333,6 @@ export function SponsorList({ sponsors, partyId, invoices = [], onEdit, onDelete
                   {/* Actions */}
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
-                      <InvoiceButton
-                        sponsor={sponsor}
-                        partyId={partyId}
-                        invoice={invoices.find(inv => inv.sponsorId === sponsor.id) || null}
-                        onInvoiceUpdate={(inv) => onInvoiceUpdate?.(inv)}
-                        onSponsorUpdate={onSponsorUpdate}
-                      />
                       <PartnerIntakeButton
                         sponsor={sponsor}
                         partyId={partyId}
