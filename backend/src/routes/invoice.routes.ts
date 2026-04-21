@@ -756,4 +756,78 @@ publicRouter.post('/:viewToken/record-view', async (req: Request, res: Response,
   }
 });
 
+// POST /api/invoice/:viewToken/pay - Record payment (public, token-gated)
+publicRouter.post('/:viewToken/pay', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { viewToken } = req.params;
+    const { paymentMethod, paymentRef, paidAmount, chainId, tokenSymbol } = req.body;
+
+    if (!paymentMethod || !paymentRef) {
+      throw new AppError('paymentMethod and paymentRef are required', 400, 'VALIDATION_ERROR');
+    }
+
+    const validMethods = ['stripe', 'usdc', 'crypto'];
+    if (!validMethods.includes(paymentMethod)) {
+      throw new AppError(`Invalid payment method. Must be one of: ${validMethods.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { viewToken },
+      include: {
+        sponsor: { select: { id: true } },
+      },
+    });
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    }
+
+    // Only allow payment on issued or viewed invoices
+    if (!['issued', 'viewed'].includes(invoice.status)) {
+      throw new AppError(
+        invoice.status === 'paid'
+          ? 'This invoice has already been paid'
+          : `Cannot pay an invoice with status "${invoice.status}"`,
+        400,
+        'INVALID_STATUS'
+      );
+    }
+
+    // Build payment ref with chain/token info for crypto payments
+    let fullPaymentRef = paymentRef;
+    if (chainId || tokenSymbol) {
+      const parts = [paymentRef];
+      if (chainId) parts.push(`chain:${chainId}`);
+      if (tokenSymbol) parts.push(`token:${tokenSymbol}`);
+      fullPaymentRef = parts.join(' | ');
+    }
+
+    // Update invoice to paid
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        status: 'paid',
+        paidAt: new Date(),
+        paidAmount: paidAmount ?? invoice.total,
+        paymentMethod,
+        paymentRef: fullPaymentRef,
+      },
+      include: {
+        party: { select: { name: true, eventImageUrl: true } },
+        sponsor: { select: { name: true, logoUrl: true } },
+      },
+    });
+
+    // Auto-update sponsor status to 'paid'
+    await prisma.sponsor.update({
+      where: { id: invoice.sponsorId },
+      data: { status: 'paid' },
+    });
+
+    res.json({ invoice: updatedInvoice });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { hostRouter as invoiceHostRoutes, publicRouter as invoicePublicRoutes };

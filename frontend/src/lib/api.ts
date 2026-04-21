@@ -1087,6 +1087,29 @@ export async function recordInvoiceView(viewToken: string): Promise<boolean> {
   }
 }
 
+// Pay an invoice (public, token-gated — no auth required)
+export async function payInvoice(
+  viewToken: string,
+  data: {
+    paymentMethod: 'stripe' | 'usdc' | 'crypto';
+    paymentRef: string;
+    paidAmount?: number;
+    chainId?: number;
+    tokenSymbol?: string;
+  }
+): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/invoice/${viewToken}/pay`, {
+      method: 'POST',
+      body: data,
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error paying invoice:', error);
+    throw error; // Re-throw so callers can show the error message
+  }
+}
+
 // ============================================
 // Partner Intake Form API functions
 
