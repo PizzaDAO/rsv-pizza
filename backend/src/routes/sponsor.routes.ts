@@ -211,6 +211,58 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
   }
 });
 
+// PATCH /api/parties/:partyId/sponsors/reorder - Reorder sponsors (host only)
+router.patch('/:partyId/sponsors/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { sponsorIds } = req.body;
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'sponsors');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    if (!Array.isArray(sponsorIds) || sponsorIds.length === 0) {
+      throw new AppError('sponsorIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    const sponsors = await prisma.sponsor.findMany({
+      where: { partyId },
+      select: { id: true },
+    });
+
+    const existingIds = new Set(sponsors.map(s => s.id));
+    for (const id of sponsorIds) {
+      if (!existingIds.has(id)) {
+        throw new AppError(`Sponsor ${id} not found in this party`, 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    await prisma.$transaction(
+      sponsorIds.map((id: string, index: number) =>
+        prisma.sponsor.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    const updatedSponsors = await prisma.sponsor.findMany({
+      where: { partyId },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    res.json({ sponsors: updatedSponsors });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/:partyId/sponsors/:sponsorId - Get single sponsor details
 router.get('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

@@ -865,12 +865,16 @@ model Sponsor {
   intakeSubmittedAt DateTime? @map("intake_submitted_at") @db.Timestamptz
   sponsorMessage    String?   @map("sponsor_message")
 
+  // Display order (for flyer logo row)
+  sortOrder Int @default(0) @map("sort_order")
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([partyId, status])
   @@index([partyId, createdAt])
+  @@index([partyId, sortOrder])
   @@map("sponsors")
 }
 
