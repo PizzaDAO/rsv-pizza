@@ -168,6 +168,9 @@ model Party {
   hiddenGppPhotos  Json  @default("[]") @map("hidden_gpp_photos")  // Array of hidden app.gpp.day photo src paths
   extraGppPhotos   Json  @default("[]") @map("extra_gpp_photos")   // Array of host-uploaded previous year photo URLs
 
+  // Quiz settings
+  quizEnabled Boolean @default(false) @map("quiz_enabled")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -190,6 +193,7 @@ model Party {
   pageViews             PageView[]
   linkClicks            LinkClick[]
   sponsorChecklistItems SponsorChecklistItem[]
+  quizQuestions         QuizQuestion[]
 
   @@map("parties")
 }
@@ -239,6 +243,7 @@ model Guest {
   raffleEntries    RaffleEntry[]
   raffleWins       RaffleWinner[]
   notableAttendees NotableAttendee[]
+  quizAnswers      QuizAnswer[]
 
   @@index([email])
   @@map("guests")
@@ -875,6 +880,8 @@ model Sponsor {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  quizQuestions QuizQuestion[]
+
   @@index([partyId, status])
   @@index([partyId, createdAt])
   @@index([partyId, sortOrder])
@@ -1133,7 +1140,8 @@ model SponsorUser {
   coHostCanEdit     Boolean @default(false) @map("co_host_can_edit")
   coHostAllowedTabs Json?   @map("co_host_allowed_tabs")
 
-  checklistItems SponsorChecklistItem[]
+  checklistItems        SponsorChecklistItem[]
+  quizQuestionTemplates QuizQuestionTemplate[]
 
   @@index([tag])
   @@map("sponsor_users")
@@ -1169,4 +1177,76 @@ model AppConfig {
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   @@map("app_config")
+}
+
+// ============================================
+// Quiz Models
+// ============================================
+
+// Quiz question templates (global, per partner — managed by underboss)
+model QuizQuestionTemplate {
+  id            String      @id @default(uuid()) @db.Uuid
+  sponsorUserId String      @map("sponsor_user_id") @db.Uuid
+  sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
+
+  question     String
+  options      Json    @default("[]") // ["Option A", "Option B", "Option C", "Option D"]
+  correctIndex Int     @map("correct_index")
+  explanation  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  quizQuestions QuizQuestion[]
+
+  @@index([sponsorUserId])
+  @@map("quiz_question_templates")
+}
+
+// Quiz questions (per event, copied from templates or created by host)
+model QuizQuestion {
+  id       String  @id @default(uuid()) @db.Uuid
+  partyId  String  @map("party_id") @db.Uuid
+  party    Party   @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  sponsorId  String?  @map("sponsor_id") @db.Uuid
+  sponsor    Sponsor? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+
+  templateId String?               @map("template_id") @db.Uuid
+  template   QuizQuestionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  question     String
+  options      Json    @default("[]") // ["Option A", "Option B", "Option C", "Option D"]
+  correctIndex Int     @map("correct_index")
+  explanation  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  answers QuizAnswer[]
+
+  @@index([partyId])
+  @@map("quiz_questions")
+}
+
+// Quiz answers (guest responses)
+model QuizAnswer {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  guestId String @map("guest_id") @db.Uuid
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  selectedIndex Int     @map("selected_index")
+  isCorrect     Boolean @map("is_correct")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([questionId, guestId])
+  @@index([questionId])
+  @@index([guestId])
+  @@map("quiz_answers")
 }

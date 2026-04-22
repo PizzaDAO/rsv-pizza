@@ -393,7 +393,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       region,
       venueReportTitle, venueReportNotes,
       hiddenGppPhotos, extraGppPhotos,
-      lumaUrl, meetupUrl, eventbriteUrl, externalLinks
+      lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
+      quizEnabled
     } = req.body;
 
     // Verify ownership or super admin
@@ -509,6 +510,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(meetupUrl !== undefined && { meetupUrl: meetupUrl || null }),
         ...(eventbriteUrl !== undefined && { eventbriteUrl: eventbriteUrl || null }),
         ...(externalLinks !== undefined && { externalLinks }),
+        ...(quizEnabled !== undefined && { quizEnabled }),
       },
       include: {
         user: { select: { name: true } },

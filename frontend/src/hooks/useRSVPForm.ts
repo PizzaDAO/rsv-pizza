@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
-import { Pizzeria } from '../types';
-import { PublicEvent } from '../lib/api';
+import { Pizzeria, QuizPublicQuestion, QuizSubmitResponse } from '../types';
+import { PublicEvent, getEventQuiz, submitQuizAnswers } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 
@@ -27,6 +27,7 @@ export interface RSVPEventData {
   availableBeverages: string[];
   availableToppings: string[];
   selectedPizzerias?: Pizzeria[];
+  quizEnabled?: boolean;
 }
 
 export interface RSVPSubmitResult {
@@ -67,6 +68,7 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     availableBeverages: event.availableBeverages || [],
     availableToppings: event.availableToppings || [],
     selectedPizzerias: event.selectedPizzerias,
+    quizEnabled: event.quizEnabled,
   };
 }
 
@@ -89,6 +91,7 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     availableBeverages: party.available_beverages || [],
     availableToppings: party.available_toppings || [],
     selectedPizzerias: party.selected_pizzerias as Pizzeria[] | undefined,
+    quizEnabled: party.quiz_enabled,
   };
 }
 
@@ -140,7 +143,16 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [venueLocation, setVenueLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Quiz state (Step 3)
+  const [quizQuestions, setQuizQuestions] = useState<QuizPublicQuestion[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [quizResults, setQuizResults] = useState<QuizSubmitResponse | null>(null);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+
   // Computed values
+  const hasQuiz = !!(eventData.quizEnabled && quizQuestions.length > 0);
+  const totalSteps = hasQuiz ? 3 : 2;
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
@@ -172,6 +184,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setError(null);
     setSwcOptIn(false);
     setShowSwcInfoModal(false);
+    setQuizAnswers({});
+    setQuizResults(null);
+    setQuizSubmitted(false);
 
     // Pre-fill with existing guest data if editing
     if (existingGuest) {
@@ -280,7 +295,34 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     fetchPizzerias();
   }, [eventData.address, eventData.selectedPizzerias, isOpen]);
 
+  // Load quiz questions when quiz is enabled
+  useEffect(() => {
+    async function fetchQuiz() {
+      if (!isOpen || !eventData.quizEnabled) return;
+
+      const slug = eventData.customUrl || eventData.inviteCode;
+      if (!slug) return;
+
+      setLoadingQuiz(true);
+      try {
+        const data = await getEventQuiz(slug);
+        if (data.quizEnabled && data.questions.length > 0) {
+          setQuizQuestions(data.questions);
+        }
+      } catch (err) {
+        console.error('Failed to load quiz:', err);
+      } finally {
+        setLoadingQuiz(false);
+      }
+    }
+    fetchQuiz();
+  }, [eventData.quizEnabled, eventData.customUrl, eventData.inviteCode, isOpen]);
+
   // ---- Handlers ----
+
+  const setQuizAnswer = useCallback((questionId: string, optionIndex: number) => {
+    setQuizAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
+  }, []);
 
   const toggleRole = useCallback((role: string) => {
     setRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
@@ -352,8 +394,24 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setStep(2);
   }, [name]);
 
+  // When quiz is active and user is on Step 2, advance to Step 3 instead of submitting
+  const handleStep2Continue = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasQuiz) {
+      setError(null);
+      setStep(3);
+    }
+  }, [hasQuiz]);
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // If on step 2 with quiz, advance to step 3 instead
+    if (step === 2 && hasQuiz) {
+      setError(null);
+      setStep(3);
+      return;
+    }
 
     const inviteCode = eventData.customUrl || eventData.inviteCode;
     if (!inviteCode) {
@@ -394,6 +452,23 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
             disliked_beverages: dislikedBeverages,
           });
         }
+
+        // Submit quiz answers if quiz is active
+        if (hasQuiz && Object.keys(quizAnswers).length > 0 && result.guest?.id) {
+          try {
+            const answers = Object.entries(quizAnswers).map(([questionId, selectedIndex]) => ({
+              questionId,
+              selectedIndex,
+            }));
+            const quizResult = await submitQuizAnswers(inviteCode, result.guest.id, answers);
+            setQuizResults(quizResult);
+            setQuizSubmitted(true);
+          } catch (quizErr) {
+            console.error('Failed to submit quiz answers:', quizErr);
+            // Don't block RSVP success for quiz failure
+          }
+        }
+
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
         setWasUpdated(isEditing || result.updated);
@@ -419,16 +494,18 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
     setSubmitting(false);
   }, [
-    eventData, name, email, ethereumAddress, roles, mailingListOptIn,
+    step, hasQuiz, eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
     dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn,
-    saveToProfile, isEditing, onSuccess,
+    saveToProfile, isEditing, onSuccess, quizAnswers,
   ]);
 
   return {
     // Step navigation
     step,
     setStep,
+    totalSteps,
+    hasQuiz,
 
     // Step 1 fields
     name,
@@ -503,8 +580,17 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     handlePizzeriaClick,
     handleSuggestPizzeria,
 
+    // Quiz state (Step 3)
+    quizQuestions,
+    quizAnswers,
+    setQuizAnswer,
+    quizResults,
+    quizSubmitted,
+    loadingQuiz,
+
     // Handlers
     handleStep1Continue,
+    handleStep2Continue,
     handleSubmit,
 
     // Computed

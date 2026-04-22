@@ -36,6 +36,8 @@ import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
+import quizTemplateRoutes from './routes/quiz-template.routes.js';
+import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -99,6 +101,7 @@ app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
+app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
@@ -117,12 +120,14 @@ app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
+app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
 app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
+app.use('/api/events', quizPublicRouter); // Public quiz endpoints (before eventRoutes)
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
-import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
-import type { SponsorUser } from '../../types';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers, getQuizTemplates, createQuizTemplate, updateQuizTemplate, deleteQuizTemplate } from '../../lib/api';
+import type { SponsorUser, QuizQuestionTemplate } from '../../types';
 import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
+import { QuizQuestionEditor } from '../QuizQuestionEditor';
 
 interface PartnerManagerProps {
   onSyncComplete?: () => void;
@@ -19,6 +20,11 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Quiz template state
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [quizTemplates, setQuizTemplates] = useState<Record<string, QuizQuestionTemplate[]>>({});
+  const [loadingQuiz, setLoadingQuiz] = useState<string | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -150,6 +156,66 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
     }
   };
 
+  // Quiz template handlers
+  const toggleQuiz = async (partnerId: string) => {
+    if (expandedQuizId === partnerId) {
+      setExpandedQuizId(null);
+      return;
+    }
+    setExpandedQuizId(partnerId);
+    if (!quizTemplates[partnerId]) {
+      setLoadingQuiz(partnerId);
+      try {
+        const templates = await getQuizTemplates(partnerId);
+        setQuizTemplates((prev) => ({ ...prev, [partnerId]: templates }));
+      } catch (err) {
+        console.error('Failed to load quiz templates:', err);
+      } finally {
+        setLoadingQuiz(null);
+      }
+    }
+  };
+
+  const handleAddQuestion = async (partnerId: string) => {
+    try {
+      const template = await createQuizTemplate(partnerId, {
+        question: '',
+        options: ['', '', '', ''],
+        correctIndex: 0,
+      });
+      setQuizTemplates((prev) => ({
+        ...prev,
+        [partnerId]: [...(prev[partnerId] || []), template],
+      }));
+    } catch (err) {
+      console.error('Failed to create quiz template:', err);
+    }
+  };
+
+  const handleUpdateQuestion = async (partnerId: string, templateId: string, data: any) => {
+    try {
+      const updated = await updateQuizTemplate(partnerId, templateId, data);
+      setQuizTemplates((prev) => ({
+        ...prev,
+        [partnerId]: (prev[partnerId] || []).map((t) => (t.id === templateId ? updated : t)),
+      }));
+    } catch (err) {
+      console.error('Failed to update quiz template:', err);
+    }
+  };
+
+  const handleDeleteQuestion = async (partnerId: string, templateId: string) => {
+    try {
+      await deleteQuizTemplate(partnerId, templateId);
+      setQuizTemplates((prev) => ({
+        ...prev,
+        [partnerId]: (prev[partnerId] || []).filter((t) => t.id !== templateId),
+      }));
+    } catch (err) {
+      console.error('Failed to delete quiz template:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -261,6 +327,17 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
                   <button
+                    onClick={() => toggleQuiz(partner.id)}
+                    className={`p-1.5 transition-colors ${
+                      expandedQuizId === partner.id
+                        ? 'text-blue-400'
+                        : 'text-theme-text-faint hover:text-theme-text-muted'
+                    }`}
+                    title="Quiz questions"
+                  >
+                    <BookOpen size={14} />
+                  </button>
+                  <button
                     onClick={() => openEditModal(partner)}
                     className="p-1.5 text-theme-text-faint hover:text-theme-text-muted transition-colors"
                     title="Edit partner"
@@ -278,6 +355,50 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
                   )}
                 </div>
               </div>
+
+              {/* Quiz Templates Section */}
+              {expandedQuizId === partner.id && (
+                <div className="mt-3 pt-3 border-t border-theme-stroke">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-theme-text-muted flex items-center gap-1">
+                      <BookOpen size={12} />
+                      Quiz Questions ({(quizTemplates[partner.id] || []).length})
+                    </span>
+                    <button
+                      onClick={() => handleAddQuestion(partner.id)}
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Add Question
+                    </button>
+                  </div>
+                  {loadingQuiz === partner.id ? (
+                    <div className="flex justify-center py-4">
+                      <RefreshCw size={14} className="animate-spin text-theme-text-muted" />
+                    </div>
+                  ) : (quizTemplates[partner.id] || []).length === 0 ? (
+                    <p className="text-xs text-theme-text-faint text-center py-4">
+                      No quiz questions. Add questions to auto-copy them to tagged events.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(quizTemplates[partner.id] || []).map((template, idx) => (
+                        <QuizQuestionEditor
+                          key={template.id}
+                          question={template.question}
+                          options={template.options}
+                          correctIndex={template.correctIndex}
+                          explanation={template.explanation}
+                          onUpdate={(data) => handleUpdateQuestion(partner.id, template.id, data)}
+                          onDelete={() => handleDeleteQuestion(partner.id, template.id)}
+                          isFirst={idx === 0}
+                          isLast={idx === (quizTemplates[partner.id] || []).length - 1}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

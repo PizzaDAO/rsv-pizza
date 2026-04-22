@@ -9,6 +9,7 @@ import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
 import { RSVPFormStep1 } from '../components/RSVPFormStep1';
 import { RSVPFormStep2 } from '../components/RSVPFormStep2';
+import { RSVPFormStep3 } from '../components/RSVPFormStep3';
 // GPP theme applied conditionally
 import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
@@ -347,7 +348,7 @@ export function RSVPPage() {
 
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-theme-text">RSVP to {party?.name}</h1>
-            <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
+            <p className="text-sm text-theme-text-secondary">Step 1 of {form.totalSteps}</p>
           </div>
 
           <RSVPFormStep1
@@ -361,6 +362,35 @@ export function RSVPPage() {
   }
 
   // ---- Step 2 - Pizza Preferences ----
+  if (form.step === 2) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+        {isGPP && <GPPClouds />}
+        <div className="card p-8 max-w-2xl w-full relative">
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+          >
+            <X size={24} />
+          </button>
+
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
+            <p className="text-sm text-theme-text-secondary">Step 2 of {form.totalSteps}</p>
+          </div>
+
+          <RSVPFormStep2
+            form={form}
+            donationSlot={donationSlot}
+            submitLabel={form.hasQuiz ? 'Next' : undefined}
+          />
+        </div>
+        {ConfettiOverlay}
+      </div>
+    );
+  }
+
+  // ---- Step 3 - Sponsor Quiz ----
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
       {isGPP && <GPPClouds />}
@@ -373,14 +403,11 @@ export function RSVPPage() {
         </button>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
-          <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
+          <h1 className="text-2xl font-bold text-theme-text">Sponsor Quiz</h1>
+          <p className="text-sm text-theme-text-secondary">Step 3 of {form.totalSteps}</p>
         </div>
 
-        <RSVPFormStep2
-          form={form}
-          donationSlot={donationSlot}
-        />
+        <RSVPFormStep3 form={form} />
       </div>
       {ConfettiOverlay}
     </div>

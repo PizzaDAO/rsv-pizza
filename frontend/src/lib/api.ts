@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, QuizQuestionTemplate, QuizQuestion, QuizPublicQuestion, QuizSubmitResponse, QuizStats } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -413,6 +413,7 @@ export interface PublicEvent {
   nftChain?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
+  quizEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
 }
 
@@ -3019,5 +3020,130 @@ export async function updateGppDescription(description: string): Promise<{
     method: 'PATCH',
     body: { description },
   });
+}
+
+// ============================================
+// Quiz Template API (Underboss)
+// ============================================
+
+export async function getQuizTemplates(sponsorUserId: string): Promise<QuizQuestionTemplate[]> {
+  const result = await apiRequest<{ templates: QuizQuestionTemplate[] }>(
+    `/api/sponsor-users/${sponsorUserId}/quiz-templates`
+  );
+  return result.templates;
+}
+
+export async function createQuizTemplate(
+  sponsorUserId: string,
+  data: { question: string; options: string[]; correctIndex: number; explanation?: string }
+): Promise<QuizQuestionTemplate> {
+  const result = await apiRequest<{ template: QuizQuestionTemplate }>(
+    `/api/sponsor-users/${sponsorUserId}/quiz-templates`,
+    { method: 'POST', body: data }
+  );
+  return result.template;
+}
+
+export async function updateQuizTemplate(
+  sponsorUserId: string,
+  templateId: string,
+  data: Partial<{ question: string; options: string[]; correctIndex: number; explanation: string }>
+): Promise<QuizQuestionTemplate> {
+  const result = await apiRequest<{ template: QuizQuestionTemplate }>(
+    `/api/sponsor-users/${sponsorUserId}/quiz-templates/${templateId}`,
+    { method: 'PATCH', body: data }
+  );
+  return result.template;
+}
+
+export async function deleteQuizTemplate(sponsorUserId: string, templateId: string): Promise<void> {
+  await apiRequest(`/api/sponsor-users/${sponsorUserId}/quiz-templates/${templateId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function reorderQuizTemplates(sponsorUserId: string, order: string[]): Promise<QuizQuestionTemplate[]> {
+  const result = await apiRequest<{ templates: QuizQuestionTemplate[] }>(
+    `/api/sponsor-users/${sponsorUserId}/quiz-templates/reorder`,
+    { method: 'PATCH', body: { order } }
+  );
+  return result.templates;
+}
+
+// ============================================
+// Quiz Questions API (Host — per event)
+// ============================================
+
+export async function getQuizQuestions(partyId: string): Promise<QuizQuestion[]> {
+  const result = await apiRequest<{ questions: QuizQuestion[] }>(
+    `/api/parties/${partyId}/quiz/questions`
+  );
+  return result.questions;
+}
+
+export async function createQuizQuestion(
+  partyId: string,
+  data: { question: string; options: string[]; correctIndex: number; explanation?: string; sponsorId?: string }
+): Promise<QuizQuestion> {
+  const result = await apiRequest<{ question: QuizQuestion }>(
+    `/api/parties/${partyId}/quiz/questions`,
+    { method: 'POST', body: data }
+  );
+  return result.question;
+}
+
+export async function updateQuizQuestion(
+  partyId: string,
+  questionId: string,
+  data: Partial<{ question: string; options: string[]; correctIndex: number; explanation: string; sponsorId: string }>
+): Promise<QuizQuestion> {
+  const result = await apiRequest<{ question: QuizQuestion }>(
+    `/api/parties/${partyId}/quiz/questions/${questionId}`,
+    { method: 'PATCH', body: data }
+  );
+  return result.question;
+}
+
+export async function deleteQuizQuestion(partyId: string, questionId: string): Promise<void> {
+  await apiRequest(`/api/parties/${partyId}/quiz/questions/${questionId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function reorderQuizQuestions(partyId: string, order: string[]): Promise<QuizQuestion[]> {
+  const result = await apiRequest<{ questions: QuizQuestion[] }>(
+    `/api/parties/${partyId}/quiz/questions/reorder`,
+    { method: 'PATCH', body: { order } }
+  );
+  return result.questions;
+}
+
+export async function getQuizStats(partyId: string): Promise<QuizStats[]> {
+  const result = await apiRequest<{ stats: QuizStats[] }>(
+    `/api/parties/${partyId}/quiz/stats`
+  );
+  return result.stats;
+}
+
+// ============================================
+// Quiz Public API (Guest — RSVP flow)
+// ============================================
+
+export async function getEventQuiz(slug: string): Promise<{ quizEnabled: boolean; questions: QuizPublicQuestion[] }> {
+  return apiRequest<{ quizEnabled: boolean; questions: QuizPublicQuestion[] }>(
+    `/api/events/${slug}/quiz`,
+    { requireAuth: false }
+  );
+}
+
+export async function submitQuizAnswers(
+  slug: string,
+  guestId: string,
+  answers: Array<{ questionId: string; selectedIndex: number }>
+): Promise<QuizSubmitResponse> {
+  return apiRequest<QuizSubmitResponse>(
+    `/api/events/${slug}/quiz/answers`,
+    { method: 'POST', body: { guestId, answers }, requireAuth: false }
+  );
 }
 
