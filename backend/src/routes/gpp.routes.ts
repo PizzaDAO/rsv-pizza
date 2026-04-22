@@ -435,54 +435,128 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+// Shared select for GPP event queries
+const gppEventSelect = {
+  id: true,
+  name: true,
+  inviteCode: true,
+  customUrl: true,
+  date: true,
+  endTime: true,
+  timezone: true,
+  address: true,
+  venueName: true,
+  country: true,
+  region: true,
+  latitude: true,
+  longitude: true,
+  eventImageUrl: true,
+  eventType: true,
+  eventTags: true,
+  rsvpClosedAt: true,
+  createdAt: true,
+  _count: {
+    select: { guests: true },
+  },
+  user: {
+    select: { name: true },
+  },
+} as const;
+
+// Format a Party record into the public GPP API response
+function formatGppEvent(event: any) {
+  const baseUrl = 'https://rsv.pizza';
+  const url = event.customUrl
+    ? `${baseUrl}/${event.customUrl}`
+    : `${baseUrl}/${event.inviteCode}`;
+  const city = event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
+
+  return {
+    id: event.id,
+    name: event.name,
+    city,
+    customUrl: event.customUrl,
+    inviteCode: event.inviteCode,
+    url,
+    date: event.date,
+    endTime: event.endTime,
+    timezone: event.timezone,
+    country: event.country,
+    region: event.region,
+    address: event.address,
+    venueName: event.venueName,
+    latitude: event.latitude,
+    longitude: event.longitude,
+    eventImageUrl: event.eventImageUrl,
+    eventType: event.eventType,
+    eventTags: event.eventTags,
+    createdAt: event.createdAt,
+    hostName: 'PizzaDAO',
+    guestCount: event._count?.guests ?? 0,
+    rsvpOpen: !event.rsvpClosedAt,
+  };
+}
+
+// GET /api/gpp/events/by-city/:citySlug - Look up a single GPP event by custom URL slug
+router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { citySlug } = req.params;
+
+    const event = await prisma.party.findFirst({
+      where: {
+        eventType: 'gpp',
+        customUrl: citySlug.toLowerCase(),
+      },
+      select: gppEventSelect,
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: 'GPP event not found for this city' });
+    }
+
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ event: formatGppEvent(event) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/gpp/events - List all GPP events (for admin/public listing)
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '50', offset = '0' } = req.query;
+    const { limit = '500', offset = '0', city, country, region } = req.query;
 
-    const events = await prisma.party.findMany({
-      where: {
-        eventType: 'gpp',
-      },
-      select: {
-        id: true,
-        name: true,
-        inviteCode: true,
-        customUrl: true,
-        date: true,
-        address: true,
-        venueName: true,
-        eventImageUrl: true,
-        eventType: true,
-        eventTags: true,
-        createdAt: true,
-        _count: {
-          select: { guests: true },
-        },
-        user: {
-          select: { name: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(parseInt(limit as string, 10), 100),
-      skip: parseInt(offset as string, 10),
-    });
+    const where: any = { eventType: 'gpp' };
+    if (city) {
+      where.name = { contains: city as string, mode: 'insensitive' };
+    }
+    if (country) {
+      where.country = { contains: country as string, mode: 'insensitive' };
+    }
+    if (region) {
+      where.region = region as string;
+    }
 
-    const total = await prisma.party.count({
-      where: { eventType: 'gpp' },
-    });
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedOffset = parseInt(offset as string, 10) || 0;
 
+    const [events, total] = await Promise.all([
+      prisma.party.findMany({
+        where,
+        select: gppEventSelect,
+        orderBy: { createdAt: 'desc' },
+        take: parsedLimit,
+        skip: parsedOffset,
+      }),
+      prisma.party.count({ where }),
+    ]);
+
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({
-      events: events.map(event => ({
-        ...event,
-        hostName: 'PizzaDAO',
-        guestCount: event._count.guests,
-        user: undefined,
-        _count: undefined,
-      })),
+      events: events.map(formatGppEvent),
       total,
-      limit: parseInt(limit as string, 10),
-      offset: parseInt(offset as string, 10),
+      limit: parsedLimit,
+      offset: parsedOffset,
     });
   } catch (error) {
     next(error);
