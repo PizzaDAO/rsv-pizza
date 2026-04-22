@@ -156,7 +156,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         logoUrl: true,
         brandTwitter: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
 
     // Enrich coHosts with user profile data (avatar, socials) then strip emails

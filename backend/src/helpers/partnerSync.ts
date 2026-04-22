@@ -27,6 +27,7 @@ interface SponsorUserLike {
   name: string | null;
   email: string;
   brandDescription: string | null;
+  descriptionSortOrder: number;
 }
 
 interface PartyLike {
@@ -95,6 +96,7 @@ export async function addPartnerToParty(
       brandDescription: sponsorUser.brandDescription || null,
       logoUrl: sponsorUser.coHostLogoUrl || null,
       category: sponsorUser.category || null,
+      sortOrder: sponsorUser.descriptionSortOrder,
     };
 
     const existingSponsor = await prisma.sponsor.findFirst({

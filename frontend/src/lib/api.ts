@@ -964,6 +964,18 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
   }
 }
 
+// Reorder sponsors for a party (host)
+export async function reorderSponsors(
+  partyId: string,
+  sponsorIds: string[]
+): Promise<{ sponsors: Sponsor[] }> {
+  return apiRequest<{ sponsors: Sponsor[] }>(`/api/parties/${partyId}/sponsors/reorder`, {
+    method: 'PATCH',
+    body: { sponsorIds },
+    requireAuth: true,
+  });
+}
+
 // Partner Intake Form API functions
 
 export interface PartnerIntakeData {
@@ -2927,6 +2939,14 @@ export async function updateSponsorUser(id: string, data: SponsorUserUpdateData)
 
 export async function deleteSponsorUser(id: string): Promise<void> {
   await apiRequest(`/api/sponsor-users/${id}`, { method: 'DELETE' });
+}
+
+// Reorder sponsor users (admin) — updates descriptionSortOrder based on array position
+export async function reorderSponsorUsers(sponsorUserIds: string[]): Promise<void> {
+  await apiRequest('/api/sponsor-users/reorder', {
+    method: 'PATCH',
+    body: { sponsorUserIds },
+  });
 }
 
 // User Sponsorship Profile

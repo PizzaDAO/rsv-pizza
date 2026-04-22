@@ -18,7 +18,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
     }
 
     const sponsorUsers = await prisma.sponsorUser.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ descriptionSortOrder: 'asc' }, { createdAt: 'desc' }],
       select: {
         id: true,
         email: true,
@@ -42,6 +42,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostCanEdit: true,
         coHostAllowedTabs: true,
         brandDescription: true,
+        descriptionSortOrder: true,
       },
     });
 
@@ -77,6 +78,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
       brandDescription,
+      descriptionSortOrder,
     } = req.body;
 
     if (!email || !tag) {
@@ -108,6 +110,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         autoCoHost: autoCoHost || false,
         autoSponsor: autoSponsor || false,
         brandDescription: brandDescription?.trim() || null,
+        descriptionSortOrder: typeof descriptionSortOrder === 'number' ? descriptionSortOrder : 0,
         coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
         coHostCanEdit: !!coHostCanEdit,
         coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
@@ -131,6 +134,118 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
+// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin only)
+// NOTE: Must be registered before /:id to avoid Express matching 'reorder' as an id
+sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { sponsorUserIds } = req.body;
+
+    if (!Array.isArray(sponsorUserIds) || sponsorUserIds.length === 0) {
+      throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    // Capture old global order BEFORE updating
+    const oldSponsorUsers = await prisma.sponsorUser.findMany({
+      where: { id: { in: sponsorUserIds }, autoSponsor: true, isActive: true },
+      select: { id: true, email: true, descriptionSortOrder: true, tag: true },
+      orderBy: { descriptionSortOrder: 'asc' },
+    });
+
+    // Apply the new order
+    await prisma.$transaction(
+      sponsorUserIds.map((id: string, index: number) =>
+        prisma.sponsorUser.update({
+          where: { id },
+          data: { descriptionSortOrder: index },
+        })
+      )
+    );
+
+    // Smart sync: propagate new order to events that haven't been host-customized
+    try {
+      // Build old order: email -> old descriptionSortOrder
+      const oldOrderByEmail = new Map(oldSponsorUsers.map(su => [su.email, su.descriptionSortOrder]));
+
+      // Build new order: email -> new descriptionSortOrder (index)
+      const newSponsorUsers = await prisma.sponsorUser.findMany({
+        where: { id: { in: sponsorUserIds }, autoSponsor: true, isActive: true },
+        select: { id: true, email: true, descriptionSortOrder: true, tag: true },
+      });
+      const newOrderByEmail = new Map(newSponsorUsers.map(su => [su.email, su.descriptionSortOrder]));
+
+      // Find all auto-created sponsors across all events
+      const autoSponsors = await prisma.sponsor.findMany({
+        where: {
+          contactEmail: { in: Array.from(oldOrderByEmail.keys()) },
+          notes: { startsWith: 'Auto-created from partner tag' },
+        },
+        select: { id: true, partyId: true, contactEmail: true, sortOrder: true },
+      });
+
+      if (autoSponsors.length > 0) {
+        // Group by event
+        const byEvent = new Map<string, typeof autoSponsors>();
+        for (const sp of autoSponsors) {
+          const list = byEvent.get(sp.partyId) || [];
+          list.push(sp);
+          byEvent.set(sp.partyId, list);
+        }
+
+        const updates: { id: string; sortOrder: number }[] = [];
+
+        for (const [, eventSponsors] of byEvent) {
+          // Current event order (by sortOrder)
+          const currentOrder = [...eventSponsors]
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map(s => s.contactEmail);
+
+          // Old global order for the same emails
+          const oldGlobalOrder = [...eventSponsors]
+            .sort((a, b) => (oldOrderByEmail.get(a.contactEmail!) ?? 0) - (oldOrderByEmail.get(b.contactEmail!) ?? 0))
+            .map(s => s.contactEmail);
+
+          // Compare sequences — if they match, event hasn't been host-customized
+          const isCustomized = currentOrder.length !== oldGlobalOrder.length ||
+            currentOrder.some((email, i) => email !== oldGlobalOrder[i]);
+
+          if (!isCustomized) {
+            // Safe to sync — update each sponsor's sortOrder to new global value
+            for (const sp of eventSponsors) {
+              const newOrder = newOrderByEmail.get(sp.contactEmail!);
+              if (newOrder !== undefined) {
+                updates.push({ id: sp.id, sortOrder: newOrder });
+              }
+            }
+          }
+        }
+
+        // Batch update
+        if (updates.length > 0) {
+          await prisma.$transaction(
+            updates.map(u =>
+              prisma.sponsor.update({
+                where: { id: u.id },
+                data: { sortOrder: u.sortOrder },
+              })
+            )
+          );
+        }
+      }
+    } catch (syncError) {
+      console.error('Failed to sync sponsor sort order to events:', syncError);
+      // Non-fatal: the global reorder succeeded, event sync is best-effort
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -146,6 +261,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
       brandDescription,
+      descriptionSortOrder,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -169,6 +285,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostAvatarUrl !== undefined) updateData.coHostAvatarUrl = coHostAvatarUrl?.trim() || null;
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
     if (brandDescription !== undefined) updateData.brandDescription = brandDescription?.trim() || null;
+    if (descriptionSortOrder !== undefined) updateData.descriptionSortOrder = typeof descriptionSortOrder === 'number' ? descriptionSortOrder : 0;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
     if (category !== undefined) updateData.category = category?.trim() || null;
