@@ -968,8 +968,8 @@ export function EventPage() {
                 )}
 
                 {/* Description + Sponsor Blurbs */}
-                {(event.description || true) && (
-                  <div className="border-t border-theme-stroke pt-4 mt-4">
+                {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
+                  <div className="border-y border-theme-stroke/50 py-4 mt-4">
                     <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
                       {event.description && (
                         <ReactMarkdown
