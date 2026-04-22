@@ -117,7 +117,7 @@ export function RSVPFormStep1({
           <Square size={20} className="text-theme-text-muted flex-shrink-0" />
         )}
         <span className="text-sm text-theme-text">
-          Want to join the mailing list?
+          Join PizzaDAO's mailing list
         </span>
       </button>
 
