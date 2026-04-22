@@ -97,9 +97,9 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     }
 
     // Validate parseMode
-    const validParseModes = ['HTML', 'Markdown', undefined];
+    const validParseModes = ['HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
-      throw new AppError('parseMode must be "HTML" or "Markdown"', 400, 'VALIDATION_ERROR');
+      throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -126,6 +126,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
 
       try {
+        const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
         const telegramResponse = await fetch(
           `https://api.telegram.org/bot${botToken}/sendMessage`,
           {
@@ -134,7 +135,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
             body: JSON.stringify({
               chat_id: chatId,
               text: personalizedMessage,
-              parse_mode: parseMode || 'HTML',
+              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
             }),
           }
         );
@@ -201,6 +202,7 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossReq
     console.log(`[Telegram Test] ${req.underboss!.email} sending test to ${chatId} at ${new Date().toISOString()}`);
 
     try {
+      const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
       const telegramResponse = await fetch(
         `https://api.telegram.org/bot${botToken}/sendMessage`,
         {
@@ -209,7 +211,7 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossReq
           body: JSON.stringify({
             chat_id: chatId,
             text: message,
-            parse_mode: parseMode || 'HTML',
+            ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
           }),
         }
       );

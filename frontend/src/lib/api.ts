@@ -2846,7 +2846,7 @@ export interface BroadcastResponse {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' = 'HTML'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
@@ -2857,7 +2857,7 @@ export async function sendTelegramBroadcast(
 export async function sendTelegramTest(
   chatId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' = 'HTML'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
     method: 'POST',

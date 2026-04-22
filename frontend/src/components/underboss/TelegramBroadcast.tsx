@@ -26,7 +26,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
   // Message
   const [message, setMessage] = useState('');
-  const [parseMode, setParseMode] = useState<'HTML' | 'Markdown'>('HTML');
+  const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('None');
 
   // State flow
   const [viewState, setViewState] = useState<ViewState>('compose');
@@ -456,9 +456,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                     </span>
                     <select
                       value={parseMode}
-                      onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown')}
+                      onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
                       className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                     >
+                      <option value="None">Plain Text</option>
                       <option value="HTML">HTML</option>
                       <option value="Markdown">Markdown</option>
                     </select>
