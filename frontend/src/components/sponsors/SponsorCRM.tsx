@@ -67,7 +67,9 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   // Keep description-order sponsors in sync with main sponsors list
   useEffect(() => {
     setDescOrderSponsors(
-      sponsors.filter(s => s.brandDescription && ['yes', 'billed', 'paid'].includes(s.status))
+      sponsors
+        .filter(s => s.brandDescription && ['yes', 'billed', 'paid'].includes(s.status))
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     );
   }, [sponsors]);
 

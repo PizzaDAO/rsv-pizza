@@ -460,6 +460,7 @@ export interface Sponsor {
   logoUrl: string | null;
   category: string | null;
   notes: string | null;
+  sortOrder: number;
   lastContactedAt: string | null;
   intakeToken: string | null;
   intakeSubmittedAt: string | null;

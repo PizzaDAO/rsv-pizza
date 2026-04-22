@@ -148,6 +148,14 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
       throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
 
+    // Capture old global order BEFORE updating
+    const oldSponsorUsers = await prisma.sponsorUser.findMany({
+      where: { id: { in: sponsorUserIds }, autoSponsor: true, isActive: true },
+      select: { id: true, email: true, descriptionSortOrder: true, tag: true },
+      orderBy: { descriptionSortOrder: 'asc' },
+    });
+
+    // Apply the new order
     await prisma.$transaction(
       sponsorUserIds.map((id: string, index: number) =>
         prisma.sponsorUser.update({
@@ -156,6 +164,81 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
         })
       )
     );
+
+    // Smart sync: propagate new order to events that haven't been host-customized
+    try {
+      // Build old order: email -> old descriptionSortOrder
+      const oldOrderByEmail = new Map(oldSponsorUsers.map(su => [su.email, su.descriptionSortOrder]));
+
+      // Build new order: email -> new descriptionSortOrder (index)
+      const newSponsorUsers = await prisma.sponsorUser.findMany({
+        where: { id: { in: sponsorUserIds }, autoSponsor: true, isActive: true },
+        select: { id: true, email: true, descriptionSortOrder: true, tag: true },
+      });
+      const newOrderByEmail = new Map(newSponsorUsers.map(su => [su.email, su.descriptionSortOrder]));
+
+      // Find all auto-created sponsors across all events
+      const autoSponsors = await prisma.sponsor.findMany({
+        where: {
+          contactEmail: { in: Array.from(oldOrderByEmail.keys()) },
+          notes: { startsWith: 'Auto-created from partner tag' },
+        },
+        select: { id: true, partyId: true, contactEmail: true, sortOrder: true },
+      });
+
+      if (autoSponsors.length > 0) {
+        // Group by event
+        const byEvent = new Map<string, typeof autoSponsors>();
+        for (const sp of autoSponsors) {
+          const list = byEvent.get(sp.partyId) || [];
+          list.push(sp);
+          byEvent.set(sp.partyId, list);
+        }
+
+        const updates: { id: string; sortOrder: number }[] = [];
+
+        for (const [, eventSponsors] of byEvent) {
+          // Current event order (by sortOrder)
+          const currentOrder = [...eventSponsors]
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map(s => s.contactEmail);
+
+          // Old global order for the same emails
+          const oldGlobalOrder = [...eventSponsors]
+            .sort((a, b) => (oldOrderByEmail.get(a.contactEmail!) ?? 0) - (oldOrderByEmail.get(b.contactEmail!) ?? 0))
+            .map(s => s.contactEmail);
+
+          // Compare sequences — if they match, event hasn't been host-customized
+          const isCustomized = currentOrder.length !== oldGlobalOrder.length ||
+            currentOrder.some((email, i) => email !== oldGlobalOrder[i]);
+
+          if (!isCustomized) {
+            // Safe to sync — update each sponsor's sortOrder to new global value
+            for (const sp of eventSponsors) {
+              const newOrder = newOrderByEmail.get(sp.contactEmail!);
+              if (newOrder !== undefined) {
+                updates.push({ id: sp.id, sortOrder: newOrder });
+              }
+            }
+          }
+        }
+
+        // Batch update
+        if (updates.length > 0) {
+          await prisma.$transaction(
+            updates.map(u =>
+              prisma.sponsor.update({
+                where: { id: u.id },
+                data: { sortOrder: u.sortOrder },
+              })
+            )
+          );
+        }
+      }
+    } catch (syncError) {
+      console.error('Failed to sync sponsor sort order to events:', syncError);
+      // Non-fatal: the global reorder succeeded, event sync is best-effort
+    }
 
     res.json({ success: true });
   } catch (error) {
