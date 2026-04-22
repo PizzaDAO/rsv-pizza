@@ -1039,7 +1039,7 @@ export function EventPage() {
                               PizzaDAO
                             </a>
                           </strong>{' '}
-                          PizzaDAO is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.
+                          is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.
                         </p>
                         {event.sponsors && event.sponsors
                           .filter(s => s.brandDescription)
