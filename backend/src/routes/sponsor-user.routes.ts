@@ -18,7 +18,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
     }
 
     const sponsorUsers = await prisma.sponsorUser.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ descriptionSortOrder: 'asc' }, { createdAt: 'desc' }],
       select: {
         id: true,
         email: true,
@@ -42,6 +42,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
         coHostCanEdit: true,
         coHostAllowedTabs: true,
         brandDescription: true,
+        descriptionSortOrder: true,
       },
     });
 
@@ -77,6 +78,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
       brandDescription,
+      descriptionSortOrder,
     } = req.body;
 
     if (!email || !tag) {
@@ -108,6 +110,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         autoCoHost: autoCoHost || false,
         autoSponsor: autoSponsor || false,
         brandDescription: brandDescription?.trim() || null,
+        descriptionSortOrder: typeof descriptionSortOrder === 'number' ? descriptionSortOrder : 0,
         coHostShowOnEvent: coHostShowOnEvent !== undefined ? !!coHostShowOnEvent : true,
         coHostCanEdit: !!coHostCanEdit,
         coHostAllowedTabs: Array.isArray(coHostAllowedTabs) ? coHostAllowedTabs : Prisma.JsonNull,
@@ -131,6 +134,35 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
+// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin only)
+// NOTE: Must be registered before /:id to avoid Express matching 'reorder' as an id
+sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { sponsorUserIds } = req.body;
+
+    if (!Array.isArray(sponsorUserIds) || sponsorUserIds.length === 0) {
+      throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    await prisma.$transaction(
+      sponsorUserIds.map((id: string, index: number) =>
+        prisma.sponsorUser.update({
+          where: { id },
+          data: { descriptionSortOrder: index },
+        })
+      )
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -146,6 +178,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       coHostShowOnEvent, coHostCanEdit, coHostAllowedTabs,
       category,
       brandDescription,
+      descriptionSortOrder,
     } = req.body;
 
     // Fetch old state for sync reconciliation
@@ -169,6 +202,7 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     if (coHostAvatarUrl !== undefined) updateData.coHostAvatarUrl = coHostAvatarUrl?.trim() || null;
     if (coHostLogoUrl !== undefined) updateData.coHostLogoUrl = coHostLogoUrl?.trim() || null;
     if (brandDescription !== undefined) updateData.brandDescription = brandDescription?.trim() || null;
+    if (descriptionSortOrder !== undefined) updateData.descriptionSortOrder = typeof descriptionSortOrder === 'number' ? descriptionSortOrder : 0;
     if (autoCoHost !== undefined) updateData.autoCoHost = autoCoHost;
     if (autoSponsor !== undefined) updateData.autoSponsor = autoSponsor;
     if (category !== undefined) updateData.category = category?.trim() || null;

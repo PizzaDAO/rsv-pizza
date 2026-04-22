@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle } from 'lucide-react';
-import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser } from '../../lib/api';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
+import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
 import type { SponsorUser } from '../../types';
 import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
@@ -18,6 +18,7 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -109,6 +110,35 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
     }
   };
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newPartners = [...partners];
+    const draggedItem = newPartners[draggedIndex];
+    newPartners.splice(draggedIndex, 1);
+    newPartners.splice(index, 0, draggedItem);
+
+    setPartners(newPartners);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    // Persist new order to backend
+    try {
+      await reorderSponsorUsers(partners.map(p => p.id));
+    } catch (err) {
+      console.error('Failed to save partner order:', err);
+      // Reload to get correct order from server
+      await loadPartners();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Deactivate this partner? This will remove their co-host entries from all events.')) return;
     try {
@@ -163,16 +193,25 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         </p>
       ) : (
         <div className="space-y-2">
-          {partners.map((partner) => (
+          {partners.map((partner, index) => (
             <div
               key={partner.id}
-              className={`p-3 rounded-xl border transition-colors ${
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              className={`p-3 rounded-xl border transition-colors cursor-move ${
                 partner.isActive
                   ? 'bg-theme-surface border-theme-stroke'
                   : 'bg-theme-surface/50 border-theme-stroke/50 opacity-60'
-              }`}
+              } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
             >
               <div className="flex items-start gap-3">
+                {/* Drag handle */}
+                <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
+                  <GripVertical size={16} />
+                </div>
+
                 {/* Avatar */}
                 {partner.coHostAvatarUrl ? (
                   <img

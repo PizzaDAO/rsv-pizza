@@ -1139,6 +1139,7 @@ export interface SponsorUser {
   autoSponsor: boolean;
   category: string | null;
   brandDescription: string | null;
+  descriptionSortOrder: number;
 }
 
 export interface SponsorChecklistItem {

@@ -1122,7 +1122,8 @@ model SponsorUser {
   category        String?
 
   // Brand info (synced to Sponsor records)
-  brandDescription String? @map("brand_description")
+  brandDescription     String? @map("brand_description")
+  descriptionSortOrder Int     @default(0) @map("description_sort_order")
 
   // Granular co-host permissions (applied when autoCoHost adds them to events)
   coHostShowOnEvent Boolean @default(true)  @map("co_host_show_on_event")

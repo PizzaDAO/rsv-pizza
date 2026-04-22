@@ -968,7 +968,7 @@ export function EventPage() {
                 )}
 
                 {/* Description + Sponsor Blurbs */}
-                {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
+                {(event.description || true) && (
                   <div className="border-t border-theme-stroke pt-4 mt-4">
                     <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
                       {event.description && (
@@ -1026,31 +1026,43 @@ export function EventPage() {
                           {event.description}
                         </ReactMarkdown>
                       )}
-                      {event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0 && (
-                        <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
-                          {event.sponsors
-                            .filter(s => s.brandDescription)
-                            .map(sponsor => (
-                              <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
-                                <strong>
-                                  {sponsor.website ? (
-                                    <a
-                                      href={sponsor.website}
-                                      className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      {sponsor.name}
-                                    </a>
-                                  ) : (
-                                    sponsor.name
-                                  )}
-                                </strong>{' '}
-                                {sponsor.brandDescription}
-                              </p>
-                            ))}
-                        </div>
-                      )}
+                      <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
+                        {/* PizzaDAO — always first */}
+                        <p className="mb-2 last:mb-0 text-base">
+                          <strong>
+                            <a
+                              href="https://pizzadao.org"
+                              className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              PizzaDAO
+                            </a>
+                          </strong>{' '}
+                          PizzaDAO is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.
+                        </p>
+                        {event.sponsors && event.sponsors
+                          .filter(s => s.brandDescription)
+                          .map(sponsor => (
+                            <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
+                              <strong>
+                                {sponsor.website ? (
+                                  <a
+                                    href={sponsor.website}
+                                    className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {sponsor.name}
+                                  </a>
+                                ) : (
+                                  sponsor.name
+                                )}
+                              </strong>{' '}
+                              {sponsor.brandDescription}
+                            </p>
+                          ))}
+                      </div>
                     </div>
                   </div>
                 )}
