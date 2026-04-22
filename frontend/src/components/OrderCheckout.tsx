@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Pizzeria, OrderingOption, PizzaRecommendation, OrderItem } from '../types';
 import {
   createSquareOrder,
@@ -13,13 +13,10 @@ import {
 import { AICallStatus, CallStatusData } from './AICallStatus';
 import { CallTranscript } from './CallTranscript';
 import {
-  hasStoredPaymentMethod,
   estimateOrderTotal,
   formatCurrency,
-  createVirtualCard,
-  getVirtualCardDetails,
-  createPaymentIntent,
-  getStoredCustomerId,
+  createOrderPayment,
+  refundPayment,
   getStoredCustomerEmail,
 } from '../lib/stripe';
 import { PaymentForm } from './PaymentForm';
@@ -73,8 +70,9 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
   // Payment state
   const [step, setStep] = useState<CheckoutStep>('details');
-  const [hasPaymentMethod, setHasPaymentMethod] = useState(hasStoredPaymentMethod());
   const [payWithCard, setPayWithCard] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   // AI Phone Call state
   const [aiPhoneCallId, setAiPhoneCallId] = useState<string | null>(null);
@@ -157,15 +155,40 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
       return;
     }
 
-    // If paying with card but no payment method, go to payment step
-    if (payWithCard && !hasPaymentMethod) {
-      setStep('payment');
+    // If paying with card and we don't have a clientSecret yet, create the payment intent
+    if (payWithCard && !clientSecret && step === 'details') {
+      // Email is required for card payments
+      if (!customerEmail.trim()) {
+        setError('Please enter your email for card payments');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const result = await createOrderPayment(
+          estimatedTotal,
+          orderId,
+          partyId || '',
+          pizzeria.name,
+          customerEmail
+        );
+        setClientSecret(result.clientSecret);
+        setPaymentIntentId(result.paymentIntentId);
+        setStep('payment');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create payment');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
-    // If paying with card, go to confirm step
-    if (payWithCard && step === 'details') {
-      setStep('confirm');
+    // If paying with card but payment not yet completed, go to payment step
+    if (payWithCard && clientSecret && step === 'details') {
+      setStep('payment');
       return;
     }
 
@@ -206,38 +229,6 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
       if (useEdgeFunctionFallback) {
         // Fallback to Supabase edge function (works without backend deployment)
-        let virtualCardDetails = undefined;
-
-        // If paying with card, create virtual card
-        if (payWithCard && hasPaymentMethod) {
-          const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-          // Create pre-authorization on customer's card
-          const customerId = getStoredCustomerId();
-          if (customerId) {
-            await createPaymentIntent(
-              estimatedTotal,
-              customerId,
-              customerEmail,
-              {
-                orderId,
-                pizzeriaName: pizzeria.name,
-                pizzeriaPhone: pizzeria.phone,
-              }
-            );
-          }
-
-          // Create virtual card for this order
-          const card = await createVirtualCard(
-            estimatedTotal,
-            orderId,
-            pizzeria.name
-          );
-
-          // Get full card details for AI
-          virtualCardDetails = await getVirtualCardDetails(card.cardId);
-        }
-
         const result = await createAIPhoneOrder(
           pizzeria.name,
           pizzeria.phone,
@@ -247,17 +238,38 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
           deliveryAddress || undefined,
           partySize,
-          virtualCardDetails
+          undefined
         );
 
         if (result.success && result.callId) {
           onOrderComplete(result.callId, undefined);
         } else {
-          setError(result.error || 'Failed to initiate AI call');
+          // AI call failed — refund the payment if one was made
+          if (paymentIntentId) {
+            try {
+              await refundPayment(paymentIntentId);
+              setError((result.error || 'Failed to initiate AI call') + ' Your payment has been refunded.');
+            } catch {
+              setError((result.error || 'Failed to initiate AI call') + ' Please contact support for a refund.');
+            }
+          } else {
+            setError(result.error || 'Failed to initiate AI call');
+          }
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate AI call');
+      // If the AI call threw an error, attempt refund
+      const errMsg = err instanceof Error ? err.message : 'Failed to initiate AI call';
+      if (paymentIntentId) {
+        try {
+          await refundPayment(paymentIntentId);
+          setError(errMsg + ' Your payment has been refunded.');
+        } catch {
+          setError(errMsg + ' Please contact support for a refund.');
+        }
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -277,12 +289,6 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
     });
-  };
-
-  // Handle payment method saved
-  const handlePaymentMethodSaved = () => {
-    setHasPaymentMethod(true);
-    setStep('confirm');
   };
 
   // Handle call completion
@@ -316,15 +322,15 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   };
 
   // Render payment step
-  if (step === 'payment') {
+  if (step === 'payment' && clientSecret) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-theme-text">Add Payment Method</h2>
+              <h2 className="text-xl font-bold text-theme-text">Pay for Your Order</h2>
               <p className="text-sm text-theme-text-secondary mt-1">
-                Your card will be charged after the order is confirmed
+                {pizzeria.name} &middot; {formatCurrency(estimatedTotal)}
               </p>
             </div>
             <button
@@ -336,9 +342,12 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
           </div>
 
           <PaymentForm
-            customerEmail={customerEmail}
-            customerName={customerName}
-            onPaymentMethodSaved={handlePaymentMethodSaved}
+            clientSecret={clientSecret}
+            amount={estimatedTotal}
+            onPaymentSuccess={(piId) => {
+              setPaymentIntentId(piId);
+              setStep('confirm');
+            }}
             onCancel={() => setStep('details')}
           />
         </div>
@@ -388,14 +397,14 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             </div>
           </div>
 
-          {/* Payment Method */}
-          <div className="mb-6 p-4 bg-[#8b5cf6]/10 rounded-xl border border-[#8b5cf6]/30">
+          {/* Payment Confirmation */}
+          <div className="mb-6 p-4 bg-[#39d98a]/10 rounded-xl border border-[#39d98a]/30">
             <div className="flex items-center gap-3">
-              <CreditCard size={20} className="text-[#8b5cf6]" />
+              <Check size={20} className="text-[#39d98a]" />
               <div>
-                <p className="text-theme-text font-medium">Card on file</p>
+                <p className="text-theme-text font-medium">Payment of {formatCurrency(estimatedTotal)} received</p>
                 <p className="text-theme-text-secondary text-sm">
-                  Your card will be pre-authorized for {formatCurrency(estimatedTotal)}
+                  Your payment has been securely processed
                 </p>
               </div>
             </div>
@@ -406,16 +415,16 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
             <h4 className="font-medium text-theme-text mb-2">How it works</h4>
             <ol className="space-y-2 text-sm text-theme-text-secondary">
               <li className="flex items-start gap-2">
-                <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">1</span>
-                <span>AI calls the pizzeria and places your order</span>
+                <span className="bg-[#39d98a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">1</span>
+                <span>Your payment has been secured</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">2</span>
-                <span>AI pays with a secure virtual card</span>
+                <span>AI calls the pizzeria and places your order</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">3</span>
-                <span>Your card is charged for the actual order total</span>
+                <span>If anything goes wrong, you'll get an automatic refund</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="bg-[#ff393a] text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">4</span>
@@ -725,10 +734,10 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
               >
                 <CreditCard size={18} />
                 <div className="text-left flex-1">
-                  <p className="font-medium">Pay with card</p>
-                  <p className="text-xs text-theme-text-muted">AI pays over phone with secure virtual card</p>
+                  <p className="font-medium">Pay with card or crypto</p>
+                  <p className="text-xs text-theme-text-muted">Pay securely before your order is placed</p>
                 </div>
-                {hasPaymentMethod && (
+                {paymentIntentId && (
                   <Check size={16} className="text-[#39d98a]" />
                 )}
               </button>
