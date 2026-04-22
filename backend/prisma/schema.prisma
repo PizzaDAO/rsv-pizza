@@ -1154,3 +1154,15 @@ model SponsorChecklistItem {
   @@index([partyId])
   @@map("sponsor_checklist_items")
 }
+
+// ============================================
+// App Config (key-value store)
+// ============================================
+
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("app_config")
+}

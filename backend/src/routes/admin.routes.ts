@@ -391,8 +391,115 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
   }
 });
 
+// ============================================
+// GPP Default Description
+// ============================================
+
+const GPP_HARDCODED_DESCRIPTION = `Join us for the Global Pizza Party, a worldwide celebration of pizza and bitcoin, where communities around the world come together to share pizza and good vibes.
+
+What to expect:
+- Free pizza
+- Crypto enthusiasts
+- Good conversations
+
+RSVP to secure your slice!`;
+
+// GET /api/admin/gpp-description — Read current default + event stats
+router.get('/gpp-description', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+
+    // Read current default from app_config
+    const configRow = await prisma.appConfig.findUnique({ where: { key: 'gpp_default_description' } });
+    const defaultDescription = configRow?.value ?? GPP_HARDCODED_DESCRIPTION;
+
+    // Count all GPP events
+    const totalGppEvents = await prisma.party.count({ where: { eventType: 'gpp' } });
+
+    // Count events still on default
+    const defaultCount = await prisma.party.count({
+      where: { eventType: 'gpp', description: defaultDescription },
+    });
+
+    // Find events with custom descriptions
+    const customEvents = await prisma.party.findMany({
+      where: {
+        eventType: 'gpp',
+        NOT: { description: defaultDescription },
+      },
+      select: {
+        id: true,
+        name: true,
+        customUrl: true,
+        inviteCode: true,
+        description: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const customizedEvents = customEvents.map(e => ({
+      id: e.id,
+      name: e.name,
+      customUrl: e.customUrl,
+      inviteCode: e.inviteCode,
+      descriptionPreview: (e.description || '').slice(0, 100),
+    }));
+
+    res.json({ defaultDescription, totalGppEvents, defaultCount, customizedEvents });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/gpp-description — Update default + bulk-apply to events on old default
+router.patch('/gpp-description', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { description } = req.body;
+    if (!description || typeof description !== 'string' || description.trim().length === 0) {
+      throw new AppError('description is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const newDescription = description.trim();
+
+    // Read old default
+    const configRow = await prisma.appConfig.findUnique({ where: { key: 'gpp_default_description' } });
+    const oldDefault = configRow?.value ?? GPP_HARDCODED_DESCRIPTION;
+
+    // Upsert the new default
+    await prisma.appConfig.upsert({
+      where: { key: 'gpp_default_description' },
+      update: { value: newDescription, updatedAt: new Date() },
+      create: { key: 'gpp_default_description', value: newDescription },
+    });
+
+    // Bulk-update events that still have the old default
+    const result = await prisma.party.updateMany({
+      where: { eventType: 'gpp', description: oldDefault },
+      data: { description: newDescription },
+    });
+
+    const totalGppEvents = await prisma.party.count({ where: { eventType: 'gpp' } });
+    const skippedCount = totalGppEvents - result.count;
+
+    res.json({
+      success: true,
+      updatedCount: result.count,
+      skippedCount,
+      newDefault: newDescription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /api/admin/:id — Update admin role/name (super_admin only, can't downgrade self)
-// IMPORTANT: This wildcard route must be LAST to avoid matching named routes like /checklist-defaults
+// IMPORTANT: This wildcard route must be LAST to avoid matching named routes like /checklist-defaults, /gpp-description
 router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!(await isSuperAdmin(req.userEmail))) {

@@ -2954,3 +2954,34 @@ export async function getUserSponsorships(): Promise<UserSponsorshipEntry[]> {
   return apiRequest<UserSponsorshipEntry[]>('/api/user/sponsorships');
 }
 
+// GPP Default Description Admin API
+
+export interface GppDescriptionData {
+  defaultDescription: string;
+  totalGppEvents: number;
+  defaultCount: number;
+  customizedEvents: Array<{
+    id: string;
+    name: string;
+    customUrl: string | null;
+    inviteCode: string;
+    descriptionPreview: string;
+  }>;
+}
+
+export async function fetchGppDescription(): Promise<GppDescriptionData> {
+  return apiRequest<GppDescriptionData>('/api/admin/gpp-description');
+}
+
+export async function updateGppDescription(description: string): Promise<{
+  success: boolean;
+  updatedCount: number;
+  skippedCount: number;
+  newDefault: string;
+}> {
+  return apiRequest('/api/admin/gpp-description', {
+    method: 'PATCH',
+    body: { description },
+  });
+}
+

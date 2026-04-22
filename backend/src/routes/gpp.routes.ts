@@ -303,11 +303,15 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       }));
     }
 
+    // Read DB-stored default description, fall back to hardcoded
+    const configRow = await prisma.appConfig.findUnique({ where: { key: 'gpp_default_description' } });
+    const gppDescription = configRow?.value ?? GPP_DEFAULTS.description;
+
     // Create the party with GPP defaults
     const party = await prisma.party.create({
       data: {
         name: eventName,
-        description: GPP_DEFAULTS.description,
+        description: gppDescription,
         eventType: GPP_DEFAULTS.eventType,
         eventTags: GPP_DEFAULTS.eventTags,
         requireApproval: GPP_DEFAULTS.requireApproval,
