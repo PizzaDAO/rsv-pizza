@@ -5,6 +5,38 @@ import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
 import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../lib/api';
 
+/** Normalize a city name for fuzzy matching (strip accents, suffixes, etc.) */
+function normalizeCity(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents/diacritics
+    .replace(/[İ]/g, 'I')           // Turkish İ
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, '')   // remove parentheticals like "(Queensland)"
+    .replace(/^[-–—]\s*/, '')        // strip leading dashes "- La Paz, Bolivia"
+    .replace(/\s*[-–—]\s+.*$/, '')   // strip trailing " - Pizza Touk" but NOT hyphens within words
+    .replace(/\s*,\s+.*$/, '')       // strip ", Bolivia"
+    .replace(/\s+\d{4}$/, '')        // strip trailing year "2026"
+    .replace(/\s+city$/i, '')        // strip trailing "City"
+    .replace(/\s+at\s+.*$/i, '')     // strip "at Papa Toms"
+    .replace(/\s+in\s+.*$/i, '')     // strip "in Hangzhou"
+    .trim();
+}
+
+/** Check whether two city names refer to the same city after normalization */
+function citiesMatch(eventCity: string, sheetCity: string): boolean {
+  const a = normalizeCity(eventCity);
+  const b = normalizeCity(sheetCity);
+  if (!a || !b) return false;
+  // Exact match after normalization
+  if (a === b) return true;
+  // One contains the other (handles "New Delhi" matching "Delhi", etc.)
+  if (a.length >= 3 && b.length >= 3) {
+    if (a.includes(b) || b.includes(a)) return true;
+  }
+  return false;
+}
+
 interface TelegramBroadcastProps {
   onClose: () => void;
   preSelectedCities?: string[];
@@ -43,12 +75,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
       try {
         const data = await fetchTelegramGroups();
         setGroups(data);
-        // Auto-select groups matching pre-selected cities
+        // Auto-select groups matching pre-selected cities (fuzzy match)
         if (preSelectedCities && preSelectedCities.length > 0) {
-          const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
           const matchingIds = new Set<string>();
           for (const g of data) {
-            if (citySet.has(g.city.toLowerCase())) {
+            if (preSelectedCities.some(pc => citiesMatch(pc, g.city))) {
               matchingIds.add(g.groupId);
             }
           }
@@ -73,10 +104,9 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
   const filteredGroups = useMemo(() => {
     let filtered = groups;
 
-    // When opened from actions dropdown, only show groups matching the selected cities
+    // When opened from actions dropdown, only show groups matching the selected cities (fuzzy match)
     if (preSelectedCities && preSelectedCities.length > 0) {
-      const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
-      filtered = filtered.filter(g => citySet.has(g.city.toLowerCase()));
+      filtered = filtered.filter(g => preSelectedCities.some(pc => citiesMatch(pc, g.city)));
     }
 
     if (regionFilter !== 'all') {
