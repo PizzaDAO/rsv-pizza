@@ -137,6 +137,41 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 }
 
 /**
+ * Upload an image for use in event descriptions (Markdown).
+ * Stored under `description-images/{partyId}/` in the event-images bucket.
+ * @param file The image file to upload
+ * @param partyId The party ID for organizing uploads
+ * @returns The public URL of the uploaded image, or null if upload failed
+ */
+export async function uploadDescriptionImage(file: File, partyId: string): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `description-images/${partyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading description image:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading description image:', error);
+    return null;
+  }
+}
+
+/**
  * Upload a receipt file (image or PDF) to Supabase Storage and return the public URL
  * @param file The receipt file to upload (JPEG, PNG, WebP, or PDF)
  * @param partyId The party ID for organizing uploads
