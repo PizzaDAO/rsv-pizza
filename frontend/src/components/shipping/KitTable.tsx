@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, ChevronDown } from 'lucide-react';
+import { ArrowUpDown } from 'lucide-react';
 import { KitRow } from './KitRow';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 
@@ -109,7 +109,6 @@ export function KitTable({
                 <option value="deluxe">Tier: Deluxe</option>
               </optgroup>
             </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
           </div>
           <button
             onClick={handleBulkApply}

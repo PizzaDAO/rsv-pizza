@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download, ChevronDown } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { KitStatus } from '../../types';
 
@@ -90,7 +90,6 @@ export function KitFilters({
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
         </div>
 
         <button

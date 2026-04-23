@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ExternalLink, Eye } from 'lucide-react';
+import { ExternalLink, Eye } from 'lucide-react';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 import { GPP_REGIONS } from '../../types';
 
@@ -115,7 +115,6 @@ export function KitRow({
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
-          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
         </div>
         {kit.allocatedTier && kit.allocatedTier !== kit.requestedTier && (
           <div className="text-xs text-theme-text-faint mt-0.5">req: {kit.requestedTier}</div>
@@ -134,7 +133,6 @@ export function KitRow({
               <option key={s} value={s} className="bg-white text-gray-900 capitalize">{s}</option>
             ))}
           </select>
-          <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </td>
 
