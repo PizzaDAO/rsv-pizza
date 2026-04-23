@@ -42,6 +42,14 @@ const CITY_ALIASES: Record<string, string[]> = {
   'denver': ['ethdenver'],
   'tokyo': ['ethtokyo'],
   'prague': ['pizzadayprague'],
+  // CJK / Cyrillic city names
+  'ningbo': ['ning bo shi', '\u5b81\u6ce2\u5e02'],
+  'hangzhou': ['hang zhou shi', '\u676d\u5dde\u5e02'],
+  'gotemba': ['yu dian chang shi', '\u5fa1\u6bbf\u5834\u5e02'],
+  // Additional language variants
+  'luxembourg': ['lussemburgo'],
+  'goa': ['madgaon'],
+  'durham': ['raleigh'],
 };
 
 // Build reverse alias lookup: alternate name -> canonical names
