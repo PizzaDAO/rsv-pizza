@@ -84,8 +84,8 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     if (!Array.isArray(groups) || groups.length === 0) {
       throw new AppError('groups must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    if (groups.length > 50) {
-      throw new AppError('Maximum 50 groups per request', 400, 'VALIDATION_ERROR');
+    if (groups.length > 500) {
+      throw new AppError('Maximum 500 groups per request', 400, 'VALIDATION_ERROR');
     }
 
     // Validate message
