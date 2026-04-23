@@ -23,6 +23,41 @@ function normalizeCity(name: string): string {
     .trim();
 }
 
+// Aliases for cities known by different names in different languages/romanizations
+const CITY_ALIASES: Record<string, string[]> = {
+  'bangalore': ['bengaluru'],
+  'johannesberg': ['johannesburg'],
+  'koh phangan': ['ko phangan'],
+  'mysore': ['mysuru'],
+  'vienna': ['wien'],
+  'warsaw': ['warszawa'],
+  'rome': ['roma'],
+  'naples': ['napoli'],
+  'portland me': ['portland maine'],
+  'san pedro de sula': ['san pedro sula'],
+  'tirana': ['tirane'],
+  'goteborg': ['gothenburg'],
+  'new york city': ['new york', 'nyc', 'newyork'],
+  'sao paulo': ['sao paulo/ brazil'],
+  'denver': ['ethdenver'],
+  'tokyo': ['ethtokyo'],
+  'prague': ['pizzadayprague'],
+};
+
+// Build reverse alias lookup: alternate name -> canonical names
+const ALIAS_LOOKUP: Record<string, string[]> = {};
+for (const [canonical, alts] of Object.entries(CITY_ALIASES)) {
+  for (const alt of alts) {
+    if (!ALIAS_LOOKUP[alt]) ALIAS_LOOKUP[alt] = [];
+    ALIAS_LOOKUP[alt].push(canonical);
+  }
+  // Also map canonical to itself for bidirectional lookup
+  if (!ALIAS_LOOKUP[canonical]) ALIAS_LOOKUP[canonical] = [];
+  for (const alt of alts) {
+    ALIAS_LOOKUP[canonical].push(alt);
+  }
+}
+
 /** Check whether two city names refer to the same city after normalization */
 function citiesMatch(eventCity: string, sheetCity: string): boolean {
   const a = normalizeCity(eventCity);
@@ -30,9 +65,20 @@ function citiesMatch(eventCity: string, sheetCity: string): boolean {
   if (!a || !b) return false;
   // Exact match after normalization
   if (a === b) return true;
-  // One contains the other (handles "New Delhi" matching "Delhi", etc.)
+  // Substring containment (handles "New Delhi" matching "Delhi", etc.)
   if (a.length >= 3 && b.length >= 3) {
     if (a.includes(b) || b.includes(a)) return true;
+  }
+  // Check aliases
+  const aAliases = ALIAS_LOOKUP[a] || [];
+  const bAliases = ALIAS_LOOKUP[b] || [];
+  for (const alias of aAliases) {
+    if (alias === b) return true;
+    if (alias.length >= 3 && b.length >= 3 && (alias.includes(b) || b.includes(alias))) return true;
+  }
+  for (const alias of bAliases) {
+    if (alias === a) return true;
+    if (alias.length >= 3 && a.length >= 3 && (alias.includes(a) || a.includes(alias))) return true;
   }
   return false;
 }
