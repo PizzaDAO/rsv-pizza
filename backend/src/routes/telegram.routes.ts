@@ -97,9 +97,9 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     }
 
     // Validate parseMode
-    const validParseModes = ['HTML', 'Markdown', undefined];
+    const validParseModes = ['HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
-      throw new AppError('parseMode must be "HTML" or "Markdown"', 400, 'VALIDATION_ERROR');
+      throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -126,6 +126,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
 
       try {
+        const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
         const telegramResponse = await fetch(
           `https://api.telegram.org/bot${botToken}/sendMessage`,
           {
@@ -134,22 +135,39 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
             body: JSON.stringify({
               chat_id: chatId,
               text: personalizedMessage,
-              parse_mode: parseMode || 'HTML',
+              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
             }),
           }
         );
 
-        const telegramResult = await telegramResponse.json();
+        let telegramResult = await telegramResponse.json();
 
-        if (telegramResult.ok) {
+        // Auto-retry if group was upgraded to supergroup
+        if (!telegramResult.ok && telegramResult.parameters?.migrate_to_chat_id) {
+          const newChatId = String(telegramResult.parameters.migrate_to_chat_id);
+          console.log(`[Telegram Broadcast] Group ${chatId} migrated to ${newChatId}, retrying...`);
+          const retryResponse = await fetch(
+            `https://api.telegram.org/bot${botToken}/sendMessage`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: newChatId,
+                text: personalizedMessage,
+                ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
+              }),
+            }
+          );
+          telegramResult = await retryResponse.json();
+          if (telegramResult.ok) {
+            results.push({ chatId, city: city || '', success: true, error: `Migrated: update sheet to ${newChatId}` });
+          } else {
+            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
+          }
+        } else if (telegramResult.ok) {
           results.push({ chatId, city: city || '', success: true });
         } else {
-          results.push({
-            chatId,
-            city: city || '',
-            success: false,
-            error: telegramResult.description || 'Unknown Telegram error',
-          });
+          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error' });
         }
       } catch (err: any) {
         results.push({
@@ -201,6 +219,7 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossReq
     console.log(`[Telegram Test] ${req.underboss!.email} sending test to ${chatId} at ${new Date().toISOString()}`);
 
     try {
+      const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
       const telegramResponse = await fetch(
         `https://api.telegram.org/bot${botToken}/sendMessage`,
         {
@@ -209,14 +228,36 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossReq
           body: JSON.stringify({
             chat_id: chatId,
             text: message,
-            parse_mode: parseMode || 'HTML',
+            ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
           }),
         }
       );
 
-      const telegramResult = await telegramResponse.json();
+      let telegramResult = await telegramResponse.json();
 
-      if (telegramResult.ok) {
+      // Auto-retry if group was upgraded to supergroup
+      if (!telegramResult.ok && telegramResult.parameters?.migrate_to_chat_id) {
+        const newChatId = String(telegramResult.parameters.migrate_to_chat_id);
+        console.log(`[Telegram Test] Group ${chatId} migrated to ${newChatId}, retrying...`);
+        const retryResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: newChatId,
+              text: message,
+              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
+            }),
+          }
+        );
+        telegramResult = await retryResponse.json();
+        if (telegramResult.ok) {
+          res.json({ chatId, success: true, migratedTo: newChatId });
+        } else {
+          res.json({ chatId, success: false, error: telegramResult.description || 'Failed after migration retry' });
+        }
+      } else if (telegramResult.ok) {
         res.json({ chatId, success: true });
       } else {
         res.json({

@@ -5,6 +5,84 @@ import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
 import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../lib/api';
 
+/** Normalize a city name for fuzzy matching (strip accents, suffixes, etc.) */
+function normalizeCity(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents/diacritics
+    .replace(/[İ]/g, 'I')           // Turkish İ
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, '')   // remove parentheticals like "(Queensland)"
+    .replace(/^[-–—]\s*/, '')        // strip leading dashes "- La Paz, Bolivia"
+    .replace(/\s*[-–—]\s+.*$/, '')   // strip trailing " - Pizza Touk" but NOT hyphens within words
+    .replace(/\s*,\s+.*$/, '')       // strip ", Bolivia"
+    .replace(/\s+\d{4}$/, '')        // strip trailing year "2026"
+    .replace(/\s+city$/i, '')        // strip trailing "City"
+    .replace(/\s+at\s+.*$/i, '')     // strip "at Papa Toms"
+    .replace(/\s+in\s+.*$/i, '')     // strip "in Hangzhou"
+    .trim();
+}
+
+// Aliases for cities known by different names in different languages/romanizations
+const CITY_ALIASES: Record<string, string[]> = {
+  'bangalore': ['bengaluru'],
+  'johannesberg': ['johannesburg'],
+  'koh phangan': ['ko phangan'],
+  'mysore': ['mysuru'],
+  'vienna': ['wien'],
+  'warsaw': ['warszawa'],
+  'rome': ['roma'],
+  'naples': ['napoli'],
+  'portland me': ['portland maine'],
+  'san pedro de sula': ['san pedro sula'],
+  'tirana': ['tirane'],
+  'goteborg': ['gothenburg'],
+  'new york city': ['new york', 'nyc', 'newyork'],
+  'sao paulo': ['sao paulo/ brazil'],
+  'denver': ['ethdenver'],
+  'tokyo': ['ethtokyo'],
+  'prague': ['pizzadayprague'],
+};
+
+// Build reverse alias lookup: alternate name -> canonical names
+const ALIAS_LOOKUP: Record<string, string[]> = {};
+for (const [canonical, alts] of Object.entries(CITY_ALIASES)) {
+  for (const alt of alts) {
+    if (!ALIAS_LOOKUP[alt]) ALIAS_LOOKUP[alt] = [];
+    ALIAS_LOOKUP[alt].push(canonical);
+  }
+  // Also map canonical to itself for bidirectional lookup
+  if (!ALIAS_LOOKUP[canonical]) ALIAS_LOOKUP[canonical] = [];
+  for (const alt of alts) {
+    ALIAS_LOOKUP[canonical].push(alt);
+  }
+}
+
+/** Check whether two city names refer to the same city after normalization */
+function citiesMatch(eventCity: string, sheetCity: string): boolean {
+  const a = normalizeCity(eventCity);
+  const b = normalizeCity(sheetCity);
+  if (!a || !b) return false;
+  // Exact match after normalization
+  if (a === b) return true;
+  // Substring containment (handles "New Delhi" matching "Delhi", etc.)
+  if (a.length >= 3 && b.length >= 3) {
+    if (a.includes(b) || b.includes(a)) return true;
+  }
+  // Check aliases
+  const aAliases = ALIAS_LOOKUP[a] || [];
+  const bAliases = ALIAS_LOOKUP[b] || [];
+  for (const alias of aAliases) {
+    if (alias === b) return true;
+    if (alias.length >= 3 && b.length >= 3 && (alias.includes(b) || b.includes(alias))) return true;
+  }
+  for (const alias of bAliases) {
+    if (alias === a) return true;
+    if (alias.length >= 3 && a.length >= 3 && (alias.includes(a) || a.includes(alias))) return true;
+  }
+  return false;
+}
+
 interface TelegramBroadcastProps {
   onClose: () => void;
   preSelectedCities?: string[];
@@ -26,7 +104,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
 
   // Message
   const [message, setMessage] = useState('');
-  const [parseMode, setParseMode] = useState<'HTML' | 'Markdown'>('HTML');
+  const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('None');
 
   // State flow
   const [viewState, setViewState] = useState<ViewState>('compose');
@@ -43,12 +121,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
       try {
         const data = await fetchTelegramGroups();
         setGroups(data);
-        // Auto-select groups matching pre-selected cities
+        // Auto-select groups matching pre-selected cities (fuzzy match)
         if (preSelectedCities && preSelectedCities.length > 0) {
-          const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
           const matchingIds = new Set<string>();
           for (const g of data) {
-            if (citySet.has(g.city.toLowerCase())) {
+            if (preSelectedCities.some(pc => citiesMatch(pc, g.city))) {
               matchingIds.add(g.groupId);
             }
           }
@@ -73,10 +150,9 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
   const filteredGroups = useMemo(() => {
     let filtered = groups;
 
-    // When opened from actions dropdown, only show groups matching the selected cities
+    // When opened from actions dropdown, only show groups matching the selected cities (fuzzy match)
     if (preSelectedCities && preSelectedCities.length > 0) {
-      const citySet = new Set(preSelectedCities.map(c => c.toLowerCase()));
-      filtered = filtered.filter(g => citySet.has(g.city.toLowerCase()));
+      filtered = filtered.filter(g => preSelectedCities.some(pc => citiesMatch(pc, g.city)));
     }
 
     if (regionFilter !== 'all') {
@@ -456,9 +532,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                     </span>
                     <select
                       value={parseMode}
-                      onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown')}
+                      onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
                       className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                     >
+                      <option value="None">Plain Text</option>
                       <option value="HTML">HTML</option>
                       <option value="Markdown">Markdown</option>
                     </select>
