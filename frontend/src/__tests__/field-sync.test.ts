@@ -186,7 +186,7 @@ describe('Field Mapping Consistency', () => {
       'kit_enabled', 'kit_deadline',
       'fundraising_goal', 'report_recap', 'report_video_url', 'report_photos_url',
       'flyer_artist', 'x_post_url', 'x_post_views', 'farcaster_post_url', 'farcaster_views',
-      'luma_url', 'luma_views', 'poap_event_id', 'poap_mints', 'poap_moments',
+      'luma_views', 'poap_event_id', 'poap_mints', 'poap_moments',
       'report_published', 'report_public_slug',
     ]);
 
@@ -237,6 +237,10 @@ describe('Field Mapping Consistency', () => {
       region: null,
       event_type: null,
       event_tags: [],
+      luma_url: null,
+      meetup_url: null,
+      eventbrite_url: null,
+      external_links: [],
     };
 
     const party = dbPartyToParty(sampleDbParty as any, []);

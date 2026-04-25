@@ -395,7 +395,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       pinnedApps,
       region,
       venueReportTitle, venueReportNotes,
-      hiddenGppPhotos, extraGppPhotos
+      hiddenGppPhotos, extraGppPhotos,
+      lumaUrl, meetupUrl, eventbriteUrl, externalLinks
     } = req.body;
 
     // Verify ownership or super admin
@@ -411,6 +412,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
       if (customUrl.length < 3 || customUrl.length > 50) {
         throw new AppError('Custom URL must be between 3 and 50 characters', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    // Validate externalLinks if provided
+    if (externalLinks !== undefined && externalLinks !== null) {
+      if (!Array.isArray(externalLinks)) {
+        throw new AppError('externalLinks must be an array', 400, 'VALIDATION_ERROR');
+      }
+      if (externalLinks.length > 10) {
+        throw new AppError('Maximum 10 external links allowed', 400, 'VALIDATION_ERROR');
+      }
+      for (const link of externalLinks) {
+        if (typeof link.label !== 'string' || typeof link.url !== 'string') {
+          throw new AppError('Each external link must have a label and url string', 400, 'VALIDATION_ERROR');
+        }
       }
     }
 
@@ -492,6 +508,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(venueReportNotes !== undefined && { venueReportNotes: venueReportNotes || null }),
         ...(hiddenGppPhotos !== undefined && { hiddenGppPhotos }),
         ...(extraGppPhotos !== undefined && { extraGppPhotos }),
+        ...(lumaUrl !== undefined && { lumaUrl: lumaUrl || null }),
+        ...(meetupUrl !== undefined && { meetupUrl: meetupUrl || null }),
+        ...(eventbriteUrl !== undefined && { eventbriteUrl: eventbriteUrl || null }),
+        ...(externalLinks !== undefined && { externalLinks }),
       },
       include: {
         user: { select: { name: true } },

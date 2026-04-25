@@ -436,6 +436,11 @@ export interface DbParty {
   allowed_tabs?: string[];
   hidden_gpp_photos?: string[];
   extra_gpp_photos?: string[];
+  // External event links
+  luma_url?: string | null;
+  meetup_url?: string | null;
+  eventbrite_url?: string | null;
+  external_links?: Array<{label: string; url: string}>;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -482,7 +487,8 @@ export const SAFE_PARTY_COLUMNS = `
   kit_enabled, kit_deadline,
   fundraising_goal, report_recap, report_video_url, report_photos_url,
   flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
-  luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
+  luma_url, luma_views, meetup_url, eventbrite_url, external_links,
+  poap_event_id, poap_mints, poap_moments,
   report_published, report_public_slug,
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
@@ -1327,6 +1333,10 @@ export async function updateParty(
     region?: string | null;
     hidden_gpp_photos?: string[];
     extra_gpp_photos?: string[];
+    luma_url?: string | null;
+    meetup_url?: string | null;
+    eventbrite_url?: string | null;
+    external_links?: Array<{label: string; url: string}>;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1384,6 +1394,10 @@ export async function updateParty(
         region: updates.region,
         hiddenGppPhotos: updates.hidden_gpp_photos,
         extraGppPhotos: updates.extra_gpp_photos,
+        lumaUrl: updates.luma_url,
+        meetupUrl: updates.meetup_url,
+        eventbriteUrl: updates.eventbrite_url,
+        externalLinks: updates.external_links,
       });
       return true;
     } catch (error) {

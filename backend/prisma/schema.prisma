@@ -131,6 +131,9 @@ model Party {
   farcasterViews     Int?      @map("farcaster_views")    // Farcaster view count
   lumaUrl            String?   @map("luma_url")           // Luma event URL
   lumaViews          Int?      @map("luma_views")         // Luma page views
+  meetupUrl          String?   @map("meetup_url")         // Meetup event URL
+  eventbriteUrl      String?   @map("eventbrite_url")     // Eventbrite event URL
+  externalLinks      Json?     @default("[]") @map("external_links") // Custom external links [{label, url}]
   poapEventId        String?   @map("poap_event_id")      // POAP event ID
   poapMints          Int?      @map("poap_mints")         // POAP mint count
   poapMoments        Int?      @map("poap_moments")       // POAP moments count

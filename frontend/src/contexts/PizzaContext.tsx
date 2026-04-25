@@ -127,6 +127,10 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     allowedTabs: dbParty.allowed_tabs,
     hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],
     extraGppPhotos: (dbParty.extra_gpp_photos as string[]) || [],
+    lumaUrl: dbParty.luma_url || null,
+    meetupUrl: dbParty.meetup_url || null,
+    eventbriteUrl: dbParty.eventbrite_url || null,
+    externalLinks: dbParty.external_links || [],
     guests,
   };
 }
