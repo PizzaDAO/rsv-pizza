@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, Upload } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { KitStatus } from '../../types';
 
@@ -30,6 +30,7 @@ interface KitFiltersProps {
   countries: string[];
   onExport: () => void;
   exporting?: boolean;
+  onImport?: () => void;
 }
 
 export function KitFilters({
@@ -42,6 +43,7 @@ export function KitFilters({
   countries,
   onExport,
   exporting,
+  onImport,
 }: KitFiltersProps) {
   return (
     <div className="space-y-3">
@@ -100,6 +102,16 @@ export function KitFilters({
           <Download size={14} />
           {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
+
+        {onImport && (
+          <button
+            onClick={onImport}
+            className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-sm text-theme-text hover:border-theme-stroke-hover transition-colors"
+          >
+            <Upload size={14} />
+            Import Tracking
+          </button>
+        )}
       </div>
     </div>
   );

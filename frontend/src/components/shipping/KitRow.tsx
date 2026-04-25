@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ExternalLink, Eye } from 'lucide-react';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 import { GPP_REGIONS } from '../../types';
+import { detectTrackingUrl } from '../../lib/trackingUtils';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-700',
@@ -50,8 +51,17 @@ export function KitRow({
   const requestedDate = new Date(kit.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   const handleTrackingBlur = () => {
-    if (trackingNum !== (kit.trackingNumber || '') || trackingLink !== (kit.trackingUrl || '')) {
-      onTrackingChange(kit.id, trackingNum, trackingLink);
+    // Auto-fill tracking URL if the tracking number changed and URL is empty
+    let url = trackingLink;
+    if (trackingNum && !url) {
+      const detected = detectTrackingUrl(trackingNum);
+      if (detected) {
+        url = detected;
+        setTrackingLink(detected);
+      }
+    }
+    if (trackingNum !== (kit.trackingNumber || '') || url !== (kit.trackingUrl || '')) {
+      onTrackingChange(kit.id, trackingNum, url);
     }
   };
 

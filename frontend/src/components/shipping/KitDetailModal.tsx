@@ -4,6 +4,7 @@ import { X, Package, MapPin, Truck, User, Calendar, FileText, ExternalLink } fro
 import { IconInput } from '../IconInput';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 import { GPP_REGIONS } from '../../types';
+import { detectCarrier, detectTrackingUrl } from '../../lib/trackingUtils';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-700',
@@ -185,7 +186,16 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
                 placeholder="Tracking number"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber((e.target as HTMLInputElement).value)}
+                onBlur={() => {
+                  if (trackingNumber && !trackingUrl) {
+                    const detected = detectTrackingUrl(trackingNumber);
+                    if (detected) setTrackingUrl(detected);
+                  }
+                }}
               />
+              {trackingNumber && detectCarrier(trackingNumber) && (
+                <p className="text-xs text-theme-text-muted mt-1 ml-1">Detected: {detectCarrier(trackingNumber)}</p>
+              )}
             </div>
 
             <div>
