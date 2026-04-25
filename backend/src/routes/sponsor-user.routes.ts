@@ -64,11 +64,11 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
-// POST /api/sponsor-users - Create a sponsor user (super admin only)
+// POST /api/sponsor-users - Create a sponsor user (admin only)
 sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const {
@@ -246,11 +246,11 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
   }
 });
 
-// PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
+// PATCH /api/sponsor-users/:id - Update a sponsor user (admin only)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -351,11 +351,11 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
   }
 });
 
-// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (super admin only)
+// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (admin only)
 sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
