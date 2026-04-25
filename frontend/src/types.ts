@@ -541,7 +541,7 @@ export interface Playlist {
 export interface SocialPost {
   id: string;
   partyId: string;
-  platform: 'twitter' | 'farcaster' | 'instagram';
+  platform: 'twitter' | 'farcaster' | 'instagram' | 'facebook' | 'linkedin';
   url: string;
   authorHandle: string | null;
   title: string | null;

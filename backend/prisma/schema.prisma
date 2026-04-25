@@ -247,7 +247,7 @@ model SocialPost {
   partyId      String   @map("party_id") @db.Uuid
   party        Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  platform     String   // "twitter", "farcaster", "instagram"
+  platform     String   // "twitter", "farcaster", "instagram", "facebook", "linkedin"
   url          String   // Full URL to the post
   authorHandle String?  @map("author_handle")
   title        String?  // Title/description of what the post is about
