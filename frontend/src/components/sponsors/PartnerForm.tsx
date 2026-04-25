@@ -202,6 +202,7 @@ interface PartnerFormProps {
   eventName?: string;
   submitLabel?: string;
   wasPreviouslySubmitted?: boolean;
+  defaultStatus?: SponsorStatus;
 }
 
 /* ---------- Component ---------- */
@@ -219,6 +220,7 @@ export function PartnerForm({
   intakeInitialData,
   submitLabel,
   wasPreviouslySubmitted,
+  defaultStatus,
 }: PartnerFormProps) {
   const isCrm = mode === 'crm';
   const isPartner = mode === 'partner';
@@ -229,7 +231,9 @@ export function PartnerForm({
     if (isCrm && sponsor) return sponsorToFormData(sponsor);
     if (isPartner && partnerData) return sponsorUserToFormData(partnerData);
     if (isIntake && intakeInitialData) return intakeDataToFormData(intakeInitialData);
-    return getDefaultFormData();
+    const defaults = getDefaultFormData();
+    if (defaultStatus) defaults.status = defaultStatus;
+    return defaults;
   });
   const [error, setError] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
