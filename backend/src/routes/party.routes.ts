@@ -12,9 +12,6 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
     where: { id: partyId },
     include: {
       user: { select: { name: true } },
-      guests: {
-        orderBy: { submittedAt: 'desc' },
-      },
     },
   });
 
