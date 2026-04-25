@@ -157,6 +157,10 @@ export interface UpdatePartyData {
   region?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
+  lumaUrl?: string | null;
+  meetupUrl?: string | null;
+  eventbriteUrl?: string | null;
+  externalLinks?: Array<{label: string; url: string}>;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -243,6 +247,10 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       region: data.region,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
+      lumaUrl: data.lumaUrl,
+      meetupUrl: data.meetupUrl,
+      eventbriteUrl: data.eventbriteUrl,
+      externalLinks: data.externalLinks,
     },
   });
 }

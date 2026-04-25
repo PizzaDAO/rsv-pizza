@@ -270,6 +270,11 @@ export interface Party {
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
+  // External event links
+  lumaUrl?: string | null;
+  meetupUrl?: string | null;
+  eventbriteUrl?: string | null;
+  externalLinks?: Array<{label: string; url: string}>;
 }
 
 export interface Donation {

@@ -95,7 +95,7 @@ export const PromoWidget: React.FC = () => {
             {isExpanded && (
               <div className="border-t border-theme-stroke p-4">
                 {section.id === 'social' && <SocialComposer party={party} />}
-                {section.id === 'publish' && <PlatformPublisher party={party} />}
+                {section.id === 'publish' && <PlatformPublisher />}
                 {section.id === 'email' && <EmailOutreach party={party} guests={guests} />}
                 {section.id === 'invite' && <BulkInvite party={party} />}
               </div>
