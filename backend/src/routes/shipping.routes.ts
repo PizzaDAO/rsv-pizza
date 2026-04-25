@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { detectTrackingUrl } from '../utils/trackingUtils.js';
 
 // Valid kit statuses and tiers
 const VALID_STATUSES = ['pending', 'approved', 'shipped', 'delivered', 'declined'];
@@ -203,11 +204,12 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
     }
 
     // Build CSV
-    const headers = ['Event Name', 'Region', 'Host Name', 'Host Email', 'Event Venue', 'Event Address', 'Event Approved', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes'];
+    const headers = ['Kit ID', 'Event Name', 'Region', 'Host Name', 'Host Email', 'Event Venue', 'Event Address', 'Event Approved', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes', 'Tracking Number', 'Tracking URL'];
     const csvRows = [headers.join(',')];
 
     for (const kit of filtered) {
       const row = [
+        escapeCSV(kit.id),
         escapeCSV(kit.party.name),
         escapeCSV(kit.party.region || ''),
         escapeCSV(kit.party.user?.name || ''),
@@ -227,6 +229,8 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
         escapeCSV(kit.allocatedTier || ''),
         escapeCSV(kit.status),
         escapeCSV(kit.notes || ''),
+        escapeCSV(kit.trackingNumber || ''),
+        escapeCSV(kit.trackingUrl || ''),
       ];
       csvRows.push(row.join(','));
     }
@@ -288,6 +292,77 @@ router.patch('/kits/bulk-update', requireAuth, requireShippingAuth, async (req: 
     });
 
     res.json({ updated: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// POST /api/shipping/kits/import-tracking - Bulk import tracking numbers from CSV
+// ============================================
+router.post('/kits/import-tracking', requireAuth, requireShippingAuth, async (req: ShippingRequest, res: Response, next: NextFunction) => {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new AppError('items must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (items.length > 500) {
+      throw new AppError('Maximum 500 items per import', 400, 'VALIDATION_ERROR');
+    }
+
+    const regionFilter = buildRegionFilter(req.shippingRegions!);
+    let updated = 0;
+    let skipped = 0;
+    const notFound: string[] = [];
+
+    for (const item of items) {
+      const { kitId, trackingNumber, trackingUrl } = item;
+
+      if (!kitId) {
+        skipped++;
+        continue;
+      }
+
+      // Skip rows with no tracking data
+      if (!trackingNumber && !trackingUrl) {
+        skipped++;
+        continue;
+      }
+
+      // Verify kit exists and user has access
+      const kit = await prisma.partyKit.findFirst({
+        where: { id: kitId, ...regionFilter },
+      });
+
+      if (!kit) {
+        notFound.push(kitId);
+        continue;
+      }
+
+      const updateData: any = {};
+      if (trackingNumber) updateData.trackingNumber = trackingNumber;
+
+      if (trackingUrl) {
+        updateData.trackingUrl = trackingUrl;
+      } else if (trackingNumber) {
+        // Auto-detect URL from tracking number
+        const detected = detectTrackingUrl(trackingNumber);
+        if (detected) updateData.trackingUrl = detected;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.partyKit.update({
+          where: { id: kitId },
+          data: updateData,
+        });
+        updated++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ updated, skipped, notFound });
   } catch (error) {
     next(error);
   }
@@ -519,6 +594,12 @@ router.patch('/kits/:kitId', requireAuth, requireShippingAuth, async (req: Shipp
     if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
     if (trackingUrl !== undefined) updateData.trackingUrl = trackingUrl;
     if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+
+    // Auto-detect tracking URL if tracking number provided but URL is missing/empty
+    if (updateData.trackingNumber && !updateData.trackingUrl && trackingUrl === undefined) {
+      const detected = detectTrackingUrl(updateData.trackingNumber);
+      if (detected) updateData.trackingUrl = detected;
+    }
 
     const updatedKit = await prisma.partyKit.update({
       where: { id: kitId },

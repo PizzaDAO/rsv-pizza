@@ -4,7 +4,7 @@ import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check } from '
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { KitStats, KitFilters, KitTable, KitDetailModal, CoordinatorManager } from '../components/shipping';
+import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager } from '../components/shipping';
 import {
   fetchShippingMe,
   fetchShippingKits,
@@ -52,6 +52,9 @@ export function ShippingDashboard() {
 
   // Exporting
   const [exporting, setExporting] = useState(false);
+
+  // CSV import modal
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Available regions based on role
   const availableRegions = useMemo(() => {
@@ -424,6 +427,7 @@ export function ShippingDashboard() {
               countries={countries}
               onExport={handleExport}
               exporting={exporting}
+              onImport={() => setShowImportModal(true)}
             />
           </section>
 
@@ -459,6 +463,14 @@ export function ShippingDashboard() {
           kit={detailKit}
           onClose={() => setDetailKit(null)}
           onUpdate={handleDetailUpdate}
+        />
+      )}
+
+      {/* CSV Import Modal */}
+      {showImportModal && (
+        <CsvImportModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => loadData()}
         />
       )}
     </div>

@@ -2569,6 +2569,14 @@ export async function bulkUpdateShippingKits(kitIds: string[], updates: {
   });
 }
 
+// Import tracking numbers in bulk from CSV
+export async function importShippingTracking(items: { kitId: string; trackingNumber?: string; trackingUrl?: string }[]): Promise<{ updated: number; skipped: number; notFound: string[] }> {
+  return apiRequest<{ updated: number; skipped: number; notFound: string[] }>('/api/shipping/kits/import-tracking', {
+    method: 'POST',
+    body: { items },
+  });
+}
+
 // Export shipping kits CSV
 export async function exportShippingKitsCsv(filters?: ShippingKitFilters): Promise<Blob> {
   const params = new URLSearchParams();

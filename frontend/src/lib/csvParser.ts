@@ -20,7 +20,7 @@ export interface ParsedCsvRow {
 }
 
 // Split a single CSV line into cells, respecting quoted fields.
-function splitCsvLine(line: string): string[] {
+export function splitCsvLine(line: string): string[] {
   const cells: string[] = [];
   let current = '';
   let inQuotes = false;
