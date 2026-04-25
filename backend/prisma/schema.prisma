@@ -253,11 +253,64 @@ model SocialPost {
   title        String?  // Title/description of what the post is about
   views        Int?     // Number of views the post received
 
+  // Auto-discovery fields (populated by tweet caching cron)
+  tweetId          String?   @unique @map("tweet_id")        // X/Twitter tweet ID
+  autoDiscovered   Boolean   @default(false) @map("auto_discovered")
+  authorName       String?   @map("author_name")
+  authorAvatarUrl  String?   @map("author_avatar_url")
+  likeCount        Int?      @map("like_count")
+  retweetCount     Int?      @map("retweet_count")
+  impressionCount  Int?      @map("impression_count")
+  tweetCreatedAt   DateTime? @map("tweet_created_at") @db.Timestamptz
+
   sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([partyId])
   @@map("social_posts")
+}
+
+// Cached tweets mentioning rsv.pizza (populated by cron job)
+model TweetCache {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tweetId            String   @unique @map("tweet_id")       // X/Twitter tweet ID
+  authorHandle       String   @map("author_handle")
+  authorName         String   @map("author_name")
+  authorAvatarUrl    String?  @map("author_avatar_url")
+  tweetText          String   @map("tweet_text")
+  mediaUrls          Json?    @map("media_urls")             // Array of media URLs
+  conversationId     String?  @map("conversation_id")
+  inReplyToId        String?  @map("in_reply_to_id")
+
+  // Public metrics
+  likeCount          Int      @default(0) @map("like_count")
+  retweetCount       Int      @default(0) @map("retweet_count")
+  replyCount         Int      @default(0) @map("reply_count")
+  quoteCount         Int      @default(0) @map("quote_count")
+  impressionCount    Int?     @map("impression_count")
+
+  // OCR impression count (populated by Phase 3 script)
+  ocrImpressionCount Int?     @map("ocr_impression_count")
+
+  // Event matching
+  matchedPartyId     String?  @map("matched_party_id") @db.Uuid
+  matchedSlug        String?  @map("matched_slug")
+
+  tweetCreatedAt     DateTime @map("tweet_created_at") @db.Timestamptz
+  fetchedAt          DateTime @default(now()) @map("fetched_at") @db.Timestamptz
+
+  @@index([matchedPartyId])
+  @@index([tweetCreatedAt])
+  @@map("tweet_cache")
+}
+
+// Key-value store for cron job state (e.g., since_id tracking)
+model CronState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("cron_state")
 }
 
 // Notable attendees for event reports

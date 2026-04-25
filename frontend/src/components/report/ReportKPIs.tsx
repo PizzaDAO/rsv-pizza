@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Users, Mail, Wallet, Award, Video, MousePointerClick, FileText } from 'lucide-react';
+import { Eye, EyeOff, Users, Mail, Wallet, Award, Video, MousePointerClick, FileText, Zap } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 
 type StatsConfig = Record<string, { override?: number | null; hidden?: boolean }>;
@@ -11,6 +11,7 @@ interface ReportKPIsProps {
   pageViewStats?: PageViewStats | null;
   socialPostViews?: number;
   socialPostCount?: number;
+  tweetImpressions?: number;
 }
 
 interface StatItem {
@@ -21,7 +22,7 @@ interface StatItem {
   color: string;
 }
 
-export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount }: ReportKPIsProps) {
+export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount, tweetImpressions }: ReportKPIsProps) {
   const config: StatsConfig = report.reportStatsConfig || {};
 
   const allStats: StatItem[] = [
@@ -29,6 +30,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
       { key: 'pageViews', label: 'Page Views', autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
       { key: 'uniqueVisitors', label: 'Unique Visitors', autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
     ] : []),
+    { key: 'tweetImpressions', label: 'Tweet Impressions', autoValue: tweetImpressions || null, icon: Zap, color: 'text-sky-400' },
     { key: 'socialPostViews', label: 'Social Post Views', autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
     { key: 'socialPosts', label: 'Social Posts', autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: 'Total RSVPs', autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },

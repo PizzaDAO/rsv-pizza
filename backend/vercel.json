@@ -18,5 +18,11 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/fetch-tweets",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

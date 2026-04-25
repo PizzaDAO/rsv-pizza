@@ -546,8 +546,39 @@ export interface SocialPost {
   authorHandle: string | null;
   title: string | null;
   views: number | null;
+  // Auto-discovery fields (populated by tweet caching cron)
+  tweetId: string | null;
+  autoDiscovered: boolean;
+  authorName: string | null;
+  authorAvatarUrl: string | null;
+  likeCount: number | null;
+  retweetCount: number | null;
+  impressionCount: number | null;
+  tweetCreatedAt: string | null;
   sortOrder: number;
   createdAt: string;
+}
+
+export interface TweetCache {
+  id: string;
+  tweetId: string;
+  authorHandle: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  tweetText: string;
+  mediaUrls: string[] | null;
+  conversationId: string | null;
+  inReplyToId: string | null;
+  likeCount: number;
+  retweetCount: number;
+  replyCount: number;
+  quoteCount: number;
+  impressionCount: number | null;
+  ocrImpressionCount: number | null;
+  matchedPartyId: string | null;
+  matchedSlug: string | null;
+  tweetCreatedAt: string;
+  fetchedAt: string;
 }
 
 export interface NotableAttendee {

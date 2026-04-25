@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, ExternalLink, Loader2, Eye, Link, Type } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Loader2, Eye, Link, Type, Heart, Repeat2, RefreshCw, Zap } from 'lucide-react';
 import { SocialPost } from '../../types';
 import { IconInput } from '../IconInput';
 
@@ -14,6 +14,7 @@ interface SocialPostsListProps {
   posts: SocialPost[];
   onAdd: (post: { platform: string; url: string; title?: string; views?: number | null }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRefreshTweets?: () => Promise<void>;
   editable?: boolean;
 }
 
@@ -26,6 +27,42 @@ function isTwitterUrl(url: string): boolean {
 function getTweetId(url: string): string | null {
   const match = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
   return match ? match[1] : null;
+}
+
+// Helper: format compact number
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+// Engagement metrics display
+function EngagementMetrics({ post }: { post: SocialPost }) {
+  const hasMetrics = post.likeCount != null || post.retweetCount != null || post.impressionCount != null;
+  if (!hasMetrics) return null;
+
+  return (
+    <div className="flex items-center gap-3 px-2 pb-1.5 text-[10px] text-theme-text-muted">
+      {post.impressionCount != null && (
+        <span className="flex items-center gap-0.5" title="Impressions">
+          <Eye size={10} />
+          {formatCompact(post.impressionCount)}
+        </span>
+      )}
+      {post.likeCount != null && (
+        <span className="flex items-center gap-0.5" title="Likes">
+          <Heart size={10} />
+          {formatCompact(post.likeCount)}
+        </span>
+      )}
+      {post.retweetCount != null && (
+        <span className="flex items-center gap-0.5" title="Retweets">
+          <Repeat2 size={10} />
+          {formatCompact(post.retweetCount)}
+        </span>
+      )}
+    </div>
+  );
 }
 
 // Twitter/X embed component
@@ -106,13 +143,99 @@ function LinkPreview({ url, platform }: { url: string; platform: string }) {
   );
 }
 
-export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: SocialPostsListProps) {
+// Post header with optional author avatar and auto-discovered badge
+function PostHeader({ post, platform, editable, onDelete, deletingId }: {
+  post: SocialPost;
+  platform: { name: string; color: string; icon: string };
+  editable: boolean;
+  onDelete?: (id: string) => void;
+  deletingId?: string | null;
+}) {
+  return (
+    <div className="flex items-center gap-2 p-2">
+      {/* Author avatar or platform icon */}
+      {post.authorAvatarUrl ? (
+        <img
+          src={post.authorAvatarUrl}
+          alt={post.authorName || post.authorHandle || ''}
+          className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
+        />
+      ) : (
+        <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-theme-text text-[9px] font-bold flex-shrink-0`}>
+          {platform.icon}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          {post.authorName && (
+            <p className="text-xs text-theme-text font-medium truncate">{post.authorName}</p>
+          )}
+          {post.title && !post.authorName && (
+            <p className="text-xs text-theme-text font-medium truncate">{post.title}</p>
+          )}
+          {post.autoDiscovered && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-medium bg-emerald-500/20 text-emerald-400 flex-shrink-0"
+              title="Auto-discovered from X/Twitter"
+            >
+              <Zap size={8} />
+              auto
+            </span>
+          )}
+        </div>
+        {post.authorHandle && (
+          <span className="text-[10px] text-theme-text-secondary">@{post.authorHandle}</span>
+        )}
+        {editable && (
+          <a
+            href={post.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-theme-text-muted hover:text-theme-text-secondary truncate block"
+          >
+            {post.url}
+          </a>
+        )}
+        {!editable && !post.title && !post.authorHandle && !post.authorName && (
+          <p className="text-[10px] text-theme-text-muted truncate">{post.url}</p>
+        )}
+      </div>
+      {post.views != null && (
+        <div className="flex items-center gap-1 text-theme-text-muted text-[10px] flex-shrink-0 bg-theme-surface px-1.5 py-0.5 rounded">
+          <Eye size={10} />
+          <span>{post.views.toLocaleString()}</span>
+        </div>
+      )}
+      {!editable && (
+        <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+          <ExternalLink size={12} className="text-theme-text-muted hover:text-theme-text-secondary" />
+        </a>
+      )}
+      {editable && onDelete && (
+        <button
+          onClick={() => onDelete(post.id)}
+          disabled={deletingId === post.id}
+          className="p-1 text-theme-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+        >
+          {deletingId === post.id ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Trash2 size={14} />
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function SocialPostsList({ posts, onAdd, onDelete, onRefreshTweets, editable = true }: SocialPostsListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newPlatform, setNewPlatform] = useState<string>('twitter');
   const [newUrl, setNewUrl] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newViews, setNewViews] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleAdd = async () => {
@@ -148,6 +271,18 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     }
   };
 
+  const handleRefresh = async () => {
+    if (!onRefreshTweets) return;
+    setRefreshing(true);
+    try {
+      await onRefreshTweets();
+    } catch (error) {
+      console.error('Failed to refresh tweets:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Auto-detect platform from URL
   const detectPlatform = (url: string) => {
     if (url.includes('twitter.com') || url.includes('x.com')) {
@@ -161,6 +296,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
 
   // Calculate total views across all posts
   const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
+  const totalImpressions = posts.reduce((sum, post) => sum + (post.impressionCount || 0), 0);
+  const autoCount = posts.filter(p => p.autoDiscovered).length;
 
   // Read-only display
   if (!editable) {
@@ -182,31 +319,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
             const platform = PLATFORMS[post.platform as keyof typeof PLATFORMS] || PLATFORMS.twitter;
             return (
               <div key={post.id} className="bg-theme-surface rounded-xl border border-theme-stroke overflow-hidden">
-                <div className="flex items-center gap-2 p-2">
-                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-theme-text text-[9px] font-bold flex-shrink-0`}>
-                    {platform.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {post.title && (
-                      <p className="text-xs text-theme-text font-medium truncate">{post.title}</p>
-                    )}
-                    {post.authorHandle && (
-                      <span className="text-[10px] text-theme-text-secondary">@{post.authorHandle}</span>
-                    )}
-                    {!post.title && !post.authorHandle && (
-                      <p className="text-[10px] text-theme-text-muted truncate">{post.url}</p>
-                    )}
-                  </div>
-                  {post.views != null && (
-                    <div className="flex items-center gap-1 text-theme-text-secondary text-[10px] flex-shrink-0">
-                      <Eye size={10} />
-                      <span>{post.views.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                    <ExternalLink size={12} className="text-theme-text-muted hover:text-theme-text-secondary" />
-                  </a>
-                </div>
+                <PostHeader post={post} platform={platform} editable={false} />
+                <EngagementMetrics post={post} />
                 {/* Embed for Twitter/X posts */}
                 {isTwitterUrl(post.url) && (
                   <div className="px-2 pb-2">
@@ -232,21 +346,44 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-theme-text">Social Posts</h3>
-          {totalViews > 0 && (
-            <p className="text-xs text-theme-text-muted mt-0.5">
-              {totalViews.toLocaleString()} total views across {posts.length} post{posts.length !== 1 ? 's' : ''}
-            </p>
+          <p className="text-xs text-theme-text-muted mt-0.5">
+            {posts.length > 0 && (
+              <>
+                {totalViews > 0 && `${totalViews.toLocaleString()} total views`}
+                {totalViews > 0 && totalImpressions > 0 && ' / '}
+                {totalImpressions > 0 && `${totalImpressions.toLocaleString()} impressions`}
+                {(totalViews > 0 || totalImpressions > 0) && ` across ${posts.length} post${posts.length !== 1 ? 's' : ''}`}
+                {autoCount > 0 && ` (${autoCount} auto-discovered)`}
+              </>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {onRefreshTweets && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+              title="Search X/Twitter for new tweets mentioning this event"
+            >
+              {refreshing ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              Refresh Tweets
+            </button>
+          )}
+          {!isAdding && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+            >
+              <Plus size={16} />
+              Add Post
+            </button>
           )}
         </div>
-        {!isAdding && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
-          >
-            <Plus size={16} />
-            Add Post
-          </button>
-        )}
       </div>
 
       {/* Add new post form */}
@@ -325,45 +462,14 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
                 key={post.id}
                 className="bg-theme-surface rounded-xl border border-theme-stroke overflow-hidden"
               >
-                {/* Post header row */}
-                <div className="flex items-center gap-2 p-2">
-                  <div className={`w-6 h-6 ${platform.color} rounded flex items-center justify-center text-theme-text text-[9px] font-bold flex-shrink-0`}>
-                    {platform.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {post.title && (
-                      <p className="text-xs text-theme-text font-medium truncate">{post.title}</p>
-                    )}
-                    {post.authorHandle && (
-                      <span className="text-[10px] text-theme-text-secondary">@{post.authorHandle}</span>
-                    )}
-                    <a
-                      href={post.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-theme-text-muted hover:text-theme-text-secondary truncate block"
-                    >
-                      {post.url}
-                    </a>
-                  </div>
-                  {post.views != null && (
-                    <div className="flex items-center gap-1 text-theme-text-muted text-[10px] flex-shrink-0 bg-theme-surface px-1.5 py-0.5 rounded">
-                      <Eye size={10} />
-                      <span>{post.views.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    disabled={deletingId === post.id}
-                    className="p-1 text-theme-text-muted hover:text-red-400 transition-colors flex-shrink-0"
-                  >
-                    {deletingId === post.id ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                  </button>
-                </div>
+                <PostHeader
+                  post={post}
+                  platform={platform}
+                  editable={true}
+                  onDelete={handleDelete}
+                  deletingId={deletingId}
+                />
+                <EngagementMetrics post={post} />
                 {/* Embed for Twitter/X posts */}
                 {isTwitterUrl(post.url) && (
                   <div className="px-2 pb-2">

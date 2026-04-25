@@ -36,6 +36,7 @@ import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
+import cronRoutes from './routes/cron.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -130,6 +131,9 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
 app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug
+
+// Cron routes (Vercel cron jobs)
+app.use('/api/cron', cronRoutes);
 
 // Public API v1 routes
 app.use('/api/v1', v1Routes);
