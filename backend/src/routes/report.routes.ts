@@ -659,6 +659,243 @@ router.get('/:partyId/report/link-clicks', requireAuth, async (req: AuthRequest,
 });
 
 // =====================
+// Tweet Cache / Auto-Discovered Tweets
+// =====================
+
+// GET /api/parties/:partyId/report/tweets - Get cached tweets for this event
+router.get('/:partyId/report/tweets', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership, super admin, or sponsor tagged on event
+    const canView = await canUserViewReport(partyId, req.userId, req.userEmail);
+    if (!canView) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Get cached tweets matched to this party
+    const tweets = await prisma.tweetCache.findMany({
+      where: { matchedPartyId: partyId },
+      orderBy: { tweetCreatedAt: 'desc' },
+    });
+
+    // Get auto-discovered social posts for this party
+    const autoDiscoveredPosts = await prisma.socialPost.findMany({
+      where: {
+        partyId,
+        autoDiscovered: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    res.json({
+      tweets,
+      autoDiscoveredPosts,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/report/refresh-tweets - Manually trigger tweet search for this event
+router.post('/:partyId/report/refresh-tweets', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Check for Twitter bearer token
+    const twitterBearerToken = process.env.TWITTER_BEARER_TOKEN;
+    if (!twitterBearerToken) {
+      throw new AppError('TWITTER_BEARER_TOKEN not configured. Tweet refresh is unavailable.', 503, 'SERVICE_UNAVAILABLE');
+    }
+
+    // Get the party's custom_url and invite_code for search
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { customUrl: true, inviteCode: true },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Build search query for this specific event
+    const slugs = [party.customUrl, party.inviteCode].filter(Boolean);
+    if (slugs.length === 0) {
+      throw new AppError('No event slugs to search for', 400, 'VALIDATION_ERROR');
+    }
+
+    const queryParts = slugs.map(slug => `"rsv.pizza/${slug}"`);
+    const query = `(${queryParts.join(' OR ')}) -is:retweet`;
+
+    const searchParams = new URLSearchParams({
+      query,
+      'tweet.fields': 'created_at,public_metrics,conversation_id,in_reply_to_user_id,attachments',
+      'expansions': 'author_id,attachments.media_keys',
+      'user.fields': 'name,username,profile_image_url',
+      'media.fields': 'url,preview_image_url',
+      'max_results': '100',
+    });
+
+    const apiUrl = `https://api.twitter.com/2/tweets/search/recent?${searchParams.toString()}`;
+
+    const twitterRes = await fetch(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${twitterBearerToken}`,
+      },
+    });
+
+    if (!twitterRes.ok) {
+      const errorBody = await twitterRes.text();
+      console.error('Twitter API error:', twitterRes.status, errorBody);
+      throw new AppError(`Twitter API error: ${twitterRes.status}`, 502, 'TWITTER_API_ERROR');
+    }
+
+    const data = await twitterRes.json();
+
+    if (!data.data || data.data.length === 0) {
+      return res.json({
+        success: true,
+        tweetsProcessed: 0,
+        socialPostsCreated: 0,
+        message: 'No tweets found for this event',
+      });
+    }
+
+    // Build user lookup map
+    const usersMap = new Map<string, { name: string; username: string; profile_image_url?: string }>();
+    if (data.includes?.users) {
+      for (const user of data.includes.users) {
+        usersMap.set(user.id, {
+          name: user.name,
+          username: user.username,
+          profile_image_url: user.profile_image_url,
+        });
+      }
+    }
+
+    // Build media lookup map
+    const mediaMap = new Map<string, string>();
+    if (data.includes?.media) {
+      for (const media of data.includes.media) {
+        mediaMap.set(media.media_key, media.url || media.preview_image_url || '');
+      }
+    }
+
+    let tweetsProcessed = 0;
+    let socialPostsCreated = 0;
+
+    for (const tweet of data.data) {
+      const tweetId = tweet.id;
+      const authorId = tweet.author_id;
+      const author = usersMap.get(authorId);
+
+      if (!author) continue;
+
+      // Extract media URLs
+      const mediaUrls: string[] = [];
+      if (tweet.attachments?.media_keys) {
+        for (const key of tweet.attachments.media_keys) {
+          const url = mediaMap.get(key);
+          if (url) mediaUrls.push(url);
+        }
+      }
+
+      // Upsert into tweet_cache
+      try {
+        await prisma.tweetCache.upsert({
+          where: { tweetId },
+          update: {
+            likeCount: tweet.public_metrics?.like_count || 0,
+            retweetCount: tweet.public_metrics?.retweet_count || 0,
+            replyCount: tweet.public_metrics?.reply_count || 0,
+            quoteCount: tweet.public_metrics?.quote_count || 0,
+            impressionCount: tweet.public_metrics?.impression_count || null,
+            matchedPartyId: partyId,
+            matchedSlug: party.customUrl || party.inviteCode,
+          },
+          create: {
+            tweetId,
+            authorHandle: author.username,
+            authorName: author.name,
+            authorAvatarUrl: author.profile_image_url || null,
+            tweetText: tweet.text,
+            mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+            conversationId: tweet.conversation_id || null,
+            inReplyToId: tweet.in_reply_to_user_id || null,
+            likeCount: tweet.public_metrics?.like_count || 0,
+            retweetCount: tweet.public_metrics?.retweet_count || 0,
+            replyCount: tweet.public_metrics?.reply_count || 0,
+            quoteCount: tweet.public_metrics?.quote_count || 0,
+            impressionCount: tweet.public_metrics?.impression_count || null,
+            matchedPartyId: partyId,
+            matchedSlug: party.customUrl || party.inviteCode,
+            tweetCreatedAt: new Date(tweet.created_at),
+          },
+        });
+        tweetsProcessed++;
+      } catch (err) {
+        console.error(`Failed to upsert tweet ${tweetId}:`, err);
+        continue;
+      }
+
+      // Auto-create social_post entry
+      try {
+        const existing = await prisma.socialPost.findFirst({
+          where: { tweetId },
+        });
+
+        if (!existing) {
+          const tweetUrl = `https://x.com/${author.username}/status/${tweetId}`;
+
+          const maxOrder = await prisma.socialPost.aggregate({
+            where: { partyId },
+            _max: { sortOrder: true },
+          });
+
+          await prisma.socialPost.create({
+            data: {
+              partyId,
+              platform: 'twitter',
+              url: tweetUrl,
+              authorHandle: author.username,
+              title: null,
+              views: tweet.public_metrics?.impression_count || null,
+              tweetId,
+              autoDiscovered: true,
+              authorName: author.name,
+              authorAvatarUrl: author.profile_image_url || null,
+              likeCount: tweet.public_metrics?.like_count || 0,
+              retweetCount: tweet.public_metrics?.retweet_count || 0,
+              impressionCount: tweet.public_metrics?.impression_count || null,
+              tweetCreatedAt: new Date(tweet.created_at),
+              sortOrder: (maxOrder._max.sortOrder || 0) + 1,
+            },
+          });
+          socialPostsCreated++;
+        }
+      } catch (err) {
+        console.error(`Failed to create social post for tweet ${tweetId}:`, err);
+      }
+    }
+
+    res.json({
+      success: true,
+      tweetsProcessed,
+      socialPostsCreated,
+      totalResults: data.data.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================
 // Social Posts CRUD
 // =====================
 

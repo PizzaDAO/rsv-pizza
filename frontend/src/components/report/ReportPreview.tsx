@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, X, MousePointerClick, FileText, Download, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, X, MousePointerClick, FileText, Download, Building2, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { EventReport, PageViewStats, NotableAttendee, Photo } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
@@ -16,6 +16,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
   const config = report.reportStatsConfig || {};
   const socialPostViews = report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0);
   const socialPostCount = report.socialPosts.length;
+  const tweetImpressions = report.socialPosts.reduce((sum, p) => sum + (p.impressionCount || 0), 0);
 
   // Build stats list with config-aware values
   const downloadWallets = report.walletAddressList && report.walletAddressList.length > 0 ? () => {
@@ -34,6 +35,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       { key: 'pageViews', label: 'Page Views', autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
       { key: 'uniqueVisitors', label: 'Unique Visitors', autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
     ] : []),
+    { key: 'tweetImpressions', label: 'Tweet Impressions', autoValue: tweetImpressions || null, icon: Zap, color: 'text-sky-400' },
     { key: 'socialPostViews', label: 'Social Post Views', autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
     { key: 'socialPosts', label: 'Social Posts', autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: 'Total RSVPs', autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },

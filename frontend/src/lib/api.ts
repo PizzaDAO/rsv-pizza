@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, TweetCache, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -1423,6 +1423,36 @@ export async function deleteSocialPost(partyId: string, postId: string): Promise
   } catch (error) {
     console.error('Error deleting social post:', error);
     return false;
+  }
+}
+
+// Get cached tweets for an event (host report)
+export async function getEventTweets(
+  partyId: string
+): Promise<{ tweets: TweetCache[]; autoDiscoveredPosts: SocialPost[] } | null> {
+  try {
+    return await apiRequest<{ tweets: TweetCache[]; autoDiscoveredPosts: SocialPost[] }>(
+      `/api/parties/${partyId}/report/tweets`,
+      { requireAuth: true }
+    );
+  } catch (error) {
+    console.error('Error fetching event tweets:', error);
+    return null;
+  }
+}
+
+// Manually refresh tweets for an event
+export async function refreshTweets(
+  partyId: string
+): Promise<{ success: boolean; tweetsProcessed: number; socialPostsCreated: number } | null> {
+  try {
+    return await apiRequest<{ success: boolean; tweetsProcessed: number; socialPostsCreated: number }>(
+      `/api/parties/${partyId}/report/refresh-tweets`,
+      { method: 'POST', requireAuth: true }
+    );
+  } catch (error) {
+    console.error('Error refreshing tweets:', error);
+    return null;
   }
 }
 

@@ -21,6 +21,7 @@ import {
   deleteNotableAttendee,
   getPageViewStats,
   getLinkClickStats,
+  refreshTweets,
 } from '../../lib/api';
 
 interface ReportWidgetProps {
@@ -204,6 +205,15 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       }
     };
   }, []);
+
+  // Handle refreshing tweets from X/Twitter API
+  const handleRefreshTweets = async () => {
+    const result = await refreshTweets(partyId);
+    if (result?.success) {
+      // Reload the report to get the new social posts
+      await loadReport();
+    }
+  };
 
   // Handle adding social posts (authorHandle extracted by backend from URL)
   const handleAddSocialPost = async (post: { platform: string; url: string; title?: string; views?: number | null }) => {
@@ -496,6 +506,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           posts={report.socialPosts}
           onAdd={handleAddSocialPost}
           onDelete={handleDeleteSocialPost}
+          onRefreshTweets={handleRefreshTweets}
           editable={true}
         />
       </div>
@@ -509,6 +520,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           pageViewStats={viewStats}
           socialPostViews={report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0)}
           socialPostCount={report.socialPosts.length}
+          tweetImpressions={report.socialPosts.reduce((sum, p) => sum + (p.impressionCount || 0), 0)}
         />
       </div>
 
