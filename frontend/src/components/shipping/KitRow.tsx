@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ExternalLink, Eye } from 'lucide-react';
+import { ExternalLink, Eye, Info } from 'lucide-react';
+import { KitContentsModal } from './KitContentsModal';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 import { GPP_REGIONS } from '../../types';
 import { detectTrackingUrl } from '../../lib/trackingUtils';
@@ -37,6 +38,7 @@ export function KitRow({
   showRegion,
 }: KitRowProps) {
   const [showTracking, setShowTracking] = useState(false);
+  const [showContents, setShowContents] = useState(false);
   const [trackingNum, setTrackingNum] = useState(kit.trackingNumber || '');
   const [trackingLink, setTrackingLink] = useState(kit.trackingUrl || '');
 
@@ -115,7 +117,7 @@ export function KitRow({
 
       {/* Tier */}
       <td className="px-3 py-3 hidden lg:table-cell">
-        <div className="relative">
+        <div className="flex items-center gap-1">
           <select
             value={kit.allocatedTier || kit.requestedTier}
             onChange={(e) => onTierChange(kit.id, e.target.value)}
@@ -125,6 +127,13 @@ export function KitRow({
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+          <button
+            onClick={() => setShowContents(true)}
+            className="p-1 rounded hover:bg-theme-surface transition-colors text-theme-text-faint hover:text-theme-text-muted"
+            title="View tier contents"
+          >
+            <Info size={14} />
+          </button>
         </div>
         {kit.allocatedTier && kit.allocatedTier !== kit.requestedTier && (
           <div className="text-xs text-theme-text-faint mt-0.5">req: {kit.requestedTier}</div>
@@ -199,6 +208,13 @@ export function KitRow({
           <Eye size={16} />
         </button>
       </td>
+
+      {showContents && (
+        <KitContentsModal
+          tier={kit.allocatedTier || kit.requestedTier}
+          onClose={() => setShowContents(false)}
+        />
+      )}
     </tr>
   );
 }
