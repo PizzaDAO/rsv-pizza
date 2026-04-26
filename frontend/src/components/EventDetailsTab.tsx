@@ -44,6 +44,7 @@ export const EventDetailsTab: React.FC = () => {
   const [shareTweetText, setShareTweetText] = useState('');
   const [nftEnabled, setNftEnabled] = useState(false);
   const [nftChain, setNftChain] = useState<string>('base');
+  const [quizEnabled, setQuizEnabled] = useState(false);
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
@@ -125,6 +126,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyShareTweetText = party.shareTweetText || '';
       const partyNftEnabled = party.nftEnabled || false;
       const partyNftChain = party.nftChain || 'base';
+      const partyQuizEnabled = party.quizEnabled || false;
 
       // Set form values
       setName(partyName);
@@ -149,6 +151,7 @@ export const EventDetailsTab: React.FC = () => {
       setShareTweetText(partyShareTweetText);
       setNftEnabled(partyNftEnabled);
       setNftChain(partyNftChain);
+      setQuizEnabled(partyQuizEnabled);
 
       // Store original values
       setOriginalValues({
@@ -855,6 +858,22 @@ export const EventDetailsTab: React.FC = () => {
                 </>
               )}
             </div>
+          )}
+
+          {/* Quiz Settings */}
+          <Checkbox
+            checked={quizEnabled}
+            onChange={() => {
+              const newValue = !quizEnabled;
+              setQuizEnabled(newValue);
+              saveOptions({ quiz_enabled: newValue });
+            }}
+            label="Sponsor Quiz (RSVP Step 3)"
+          />
+          {quizEnabled && (
+            <p className="text-xs text-theme-text-faint -mt-1 ml-7">
+              Guests must answer quiz questions before completing RSVP. Manage questions in the Partners tab.
+            </p>
           )}
         </div>
 

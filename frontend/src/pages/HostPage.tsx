@@ -396,7 +396,7 @@ function HostPageContent() {
               )}
 
               {activeTab === 'partners' && party && (
-                <SponsorCRM partyId={party.id} />
+                <SponsorCRM partyId={party.id} quizEnabled={party.quizEnabled} />
               )}
 
               {activeTab === 'staff' && party && (

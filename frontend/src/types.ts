@@ -275,6 +275,7 @@ export interface Party {
   meetupUrl?: string | null;
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
+  quizEnabled?: boolean;
 }
 
 export interface Donation {
@@ -1222,4 +1223,70 @@ export interface SponsorDashboardData {
   isAdmin: boolean;
   tag: string | null;
   events: SponsorDashboardEvent[];
+}
+
+// Quiz types
+
+export interface QuizQuestionTemplate {
+  id: string;
+  sponsorUserId: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  partyId: string;
+  sponsorId?: string | null;
+  templateId?: string | null;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string | null;
+  sortOrder: number;
+  sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
+  _count?: { answers: number };
+}
+
+export interface QuizAnswer {
+  questionId: string;
+  selectedIndex: number;
+  isCorrect: boolean;
+}
+
+export interface QuizPublicQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  sortOrder: number;
+  sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
+}
+
+export interface QuizResult {
+  questionId: string;
+  selectedIndex: number;
+  correctIndex: number;
+  isCorrect: boolean;
+  explanation: string | null;
+}
+
+export interface QuizSubmitResponse {
+  results: QuizResult[];
+  totalCorrect: number;
+  totalQuestions: number;
+  score: number;
+}
+
+export interface QuizStats {
+  questionId: string;
+  question: string;
+  sponsorName: string | null;
+  totalAnswers: number;
+  correctAnswers: number;
+  correctPercentage: number;
 }

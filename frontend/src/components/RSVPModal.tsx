@@ -9,6 +9,7 @@ import { DonationStep } from './DonationStep';
 import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/useRSVPForm';
 import { RSVPFormStep1 } from './RSVPFormStep1';
 import { RSVPFormStep2 } from './RSVPFormStep2';
+import { RSVPFormStep3 } from './RSVPFormStep3';
 import { ShareRSVP } from './ShareRSVP';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
@@ -399,7 +400,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
-              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
+              <p className="text-sm text-theme-text-secondary">Step 1 of {form.totalSteps}</p>
             </div>
 
             <RSVPFormStep1
@@ -417,6 +418,42 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   }
 
   // ---- Step 2 - Pizza Preferences ----
+  if (form.step === 2) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
+        onClick={handleClose}
+      >
+        <div className="min-h-full flex items-center justify-center px-2 py-4 sm:p-4">
+          <div
+            className="card p-8 max-w-2xl w-full relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+            >
+              <X size={24} />
+            </button>
+
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
+              <p className="text-sm text-theme-text-secondary">Step 2 of {form.totalSteps}</p>
+            </div>
+
+            <RSVPFormStep2
+              form={form}
+              isEditing={isEditing}
+              submitLabel={form.hasQuiz ? 'Next' : undefined}
+            />
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  // ---- Step 3 - Sponsor Quiz ----
   return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
@@ -435,11 +472,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </button>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
-            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
+            <h1 className="text-2xl font-bold text-theme-text">Sponsor Quiz</h1>
+            <p className="text-sm text-theme-text-secondary">Step 3 of {form.totalSteps}</p>
           </div>
 
-          <RSVPFormStep2
+          <RSVPFormStep3
             form={form}
             isEditing={isEditing}
           />

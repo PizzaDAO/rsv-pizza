@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, RefreshCw, GripVertical, FileText } from 'lucide-react';
-import { Sponsor, SponsorStats } from '../../types';
+import { Plus, RefreshCw, GripVertical, FileText, BookOpen } from 'lucide-react';
+import { Sponsor, SponsorStats, QuizQuestion, QuizStats as QuizStatsType } from '../../types';
 import {
   getSponsors,
   getSponsorStats,
@@ -9,17 +9,24 @@ import {
   deleteSponsor,
   updateFundraisingGoal,
   reorderSponsors,
+  getQuizQuestions,
+  createQuizQuestion,
+  updateQuizQuestion,
+  deleteQuizQuestion,
+  getQuizStats,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
 import { PartnerForm, extractSponsorData } from './PartnerForm';
 import type { PartnerFormData } from './PartnerForm';
+import { QuizQuestionEditor } from '../QuizQuestionEditor';
 
 interface SponsorCRMProps {
   partyId: string;
+  quizEnabled?: boolean;
 }
 
-export function SponsorCRM({ partyId }: SponsorCRMProps) {
+export function SponsorCRM({ partyId, quizEnabled }: SponsorCRMProps) {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +41,11 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   // Description reorder state
   const [descDragIndex, setDescDragIndex] = useState<number | null>(null);
   const [descOrderSponsors, setDescOrderSponsors] = useState<Sponsor[]>([]);
+
+  // Quiz state
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizStats, setQuizStats] = useState<QuizStatsType[]>([]);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
 
   // Load sponsors and stats
   const loadData = useCallback(async (showRefresh = false) => {
@@ -60,6 +72,24 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     }
   }, [partyId]);
 
+  // Load quiz questions and stats
+  const loadQuiz = useCallback(async () => {
+    if (!quizEnabled) return;
+    setLoadingQuiz(true);
+    try {
+      const [questions, statsResult] = await Promise.all([
+        getQuizQuestions(partyId),
+        getQuizStats(partyId),
+      ]);
+      setQuizQuestions(questions);
+      setQuizStats(statsResult);
+    } catch (err) {
+      console.error('Failed to load quiz:', err);
+    } finally {
+      setLoadingQuiz(false);
+    }
+  }, [partyId, quizEnabled]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -72,6 +102,10 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     );
   }, [sponsors]);
+
+  useEffect(() => {
+    loadQuiz();
+  }, [loadQuiz]);
 
   // Handle form submission
   const handleFormSubmit = async (formData: PartnerFormData) => {
@@ -129,6 +163,38 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     // Refresh stats
     const statsResult = await getSponsorStats(partyId);
     if (statsResult) setStats(statsResult);
+  };
+
+  // Quiz question handlers
+  const handleAddQuizQuestion = async () => {
+    try {
+      const question = await createQuizQuestion(partyId, {
+        question: 'New Question',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctIndex: 0,
+      });
+      setQuizQuestions(prev => [...prev, question]);
+    } catch (err) {
+      console.error('Failed to create quiz question:', err);
+    }
+  };
+
+  const handleUpdateQuizQuestion = async (questionId: string, data: any) => {
+    try {
+      const updated = await updateQuizQuestion(partyId, questionId, data);
+      setQuizQuestions(prev => prev.map(q => q.id === questionId ? updated : q));
+    } catch (err) {
+      console.error('Failed to update quiz question:', err);
+    }
+  };
+
+  const handleDeleteQuizQuestion = async (questionId: string) => {
+    try {
+      await deleteQuizQuestion(partyId, questionId);
+      setQuizQuestions(prev => prev.filter(q => q.id !== questionId));
+    } catch (err) {
+      console.error('Failed to delete quiz question:', err);
+    }
   };
 
   // Close form
@@ -259,6 +325,71 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Quiz Questions Section */}
+      {quizEnabled && (
+        <div className="card p-4 bg-theme-header border-theme-stroke">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BookOpen size={16} className="text-theme-text-muted" />
+              <h3 className="text-sm font-semibold text-theme-text">
+                Quiz Questions ({quizQuestions.length})
+              </h3>
+            </div>
+            <button
+              onClick={handleAddQuizQuestion}
+              className="flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff393a]/80 transition-colors"
+            >
+              <Plus size={14} />
+              Add Question
+            </button>
+          </div>
+
+          {loadingQuiz ? (
+            <div className="flex items-center justify-center py-6">
+              <RefreshCw size={16} className="animate-spin text-theme-text-muted" />
+            </div>
+          ) : quizQuestions.length === 0 ? (
+            <p className="text-sm text-theme-text-faint text-center py-6">
+              No quiz questions yet. Add questions or tag a partner with quiz templates.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {quizQuestions.map((q, idx) => {
+                const qStats = quizStats.find(s => s.questionId === q.id);
+                return (
+                  <div key={q.id}>
+                    <QuizQuestionEditor
+                      question={q.question}
+                      options={q.options}
+                      correctIndex={q.correctIndex}
+                      explanation={q.explanation}
+                      isFromTemplate={!!q.templateId}
+                      sponsorName={q.sponsor?.name}
+                      sponsorId={q.sponsorId}
+                      sponsors={sponsors.filter(s => ['yes', 'billed', 'paid'].includes(s.status))}
+                      onUpdate={(data) => handleUpdateQuizQuestion(q.id, data)}
+                      onDelete={() => handleDeleteQuizQuestion(q.id)}
+                      isFirst={idx === 0}
+                      isLast={idx === quizQuestions.length - 1}
+                    />
+                    {qStats && qStats.totalAnswers > 0 && (
+                      <div className="flex items-center gap-3 mt-1 ml-1">
+                        <span className="text-[10px] text-theme-text-faint">
+                          {qStats.totalAnswers} answer{qStats.totalAnswers !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-[10px] text-theme-text-faint">
+                          {qStats.correctPercentage}% correct
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

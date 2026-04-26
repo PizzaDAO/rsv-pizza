@@ -476,6 +476,7 @@ export interface DbParty {
   meetup_url?: string | null;
   eventbrite_url?: string | null;
   external_links?: Array<{label: string; url: string}>;
+  quiz_enabled?: boolean;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -1363,6 +1364,7 @@ export async function updateParty(
     meetup_url?: string | null;
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
+    quiz_enabled?: boolean;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1424,6 +1426,7 @@ export async function updateParty(
         meetupUrl: updates.meetup_url,
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
+        quizEnabled: updates.quiz_enabled,
       });
       return true;
     } catch (error) {
