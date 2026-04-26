@@ -32,7 +32,7 @@ import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
-import { GeoCheckInButton } from '../components/GeoCheckInButton';
+import { CheckInButton } from '../components/CheckInButton';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -61,6 +61,7 @@ export function EventPage() {
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [canEditAsCoHost, setCanEditAsCoHost] = useState(false);
+  const [isHostUser, setIsHostUser] = useState(false);
   const [showTweetInput, setShowTweetInput] = useState(false);
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
@@ -139,6 +140,8 @@ export function EventPage() {
               console.warn('Could not check host status:', e);
             }
           }
+
+          setIsHostUser(isHost);
 
           // Skip password for hosts and already-RSVP'd guests
           if (isHost || hasRSVPd) {
@@ -511,8 +514,8 @@ export function EventPage() {
     return now.getTime() >= start.getTime() - oneHourMs && now.getTime() <= end.getTime() + oneHourMs;
   })();
 
-  // Show split RSVP + Check In button when all conditions are met
-  const showCheckIn = isEventDay && userHasRSVPd && !!event?.latitude && !!event?.longitude;
+  // Show split RSVP + Check In button when on event day and user is RSVPd or host
+  const showCheckIn = isEventDay && (userHasRSVPd || isHostUser);
 
   return (
     <ThemeProvider theme={isGPP ? 'gpp' : 'dark'}>
@@ -874,9 +877,12 @@ export function EventPage() {
                           >
                             Edit RSVP
                           </button>
-                          <GeoCheckInButton
+                          <CheckInButton
                             inviteCode={event!.customUrl || event!.inviteCode}
+                            guestId={existingGuestData?.id ?? ''}
+                            guestName={existingGuestData?.name ?? ''}
                             checkedInAt={existingGuestData?.checkedInAt ?? null}
+                            isHost={isHostUser}
                             onCheckIn={(checkedInAt) => {
                               if (existingGuestData) {
                                 setExistingGuestData({ ...existingGuestData, checkedInAt });
@@ -985,9 +991,12 @@ export function EventPage() {
                       >
                         Edit RSVP
                       </button>
-                      <GeoCheckInButton
+                      <CheckInButton
                         inviteCode={event!.customUrl || event!.inviteCode}
+                        guestId={existingGuestData?.id ?? ''}
+                        guestName={existingGuestData?.name ?? ''}
                         checkedInAt={existingGuestData?.checkedInAt ?? null}
+                        isHost={isHostUser}
                         onCheckIn={(checkedInAt) => {
                           if (existingGuestData) {
                             setExistingGuestData({ ...existingGuestData, checkedInAt });
@@ -1268,9 +1277,12 @@ export function EventPage() {
               >
                 Edit RSVP
               </button>
-              <GeoCheckInButton
+              <CheckInButton
                 inviteCode={event!.customUrl || event!.inviteCode}
+                guestId={existingGuestData?.id ?? ''}
+                guestName={existingGuestData?.name ?? ''}
                 checkedInAt={existingGuestData?.checkedInAt ?? null}
+                isHost={isHostUser}
                 onCheckIn={(checkedInAt) => {
                   if (existingGuestData) {
                     setExistingGuestData({ ...existingGuestData, checkedInAt });

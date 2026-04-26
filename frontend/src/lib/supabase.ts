@@ -1014,6 +1014,7 @@ export interface ExistingGuestData {
   suggestedPizzerias: any[];
   status: DbGuestStatus;
   checkedInAt: string | null;
+  checkedInBy: string | null;
 }
 
 export async function getExistingGuest(
@@ -1050,6 +1051,7 @@ export async function getExistingGuest(
       suggestedPizzerias: guest.suggestedPizzerias || [],
       status: guest.status || 'CONFIRMED',
       checkedInAt: guest.checkedInAt || null,
+      checkedInBy: guest.checkedInBy || null,
     };
   } catch (error) {
     console.error('Error fetching guest:', error);

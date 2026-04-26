@@ -38,70 +38,72 @@ async function canUserCheckIn(partyId: string, userId?: string, userEmail?: stri
   return false;
 }
 
-// Haversine distance in meters between two lat/lng pairs
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+// Helper to find party by inviteCode or customUrl
+async function findPartyByCode(inviteCode: string, select: Record<string, any>) {
+  let party = await prisma.party.findUnique({
+    where: { inviteCode },
+    select,
+  });
+
+  if (!party) {
+    party = await prisma.party.findUnique({
+      where: { customUrl: inviteCode },
+      select,
+    });
+  }
+
+  return party;
 }
 
-const GEO_CHECKIN_THRESHOLD_METERS = 500;
-
-// POST /api/checkin/:inviteCode/self - Self-check-in via geolocation (requires auth, guest only)
-router.post('/:inviteCode/self', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+// POST /api/checkin/:inviteCode/self-host - Host/co-host self-check-in (no vouch needed)
+router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
-    const { latitude, longitude, accuracy } = req.body;
 
-    if (latitude == null || longitude == null) {
-      throw new AppError('Latitude and longitude are required', 400, 'VALIDATION_ERROR');
-    }
-
-    // Find party by invite code or custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        latitude: true,
-        longitude: true,
-      },
+    const party = await findPartyByCode(inviteCode, {
+      id: true,
+      name: true,
+      userId: true,
+      coHosts: true,
     });
-
-    if (!party) {
-      party = await prisma.party.findUnique({
-        where: { customUrl: inviteCode },
-        select: {
-          id: true,
-          name: true,
-          latitude: true,
-          longitude: true,
-        },
-      });
-    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    if (party.latitude == null || party.longitude == null) {
-      throw new AppError('This event does not have a venue location set', 400, 'NO_VENUE_LOCATION');
+    // Verify user is host or co-host
+    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheckIn) {
+      throw new AppError('Only hosts and co-hosts can self-check in', 403, 'UNAUTHORIZED');
     }
 
-    // Find guest by authenticated user's email
-    const guest = await prisma.guest.findFirst({
+    // Find existing guest record for this host
+    let guest = await prisma.guest.findFirst({
       where: {
         partyId: party.id,
         email: req.userEmail?.toLowerCase(),
       },
     });
 
+    // If host hasn't RSVPd, auto-create guest record
     if (!guest) {
-      throw new AppError('You are not an RSVP\'d guest for this event', 404, 'GUEST_NOT_FOUND');
+      guest = await prisma.guest.create({
+        data: {
+          name: req.userEmail?.split('@')[0] || 'Host',
+          email: req.userEmail?.toLowerCase() || null,
+          partyId: party.id,
+          status: 'CONFIRMED',
+          submittedVia: 'host-checkin',
+          roles: [],
+          dietaryRestrictions: [],
+          likedToppings: [],
+          dislikedToppings: [],
+          likedBeverages: [],
+          dislikedBeverages: [],
+          pizzeriaRankings: [],
+          suggestedPizzerias: [],
+        },
+      });
     }
 
     // Check if already checked in
@@ -109,32 +111,16 @@ router.post('/:inviteCode/self', requireAuth, async (req: AuthRequest, res: Resp
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
-        checkedInAt: guest.checkedInAt,
+        guest: {
+          id: guest.id,
+          name: guest.name,
+          checkedInAt: guest.checkedInAt,
+        },
         message: 'You are already checked in!',
       });
     }
 
-    // Calculate distance
-    const distance = haversineDistance(
-      latitude, longitude,
-      party.latitude, party.longitude
-    );
-
-    if (distance > GEO_CHECKIN_THRESHOLD_METERS) {
-      const distanceDisplay = distance >= 1000
-        ? `${(distance / 1000).toFixed(1)}km`
-        : `${Math.round(distance)}m`;
-
-      return res.status(400).json({
-        success: false,
-        alreadyCheckedIn: false,
-        distance: Math.round(distance),
-        threshold: GEO_CHECKIN_THRESHOLD_METERS,
-        message: `You're ~${distanceDisplay} away. You need to be within ${GEO_CHECKIN_THRESHOLD_METERS}m of the venue to check in.`,
-      });
-    }
-
-    // Check in the guest (self-check-in: checkedInBy = guest's own ID)
+    // Check in (self-vouch for hosts)
     const updatedGuest = await prisma.guest.update({
       where: { id: guest.id },
       data: {
@@ -146,10 +132,97 @@ router.post('/:inviteCode/self', requireAuth, async (req: AuthRequest, res: Resp
     res.status(200).json({
       success: true,
       alreadyCheckedIn: false,
-      checkedInAt: updatedGuest.checkedInAt,
-      distance: Math.round(distance),
-      threshold: GEO_CHECKIN_THRESHOLD_METERS,
-      message: 'You\'re checked in!',
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        checkedInAt: updatedGuest.checkedInAt,
+      },
+      message: "You're checked in!",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/checkin/:inviteCode/vouch - Vouch for another guest (peer attestation)
+router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+    const { targetGuestId } = req.body;
+
+    if (!targetGuestId) {
+      throw new AppError('targetGuestId is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await findPartyByCode(inviteCode, {
+      id: true,
+      name: true,
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the voucher (caller) - they must be checked in
+    const voucher = await prisma.guest.findFirst({
+      where: {
+        partyId: party.id,
+        email: req.userEmail?.toLowerCase(),
+      },
+    });
+
+    if (!voucher) {
+      throw new AppError('You are not a guest at this event', 404, 'GUEST_NOT_FOUND');
+    }
+
+    if (!voucher.checkedInAt) {
+      throw new AppError('You must be checked in to vouch for others', 403, 'NOT_CHECKED_IN');
+    }
+
+    // Find the target guest - must belong to same party
+    const targetGuest = await prisma.guest.findFirst({
+      where: {
+        id: targetGuestId,
+        partyId: party.id,
+      },
+    });
+
+    if (!targetGuest) {
+      throw new AppError('Guest not found at this event', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Check if already checked in
+    if (targetGuest.checkedInAt) {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        guest: {
+          id: targetGuest.id,
+          name: targetGuest.name,
+          checkedInAt: targetGuest.checkedInAt,
+        },
+        message: `${targetGuest.name} is already checked in`,
+      });
+    }
+
+    // Vouch: check in the target guest
+    const updatedGuest = await prisma.guest.update({
+      where: { id: targetGuest.id },
+      data: {
+        checkedInAt: new Date(),
+        checkedInBy: voucher.id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      alreadyCheckedIn: false,
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        checkedInAt: updatedGuest.checkedInAt,
+      },
+      message: `${updatedGuest.name} has been checked in!`,
     });
   } catch (error) {
     next(error);
@@ -161,28 +234,12 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
   try {
     const { inviteCode, guestId } = req.params;
 
-    // Find party by invite code or custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        userId: true,
-        coHosts: true,
-      },
+    const party = await findPartyByCode(inviteCode, {
+      id: true,
+      name: true,
+      userId: true,
+      coHosts: true,
     });
-
-    if (!party) {
-      party = await prisma.party.findUnique({
-        where: { customUrl: inviteCode },
-        select: {
-          id: true,
-          name: true,
-          userId: true,
-          coHosts: true,
-        },
-      });
-    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -253,28 +310,12 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
   try {
     const { inviteCode, guestId } = req.params;
 
-    // Find party by invite code or custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        userId: true,
-        coHosts: true,
-      },
+    const party = await findPartyByCode(inviteCode, {
+      id: true,
+      name: true,
+      userId: true,
+      coHosts: true,
     });
-
-    if (!party) {
-      party = await prisma.party.findUnique({
-        where: { customUrl: inviteCode },
-        select: {
-          id: true,
-          name: true,
-          userId: true,
-          coHosts: true,
-        },
-      });
-    }
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');

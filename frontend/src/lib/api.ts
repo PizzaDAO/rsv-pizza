@@ -888,25 +888,28 @@ export async function getCheckInStatus(inviteCode: string, guestId: string): Pro
   });
 }
 
-// Geolocation self-check-in
-export interface GeoCheckInResponse {
+// QR-based peer attestation check-in
+export interface VouchResponse {
   success: boolean;
-  alreadyCheckedIn: boolean;
-  checkedInAt?: string;
-  distance?: number;
-  threshold?: number;
+  alreadyCheckedIn?: boolean;
+  guest: {
+    id: string;
+    name: string;
+    checkedInAt: string;
+  };
   message: string;
 }
 
-export async function geoCheckIn(
-  inviteCode: string,
-  latitude: number,
-  longitude: number,
-  accuracy: number
-): Promise<GeoCheckInResponse> {
-  return apiRequest<GeoCheckInResponse>(`/api/checkin/${inviteCode}/self`, {
+export async function hostSelfCheckIn(inviteCode: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/self-host`, {
     method: 'POST',
-    body: { latitude, longitude, accuracy },
+  });
+}
+
+export async function vouchForGuest(inviteCode: string, targetGuestId: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/vouch`, {
+    method: 'POST',
+    body: { targetGuestId },
   });
 }
 

@@ -173,6 +173,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         pizzeriaRankings: true,
         status: true,
         checkedInAt: true,
+        checkedInBy: true,
       },
     });
 
