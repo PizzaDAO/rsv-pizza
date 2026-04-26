@@ -494,6 +494,11 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           },
           orderBy: { sortOrder: 'asc' },
         },
+        partnerEventNotes: {
+          ...(sponsorUserId ? { where: { sponsorUserId } } : {}),
+          select: { notes: true },
+          take: 1,
+        },
         _count: { select: { guests: true } },
       },
       orderBy: { date: 'asc' },
@@ -611,6 +616,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         progress,
         sponsorStatuses,
         sponsorCount,
+        partnerNotes: event.partnerEventNotes.length > 0 ? event.partnerEventNotes[0].notes : null,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,
@@ -632,6 +638,50 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       tag: tag || null,
       events: formattedEvents,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/sponsor/notes - Upsert per-event notes for the logged-in partner
+sponsorDashboardRouter.put('/notes', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    const sponsorUserId = req.sponsorUser?.id;
+    if (!sponsorUserId) {
+      throw new AppError('Sponsor user required (admins without a sponsor profile cannot save notes)', 400, 'VALIDATION_ERROR');
+    }
+
+    const { partyId, notes } = req.body;
+    if (!partyId || typeof notes !== 'string') {
+      throw new AppError('partyId and notes are required', 400, 'VALIDATION_ERROR');
+    }
+
+    const trimmedNotes = notes.trim();
+
+    if (!trimmedNotes) {
+      // Delete the row if notes are empty (cleanup)
+      await prisma.partnerEventNote.deleteMany({
+        where: { sponsorUserId, partyId },
+      });
+      return res.json({ success: true, notes: '' });
+    }
+
+    // Upsert on the composite key
+    await prisma.partnerEventNote.upsert({
+      where: {
+        sponsorUserId_partyId: { sponsorUserId, partyId },
+      },
+      create: {
+        sponsorUserId,
+        partyId,
+        notes: trimmedNotes,
+      },
+      update: {
+        notes: trimmedNotes,
+      },
+    });
+
+    res.json({ success: true, notes: trimmedNotes });
   } catch (error) {
     next(error);
   }

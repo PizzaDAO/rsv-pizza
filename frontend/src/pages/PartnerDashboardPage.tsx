@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
+import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote } from '../lib/api';
 import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
-  Wallet, TrendingUp,
+  Wallet, TrendingUp, StickyNote,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -553,6 +553,52 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
+  // Notes state with debounced auto-save
+  const [notes, setNotes] = useState(event.partnerNotes || '');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef(event.partnerNotes || '');
+
+  const saveNotes = useCallback(async (value: string) => {
+    if (value === lastSavedRef.current) return;
+    setSavingNotes(true);
+    try {
+      await updatePartnerEventNote(event.id, value);
+      lastSavedRef.current = value;
+    } catch {
+      // Revert on failure
+      setNotes(lastSavedRef.current);
+    }
+    setSavingNotes(false);
+  }, [event.id]);
+
+  const handleNotesChange = useCallback((value: string) => {
+    setNotes(value);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveNotes(value);
+    }, 800);
+  }, [saveNotes]);
+
+  const handleNotesBlur = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    saveNotes(notes);
+  }, [notes, saveNotes]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
@@ -665,6 +711,23 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             </div>
           </div>
         )}
+
+        {/* Private notes */}
+        <div className="mt-2 relative">
+          <IconInput
+            icon={StickyNote}
+            multiline
+            rows={2}
+            placeholder="Private notes for this event..."
+            value={notes}
+            onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
+            onBlur={handleNotesBlur}
+            className="text-xs"
+          />
+          {savingNotes && (
+            <Loader2 size={14} className="absolute right-2 top-2 animate-spin text-theme-text-muted" />
+          )}
+        </div>
       </div>{/* closes flex-1 wrapper */}
     </div>
   );

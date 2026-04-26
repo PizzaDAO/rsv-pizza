@@ -2898,6 +2898,13 @@ export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item
   });
 }
 
+export async function updatePartnerEventNote(partyId: string, notes: string): Promise<{ success: boolean; notes: string }> {
+  return apiRequest<{ success: boolean; notes: string }>('/api/sponsor/notes', {
+    method: 'PUT',
+    body: { partyId, notes },
+  });
+}
+
 // Sponsor User Admin API
 
 export async function fetchSponsorUsers(): Promise<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }> {
