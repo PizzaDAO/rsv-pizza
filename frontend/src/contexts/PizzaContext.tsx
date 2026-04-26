@@ -320,6 +320,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const dbParty = await db.updatePartyBeverages(party.id, beverages);
     if (dbParty) {
       const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
       setParty(updatedParty);
       // Regenerate beverage recommendations with new beverage selection
       if (beverages.length > 0) {
@@ -342,6 +345,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const dbParty = await db.updatePartyToppings(party.id, toppings);
     if (dbParty) {
       const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
       setParty(updatedParty);
     }
   };
