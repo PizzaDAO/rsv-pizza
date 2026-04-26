@@ -251,6 +251,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       meetupUrl: data.meetupUrl,
       eventbriteUrl: data.eventbriteUrl,
       externalLinks: data.externalLinks,
+      quizEnabled: data.quizEnabled,
     },
   });
 }
