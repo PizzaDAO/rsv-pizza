@@ -556,6 +556,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   // Notes state with debounced auto-save
   const [notes, setNotes] = useState(event.partnerNotes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef(event.partnerNotes || '');
 
@@ -582,12 +583,13 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
     }, 800);
   }, [saveNotes]);
 
-  const handleNotesBlur = useCallback(() => {
+  const handleModalClose = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
     saveNotes(notes);
+    setNotesModalOpen(false);
   }, [notes, saveNotes]);
 
   // Cleanup timeout on unmount
@@ -712,23 +714,58 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
           </div>
         )}
 
-        {/* Private notes */}
-        <div className="mt-2 relative">
-          <IconInput
-            icon={StickyNote}
-            multiline
-            rows={2}
-            placeholder="Private notes for this event..."
-            value={notes}
-            onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
-            onBlur={handleNotesBlur}
-            className="text-xs"
-          />
-          {savingNotes && (
-            <Loader2 size={14} className="absolute right-2 top-2 animate-spin text-theme-text-muted" />
+        {/* Private notes — clickable pill that opens modal */}
+        <button
+          onClick={() => setNotesModalOpen(true)}
+          className="mt-2 flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors truncate max-w-full text-left"
+          title={notes || 'Add private notes'}
+        >
+          <StickyNote size={12} className="flex-shrink-0" />
+          {savingNotes ? (
+            <Loader2 size={12} className="animate-spin flex-shrink-0" />
+          ) : (
+            <span className="truncate">{notes || 'Private notes for this event...'}</span>
           )}
-        </div>
+        </button>
       </div>{/* closes flex-1 wrapper */}
+
+      {/* Notes modal */}
+      {notesModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={handleModalClose}
+        >
+          <div
+            className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-theme-text flex items-center gap-2">
+                <StickyNote size={16} />
+                Notes — {event.name}
+              </h3>
+              {savingNotes && <Loader2 size={14} className="animate-spin text-theme-text-muted" />}
+            </div>
+            <IconInput
+              icon={StickyNote}
+              multiline
+              rows={5}
+              placeholder="Private notes for this event..."
+              value={notes}
+              onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
+              autoFocus
+            />
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={handleModalClose}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-[#E52828] rounded-lg hover:bg-[#CC2020] transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
