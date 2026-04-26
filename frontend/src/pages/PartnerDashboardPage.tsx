@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem } from '../lib/api';
+import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote } from '../lib/api';
 import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
-  Wallet, TrendingUp,
+  Wallet, TrendingUp, StickyNote,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -553,6 +553,54 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
+  // Notes state with debounced auto-save
+  const [notes, setNotes] = useState(event.partnerNotes || '');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef(event.partnerNotes || '');
+
+  const saveNotes = useCallback(async (value: string) => {
+    if (value === lastSavedRef.current) return;
+    setSavingNotes(true);
+    try {
+      await updatePartnerEventNote(event.id, value);
+      lastSavedRef.current = value;
+    } catch {
+      // Revert on failure
+      setNotes(lastSavedRef.current);
+    }
+    setSavingNotes(false);
+  }, [event.id]);
+
+  const handleNotesChange = useCallback((value: string) => {
+    setNotes(value);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveNotes(value);
+    }, 800);
+  }, [saveNotes]);
+
+  const handleModalClose = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    saveNotes(notes);
+    setNotesModalOpen(false);
+  }, [notes, saveNotes]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="bg-theme-card border border-theme-stroke rounded-2xl overflow-hidden flex flex-col md:flex-row hover:border-theme-stroke-hover transition-colors">
       {/* Flyer image — banner on mobile, left column on desktop */}
@@ -665,7 +713,59 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             </div>
           </div>
         )}
+
+        {/* Private notes — clickable pill that opens modal */}
+        <button
+          onClick={() => setNotesModalOpen(true)}
+          className="mt-2 flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors truncate max-w-full text-left"
+          title={notes || 'Add private notes'}
+        >
+          <StickyNote size={12} className="flex-shrink-0" />
+          {savingNotes ? (
+            <Loader2 size={12} className="animate-spin flex-shrink-0" />
+          ) : (
+            <span className="truncate">{notes || 'Private notes for this event...'}</span>
+          )}
+        </button>
       </div>{/* closes flex-1 wrapper */}
+
+      {/* Notes modal */}
+      {notesModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={handleModalClose}
+        >
+          <div
+            className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-theme-text flex items-center gap-2">
+                <StickyNote size={16} />
+                Notes — {event.name}
+              </h3>
+              {savingNotes && <Loader2 size={14} className="animate-spin text-theme-text-muted" />}
+            </div>
+            <IconInput
+              icon={StickyNote}
+              multiline
+              rows={5}
+              placeholder="Private notes for this event..."
+              value={notes}
+              onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
+              autoFocus
+            />
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={handleModalClose}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-[#E52828] rounded-lg hover:bg-[#CC2020] transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

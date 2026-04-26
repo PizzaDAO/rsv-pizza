@@ -1199,6 +1199,7 @@ export interface SponsorDashboardEvent {
   };
   sponsorStatuses?: string[];
   sponsorCount?: number;
+  partnerNotes: string | null;
   checklist: SponsorChecklistItem[];
 }
 
