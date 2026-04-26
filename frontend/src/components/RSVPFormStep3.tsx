@@ -164,32 +164,43 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
       )}
 
       {/* Navigation buttons */}
-      <div className="flex gap-3">
+      {form.quizSubmitted ? (
         <button
           type="button"
-          onClick={() => form.setStep(2)}
-          className="btn-secondary flex items-center gap-2"
-          disabled={form.submitting}
+          onClick={() => form.finishQuiz()}
+          className="w-full btn-primary flex items-center justify-center gap-2"
         >
-          <ChevronLeft size={18} />
-          Back
+          <Check size={18} />
+          Done
         </button>
-        <button
-          type="submit"
-          disabled={!allAnswered || form.submitting}
-          className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
-          data-testid="rsvp-submit"
-        >
-          {form.submitting ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            isEditing ? 'Edit RSVP' : 'RSVP'
-          )}
-        </button>
-      </div>
+      ) : (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => form.setStep(2)}
+            className="btn-secondary flex items-center gap-2"
+            disabled={form.submitting}
+          >
+            <ChevronLeft size={18} />
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={!allAnswered || form.submitting}
+            className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+            data-testid="rsvp-submit"
+          >
+            {form.submitting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              isEditing ? 'Edit RSVP' : 'RSVP'
+            )}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

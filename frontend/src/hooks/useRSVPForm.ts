@@ -463,9 +463,18 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
             const quizResult = await submitQuizAnswers(inviteCode, result.guest.id, answers);
             setQuizResults(quizResult);
             setQuizSubmitted(true);
+            // Stay on step 3 to show results — don't mark submitted yet
+            setSubmitting(false);
+            setGuestId(result.guest.id);
+            setAlreadyRegistered(result.alreadyRegistered);
+            setPendingApproval(result.requireApproval);
+            setWasUpdated(isEditing || result.updated);
+            setWaitlisted(result.waitlisted);
+            setWaitlistPosition(result.waitlistPosition);
+            return; // Don't proceed to submitted state yet
           } catch (quizErr) {
             console.error('Failed to submit quiz answers:', quizErr);
-            // Don't block RSVP success for quiz failure
+            // Fall through to submitted state
           }
         }
 
@@ -499,6 +508,19 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn,
     saveToProfile, isEditing, onSuccess, quizAnswers,
   ]);
+
+  // Called after user has reviewed quiz results to finalize the RSVP flow
+  const finishQuiz = useCallback(() => {
+    setSubmitted(true);
+    onSuccess?.({
+      guest: guestId ? { id: guestId } : null,
+      alreadyRegistered,
+      requireApproval: pendingApproval,
+      updated: wasUpdated,
+      waitlisted,
+      waitlistPosition,
+    });
+  }, [guestId, alreadyRegistered, pendingApproval, wasUpdated, waitlisted, waitlistPosition, onSuccess]);
 
   return {
     // Step navigation
@@ -592,6 +614,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     handleStep1Continue,
     handleStep2Continue,
     handleSubmit,
+    finishQuiz,
 
     // Computed
     isSwcEvent,
