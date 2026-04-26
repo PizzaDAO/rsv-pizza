@@ -694,7 +694,7 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
   const { data, error } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
-    .eq('custom_url', customUrl)
+    .eq('custom_url', customUrl.toLowerCase())
     .single();
 
   if (error) {
@@ -792,6 +792,7 @@ export async function verifyPartyPassword(inviteCode: string, passwordAttempt: s
 }
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
+  const normalizedSlug = slug.toLowerCase();
   let party: DbParty | null = null;
   let error = null;
 
@@ -799,7 +800,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const { data: customUrlData, error: customUrlError } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
-    .eq('custom_url', slug)
+    .eq('custom_url', normalizedSlug)
     .maybeSingle();
 
   if (customUrlData) {
@@ -809,7 +810,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     const { data: inviteCodeData, error: inviteCodeError } = await supabase
       .from('parties')
       .select(SAFE_PARTY_COLUMNS)
-      .eq('invite_code', slug)
+      .eq('invite_code', normalizedSlug)
       .maybeSingle();
 
     if (inviteCodeData) {

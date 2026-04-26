@@ -7,7 +7,7 @@ const router = Router();
 // GET /api/events/:slug - Get public event details with host profile (public)
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
 
     // Find party by invite code OR custom URL
     let party = await prisma.party.findUnique({
@@ -271,7 +271,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 // POST /api/events/:slug/check-host - Check if an email belongs to a co-host (public, no auth)
 router.post('/:slug/check-host', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
     const { email } = req.body;
 
     if (!email || typeof email !== 'string') {
@@ -307,7 +307,7 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
 // POST /api/events/:slug/verify-tweet - Verify a tweet exists via oEmbed
 router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
     const { tweetUrl } = req.body;
 
     if (!tweetUrl || typeof tweetUrl !== 'string') {
