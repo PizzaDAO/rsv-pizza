@@ -13,6 +13,7 @@ import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
+import { DescriptionEditor } from './DescriptionEditor';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -1125,40 +1126,18 @@ export const EventDetailsTab: React.FC = () => {
       )}
 
       {/* Description Modal */}
-      {showDescriptionModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">Description</h2>
-
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your event..."
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
-              autoFocus
-            />
-
-            <button
-              type="button"
-              onClick={async () => {
-                await saveDescription();
-                setShowDescriptionModal(false);
-              }}
-              disabled={savingField === 'description'}
-              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-            >
-              {savingField === 'description' ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Done'
-              )}
-            </button>
-          </div>
-        </div>,
-        document.body
+      {showDescriptionModal && (
+        <DescriptionEditor
+          value={description}
+          onChange={setDescription}
+          onSave={async () => {
+            await saveDescription();
+            setShowDescriptionModal(false);
+          }}
+          onClose={() => setShowDescriptionModal(false)}
+          saving={savingField === 'description'}
+          partyId={party!.id}
+        />
       )}
 
     </div>

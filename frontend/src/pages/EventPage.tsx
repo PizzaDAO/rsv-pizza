@@ -1021,6 +1021,14 @@ export function EventPage() {
                               ) : (
                                 <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
                               ),
+                            img: ({ node, ...props }) => (
+                              <img
+                                {...props}
+                                className="rounded-lg max-w-full h-auto my-3"
+                                loading="lazy"
+                                style={{ maxHeight: '400px', objectFit: 'contain' }}
+                              />
+                            ),
                           }}
                         >
                           {event.description}
