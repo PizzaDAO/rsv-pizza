@@ -121,24 +121,30 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                   })}
                 </div>
 
-                {/* Explanation after check */}
-                {result && result.explanation && (
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <p className="text-xs text-blue-300">{result.explanation}</p>
+                {/* Result feedback */}
+                {result && result.isCorrect && (
+                  <div className="p-3 rounded-lg bg-[#39d98a]/10 border border-[#39d98a]/30">
+                    <p className="text-sm text-[#39d98a] font-medium">
+                      Correct!{result.explanation ? ` ${result.explanation}` : ''}
+                    </p>
                   </div>
                 )}
 
-                {/* Learn more link when wrong */}
-                {result && !result.isCorrect && q.sponsor?.website && (
-                  <div>
-                    <a
-                      href={q.sponsor.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-[#ff393a] hover:text-[#ff393a]/80 transition-colors"
-                    >
-                      Learn more at {q.sponsor.name} <ExternalLink size={10} />
-                    </a>
+                {result && !result.isCorrect && (
+                  <div className="p-3 rounded-lg bg-[#ff393a]/10 border border-[#ff393a]/30 space-y-1">
+                    <p className="text-sm text-[#ff393a] font-medium">
+                      Incorrect.{result.explanation ? ` ${result.explanation}` : ''}
+                    </p>
+                    {q.sponsor?.website && (
+                      <a
+                        href={q.sponsor.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-[#ff393a]/80 hover:text-[#ff393a] underline transition-colors"
+                      >
+                        Learn more at {q.sponsor.name} <ExternalLink size={10} />
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -150,14 +156,6 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
             <div className="p-3 rounded-xl bg-[#ff393a]/10 border border-[#ff393a]/30 text-center">
               <p className="text-sm text-[#ff393a] font-medium">
                 {checkResult.totalCorrect} / {checkResult.totalQuestions} correct — fix your answers and try again
-              </p>
-            </div>
-          )}
-
-          {hasChecked && allCorrect && (
-            <div className="p-3 rounded-xl bg-[#39d98a]/10 border border-[#39d98a]/30 text-center">
-              <p className="text-sm text-[#39d98a] font-medium">
-                All correct! You can now submit your RSVP.
               </p>
             </div>
           )}
