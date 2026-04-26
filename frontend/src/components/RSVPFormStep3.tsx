@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, ChevronLeft, Check, X, BookOpen } from 'lucide-react';
+import { Loader2, ChevronLeft, Check, X, ExternalLink } from 'lucide-react';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
 
 interface RSVPFormStep3Props {
@@ -40,19 +40,23 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 key={q.id}
                 className="p-4 rounded-xl border border-theme-stroke bg-theme-surface space-y-3"
               >
-                {/* Question header with sponsor badge */}
+                {/* Question header with sponsor logo */}
                 <div className="flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-full bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-theme-text-muted">{idx + 1}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      {q.sponsor && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md border bg-purple-500/20 text-purple-400 border-purple-500/30 truncate">
-                          {q.sponsor.name}
-                        </span>
-                      )}
+                  {q.sponsor?.logoUrl ? (
+                    <img
+                      src={q.sponsor.logoUrl}
+                      alt={q.sponsor.name}
+                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-theme-text-muted">{idx + 1}</span>
                     </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {q.sponsor && (
+                      <p className="text-[11px] text-theme-text-muted mb-0.5">{q.sponsor.name}</p>
+                    )}
                     <p className="text-sm font-medium text-theme-text">{q.question}</p>
                   </div>
                 </div>
@@ -121,6 +125,20 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 {result && result.explanation && (
                   <div className="ml-10 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-xs text-blue-300">{result.explanation}</p>
+                  </div>
+                )}
+
+                {/* Learn more link when wrong */}
+                {result && !result.isCorrect && q.sponsor?.website && (
+                  <div className="ml-10">
+                    <a
+                      href={q.sponsor.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-[#ff393a] hover:text-[#ff393a]/80 transition-colors"
+                    >
+                      Learn more at {q.sponsor.name} <ExternalLink size={10} />
+                    </a>
                   </div>
                 )}
               </div>
