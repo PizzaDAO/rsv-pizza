@@ -493,7 +493,8 @@ export const SAFE_PARTY_COLUMNS = `
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
   region,
-  hidden_gpp_photos, extra_gpp_photos
+  hidden_gpp_photos, extra_gpp_photos,
+  quiz_enabled
 `;
 
 /**
