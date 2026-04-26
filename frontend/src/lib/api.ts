@@ -3137,6 +3137,16 @@ export async function getEventQuiz(slug: string): Promise<{ quizEnabled: boolean
   );
 }
 
+export async function checkQuizAnswers(
+  slug: string,
+  answers: Array<{ questionId: string; selectedIndex: number }>
+): Promise<import('../types').QuizCheckResponse> {
+  return apiRequest<import('../types').QuizCheckResponse>(
+    `/api/events/${slug}/quiz/check`,
+    { method: 'POST', body: { answers }, requireAuth: false }
+  );
+}
+
 export async function submitQuizAnswers(
   slug: string,
   guestId: string,

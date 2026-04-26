@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
-import { Pizzeria, QuizPublicQuestion, QuizSubmitResponse } from '../types';
-import { PublicEvent, getEventQuiz, submitQuizAnswers } from '../lib/api';
+import { Pizzeria, QuizPublicQuestion, QuizSubmitResponse, QuizCheckResponse } from '../types';
+import { PublicEvent, getEventQuiz, checkQuizAnswers, submitQuizAnswers } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 
@@ -147,7 +147,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [quizQuestions, setQuizQuestions] = useState<QuizPublicQuestion[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizResults, setQuizResults] = useState<QuizSubmitResponse | null>(null);
+  const [quizCheckResults, setQuizCheckResults] = useState<QuizCheckResponse | null>(null);
+  const [quizAllCorrect, setQuizAllCorrect] = useState(false);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [checkingQuiz, setCheckingQuiz] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
 
   // Computed values
@@ -186,7 +189,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setShowSwcInfoModal(false);
     setQuizAnswers({});
     setQuizResults(null);
+    setQuizCheckResults(null);
+    setQuizAllCorrect(false);
     setQuizSubmitted(false);
+    setCheckingQuiz(false);
 
     // Pre-fill with existing guest data if editing
     if (existingGuest) {
@@ -322,7 +328,31 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   const setQuizAnswer = useCallback((questionId: string, optionIndex: number) => {
     setQuizAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
+    // Reset check results when user changes an answer (let them retry)
+    setQuizCheckResults(null);
+    setQuizAllCorrect(false);
   }, []);
+
+  // Check quiz answers without submitting RSVP
+  const checkQuiz = useCallback(async () => {
+    const inviteCode = eventData.customUrl || eventData.inviteCode;
+    if (!inviteCode) return;
+
+    setCheckingQuiz(true);
+    setError(null);
+    try {
+      const answers = Object.entries(quizAnswers).map(([questionId, selectedIndex]) => ({
+        questionId,
+        selectedIndex,
+      }));
+      const result = await checkQuizAnswers(inviteCode, answers);
+      setQuizCheckResults(result);
+      setQuizAllCorrect(result.allCorrect);
+    } catch (err) {
+      setError('Failed to check answers. Please try again.');
+    }
+    setCheckingQuiz(false);
+  }, [eventData, quizAnswers]);
 
   const toggleRole = useCallback((role: string) => {
     setRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
@@ -453,28 +483,17 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
           });
         }
 
-        // Submit quiz answers if quiz is active
+        // Persist quiz answers if quiz is active (already validated as all correct)
         if (hasQuiz && Object.keys(quizAnswers).length > 0 && result.guest?.id) {
           try {
             const answers = Object.entries(quizAnswers).map(([questionId, selectedIndex]) => ({
               questionId,
               selectedIndex,
             }));
-            const quizResult = await submitQuizAnswers(inviteCode, result.guest.id, answers);
-            setQuizResults(quizResult);
+            await submitQuizAnswers(inviteCode, result.guest.id, answers);
             setQuizSubmitted(true);
-            // Stay on step 3 to show results — don't mark submitted yet
-            setSubmitting(false);
-            setGuestId(result.guest.id);
-            setAlreadyRegistered(result.alreadyRegistered);
-            setPendingApproval(result.requireApproval);
-            setWasUpdated(isEditing || result.updated);
-            setWaitlisted(result.waitlisted);
-            setWaitlistPosition(result.waitlistPosition);
-            return; // Don't proceed to submitted state yet
           } catch (quizErr) {
-            console.error('Failed to submit quiz answers:', quizErr);
-            // Fall through to submitted state
+            console.error('Failed to persist quiz answers:', quizErr);
           }
         }
 
@@ -509,18 +528,6 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     saveToProfile, isEditing, onSuccess, quizAnswers,
   ]);
 
-  // Called after user has reviewed quiz results to finalize the RSVP flow
-  const finishQuiz = useCallback(() => {
-    setSubmitted(true);
-    onSuccess?.({
-      guest: guestId ? { id: guestId } : null,
-      alreadyRegistered,
-      requireApproval: pendingApproval,
-      updated: wasUpdated,
-      waitlisted,
-      waitlistPosition,
-    });
-  }, [guestId, alreadyRegistered, pendingApproval, wasUpdated, waitlisted, waitlistPosition, onSuccess]);
 
   return {
     // Step navigation
@@ -607,14 +614,17 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     quizAnswers,
     setQuizAnswer,
     quizResults,
+    quizCheckResults,
+    quizAllCorrect,
     quizSubmitted,
+    checkingQuiz,
     loadingQuiz,
+    checkQuiz,
 
     // Handlers
     handleStep1Continue,
     handleStep2Continue,
     handleSubmit,
-    finishQuiz,
 
     // Computed
     isSwcEvent,

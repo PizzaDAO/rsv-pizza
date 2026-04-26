@@ -1275,6 +1275,13 @@ export interface QuizResult {
   explanation: string | null;
 }
 
+export interface QuizCheckResponse {
+  results: QuizResult[];
+  totalCorrect: number;
+  totalQuestions: number;
+  allCorrect: boolean;
+}
+
 export interface QuizSubmitResponse {
   results: QuizResult[];
   totalCorrect: number;

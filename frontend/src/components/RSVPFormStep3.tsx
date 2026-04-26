@@ -11,29 +11,38 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
   const allAnswered = form.quizQuestions.length > 0 &&
     form.quizQuestions.every(q => form.quizAnswers[q.id] !== undefined);
 
+  const checkResult = form.quizCheckResults;
+  const hasChecked = !!checkResult;
+  const allCorrect = form.quizAllCorrect;
+
   const handleOptionSelect = (questionId: string, optionIndex: number) => {
-    if (form.quizSubmitted) return;
+    if (allCorrect) return; // Lock options once all correct
     form.setQuizAnswer(questionId, optionIndex);
+  };
+
+  const handleCheck = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!allAnswered) return;
+    form.checkQuiz();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!allAnswered) return;
+    if (!allCorrect) return;
     form.handleSubmit(e);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={allCorrect ? handleSubmit : handleCheck} className="space-y-4">
       {form.quizQuestions.length === 0 ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 size={20} className="animate-spin text-theme-text-muted" />
         </div>
       ) : (
         <>
-          {form.quizQuestions.map((q, idx) => {
+          {form.quizQuestions.map((q) => {
             const selectedIndex = form.quizAnswers[q.id];
-            const result = form.quizResults?.results.find(r => r.questionId === q.id);
-            const hasAnswered = selectedIndex !== undefined;
+            const result = checkResult?.results.find(r => r.questionId === q.id);
 
             return (
               <div
@@ -65,7 +74,6 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                     let bgClass = 'bg-theme-surface hover:bg-theme-surface-hover';
 
                     if (result) {
-                      // After submission — show results
                       if (isCorrect) {
                         borderClass = 'border-[#39d98a]/50';
                         bgClass = 'bg-[#39d98a]/10';
@@ -74,7 +82,6 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         bgClass = 'bg-[#ff393a]/10';
                       }
                     } else if (isSelected) {
-                      // Before submission — selected state
                       borderClass = 'border-[#ff393a]';
                       bgClass = 'bg-[#ff393a]/10';
                     }
@@ -84,8 +91,8 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         key={optIdx}
                         type="button"
                         onClick={() => handleOptionSelect(q.id, optIdx)}
-                        disabled={form.quizSubmitted}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${borderClass} ${bgClass} ${form.quizSubmitted ? 'cursor-default' : 'cursor-pointer'}`}
+                        disabled={allCorrect}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${borderClass} ${bgClass} ${allCorrect ? 'cursor-default' : 'cursor-pointer'}`}
                       >
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                           result
@@ -114,7 +121,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                   })}
                 </div>
 
-                {/* Explanation after submission */}
+                {/* Explanation after check */}
                 {result && result.explanation && (
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-xs text-blue-300">{result.explanation}</p>
@@ -138,18 +145,19 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
             );
           })}
 
-          {/* Score display after submission */}
-          {form.quizResults && (
-            <div className="p-4 rounded-xl border border-theme-stroke bg-theme-surface text-center">
-              <p className="text-lg font-bold text-theme-text">
-                {form.quizResults.totalCorrect} / {form.quizResults.totalQuestions} correct
+          {/* Feedback after check */}
+          {hasChecked && !allCorrect && (
+            <div className="p-3 rounded-xl bg-[#ff393a]/10 border border-[#ff393a]/30 text-center">
+              <p className="text-sm text-[#ff393a] font-medium">
+                {checkResult.totalCorrect} / {checkResult.totalQuestions} correct — fix your answers and try again
               </p>
-              <p className="text-sm text-theme-text-muted">
-                {form.quizResults.score >= 80
-                  ? 'Great job!'
-                  : form.quizResults.score >= 50
-                    ? 'Not bad!'
-                    : 'Better luck next time!'}
+            </div>
+          )}
+
+          {hasChecked && allCorrect && (
+            <div className="p-3 rounded-xl bg-[#39d98a]/10 border border-[#39d98a]/30 text-center">
+              <p className="text-sm text-[#39d98a] font-medium">
+                All correct! You can now submit your RSVP.
               </p>
             </div>
           )}
@@ -164,29 +172,21 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
       )}
 
       {/* Navigation buttons */}
-      {form.quizSubmitted ? (
+      <div className="flex gap-3">
         <button
           type="button"
-          onClick={() => form.finishQuiz()}
-          className="w-full btn-primary flex items-center justify-center gap-2"
+          onClick={() => form.setStep(2)}
+          className="btn-secondary flex items-center gap-2"
+          disabled={form.submitting || form.checkingQuiz}
         >
-          <Check size={18} />
-          Done
+          <ChevronLeft size={18} />
+          Back
         </button>
-      ) : (
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => form.setStep(2)}
-            className="btn-secondary flex items-center gap-2"
-            disabled={form.submitting}
-          >
-            <ChevronLeft size={18} />
-            Back
-          </button>
+
+        {allCorrect ? (
           <button
             type="submit"
-            disabled={!allAnswered || form.submitting}
+            disabled={form.submitting}
             className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
             data-testid="rsvp-submit"
           >
@@ -196,11 +196,26 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 Submitting...
               </>
             ) : (
-              isEditing ? 'Edit RSVP' : 'RSVP'
+              isEditing ? 'Edit RSVP' : 'Submit RSVP'
             )}
           </button>
-        </div>
-      )}
+        ) : (
+          <button
+            type="submit"
+            disabled={!allAnswered || form.checkingQuiz}
+            className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {form.checkingQuiz ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Checking...
+              </>
+            ) : (
+              'Check Answers'
+            )}
+          </button>
+        )}
+      </div>
     </form>
   );
 }
