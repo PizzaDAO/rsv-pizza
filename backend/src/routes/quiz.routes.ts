@@ -241,7 +241,7 @@ quizPublicRouter.get('/:slug/quiz', async (req: Request, res: Response, next: Ne
         options: true,
         explanation: false, // Hidden until after answering
         sortOrder: true,
-        sponsor: { select: { id: true, name: true, logoUrl: true } },
+        sponsor: { select: { id: true, name: true, logoUrl: true, website: true } },
       },
       orderBy: { sortOrder: 'asc' },
     });
@@ -254,9 +254,67 @@ quizPublicRouter.get('/:slug/quiz', async (req: Request, res: Response, next: Ne
         options: q.options,
         sortOrder: q.sortOrder,
         sponsor: q.sponsor
-          ? { id: q.sponsor.id, name: q.sponsor.name, logoUrl: q.sponsor.logoUrl }
+          ? { id: q.sponsor.id, name: q.sponsor.name, logoUrl: q.sponsor.logoUrl, website: q.sponsor.website }
           : null,
       })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/events/:slug/quiz/check - Check answers without persisting (no guestId needed)
+quizPublicRouter.post('/:slug/quiz/check', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    const { answers } = req.body;
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      throw new AppError('answers array is required', 400, 'VALIDATION_ERROR');
+    }
+
+    let party = await prisma.party.findUnique({
+      where: { inviteCode: slug },
+      select: { id: true, quizEnabled: true },
+    });
+    if (!party) {
+      party = await prisma.party.findUnique({
+        where: { customUrl: slug },
+        select: { id: true, quizEnabled: true },
+      });
+    }
+    if (!party) {
+      throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
+    }
+    if (!party.quizEnabled) {
+      throw new AppError('Quiz is not enabled for this event', 400, 'QUIZ_NOT_ENABLED');
+    }
+
+    const questions = await prisma.quizQuestion.findMany({
+      where: { partyId: party.id },
+      select: { id: true, correctIndex: true, explanation: true },
+    });
+    const questionMap = new Map(questions.map((q) => [q.id, q]));
+
+    const results = answers.map((answer: { questionId: string; selectedIndex: number }) => {
+      const q = questionMap.get(answer.questionId);
+      if (!q) return null;
+      return {
+        questionId: answer.questionId,
+        selectedIndex: answer.selectedIndex,
+        correctIndex: q.correctIndex,
+        isCorrect: answer.selectedIndex === q.correctIndex,
+        explanation: q.explanation,
+      };
+    }).filter(Boolean);
+
+    const totalCorrect = results.filter((r: any) => r.isCorrect).length;
+
+    res.json({
+      results,
+      totalCorrect,
+      totalQuestions: results.length,
+      allCorrect: totalCorrect === results.length,
     });
   } catch (error) {
     next(error);
