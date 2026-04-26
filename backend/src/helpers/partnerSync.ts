@@ -106,13 +106,15 @@ export async function addPartnerToParty(
       },
     });
 
+    let sponsorId: string;
     if (existingSponsor) {
       await prisma.sponsor.update({
         where: { id: existingSponsor.id },
         data: sponsorData,
       });
+      sponsorId = existingSponsor.id;
     } else {
-      await prisma.sponsor.create({
+      const created = await prisma.sponsor.create({
         data: {
           ...sponsorData,
           partyId: party.id,
@@ -121,7 +123,60 @@ export async function addPartnerToParty(
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
         },
       });
+      sponsorId = created.id;
     }
+
+    // Copy quiz question templates to event quiz questions
+    await syncQuizTemplatesToEvent(sponsorUser.id, party.id, sponsorId);
+  }
+}
+
+/**
+ * Copy quiz question templates from a sponsor user to an event's quiz questions.
+ * Only copies templates that haven't already been copied (keyed by templateId).
+ */
+async function syncQuizTemplatesToEvent(
+  sponsorUserId: string,
+  partyId: string,
+  sponsorId: string
+): Promise<void> {
+  const templates = await prisma.quizQuestionTemplate.findMany({
+    where: { sponsorUserId },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  if (templates.length === 0) return;
+
+  // Check which templates are already copied
+  const existingQuestions = await prisma.quizQuestion.findMany({
+    where: { partyId, templateId: { in: templates.map(t => t.id) } },
+    select: { templateId: true },
+  });
+  const existingTemplateIds = new Set(existingQuestions.map(q => q.templateId));
+
+  // Get max sort order for this party's quiz questions
+  const maxSort = await prisma.quizQuestion.aggregate({
+    where: { partyId },
+    _max: { sortOrder: true },
+  });
+  let nextSort = (maxSort._max.sortOrder ?? -1) + 1;
+
+  // Copy new templates
+  for (const template of templates) {
+    if (existingTemplateIds.has(template.id)) continue;
+
+    await prisma.quizQuestion.create({
+      data: {
+        partyId,
+        sponsorId,
+        templateId: template.id,
+        question: template.question,
+        options: template.options as any,
+        correctIndex: template.correctIndex,
+        explanation: template.explanation,
+        sortOrder: nextSort++,
+      },
+    });
   }
 }
 
