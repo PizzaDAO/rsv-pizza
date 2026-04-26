@@ -441,6 +441,7 @@ export interface DbParty {
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  country?: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
   selected_pizzerias: any[] | null;
@@ -512,7 +513,7 @@ export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
-  event_image_url, description, address, latitude, longitude, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
+  event_image_url, description, address, latitude, longitude, country, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
   donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
@@ -1314,6 +1315,7 @@ export async function updateParty(
     address?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    country?: string | null;
     venue_name?: string | null;
     // Venue tracking fields
     venueStatus?: string | null;
@@ -1376,6 +1378,7 @@ export async function updateParty(
         address: updates.address,
         latitude: updates.latitude,
         longitude: updates.longitude,
+        country: updates.country,
         venueName: updates.venue_name,
         // Venue tracking fields
         venueStatus: updates.venueStatus as any,
