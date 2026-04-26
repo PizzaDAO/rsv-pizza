@@ -41,28 +41,21 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 className="p-4 rounded-xl border border-theme-stroke bg-theme-surface space-y-3"
               >
                 {/* Question header with sponsor logo */}
-                <div className="flex items-start gap-3">
+                <div className="space-y-2">
                   {q.sponsor?.logoUrl ? (
                     <img
                       src={q.sponsor.logoUrl}
                       alt={q.sponsor.name}
-                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                      className="h-8 max-w-[160px] object-contain"
                     />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-bold text-theme-text-muted">{idx + 1}</span>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    {q.sponsor && (
-                      <p className="text-[11px] text-theme-text-muted mb-0.5">{q.sponsor.name}</p>
-                    )}
-                    <p className="text-sm font-medium text-theme-text">{q.question}</p>
-                  </div>
+                  ) : q.sponsor ? (
+                    <p className="text-sm font-semibold text-theme-text">{q.sponsor.name}</p>
+                  ) : null}
+                  <p className="text-sm font-medium text-theme-text">{q.question}</p>
                 </div>
 
                 {/* Options */}
-                <div className="space-y-2 ml-10">
+                <div className="space-y-2">
                   {q.options.map((option, optIdx) => {
                     const isSelected = selectedIndex === optIdx;
                     const isCorrect = result?.correctIndex === optIdx;
@@ -123,14 +116,14 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
 
                 {/* Explanation after submission */}
                 {result && result.explanation && (
-                  <div className="ml-10 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-xs text-blue-300">{result.explanation}</p>
                   </div>
                 )}
 
                 {/* Learn more link when wrong */}
                 {result && !result.isCorrect && q.sponsor?.website && (
-                  <div className="ml-10">
+                  <div>
                     <a
                       href={q.sponsor.website}
                       target="_blank"
