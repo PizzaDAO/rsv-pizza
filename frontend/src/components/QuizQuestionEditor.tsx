@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Check, ChevronUp, ChevronDown, BookOpen } from 'lucide-react';
 import { IconInput } from './IconInput';
 
+interface SponsorOption {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+}
+
 interface QuizQuestionEditorProps {
   question: string;
   options: string[];
@@ -9,11 +15,14 @@ interface QuizQuestionEditorProps {
   explanation?: string | null;
   isFromTemplate?: boolean;
   sponsorName?: string | null;
+  sponsorId?: string | null;
+  sponsors?: SponsorOption[];
   onUpdate: (data: {
     question?: string;
     options?: string[];
     correctIndex?: number;
     explanation?: string;
+    sponsorId?: string | null;
   }) => void;
   onDelete: () => void;
   onMoveUp?: () => void;
@@ -29,6 +38,8 @@ export function QuizQuestionEditor({
   explanation,
   isFromTemplate,
   sponsorName,
+  sponsorId,
+  sponsors,
   onUpdate,
   onDelete,
   onMoveUp,
@@ -88,11 +99,22 @@ export function QuizQuestionEditor({
               from template
             </span>
           )}
-          {sponsorName && (
+          {sponsors && sponsors.length > 0 ? (
+            <select
+              value={sponsorId || ''}
+              onChange={(e) => onUpdate({ sponsorId: e.target.value || null })}
+              className="text-xs bg-theme-surface border border-theme-stroke rounded-md px-2 py-1 text-theme-text max-w-[180px] truncate"
+            >
+              <option value="">No partner</option>
+              {sponsors.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          ) : sponsorName ? (
             <span className="text-[10px] px-1.5 py-0.5 rounded-md border bg-purple-500/20 text-purple-400 border-purple-500/30 truncate">
               {sponsorName}
             </span>
-          )}
+          ) : null}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {onMoveUp && !isFirst && (

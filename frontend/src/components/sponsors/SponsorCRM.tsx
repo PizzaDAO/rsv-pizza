@@ -169,8 +169,8 @@ export function SponsorCRM({ partyId, quizEnabled }: SponsorCRMProps) {
   const handleAddQuizQuestion = async () => {
     try {
       const question = await createQuizQuestion(partyId, {
-        question: '',
-        options: ['', '', '', ''],
+        question: 'New Question',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
         correctIndex: 0,
       });
       setQuizQuestions(prev => [...prev, question]);
@@ -368,6 +368,8 @@ export function SponsorCRM({ partyId, quizEnabled }: SponsorCRMProps) {
                       explanation={q.explanation}
                       isFromTemplate={!!q.templateId}
                       sponsorName={q.sponsor?.name}
+                      sponsorId={q.sponsorId}
+                      sponsors={sponsors.filter(s => ['yes', 'billed', 'paid'].includes(s.status))}
                       onUpdate={(data) => handleUpdateQuizQuestion(q.id, data)}
                       onDelete={() => handleDeleteQuizQuestion(q.id)}
                       isFirst={idx === 0}
