@@ -381,7 +381,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
@@ -472,6 +472,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(address !== undefined && { address }),
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
+        ...(country !== undefined && { country: country || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),

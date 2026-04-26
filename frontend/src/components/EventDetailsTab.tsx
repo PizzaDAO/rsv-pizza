@@ -61,6 +61,8 @@ export const EventDetailsTab: React.FC = () => {
 
   // Pending lat/lng from LocationAutocomplete (fires before onPlaceSelected)
   const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  // Pending country from LocationAutocomplete (fires before onPlaceSelected)
+  const pendingCountryRef = useRef<string | null>(null);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
@@ -493,11 +495,14 @@ export const EventDetailsTab: React.FC = () => {
   const saveLocation = async (newAddress: string, newVenueName: string | null) => {
     const coords = pendingCoordsRef.current;
     pendingCoordsRef.current = null;
+    const country = pendingCountryRef.current;
+    pendingCountryRef.current = null;
     const success = await saveField('location', {
       address: newAddress.trim() || null,
       venue_name: newVenueName || null,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
+      country: country || null,
     });
     if (success) {
       setOriginalValues((prev: any) => ({
@@ -590,6 +595,10 @@ export const EventDetailsTab: React.FC = () => {
           onLocationSelected={(loc) => {
             // Store coords in ref; saveLocation will consume them
             pendingCoordsRef.current = loc;
+          }}
+          onCitySelected={(cityData) => {
+            // Store country in ref; saveLocation will consume it
+            pendingCountryRef.current = cityData.country || null;
           }}
           onPlaceSelected={(newAddress, newVenueName) => {
             // Save when a place is selected from autocomplete
