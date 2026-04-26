@@ -1264,7 +1264,7 @@ export interface QuizPublicQuestion {
   question: string;
   options: string[];
   sortOrder: number;
-  sponsor?: { id: string; name: string; logoUrl?: string | null; website?: string | null } | null;
+  sponsor?: { id: string; name: string; logoUrl?: string | null; website?: string | null; brandTwitter?: string | null } | null;
 }
 
 export interface QuizResult {

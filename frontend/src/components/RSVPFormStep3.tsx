@@ -131,28 +131,31 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 )}
 
                 {result && !result.isCorrect && (
-                  <div className="p-3 rounded-lg bg-[#ff393a]/10 border border-[#ff393a]/30 space-y-1">
+                  <div className="p-3 rounded-lg bg-[#ff393a]/10 border border-[#ff393a]/30">
                     <p className="text-sm text-[#ff393a] font-medium">
-                      Incorrect.{result.explanation ? ` ${result.explanation}` : ''}
+                      Incorrect!{' '}
+                      {(q.sponsor?.website || q.sponsor?.brandTwitter) ? (
+                        <>
+                          Check{' '}
+                          {q.sponsor.website && (
+                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.name}</a>
+                          )}
+                          {q.sponsor.website && q.sponsor.brandTwitter && ' or '}
+                          {q.sponsor.brandTwitter && (
+                            <a href={`https://x.com/${q.sponsor.brandTwitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">@{q.sponsor.brandTwitter.replace('@', '')}</a>
+                          )}
+                          {' '}for hints.
+                        </>
+                      ) : 'Try again.'}
                     </p>
-                    {q.sponsor?.website && (
-                      <a
-                        href={q.sponsor.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-[#ff393a]/80 hover:text-[#ff393a] underline transition-colors"
-                      >
-                        Learn more at {q.sponsor.name} <ExternalLink size={10} />
-                      </a>
-                    )}
                   </div>
                 )}
               </div>
             );
           })}
 
-          {/* Feedback after check */}
-          {hasChecked && !allCorrect && (
+          {/* Score summary — only show when multiple questions */}
+          {hasChecked && !allCorrect && checkResult.totalQuestions > 1 && (
             <div className="p-3 rounded-xl bg-[#ff393a]/10 border border-[#ff393a]/30 text-center">
               <p className="text-sm text-[#ff393a] font-medium">
                 {checkResult.totalCorrect} / {checkResult.totalQuestions} correct — fix your answers and try again
