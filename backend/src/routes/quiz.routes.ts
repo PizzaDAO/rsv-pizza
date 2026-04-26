@@ -241,7 +241,7 @@ quizPublicRouter.get('/:slug/quiz', async (req: Request, res: Response, next: Ne
         options: true,
         explanation: false, // Hidden until after answering
         sortOrder: true,
-        sponsor: { select: { id: true, name: true, logoUrl: true } },
+        sponsor: { select: { id: true, name: true, logoUrl: true, website: true } },
       },
       orderBy: { sortOrder: 'asc' },
     });
@@ -254,7 +254,7 @@ quizPublicRouter.get('/:slug/quiz', async (req: Request, res: Response, next: Ne
         options: q.options,
         sortOrder: q.sortOrder,
         sponsor: q.sponsor
-          ? { id: q.sponsor.id, name: q.sponsor.name, logoUrl: q.sponsor.logoUrl }
+          ? { id: q.sponsor.id, name: q.sponsor.name, logoUrl: q.sponsor.logoUrl, website: q.sponsor.website }
           : null,
       })),
     });
