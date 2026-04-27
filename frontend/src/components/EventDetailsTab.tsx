@@ -867,7 +867,7 @@ export const EventDetailsTab: React.FC = () => {
               setQuizEnabled(newValue);
               saveOptions({ quiz_enabled: newValue });
             }}
-            label="Sponsor Quiz (RSVP Step 3)"
+            label="Partner Quiz (RSVP Step 3)"
           />
           {quizEnabled && (
             <p className="text-xs text-theme-text-faint -mt-1 ml-7">

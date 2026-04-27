@@ -390,7 +390,7 @@ export function RSVPPage() {
     );
   }
 
-  // ---- Step 3 - Sponsor Quiz ----
+  // ---- Step 3 - Partner Quiz ----
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
       {isGPP && <GPPClouds />}
@@ -403,7 +403,7 @@ export function RSVPPage() {
         </button>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-theme-text">Sponsor Quiz</h1>
+          <h1 className="text-2xl font-bold text-theme-text">Partner Quiz</h1>
           <p className="text-sm text-theme-text-secondary">Step 3 of {form.totalSteps}</p>
         </div>
 

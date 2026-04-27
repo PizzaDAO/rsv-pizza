@@ -453,7 +453,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     );
   }
 
-  // ---- Step 3 - Sponsor Quiz ----
+  // ---- Step 3 - Partner Quiz ----
   return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
@@ -472,7 +472,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </button>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text">Sponsor Quiz</h1>
+            <h1 className="text-2xl font-bold text-theme-text">Partner Quiz</h1>
             <p className="text-sm text-theme-text-secondary">Step 3 of {form.totalSteps}</p>
           </div>
 
