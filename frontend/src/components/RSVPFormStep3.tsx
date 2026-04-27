@@ -2,6 +2,13 @@ import React from 'react';
 import { Loader2, ChevronLeft, Check, X, ExternalLink } from 'lucide-react';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
 
+function ensureUrl(url: string) {
+  return /^https?:\/\//.test(url) ? url : `https://${url}`;
+}
+function cleanUrl(url: string) {
+  return url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+}
+
 interface RSVPFormStep3Props {
   form: ReturnType<typeof useRSVPForm>;
   isEditing?: boolean;
@@ -131,7 +138,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                           {q.sponsor.website && (
                             <>
                               {' '}Visit {q.sponsor.name || 'them'} at{' '}
-                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a>
+                              <a href={ensureUrl(q.sponsor.website)} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{cleanUrl(q.sponsor.website)}</a>
                             </>
                           )}
                           {q.sponsor.website && q.sponsor.brandTwitter && ' and '}
@@ -156,7 +163,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         <>
                           Check{' '}
                           {q.sponsor.website && (
-                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a>
+                            <a href={ensureUrl(q.sponsor.website)} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{cleanUrl(q.sponsor.website)}</a>
                           )}
                           {q.sponsor.website && q.sponsor.brandTwitter && ' or '}
                           {q.sponsor.brandTwitter && (
