@@ -172,6 +172,8 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         dislikedBeverages: true,
         pizzeriaRankings: true,
         status: true,
+        checkedInAt: true,
+        checkedInBy: true,
       },
     });
 
