@@ -5,7 +5,7 @@ import { KIT_TIERS } from '../../types';
 import type { KitTier } from '../../types';
 
 interface KitContentsModalProps {
-  tier: KitTier;
+  tier?: KitTier;
   onClose: () => void;
 }
 

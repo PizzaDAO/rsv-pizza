@@ -4,7 +4,7 @@ import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check } from '
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager } from '../components/shipping';
+import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager, KitContentsModal } from '../components/shipping';
 import {
   fetchShippingMe,
   fetchShippingKits,
@@ -55,6 +55,9 @@ export function ShippingDashboard() {
 
   // CSV import modal
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // Kit contents modal
+  const [showKitContents, setShowKitContents] = useState(false);
 
   // Available regions based on role
   const availableRegions = useMemo(() => {
@@ -428,6 +431,7 @@ export function ShippingDashboard() {
               onExport={handleExport}
               exporting={exporting}
               onImport={() => setShowImportModal(true)}
+              onShowKitContents={() => setShowKitContents(true)}
             />
           </section>
 
@@ -471,6 +475,13 @@ export function ShippingDashboard() {
         <CsvImportModal
           onClose={() => setShowImportModal(false)}
           onSuccess={() => loadData()}
+        />
+      )}
+
+      {/* Kit Contents Modal */}
+      {showKitContents && (
+        <KitContentsModal
+          onClose={() => setShowKitContents(false)}
         />
       )}
     </div>
