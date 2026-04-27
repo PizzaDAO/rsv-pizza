@@ -337,7 +337,6 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               eventName={event.name}
               isEditing={isEditing}
               showWallet={!!(event.nftEnabled || event.eventType === 'gpp')}
-              walletRequired={event.eventType === 'gpp'}
             />
           </div>
         </div>

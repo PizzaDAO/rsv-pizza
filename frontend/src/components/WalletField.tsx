@@ -10,10 +10,9 @@ interface WalletFieldProps {
   onChange: (value: string) => void;
   validation: 'idle' | 'valid' | 'invalid';
   onValidate: (value: string) => void;
-  required?: boolean;
 }
 
-export function WalletField({ value, onChange, validation, onValidate, required }: WalletFieldProps) {
+export function WalletField({ value, onChange, validation, onValidate }: WalletFieldProps) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const { address: connectedAddress, isConnected: walletConnected } = useAccount();
 
@@ -37,7 +36,7 @@ export function WalletField({ value, onChange, validation, onValidate, required 
               onChange(e.target.value);
               onValidate(e.target.value);
             }}
-            placeholder={required ? 'Wallet Address or ENS (e.g. vitalik.eth) *' : 'Wallet Address or ENS (e.g. vitalik.eth)'}
+            placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
             className={
               validation === 'valid'
                 ? 'border-[#39d98a]/50'

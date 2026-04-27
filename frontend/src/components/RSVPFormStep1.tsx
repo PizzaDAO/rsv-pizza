@@ -11,7 +11,6 @@ interface RSVPFormStep1Props {
   eventName: string;
   isEditing?: boolean;
   showWallet?: boolean; // Whether to show wallet field at all
-  walletRequired?: boolean; // Whether wallet is mandatory (GPP events)
 }
 
 export function RSVPFormStep1({
@@ -19,7 +18,6 @@ export function RSVPFormStep1({
   eventName,
   isEditing,
   showWallet,
-  walletRequired,
 }: RSVPFormStep1Props) {
   return (
     <form onSubmit={form.handleStep1Continue} className="space-y-3">
@@ -53,7 +51,6 @@ export function RSVPFormStep1({
           onChange={(val) => form.setEthereumAddress(val)}
           validation={form.walletValidation}
           onValidate={form.validateWalletAddress}
-          required={walletRequired}
         />
       )}
 

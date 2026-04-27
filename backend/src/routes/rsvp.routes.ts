@@ -274,11 +274,6 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    // Validate wallet address is provided for GPP events
-    if (party.eventType === 'gpp' && (!ethereumAddress || !ethereumAddress.trim())) {
-      throw new AppError('Wallet address is required for this event', 400, 'VALIDATION_ERROR');
-    }
-
     // Check if RSVPs are closed
     if (party.rsvpClosedAt) {
       throw new AppError('RSVPs are closed for this party', 400, 'RSVP_CLOSED');
