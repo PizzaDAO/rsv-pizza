@@ -142,6 +142,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   // Computed values
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
+  const walletRequired = eventData.eventType === 'gpp';
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
   // ---- Validate wallet address ----
@@ -348,9 +349,17 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       setError('Please enter your name');
       return;
     }
+    if (walletRequired && !ethereumAddress.trim()) {
+      setError('Wallet address is required for this event');
+      return;
+    }
+    if (walletRequired && walletValidation === 'invalid') {
+      setError('Please enter a valid wallet address or ENS name');
+      return;
+    }
     setError(null);
     setStep(2);
-  }, [name]);
+  }, [name, walletRequired, ethereumAddress, walletValidation]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -509,6 +518,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
     // Computed
     isSwcEvent,
+    walletRequired,
     isEditing,
     excludedToppings,
     availableBeverages: eventData.availableBeverages,

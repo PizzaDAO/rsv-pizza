@@ -238,6 +238,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         timezone: true,
         address: true,
         customUrl: true,
+        eventType: true,
         rsvpClosedAt: true,
         maxGuests: true,
         requireApproval: true,
@@ -258,6 +259,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           timezone: true,
           address: true,
           customUrl: true,
+          eventType: true,
           rsvpClosedAt: true,
           maxGuests: true,
           requireApproval: true,
@@ -270,6 +272,11 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Validate wallet address is provided for GPP events
+    if (party.eventType === 'gpp' && (!ethereumAddress || !ethereumAddress.trim())) {
+      throw new AppError('Wallet address is required for this event', 400, 'VALIDATION_ERROR');
     }
 
     // Check if RSVPs are closed
