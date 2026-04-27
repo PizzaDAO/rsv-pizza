@@ -130,9 +130,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         <>
                           {q.sponsor.website && (
                             <>
-                              {' '}Visit{' '}
-                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.name || 'them'}</a>
-                              {' '}at{' '}
+                              {' '}Visit {q.sponsor.name || 'them'} at{' '}
                               <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
                             </>
                           )}
