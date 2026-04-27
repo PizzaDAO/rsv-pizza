@@ -126,18 +126,21 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                   <div className="p-3 rounded-lg bg-[#39d98a]/10 border border-[#39d98a]/30">
                     <p className="text-sm text-[#39d98a] font-medium">
                       Correct!{result.explanation ? ` ${result.explanation}.` : ''}
-                      {(q.sponsor?.brandTwitter || q.sponsor?.website) && (
+                      {(q.sponsor?.website || q.sponsor?.brandTwitter) && (
                         <>
-                          {' '}Follow{' '}
-                          {q.sponsor.brandTwitter && (
-                            <a href={`https://x.com/${q.sponsor.brandTwitter.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">@{q.sponsor.brandTwitter.replace(/^@/, '')}</a>
-                          )}
-                          {q.sponsor.brandTwitter && q.sponsor.website && ' and visit '}
-                          {!q.sponsor.brandTwitter && q.sponsor.website && ' Visit '}
                           {q.sponsor.website && (
                             <>
-                              {q.sponsor.name || 'them'} at{' '}
+                              {' '}Visit{' '}
+                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.name || 'them'}</a>
+                              {' '}at{' '}
                               <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
+                            </>
+                          )}
+                          {q.sponsor.website && q.sponsor.brandTwitter && ' and '}
+                          {q.sponsor.brandTwitter && (
+                            <>
+                              {!q.sponsor.website && ' '}follow at{' '}
+                              <a href={`https://x.com/${q.sponsor.brandTwitter.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">@{q.sponsor.brandTwitter.replace(/^@/, '')}</a>
                             </>
                           )}
                           .
