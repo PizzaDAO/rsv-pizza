@@ -156,7 +156,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         <>
                           Check{' '}
                           {q.sponsor.website && (
-                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.name || q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
+                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
                           )}
                           {q.sponsor.website && q.sponsor.brandTwitter && ' or '}
                           {q.sponsor.brandTwitter && (
