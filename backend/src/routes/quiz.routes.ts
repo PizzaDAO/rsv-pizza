@@ -299,12 +299,13 @@ quizPublicRouter.post('/:slug/quiz/check', async (req: Request, res: Response, n
     const results = answers.map((answer: { questionId: string; selectedIndex: number }) => {
       const q = questionMap.get(answer.questionId);
       if (!q) return null;
+      const isCorrect = answer.selectedIndex === q.correctIndex;
       return {
         questionId: answer.questionId,
         selectedIndex: answer.selectedIndex,
-        correctIndex: q.correctIndex,
-        isCorrect: answer.selectedIndex === q.correctIndex,
-        explanation: q.explanation,
+        correctIndex: isCorrect ? q.correctIndex : null,
+        isCorrect,
+        explanation: isCorrect ? q.explanation : null,
       };
     }).filter(Boolean);
 
