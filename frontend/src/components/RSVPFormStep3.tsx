@@ -131,7 +131,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                           {q.sponsor.website && (
                             <>
                               {' '}Visit {q.sponsor.name || 'them'} at{' '}
-                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
+                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a>
                             </>
                           )}
                           {q.sponsor.website && q.sponsor.brandTwitter && ' and '}
@@ -156,7 +156,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                         <>
                           Check{' '}
                           {q.sponsor.website && (
-                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
+                            <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a>
                           )}
                           {q.sponsor.website && q.sponsor.brandTwitter && ' or '}
                           {q.sponsor.brandTwitter && (
