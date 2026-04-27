@@ -1270,7 +1270,7 @@ export interface QuizPublicQuestion {
 export interface QuizResult {
   questionId: string;
   selectedIndex: number;
-  correctIndex: number;
+  correctIndex: number | null;
   isCorrect: boolean;
   explanation: string | null;
 }

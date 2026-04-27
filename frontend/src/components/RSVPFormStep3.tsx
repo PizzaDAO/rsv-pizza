@@ -67,14 +67,14 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 <div className="space-y-2">
                   {q.options.map((option, optIdx) => {
                     const isSelected = selectedIndex === optIdx;
-                    const isCorrect = result?.correctIndex === optIdx;
-                    const isWrong = result && isSelected && !result.isCorrect && result.correctIndex !== optIdx;
+                    const isCorrectAnswer = result?.isCorrect && isSelected;
+                    const isWrong = result && isSelected && !result.isCorrect;
 
                     let borderClass = 'border-theme-stroke';
                     let bgClass = 'bg-theme-surface hover:bg-theme-surface-hover';
 
                     if (result) {
-                      if (isCorrect) {
+                      if (isCorrectAnswer) {
                         borderClass = 'border-[#39d98a]/50';
                         bgClass = 'bg-[#39d98a]/10';
                       } else if (isWrong) {
@@ -96,7 +96,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                       >
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                           result
-                            ? isCorrect
+                            ? isCorrectAnswer
                               ? 'border-[#39d98a] bg-[#39d98a]/20'
                               : isWrong
                                 ? 'border-[#ff393a] bg-[#ff393a]/20'
@@ -105,12 +105,12 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                               ? 'border-[#ff393a] bg-[#ff393a]/20'
                               : 'border-theme-stroke'
                         }`}>
-                          {result && isCorrect && <Check size={12} className="text-[#39d98a]" />}
+                          {result && isCorrectAnswer && <Check size={12} className="text-[#39d98a]" />}
                           {result && isWrong && <X size={12} className="text-[#ff393a]" />}
                           {!result && isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#ff393a]" />}
                         </div>
                         <span className={`text-sm ${
-                          result && isCorrect ? 'text-[#39d98a] font-medium' :
+                          result && isCorrectAnswer ? 'text-[#39d98a] font-medium' :
                           result && isWrong ? 'text-[#ff393a]' :
                           'text-theme-text'
                         }`}>
@@ -125,7 +125,24 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 {result && result.isCorrect && (
                   <div className="p-3 rounded-lg bg-[#39d98a]/10 border border-[#39d98a]/30">
                     <p className="text-sm text-[#39d98a] font-medium">
-                      Correct!{result.explanation ? ` ${result.explanation}` : ''}
+                      Correct!{result.explanation ? ` ${result.explanation}.` : ''}
+                      {(q.sponsor?.brandTwitter || q.sponsor?.website) && (
+                        <>
+                          {' '}Follow{' '}
+                          {q.sponsor.brandTwitter && (
+                            <a href={`https://x.com/${q.sponsor.brandTwitter.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">@{q.sponsor.brandTwitter.replace(/^@/, '')}</a>
+                          )}
+                          {q.sponsor.brandTwitter && q.sponsor.website && ' and visit '}
+                          {!q.sponsor.brandTwitter && q.sponsor.website && ' Visit '}
+                          {q.sponsor.website && (
+                            <>
+                              {q.sponsor.name || 'them'} at{' '}
+                              <a href={q.sponsor.website} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{q.sponsor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
+                            </>
+                          )}
+                          .
+                        </>
+                      )}
                     </p>
                   </div>
                 )}
