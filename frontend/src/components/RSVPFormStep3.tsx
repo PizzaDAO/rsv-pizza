@@ -132,7 +132,7 @@ export function RSVPFormStep3({ form, isEditing }: RSVPFormStep3Props) {
                 {result && result.isCorrect && (
                   <div className="p-3 rounded-lg bg-[#39d98a]/10 border border-[#39d98a]/30">
                     <p className="text-sm text-[#39d98a] font-medium">
-                      Correct!{result.explanation ? ` ${result.explanation}.` : ''}
+                      Correct!{result.explanation ? ` ${result.explanation.replace(/\.+$/, '')}.` : ''}
                       {(q.sponsor?.website || q.sponsor?.brandTwitter) && (
                         <>
                           {q.sponsor.website && (
