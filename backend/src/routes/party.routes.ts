@@ -429,6 +429,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     }
 
     // Protect underboss and partner co-host entries: preserve them on co-hosts update
+    // Respects client-specified ordering so hosts can reorder protected entries
     let mergedCoHosts = coHosts;
     if (coHosts !== undefined) {
       const existingParty = await prisma.party.findUnique({
@@ -440,24 +441,37 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       const protectedEntries = existingCoHosts.filter(
         (h: any) => h.isUnderboss === true || h.isPartner === true
       );
-      const protectedIds = new Set(protectedEntries.map((h: any) => h.id));
-      // Strip isUnderboss and isPartner from client-submitted entries (prevent spoofing)
-      // and remove any client entries that duplicate a protected entry (to prevent duplicates)
-      // Also validate allowedTabs: strip invalid tab IDs
-      const clientCoHosts = (coHosts as any[])
-        .map((h: any) => {
-          const { isUnderboss: _ub, isPartner: _p, partnerTag: _pt, ...rest } = h;
+      // Build a map of protected entries by ID for O(1) lookups
+      const protectedById = new Map(protectedEntries.map((h: any) => [h.id, h]));
+      const usedProtectedIds = new Set<string>();
+
+      const ordered: any[] = [];
+      for (const clientEntry of coHosts as any[]) {
+        if (protectedById.has(clientEntry.id)) {
+          // Client referenced a protected entry — use DB version at this position
+          // but allow showOnEvent override from client
+          const dbEntry = protectedById.get(clientEntry.id)!;
+          ordered.push({ ...dbEntry, showOnEvent: clientEntry.showOnEvent ?? dbEntry.showOnEvent });
+          usedProtectedIds.add(clientEntry.id);
+        } else {
+          // Regular client entry — strip protected flags (anti-spoofing)
+          const { isUnderboss: _ub, isPartner: _p, partnerTag: _pt, ...rest } = clientEntry;
           // Validate allowedTabs if present
           if (Array.isArray(rest.allowedTabs)) {
             rest.allowedTabs = rest.allowedTabs.filter(
               (tab: string) => VALID_TAB_IDS.includes(tab as any)
             );
           }
-          return rest;
-        })
-        .filter((h: any) => !protectedIds.has(h.id));
-      // Merge: client entries + preserved protected entries
-      mergedCoHosts = [...clientCoHosts, ...protectedEntries];
+          ordered.push(rest);
+        }
+      }
+      // Append any protected entries not referenced by the client (backward compat)
+      for (const entry of protectedEntries) {
+        if (!usedProtectedIds.has(entry.id)) {
+          ordered.push(entry);
+        }
+      }
+      mergedCoHosts = ordered;
     }
 
     const party = await prisma.party.update({
