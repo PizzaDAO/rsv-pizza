@@ -335,13 +335,15 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             </div>
             {/* Bottom row: controls */}
             <div className="flex items-center gap-3 mt-2 pl-9">
-              <Checkbox
-                checked={coHost.showOnEvent !== false}
-                onChange={() => toggleCoHostShowOnEvent(coHost.id)}
-                label="Show"
-                size={16}
-                labelClassName="text-xs font-medium text-white/60"
-              />
+              {!protected_ && (
+                <Checkbox
+                  checked={coHost.showOnEvent !== false}
+                  onChange={() => toggleCoHostShowOnEvent(coHost.id)}
+                  label="Show"
+                  size={16}
+                  labelClassName="text-xs font-medium text-white/60"
+                />
+              )}
               {!protected_ && (
                 <>
                   <Checkbox

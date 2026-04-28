@@ -449,9 +449,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       for (const clientEntry of coHosts as any[]) {
         if (protectedById.has(clientEntry.id)) {
           // Client referenced a protected entry — use DB version at this position
-          // but allow showOnEvent override from client
+          // Protected entries keep all DB values (including showOnEvent)
           const dbEntry = protectedById.get(clientEntry.id)!;
-          ordered.push({ ...dbEntry, showOnEvent: clientEntry.showOnEvent ?? dbEntry.showOnEvent });
+          ordered.push(dbEntry);
           usedProtectedIds.add(clientEntry.id);
         } else {
           // Regular client entry — strip protected flags (anti-spoofing)
