@@ -349,9 +349,17 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       else if (isAutoCoHost && !wasAutoCoHost && isActive_) {
         syncedCount = await syncPartnerToAllEvents(sponsorUser);
       }
+      // Case 3b: autoSponsor just turned on (without autoCoHost) — sync sponsor rows only
+      else if (sponsorUser.autoSponsor && !oldSponsorUser.autoSponsor && !isAutoCoHost && isActive_) {
+        syncedCount = await syncAutoSponsorsToAllEvents(sponsorUser);
+      }
       // Case 4: Profile fields updated but still autoCoHost — upsert co-host entries in place
       else if (isAutoCoHost && isActive_ && wasAutoCoHost) {
         syncedCount = await syncPartnerToAllEvents(sponsorUser);
+      }
+      // Case 4b: Profile fields updated, autoSponsor on but autoCoHost off — update sponsor rows
+      else if (!isAutoCoHost && sponsorUser.autoSponsor && oldSponsorUser.autoSponsor && isActive_) {
+        syncedCount = await syncAutoSponsorsToAllEvents(sponsorUser);
       }
     } catch (syncError) {
       console.error('Failed to sync partner on update:', syncError);
