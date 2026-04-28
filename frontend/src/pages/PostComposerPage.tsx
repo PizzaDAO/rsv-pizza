@@ -31,6 +31,14 @@ function getPizzeriaNames(pizzerias: any[] | null): string {
   return pizzerias.map((p: any) => p.name).join(' and ');
 }
 
+function getPartnerInstagramTags(coHosts: any[]): string {
+  if (!coHosts || coHosts.length === 0) return '';
+  const handles = coHosts
+    .filter((ch: any) => ch.isPartner && ch.instagram)
+    .map((ch: any) => `@${ch.instagram.replace(/^@/, '')}`);
+  return handles.join(' ');
+}
+
 const POST_TEMPLATES: PostTemplate[] = [
   {
     id: 'molto-benny',
@@ -42,6 +50,25 @@ const POST_TEMPLATES: PostTemplate[] = [
       const slug = event.custom_url || event.invite_code;
       const pizzeriaText = pizzerias ? ` Especially ${pizzerias}.` : '';
       return `\u{1F355}\u{1F5FA}\u{FE0F}\nI'm in ${city}! The pizza here is very good.${pizzeriaText} Can't wait for http://rsv.pizza/${slug}`;
+    },
+  },
+  {
+    id: 'ig-partner-tags',
+    name: 'IG Partner Tags',
+    description: 'Instagram post with all partner tags',
+    compose: (event: DbParty) => {
+      const city = extractCity(event.name);
+      const slug = event.custom_url || event.invite_code;
+      const partnerTags = getPartnerInstagramTags(event.co_hosts as any[]);
+      const lines = [
+        `Pizza party in ${city}!`,
+        `RSVP: rsv.pizza/${slug}`,
+      ];
+      if (partnerTags) {
+        lines.push('');
+        lines.push(partnerTags);
+      }
+      return lines.join('\n');
     },
   },
 ];
