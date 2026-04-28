@@ -1225,3 +1225,16 @@ export interface SponsorDashboardData {
   tag: string | null;
   events: SponsorDashboardEvent[];
 }
+
+// Unified partner (merges event-level Sponsor with underboss SponsorUser)
+export interface UnifiedPartner {
+  id: string;
+  sponsorId?: string;
+  sponsorUserId?: string;
+  source: 'event' | 'underboss';
+  name: string;
+  brandDescription: string;
+  logoUrl: string | null;
+  website: string | null;
+  sortOrder: number;
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, RefreshCw, GripVertical, FileText } from 'lucide-react';
-import { Sponsor, SponsorStats } from '../../types';
+import { Plus, RefreshCw, GripVertical, FileText, Globe } from 'lucide-react';
+import { Sponsor, SponsorStats, UnifiedPartner } from '../../types';
 import {
   getSponsors,
   getSponsorStats,
@@ -9,6 +9,8 @@ import {
   deleteSponsor,
   updateFundraisingGoal,
   reorderSponsors,
+  getUnifiedSponsors,
+  ensureUnderbossSponsors,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
@@ -31,9 +33,10 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Description reorder state
+  // Unified description reorder state
   const [descDragIndex, setDescDragIndex] = useState<number | null>(null);
-  const [descOrderSponsors, setDescOrderSponsors] = useState<Sponsor[]>([]);
+  const [unifiedPartners, setUnifiedPartners] = useState<UnifiedPartner[]>([]);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   // Load sponsors and stats
   const loadData = useCallback(async (showRefresh = false) => {
@@ -60,18 +63,28 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     }
   }, [partyId]);
 
+  // Load unified partners for description ordering
+  const loadUnifiedPartners = useCallback(async () => {
+    try {
+      const result = await getUnifiedSponsors(partyId);
+      if (result) {
+        setUnifiedPartners(result.partners);
+      }
+    } catch (err) {
+      console.error('Failed to load unified partners:', err);
+      // Fall back silently — the old behavior still works via sponsors list
+    }
+  }, [partyId]);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    loadUnifiedPartners();
+  }, [loadData, loadUnifiedPartners]);
 
-  // Keep description-order sponsors in sync with main sponsors list
+  // Reload unified partners when sponsors change
   useEffect(() => {
-    setDescOrderSponsors(
-      sponsors
-        .filter(s => s.brandDescription && ['yes', 'billed', 'paid'].includes(s.status))
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    );
-  }, [sponsors]);
+    loadUnifiedPartners();
+  }, [sponsors, loadUnifiedPartners]);
 
   // Handle form submission
   const handleFormSubmit = async (formData: PartnerFormData) => {
@@ -146,22 +159,57 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
     e.preventDefault();
     if (descDragIndex === null || descDragIndex === index) return;
 
-    const newOrder = [...descOrderSponsors];
+    const newOrder = [...unifiedPartners];
     const draggedItem = newOrder[descDragIndex];
     newOrder.splice(descDragIndex, 1);
     newOrder.splice(index, 0, draggedItem);
 
-    setDescOrderSponsors(newOrder);
+    setUnifiedPartners(newOrder);
     setDescDragIndex(index);
   };
 
   const handleDescDragEnd = async () => {
     setDescDragIndex(null);
+    setIsSavingOrder(true);
+
     try {
-      await reorderSponsors(partyId, descOrderSponsors.map(s => s.id));
+      // Check if any underboss-only partners need Sponsor records created
+      const underbossOnly = unifiedPartners.filter(
+        p => p.source === 'underboss' && !p.sponsorId && p.sponsorUserId
+      );
+
+      let sponsorIdMap: Record<string, string> = {};
+
+      if (underbossOnly.length > 0) {
+        const result = await ensureUnderbossSponsors(
+          partyId,
+          underbossOnly.map(p => p.sponsorUserId!)
+        );
+
+        // Map sponsorUserIds to newly created sponsor IDs
+        underbossOnly.forEach((p, i) => {
+          if (result.createdSponsorIds[i]) {
+            sponsorIdMap[p.id] = result.createdSponsorIds[i];
+          }
+        });
+      }
+
+      // Build the final sponsor IDs list for reorder
+      const sponsorIds = unifiedPartners.map(p => {
+        if (p.sponsorId) return p.sponsorId;
+        // Use the newly created sponsor ID
+        return sponsorIdMap[p.id] || p.id;
+      });
+
+      await reorderSponsors(partyId, sponsorIds);
+
+      // Reload data to get fresh state
+      await loadData();
     } catch (err) {
       console.error('Failed to save sponsor description order:', err);
       await loadData();
+    } finally {
+      setIsSavingOrder(false);
     }
   };
 
@@ -226,18 +274,21 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
         isLoading={isRefreshing}
       />
 
-      {/* Brand Description Order */}
-      {descOrderSponsors.length > 1 && (
+      {/* Brand Description Order (Unified) */}
+      {unifiedPartners.length > 1 && (
         <div className="card bg-theme-header border-theme-stroke p-4">
           <div className="flex items-center gap-2 mb-3">
             <FileText size={16} className="text-theme-text-muted" />
             <h3 className="text-sm font-semibold text-theme-text">Brand Description Order</h3>
             <span className="text-xs text-theme-text-faint">(drag to reorder on event page)</span>
+            {isSavingOrder && (
+              <RefreshCw size={12} className="animate-spin text-theme-text-muted ml-auto" />
+            )}
           </div>
           <div className="space-y-1.5">
-            {descOrderSponsors.map((sponsor, index) => (
+            {unifiedPartners.map((partner, index) => (
               <div
-                key={sponsor.id}
+                key={partner.id}
                 draggable
                 onDragStart={() => handleDescDragStart(index)}
                 onDragOver={(e) => handleDescDragOver(e, index)}
@@ -249,12 +300,18 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
                 <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0">
                   <GripVertical size={16} />
                 </div>
-                {sponsor.logoUrl && (
-                  <img src={sponsor.logoUrl} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                {partner.logoUrl && (
+                  <img src={partner.logoUrl} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
                 )}
-                <span className="text-sm text-theme-text font-medium truncate">{sponsor.name}</span>
+                <span className="text-sm text-theme-text font-medium truncate">{partner.name}</span>
+                {partner.source === 'underboss' && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md border bg-purple-500/20 text-purple-400 border-purple-500/30 shrink-0 flex items-center gap-1">
+                    <Globe size={10} />
+                    Global
+                  </span>
+                )}
                 <span className="text-xs text-theme-text-faint truncate ml-auto max-w-[50%]">
-                  {sponsor.brandDescription?.substring(0, 60)}...
+                  {partner.brandDescription?.substring(0, 60)}...
                 </span>
               </div>
             ))}

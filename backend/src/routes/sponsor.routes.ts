@@ -47,6 +47,193 @@ router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
+// GET /api/parties/:partyId/sponsors/unified - List unified partners (event + underboss)
+router.get('/:partyId/sponsors/unified', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    // 1. Fetch confirmed event sponsors with brand descriptions
+    const eventSponsors = await prisma.sponsor.findMany({
+      where: {
+        partyId,
+        brandDescription: { not: null },
+        status: { in: ['yes', 'billed', 'paid'] },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    // 2. Get the party's eventTags
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { eventTags: true },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // 3. Fetch tag-matched SponsorUsers with brand descriptions
+    let underbossPartners: any[] = [];
+    if (party.eventTags.length > 0) {
+      underbossPartners = await prisma.sponsorUser.findMany({
+        where: {
+          tag: { in: party.eventTags },
+          isActive: true,
+          brandDescription: { not: null },
+        },
+        orderBy: [{ descriptionSortOrder: 'asc' }, { createdAt: 'asc' }],
+      });
+    }
+
+    // 4. Deduplicate: collect emails of event sponsors
+    const eventSponsorEmails = new Set(
+      eventSponsors
+        .filter(s => s.contactEmail)
+        .map(s => s.contactEmail!.toLowerCase())
+    );
+
+    // 5. Build unified list
+    const partners: any[] = [];
+
+    // Add event sponsors
+    for (const s of eventSponsors) {
+      partners.push({
+        id: s.id,
+        sponsorId: s.id,
+        sponsorUserId: undefined,
+        source: 'event',
+        name: s.name,
+        brandDescription: s.brandDescription,
+        logoUrl: s.logoUrl,
+        website: s.website,
+        sortOrder: s.sortOrder ?? 0,
+      });
+    }
+
+    // Add underboss partners that don't have a matching Sponsor record
+    for (const su of underbossPartners) {
+      if (eventSponsorEmails.has(su.email.toLowerCase())) {
+        // Already has a Sponsor record — mark the existing entry with the sponsorUserId
+        const existing = partners.find(
+          p => p.source === 'event' && eventSponsors.find(
+            es => es.id === p.sponsorId && es.contactEmail?.toLowerCase() === su.email.toLowerCase()
+          )
+        );
+        if (existing) {
+          existing.sponsorUserId = su.id;
+          existing.source = 'event'; // keep as event since it has a Sponsor record
+        }
+        continue;
+      }
+
+      partners.push({
+        id: `su-${su.id}`,
+        sponsorId: undefined,
+        sponsorUserId: su.id,
+        source: 'underboss',
+        name: su.coHostName || su.name || su.email,
+        brandDescription: su.brandDescription,
+        logoUrl: su.coHostLogoUrl,
+        website: su.coHostWebsite,
+        sortOrder: 9999 + su.descriptionSortOrder,
+      });
+    }
+
+    // Sort by sortOrder, then by name as tiebreaker
+    partners.sort((a, b) => a.sortOrder - b.sortOrder);
+
+    res.json({ partners });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/sponsors/ensure-from-underboss - Create Sponsor records for underboss partners
+router.post('/:partyId/sponsors/ensure-from-underboss', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { sponsorUserIds } = req.body;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+
+    // Verify co-host has access to sponsors tab
+    const canAccessSponsors = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
+    if (!canAccessSponsors) {
+      throw new AppError('You do not have access to the sponsors tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    if (!Array.isArray(sponsorUserIds) || sponsorUserIds.length === 0) {
+      throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    const createdSponsorIds: string[] = [];
+
+    for (const suId of sponsorUserIds) {
+      // Fetch the SponsorUser
+      const sponsorUser = await prisma.sponsorUser.findUnique({
+        where: { id: suId },
+      });
+
+      if (!sponsorUser) {
+        continue; // Skip unknown IDs
+      }
+
+      // Check if a Sponsor record already exists for this party + email
+      const existingSponsor = await prisma.sponsor.findFirst({
+        where: {
+          partyId,
+          contactEmail: sponsorUser.email,
+        },
+      });
+
+      if (existingSponsor) {
+        createdSponsorIds.push(existingSponsor.id);
+        continue;
+      }
+
+      // Create a Sponsor record, reusing partnerSync logic
+      const created = await prisma.sponsor.create({
+        data: {
+          partyId,
+          name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
+          website: sponsorUser.coHostWebsite || null,
+          brandTwitter: sponsorUser.coHostTwitter || null,
+          brandInstagram: sponsorUser.coHostInstagram || null,
+          brandDescription: sponsorUser.brandDescription || null,
+          logoUrl: sponsorUser.coHostLogoUrl || null,
+          category: sponsorUser.category || null,
+          contactEmail: sponsorUser.email,
+          status: 'yes',
+          sortOrder: sponsorUser.descriptionSortOrder,
+          notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+        },
+      });
+
+      createdSponsorIds.push(created.id);
+    }
+
+    res.json({ createdSponsorIds });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/:partyId/sponsors/stats - Get pipeline statistics
 router.get('/:partyId/sponsors/stats', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
