@@ -413,6 +413,7 @@ export interface PublicEvent {
   nftChain?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
+  telegramGroup?: string | null;
   sponsors?: PublicEventSponsor[];
 }
 

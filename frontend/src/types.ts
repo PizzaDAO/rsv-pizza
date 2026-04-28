@@ -276,6 +276,7 @@ export interface Party {
   meetupUrl?: string | null;
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
+  telegramGroup?: string | null;
 }
 
 export interface Donation {
@@ -1168,6 +1169,7 @@ export interface SponsorDashboardEvent {
   address: string | null;
   venueName: string | null;
   region: string | null;
+  telegramGroup: string | null;
   eventImageUrl: string | null;
   hostName: string | null;
   hostProfile: {

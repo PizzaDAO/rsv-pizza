@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, MessageCircle } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
@@ -44,6 +44,7 @@ export const EventDetailsTab: React.FC = () => {
   const [shareTweetText, setShareTweetText] = useState('');
   const [nftEnabled, setNftEnabled] = useState(false);
   const [nftChain, setNftChain] = useState<string>('base');
+  const [telegramGroup, setTelegramGroup] = useState('');
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
@@ -127,6 +128,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyShareTweetText = party.shareTweetText || '';
       const partyNftEnabled = party.nftEnabled || false;
       const partyNftChain = party.nftChain || 'base';
+      const partyTelegramGroup = party.telegramGroup || '';
 
       // Set form values
       setName(partyName);
@@ -151,6 +153,7 @@ export const EventDetailsTab: React.FC = () => {
       setShareTweetText(partyShareTweetText);
       setNftEnabled(partyNftEnabled);
       setNftChain(partyNftChain);
+      setTelegramGroup(partyTelegramGroup);
 
       // Store original values
       setOriginalValues({
@@ -821,6 +824,17 @@ export const EventDetailsTab: React.FC = () => {
                     saveOptions({ custom_url: customUrl.trim() || null });
                   }
                 }}
+              />
+
+              <IconInput
+                icon={MessageCircle}
+                type="url"
+                value={telegramGroup}
+                onChange={(e) => setTelegramGroup(e.target.value)}
+                onBlur={() => {
+                  saveOptions({ telegram_group: telegramGroup.trim() || null });
+                }}
+                placeholder="Telegram group link (e.g. https://t.me/+abc123)"
               />
 
               {/* NFT Settings — hidden for GPP events (managed from /admin) */}

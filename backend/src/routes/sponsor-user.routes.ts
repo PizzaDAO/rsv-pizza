@@ -618,6 +618,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         address: event.address,
         venueName: event.venueName,
         region: event.region || null,
+        telegramGroup: event.telegramGroup || null,
         eventImageUrl: event.eventImageUrl,
         hostName: event.user?.name || null,
         hostProfile: event.user ? {
