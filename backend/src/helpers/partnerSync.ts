@@ -230,6 +230,64 @@ export async function syncPartnerToAllEvents(
 }
 
 /**
+ * Sync ONLY sponsor rows (no co-host) to all events with the matching tag.
+ * Used when autoSponsor is on but autoCoHost is off.
+ */
+export async function syncAutoSponsorsToAllEvents(
+  sponsorUser: SponsorUserLike
+): Promise<number> {
+  if (!sponsorUser.autoSponsor) return 0;
+
+  const events = await prisma.party.findMany({
+    where: { eventTags: { has: sponsorUser.tag } },
+    select: { id: true, coHosts: true, eventTags: true },
+  });
+
+  const sponsorData = {
+    name: sponsorUser.coHostName || sponsorUser.name || sponsorUser.email,
+    website: sponsorUser.coHostWebsite || null,
+    brandTwitter: sponsorUser.coHostTwitter || null,
+    brandInstagram: sponsorUser.coHostInstagram || null,
+    brandDescription: sponsorUser.brandDescription || null,
+    logoUrl: sponsorUser.coHostLogoUrl || null,
+    category: sponsorUser.category || null,
+    sortOrder: sponsorUser.descriptionSortOrder,
+  };
+
+  let synced = 0;
+  for (const event of events) {
+    const existingSponsor = await prisma.sponsor.findFirst({
+      where: { partyId: event.id, contactEmail: sponsorUser.email },
+    });
+
+    let sponsorId: string;
+    if (existingSponsor) {
+      await prisma.sponsor.update({
+        where: { id: existingSponsor.id },
+        data: sponsorData,
+      });
+      sponsorId = existingSponsor.id;
+    } else {
+      const created = await prisma.sponsor.create({
+        data: {
+          ...sponsorData,
+          partyId: event.id,
+          contactEmail: sponsorUser.email,
+          status: 'yes',
+          notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+        },
+      });
+      sponsorId = created.id;
+    }
+
+    await syncQuizTemplatesToEvent(sponsorUser.id, event.id, sponsorId);
+    synced++;
+  }
+
+  return synced;
+}
+
+/**
  * Remove partner co-host entries from ALL events for a given tag.
  * Used when a SponsorUser is deactivated or autoCoHost is toggled off.
  */

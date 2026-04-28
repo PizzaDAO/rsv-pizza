@@ -4,7 +4,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
-import { syncPartnerToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
+import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
 
 // Admin management routes (mounted at /api/sponsor-users)
 
@@ -310,11 +310,23 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
       const wasActive = oldSponsorUser.isActive;
       const isActive_ = sponsorUser.isActive;
 
-      // Case 1: Deactivated or autoCoHost turned off — remove from all events
-      if ((!isActive_ && wasActive) || (!isAutoCoHost && wasAutoCoHost)) {
+      // Case 1: Deactivated — remove everything
+      if (!isActive_ && wasActive) {
         await removePartnerFromAllEvents(oldTag);
         if (oldSponsorUser.autoSponsor) {
           await removeAutoSponsorsFromAllEvents(oldTag, oldSponsorUser.email);
+        }
+      }
+      // Case 1a: autoCoHost turned off (but still active)
+      else if (!isAutoCoHost && wasAutoCoHost && isActive_) {
+        await removePartnerFromAllEvents(oldTag);
+        // Only remove sponsors if autoSponsor is also off
+        if (!sponsorUser.autoSponsor && oldSponsorUser.autoSponsor) {
+          await removeAutoSponsorsFromAllEvents(oldTag, oldSponsorUser.email);
+        }
+        // If autoSponsor is still on, sync sponsor rows (without co-host)
+        if (sponsorUser.autoSponsor) {
+          syncedCount = await syncAutoSponsorsToAllEvents(sponsorUser);
         }
       }
       // Case 1b: autoSponsor turned off but partner still active — clean up auto sponsors
