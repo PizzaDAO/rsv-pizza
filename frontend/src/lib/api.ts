@@ -3028,3 +3028,31 @@ export async function updateGppDescription(description: string): Promise<{
   });
 }
 
+// ── QR Peer Attestation Check-In ──
+
+export interface VouchResponse {
+  success: boolean;
+  alreadyCheckedIn?: boolean;
+  guest?: {
+    id: string;
+    name: string;
+    checkedInAt: string;
+  };
+  message?: string;
+}
+
+/** Host/co-host self-check-in (bootstraps the chain of trust) */
+export async function hostSelfCheckIn(inviteCode: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/self-host`, {
+    method: 'POST',
+  });
+}
+
+/** Vouch for another guest — caller must already be checked in */
+export async function vouchForGuest(inviteCode: string, targetGuestId: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/vouch`, {
+    method: 'POST',
+    body: { targetGuestId },
+  });
+}
+
