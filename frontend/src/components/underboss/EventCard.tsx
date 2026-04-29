@@ -137,7 +137,7 @@ function HostTagsPills({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
-  const presetTags = ['swc'];
+  const presetTags = ['review', 'swc'];
 
   async function addTag(tag: string) {
     const cleaned = tag.trim().toLowerCase();
@@ -156,6 +156,7 @@ function HostTagsPills({
   }
 
   const tagColors: Record<string, string> = {
+    review: 'bg-red-500/20 text-red-400 border-red-500/30',
     swc: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   };
 

@@ -425,7 +425,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     </button>
                     {showTagSubmenu === 'add' && (
                       <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
-                        {['swc', 'Global Pizza Party'].map((tag) => (
+                        {['review', 'swc', 'Global Pizza Party'].map((tag) => (
                           <button
                             key={tag}
                             onClick={async () => {
