@@ -4,7 +4,17 @@ import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshak
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
-import type { UnderbossEvent, HostStatus, Photo } from '../../types';
+import { getGppPhotosForCity } from '../../lib/gppPhotos';
+import type { UnderbossEvent, HostStatus } from '../../types';
+
+interface DisplayPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  source: 'uploaded' | 'gpp';
+  year?: number;
+}
 
 interface EventRowProps {
   event: UnderbossEvent;
@@ -243,7 +253,7 @@ function PhotoLightbox({
   onClose,
   onNavigate,
 }: {
-  photos: Photo[];
+  photos: DisplayPhoto[];
   currentIndex: number;
   onClose: () => void;
   onNavigate: (index: number) => void;
@@ -321,30 +331,57 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [photosExpanded, setPhotosExpanded] = useState(false);
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const loadPhotos = useCallback(async () => {
-    if (photos.length > 0 || !event.id) return;
+    if (displayPhotos.length > 0 || !event.id) return;
     setPhotosLoading(true);
     try {
-      const result = await getPartyPhotos(event.id);
-      setPhotos(result?.photos || []);
+      // Extract city name from event name (strip "Global Pizza Party " prefix)
+      const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+
+      // Fetch both sources in parallel
+      const [uploadedResult, gppPhotos] = await Promise.all([
+        getPartyPhotos(event.id),
+        cityName ? getGppPhotosForCity(cityName) : Promise.resolve([]),
+      ]);
+
+      // Convert uploaded photos to DisplayPhoto
+      const uploaded: DisplayPhoto[] = (uploadedResult?.photos || []).map((p) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        source: 'uploaded' as const,
+      }));
+
+      // Convert GPP photos to DisplayPhoto
+      const gpp: DisplayPhoto[] = gppPhotos.map((p, i) => ({
+        id: `gpp-${i}`,
+        url: p.url,
+        thumbnailUrl: null,
+        caption: `GPP ${p.year}`,
+        source: 'gpp' as const,
+        year: p.year,
+      }));
+
+      // Uploaded first, then GPP
+      setDisplayPhotos([...uploaded, ...gpp]);
     } catch (err) {
       console.error('Failed to load photos:', err);
     } finally {
       setPhotosLoading(false);
     }
-  }, [event.id, photos.length]);
+  }, [event.id, event.name, displayPhotos.length]);
 
   const togglePhotos = useCallback(() => {
-    if (event.photoCount === 0) return;
     const next = !photosExpanded;
     setPhotosExpanded(next);
     if (next) loadPhotos();
-  }, [photosExpanded, event.photoCount, loadPhotos]);
+  }, [photosExpanded, loadPhotos]);
 
   // Expected guests state
   const [expectedGuestsValue, setExpectedGuestsValue] = useState(
@@ -416,7 +453,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
 
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
-  const displayedPhotos = showAllPhotos ? photos : photos.slice(0, 12);
+  const displayedPhotos = showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12);
 
   return (
     <>
@@ -585,12 +622,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
         <td className="py-3 px-3 text-center">
           <button
             onClick={togglePhotos}
-            disabled={event.photoCount === 0}
-            className={`inline-flex items-center justify-center gap-1 transition-colors ${
-              event.photoCount > 0
-                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
-                : 'text-theme-text-faint/40 cursor-default'
-            }`}
+            className="inline-flex items-center justify-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
           >
             <Camera size={12} />
             <span className="text-xs">{event.photoCount}</span>
@@ -620,7 +652,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
                 <span className="text-xs text-theme-text-muted">Loading photos...</span>
               </div>
-            ) : photos.length === 0 ? (
+            ) : displayPhotos.length === 0 ? (
               <p className="text-xs text-theme-text-faint py-2">No photos found</p>
             ) : (
               <div className="space-y-2">
@@ -629,7 +661,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                     <button
                       key={photo.id}
                       onClick={() => setLightboxIndex(idx)}
-                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all relative group"
                     >
                       <img
                         src={photo.thumbnailUrl || photo.url}
@@ -637,15 +669,20 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                      {photo.source === 'gpp' && photo.year && (
+                        <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/60 text-white/80 px-1 rounded">
+                          {photo.year}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
-                {!showAllPhotos && photos.length > 12 && (
+                {!showAllPhotos && displayPhotos.length > 12 && (
                   <button
                     onClick={() => setShowAllPhotos(true)}
                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                   >
-                    Show all {photos.length} photos
+                    Show all {displayPhotos.length} photos
                   </button>
                 )}
               </div>
