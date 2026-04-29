@@ -4,6 +4,7 @@ import { requireApiKey, ApiKeyRequest, SCOPES } from '../../middleware/apiKey.js
 import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
+import { setDeleteContext } from '../../helpers/auditContext.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -434,7 +435,10 @@ router.delete('/:guestId', requireApiKey(SCOPES.GUESTS_WRITE), async (req: ApiKe
       throw new AppError('Guest not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.guest.delete({ where: { id: guestId } });
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, `api_key:${req.apiKey!.userId}`, 'api_v1');
+      await tx.guest.delete({ where: { id: guestId } });
+    });
 
     // Trigger webhook
     await triggerWebhook('guest.removed', { guestId, partyId }, req.apiKey!.userId);

@@ -4,6 +4,7 @@ import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -571,8 +572,11 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
 
-    const result = await prisma.party.deleteMany({
-      where: { id: { in: partyIds } },
+    const result = await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'underboss_bulk');
+      return tx.party.deleteMany({
+        where: { id: { in: partyIds } },
+      });
     });
 
     res.json({ deleted: result.count });
