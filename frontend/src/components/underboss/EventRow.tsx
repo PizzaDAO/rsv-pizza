@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests } from '../../lib/api';
-import type { UnderbossEvent, HostStatus } from '../../types';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
+import type { UnderbossEvent, HostStatus, Photo } from '../../types';
 
 interface EventRowProps {
   event: UnderbossEvent;
@@ -236,6 +237,80 @@ function HostTagsPills({
   );
 }
 
+function PhotoLightbox({
+  photos,
+  currentIndex,
+  onClose,
+  onNavigate,
+}: {
+  photos: Photo[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[currentIndex];
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+    };
+    window.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [currentIndex, photos.length, onClose, onNavigate]);
+
+  if (!photo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {currentIndex > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {currentIndex < photos.length - 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+
+      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={photo.url}
+          alt={photo.caption || ''}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {photo.caption && (
+          <p className="text-white/70 text-sm text-center max-w-lg">{photo.caption}</p>
+        )}
+      </div>
+
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+        {currentIndex + 1} of {photos.length}
+      </p>
+    </div>
+  );
+}
+
 export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
   // Local state for optimistic updates
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
@@ -244,6 +319,32 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
   const [notesSaving, setNotesSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [photosExpanded, setPhotosExpanded] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const loadPhotos = useCallback(async () => {
+    if (photos.length > 0 || !event.id) return;
+    setPhotosLoading(true);
+    try {
+      const result = await getPartyPhotos(event.id);
+      setPhotos(result?.photos || []);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [event.id, photos.length]);
+
+  const togglePhotos = useCallback(() => {
+    if (event.photoCount === 0) return;
+    const next = !photosExpanded;
+    setPhotosExpanded(next);
+    if (next) loadPhotos();
+  }, [photosExpanded, event.photoCount, loadPhotos]);
 
   // Expected guests state
   const [expectedGuestsValue, setExpectedGuestsValue] = useState(
@@ -315,190 +416,252 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
 
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
-  return (
-    <tr className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
-      {/* Selection checkbox */}
-      <td className="py-3 px-3 text-center">
-        <button
-          onClick={() => onToggleSelect?.(event.id)}
-          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
-            isSelected
-              ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
-              : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
-          }`}
-          title="Select event"
-        >
-          <Check size={12} />
-        </button>
-      </td>
+  const displayedPhotos = showAllPhotos ? photos : photos.slice(0, 12);
 
-      {/* Event name + relative time + approval indicator */}
-      <td className="py-3 px-3 max-w-[200px]">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              {event.underbossApproved && (
-                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
-              )}
-              <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
-              {eventUrl && (
-                <a
-                  href={eventUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0"
+  return (
+    <>
+      <tr className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
+        {/* Selection checkbox */}
+        <td className="py-3 px-3 text-center">
+          <button
+            onClick={() => onToggleSelect?.(event.id)}
+            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+              isSelected
+                ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
+                : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
+            }`}
+            title="Select event"
+          >
+            <Check size={12} />
+          </button>
+        </td>
+
+        {/* Event name + relative time + approval indicator */}
+        <td className="py-3 px-3 max-w-[200px]">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                {event.underbossApproved && (
+                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+                )}
+                <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
+                {eventUrl && (
+                  <a
+                    href={eventUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                )}
+                <button
+                  onClick={() => setNotesOpen(!notesOpen)}
+                  className={`transition-colors shrink-0 ${
+                    hasNotes
+                      ? 'text-amber-400 hover:text-amber-300'
+                      : 'text-theme-text-faint hover:text-theme-text-secondary'
+                  }`}
+                  title={hasNotes ? 'Edit notes' : 'Add notes'}
                 >
-                  <ExternalLink size={12} />
-                </a>
+                  <StickyNote size={12} />
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5" title={fullDate}>
+                <Calendar size={10} className="text-theme-text-faint" />
+                <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
+                  {relTime.text}
+                </span>
+              </div>
+              {/* Inline notes editor */}
+              {notesOpen && (
+                <div className="mt-1.5">
+                  <IconInput
+                    icon={StickyNote}
+                    iconSize={12}
+                    placeholder="Underboss notes..."
+                    value={notesValue}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
+                    onBlur={handleNotesBlur}
+                    multiline
+                    rows={2}
+                    className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
+                  />
+                  {notesSaving && (
+                    <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+                  )}
+                </div>
               )}
-              <button
-                onClick={() => setNotesOpen(!notesOpen)}
-                className={`transition-colors shrink-0 ${
-                  hasNotes
-                    ? 'text-amber-400 hover:text-amber-300'
-                    : 'text-theme-text-faint hover:text-theme-text-secondary'
-                }`}
-                title={hasNotes ? 'Edit notes' : 'Add notes'}
-              >
-                <StickyNote size={12} />
-              </button>
+              {/* Show notes preview when collapsed */}
+              {!notesOpen && hasNotes && (
+                <button
+                  onClick={() => setNotesOpen(true)}
+                  className="text-[11px] text-amber-400/70 truncate max-w-[180px] mt-0.5 text-left hover:text-amber-400 transition-colors block"
+                  title={notesValue}
+                >
+                  {notesValue}
+                </button>
+              )}
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5" title={fullDate}>
-              <Calendar size={10} className="text-theme-text-faint" />
-              <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
-                {relTime.text}
-              </span>
-            </div>
-            {/* Inline notes editor */}
-            {notesOpen && (
-              <div className="mt-1.5">
-                <IconInput
-                  icon={StickyNote}
-                  iconSize={12}
-                  placeholder="Underboss notes..."
-                  value={notesValue}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
-                  onBlur={handleNotesBlur}
-                  multiline
-                  rows={2}
-                  className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
-                />
-                {notesSaving && (
-                  <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+          </div>
+        </td>
+
+        {/* Country (optional) */}
+        {showRegion && (
+          <td className="py-3 px-3">
+            <span className="text-xs text-theme-text-muted">
+              {event.country || '\u2014'}
+            </span>
+          </td>
+        )}
+
+        {/* Host + status badge + tags */}
+        <td className="py-3 px-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-theme-text-secondary">{event.host.name || 'Unknown'}</span>
+            <HostStatusBadge
+              status={hostStatus}
+              eventId={event.id}
+              onUpdate={(s) => {
+                setHostStatus(s);
+                onEventUpdate?.(event.id, { hostStatus: s });
+              }}
+            />
+          </div>
+          {event.host.email && (
+            <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
+          )}
+          <HostTagsPills
+            tags={eventTags}
+            eventId={event.id}
+            partnerTags={partnerTags}
+            onUpdate={(tags) => {
+              setEventTags(tags);
+              onEventUpdate?.(event.id, { eventTags: tags });
+            }}
+          />
+        </td>
+
+        {/* Location */}
+        <td className="py-3 px-3">
+          <div className="flex items-center gap-1.5">
+            {event.venueName || event.address ? (
+              <>
+                <MapPin size={10} className="text-theme-text-faint shrink-0" />
+                <span className="text-xs text-theme-text-muted truncate max-w-[180px]">
+                  {event.venueName || event.address}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-theme-text-faint">No venue</span>
+            )}
+          </div>
+        </td>
+
+        {/* RSVPs */}
+        <td className="py-3 px-3 text-center">
+          <div className="flex items-center justify-center gap-1">
+            <Users size={12} className="text-theme-text-faint" />
+            <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
+          </div>
+          {event.checkedInCount > 0 && (
+            <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
+          )}
+          <div className="mt-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={expectedGuestsValue}
+              onChange={(e) => handleExpectedGuestsChange(e.target.value)}
+              onBlur={handleExpectedGuestsBlur}
+              placeholder="exp."
+              className="w-12 bg-transparent border-b border-theme-stroke text-[10px] text-center text-theme-text-muted focus:outline-none focus:border-theme-stroke-hover placeholder:text-theme-text-faint [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              title="Expected guests"
+            />
+          </div>
+        </td>
+
+        {/* Photos */}
+        <td className="py-3 px-3 text-center">
+          <button
+            onClick={togglePhotos}
+            disabled={event.photoCount === 0}
+            className={`inline-flex items-center justify-center gap-1 transition-colors ${
+              event.photoCount > 0
+                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
+                : 'text-theme-text-faint/40 cursor-default'
+            }`}
+          >
+            <Camera size={12} />
+            <span className="text-xs">{event.photoCount}</span>
+          </button>
+        </td>
+
+        {/* Progress (8 items) */}
+        <td className="py-3 px-3">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
+            <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
+            <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
+            <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
+            <ProgressIndicator done={event.progress.hasBudget} label="Budget" />
+            <ProgressIndicator done={event.progress.hasSponsors} label="Partners" />
+            <ProgressIndicator done={event.progress.hasPrepared} label="Prep" />
+            <ProgressIndicator done={event.progress.hasSocialPosts} label="Social" />
+            <ProgressIndicator done={event.progress.hasThrown} label="Thrown" />
+          </div>
+        </td>
+      </tr>
+      {photosExpanded && (
+        <tr>
+          <td colSpan={showRegion ? 9 : 8} className="py-3 px-6 bg-theme-surface/30 border-b border-theme-stroke">
+            {photosLoading ? (
+              <div className="flex items-center gap-2 py-4">
+                <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+              </div>
+            ) : photos.length === 0 ? (
+              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+                  {displayedPhotos.map((photo, idx) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => setLightboxIndex(idx)}
+                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.caption || ''}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+                {!showAllPhotos && photos.length > 12 && (
+                  <button
+                    onClick={() => setShowAllPhotos(true)}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Show all {photos.length} photos
+                  </button>
                 )}
               </div>
             )}
-            {/* Show notes preview when collapsed */}
-            {!notesOpen && hasNotes && (
-              <button
-                onClick={() => setNotesOpen(true)}
-                className="text-[11px] text-amber-400/70 truncate max-w-[180px] mt-0.5 text-left hover:text-amber-400 transition-colors block"
-                title={notesValue}
-              >
-                {notesValue}
-              </button>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Country (optional) */}
-      {showRegion && (
-        <td className="py-3 px-3">
-          <span className="text-xs text-theme-text-muted">
-            {event.country || '\u2014'}
-          </span>
-        </td>
+          </td>
+        </tr>
       )}
-
-      {/* Host + status badge + tags */}
-      <td className="py-3 px-3">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-theme-text-secondary">{event.host.name || 'Unknown'}</span>
-          <HostStatusBadge
-            status={hostStatus}
-            eventId={event.id}
-            onUpdate={(s) => {
-              setHostStatus(s);
-              onEventUpdate?.(event.id, { hostStatus: s });
-            }}
-          />
-        </div>
-        {event.host.email && (
-          <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
-        )}
-        <HostTagsPills
-          tags={eventTags}
-          eventId={event.id}
-          partnerTags={partnerTags}
-          onUpdate={(tags) => {
-            setEventTags(tags);
-            onEventUpdate?.(event.id, { eventTags: tags });
-          }}
-        />
-      </td>
-
-      {/* Location */}
-      <td className="py-3 px-3">
-        <div className="flex items-center gap-1.5">
-          {event.venueName || event.address ? (
-            <>
-              <MapPin size={10} className="text-theme-text-faint shrink-0" />
-              <span className="text-xs text-theme-text-muted truncate max-w-[180px]">
-                {event.venueName || event.address}
-              </span>
-            </>
-          ) : (
-            <span className="text-xs text-theme-text-faint">No venue</span>
-          )}
-        </div>
-      </td>
-
-      {/* RSVPs */}
-      <td className="py-3 px-3 text-center">
-        <div className="flex items-center justify-center gap-1">
-          <Users size={12} className="text-theme-text-faint" />
-          <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
-        </div>
-        {event.checkedInCount > 0 && (
-          <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
-        )}
-        <div className="mt-1">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={expectedGuestsValue}
-            onChange={(e) => handleExpectedGuestsChange(e.target.value)}
-            onBlur={handleExpectedGuestsBlur}
-            placeholder="exp."
-            className="w-12 bg-transparent border-b border-theme-stroke text-[10px] text-center text-theme-text-muted focus:outline-none focus:border-theme-stroke-hover placeholder:text-theme-text-faint [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            title="Expected guests"
-          />
-        </div>
-      </td>
-
-      {/* Photos */}
-      <td className="py-3 px-3 text-center">
-        <div className="flex items-center justify-center gap-1">
-          <Camera size={12} className="text-theme-text-faint" />
-          <span className="text-xs text-theme-text-muted">{event.photoCount}</span>
-        </div>
-      </td>
-
-      {/* Progress (8 items) */}
-      <td className="py-3 px-3">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <ProgressIndicator done={event.progress.hasCreatedEvent} label="Event" />
-          <ProgressIndicator done={event.progress.hasPartyKit} label="Kit" />
-          <ProgressIndicator done={event.progress.hasCoHosts} label="Team" />
-          <ProgressIndicator done={event.progress.hasVenue} label="Venue" />
-          <ProgressIndicator done={event.progress.hasBudget} label="Budget" />
-          <ProgressIndicator done={event.progress.hasSponsors} label="Partners" />
-          <ProgressIndicator done={event.progress.hasPrepared} label="Prep" />
-          <ProgressIndicator done={event.progress.hasSocialPosts} label="Social" />
-          <ProgressIndicator done={event.progress.hasThrown} label="Thrown" />
-        </div>
-      </td>
-    </tr>
+      {lightboxIndex !== null && displayedPhotos[lightboxIndex] && createPortal(
+        <PhotoLightbox
+          photos={displayedPhotos}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />,
+        document.body
+      )}
+    </>
   );
 }
