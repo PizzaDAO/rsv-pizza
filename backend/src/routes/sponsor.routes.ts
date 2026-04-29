@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 const router = Router();
 
@@ -605,8 +606,11 @@ router.delete('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequ
       throw new AppError('Sponsor not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.sponsor.delete({
-      where: { id: sponsorId },
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
+      await tx.sponsor.delete({
+        where: { id: sponsorId },
+      });
     });
 
     res.json({ success: true });

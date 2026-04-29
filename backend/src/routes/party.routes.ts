@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -561,7 +562,10 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.party.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
+      await tx.party.delete({ where: { id } });
+    });
 
     // Trigger webhook for party deletion
     await triggerWebhook('party.deleted', { id }, req.userId!);
@@ -725,8 +729,11 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
       throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    await prisma.guest.delete({
-      where: { id: guestId, partyId },
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
+      await tx.guest.delete({
+        where: { id: guestId, partyId },
+      });
     });
 
     // Trigger webhook for guest removal

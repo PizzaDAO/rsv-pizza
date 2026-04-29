@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 const router = Router();
 
@@ -117,7 +118,10 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next:
       throw new AppError('Cannot remove yourself', 400, 'SELF_REMOVAL');
     }
 
-    await prisma.admin.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'admin');
+      await tx.admin.delete({ where: { id } });
+    });
 
     res.json({ success: true, message: 'Admin removed' });
   } catch (error) {
