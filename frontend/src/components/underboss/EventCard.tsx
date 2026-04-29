@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes } from '../../lib/api';
-import type { UnderbossEvent, HostStatus } from '../../types';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos } from '../../lib/api';
+import type { UnderbossEvent, HostStatus, Photo } from '../../types';
 
 interface EventCardProps {
   event: UnderbossEvent;
@@ -202,6 +203,80 @@ function HostTagsPills({
   );
 }
 
+function PhotoLightbox({
+  photos,
+  currentIndex,
+  onClose,
+  onNavigate,
+}: {
+  photos: Photo[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[currentIndex];
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+    };
+    window.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [currentIndex, photos.length, onClose, onNavigate]);
+
+  if (!photo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {currentIndex > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {currentIndex < photos.length - 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+
+      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={photo.url}
+          alt={photo.caption || ''}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {photo.caption && (
+          <p className="text-white/70 text-sm text-center max-w-lg">{photo.caption}</p>
+        )}
+      </div>
+
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+        {currentIndex + 1} of {photos.length}
+      </p>
+    </div>
+  );
+}
+
 export function EventCard({ event, showRegion, onEventUpdate, isSelected, onToggleSelect }: EventCardProps) {
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
@@ -209,6 +284,32 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
   const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
   const [notesSaving, setNotesSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [photosExpanded, setPhotosExpanded] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const loadPhotos = useCallback(async () => {
+    if (photos.length > 0 || !event.id) return;
+    setPhotosLoading(true);
+    try {
+      const result = await getPartyPhotos(event.id);
+      setPhotos(result?.photos || []);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [event.id, photos.length]);
+
+  const togglePhotos = useCallback(() => {
+    if (event.photoCount === 0) return;
+    const next = !photosExpanded;
+    setPhotosExpanded(next);
+    if (next) loadPhotos();
+  }, [photosExpanded, event.photoCount, loadPhotos]);
 
   const saveNotes = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -368,11 +469,60 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             <span className="text-xs text-green-400/60">({event.checkedInCount})</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <Camera size={12} className="text-theme-text-faint" />
-          <span className="text-xs text-theme-text-muted">{event.photoCount}</span>
-        </div>
+        <button
+          onClick={togglePhotos}
+          disabled={event.photoCount === 0}
+          className={`flex items-center gap-1 transition-colors ${
+            event.photoCount > 0
+              ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
+              : 'text-theme-text-faint/40 cursor-default'
+          }`}
+        >
+          <Camera size={12} />
+          <span className="text-xs">{event.photoCount}</span>
+        </button>
       </div>
+
+      {/* Expandable photo grid */}
+      {photosExpanded && (
+        <div className="mt-3 pt-3 border-t border-theme-stroke/50">
+          {photosLoading ? (
+            <div className="flex items-center gap-2 py-3">
+              <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+              <span className="text-xs text-theme-text-muted">Loading photos...</span>
+            </div>
+          ) : photos.length === 0 ? (
+            <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-1.5">
+                {(showAllPhotos ? photos : photos.slice(0, 12)).map((photo, idx) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setLightboxIndex(idx)}
+                    className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                  >
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={photo.caption || ''}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+              {!showAllPhotos && photos.length > 12 && (
+                <button
+                  onClick={() => setShowAllPhotos(true)}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Show all {photos.length} photos
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-theme-stroke">
@@ -386,6 +536,16 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
         <ProgressIndicator done={event.progress.hasSocialPosts} label="Social" />
         <ProgressIndicator done={event.progress.hasThrown} label="Thrown" />
       </div>
+
+      {lightboxIndex !== null && (showAllPhotos ? photos : photos.slice(0, 12))[lightboxIndex] && createPortal(
+        <PhotoLightbox
+          photos={showAllPhotos ? photos : photos.slice(0, 12)}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />,
+        document.body
+      )}
     </div>
   );
 }
