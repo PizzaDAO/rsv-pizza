@@ -4,9 +4,19 @@ import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
+import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossMeResponse } from '../../lib/api';
 import { GPP_REGIONS } from '../../types';
-import type { UnderbossEvent, Photo } from '../../types';
+import type { UnderbossEvent } from '../../types';
+
+interface DisplayPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  source: 'uploaded' | 'gpp';
+  year?: number;
+}
 
 type CityStatusValue = 'created' | 'skip' | 'todo';
 
@@ -53,6 +63,12 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const [gppCounts, setGppCounts] = useState<Record<string, number>>({});
+
+  // Load GPP photo counts (cached at module level)
+  useEffect(() => {
+    getGppPhotoCounts().then(setGppCounts);
+  }, []);
 
   // Load sheet cities and DB statuses
   useEffect(() => {
@@ -111,6 +127,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status = 'todo';
       }
 
+      const gppKey = sc.city.toLowerCase().replace(/\s+/g, '');
+
       return {
         key,
         city: sc.city,
@@ -121,11 +139,11 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status,
         isAuto,
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
-        photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0),
+        photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0) + (gppCounts[gppKey] || 0),
         matchedEventIds: matchedEvents.map(e => e.id),
       };
     });
-  }, [sheetCities, cityStatuses, eventCityMap]);
+  }, [sheetCities, cityStatuses, eventCityMap, gppCounts]);
 
   // Apply filters + sorting
   const filteredCities = useMemo(() => {
@@ -598,7 +616,7 @@ function CityPhotoLightbox({
   onClose,
   onNavigate,
 }: {
-  photos: Photo[];
+  photos: DisplayPhoto[];
   currentIndex: number;
   onClose: () => void;
   onNavigate: (index: number) => void;
@@ -679,33 +697,55 @@ function CityRow({
   onToggleSelect: (key: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const loadPhotos = useCallback(async () => {
-    if (photos.length > 0 || city.matchedEventIds.length === 0) return;
+    if (displayPhotos.length > 0) return;
     setPhotosLoading(true);
     try {
-      const results = await Promise.all(
-        city.matchedEventIds.map(id => getPartyPhotos(id))
-      );
-      const allPhotos = results.flatMap(r => r?.photos || []);
-      setPhotos(allPhotos);
+      // Fetch uploaded photos from matched events + GPP manifest photos in parallel
+      const [uploadedResults, gppPhotos] = await Promise.all([
+        city.matchedEventIds.length > 0
+          ? Promise.all(city.matchedEventIds.map(id => getPartyPhotos(id)))
+          : Promise.resolve([]),
+        city.city ? getGppPhotosForCity(city.city) : Promise.resolve([]),
+      ]);
+
+      const uploaded: DisplayPhoto[] = (uploadedResults as any[]).flatMap(r => r?.photos || []).map((p: any) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        source: 'uploaded' as const,
+      }));
+
+      const gpp: DisplayPhoto[] = gppPhotos.map((p, i) => ({
+        id: `gpp-${i}`,
+        url: p.url,
+        thumbnailUrl: null,
+        caption: `GPP ${p.year}`,
+        source: 'gpp' as const,
+        year: p.year,
+      }));
+
+      setDisplayPhotos([...uploaded, ...gpp]);
     } catch (err) {
       console.error('Failed to load photos:', err);
     } finally {
       setPhotosLoading(false);
     }
-  }, [city.matchedEventIds, photos.length]);
+  }, [city.matchedEventIds, city.city, displayPhotos.length]);
 
   const toggleExpand = useCallback(() => {
-    if (city.photoCount === 0) return;
     const next = !expanded;
     setExpanded(next);
     if (next) loadPhotos();
-  }, [expanded, city.photoCount, loadPhotos]);
+  }, [expanded, loadPhotos]);
+
+  const displayedPhotos = showAll ? displayPhotos : displayPhotos.slice(0, 12);
 
   return (
     <>
@@ -746,12 +786,7 @@ function CityRow({
         <td className="py-2.5 px-3 text-center">
           <button
             onClick={toggleExpand}
-            disabled={city.photoCount === 0}
-            className={`inline-flex items-center gap-1 text-xs transition-colors ${
-              city.photoCount > 0
-                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
-                : 'text-theme-text-faint/40 cursor-default'
-            }`}
+            className="inline-flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
           >
             <Camera size={12} />
             <span>{city.photoCount}</span>
@@ -772,16 +807,16 @@ function CityRow({
                 <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
                 <span className="text-xs text-theme-text-muted">Loading photos...</span>
               </div>
-            ) : photos.length === 0 ? (
+            ) : displayPhotos.length === 0 ? (
               <p className="text-xs text-theme-text-faint py-2">No photos found</p>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-                  {(showAll ? photos : photos.slice(0, 12)).map((photo, idx) => (
+                  {displayedPhotos.map((photo, idx) => (
                     <button
                       key={photo.id}
                       onClick={() => setLightboxIndex(idx)}
-                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all relative group"
                     >
                       <img
                         src={photo.thumbnailUrl || photo.url}
@@ -789,15 +824,20 @@ function CityRow({
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                      {photo.source === 'gpp' && photo.year && (
+                        <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/60 text-white/80 px-1 rounded">
+                          {photo.year}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
-                {!showAll && photos.length > 12 && (
+                {!showAll && displayPhotos.length > 12 && (
                   <button
                     onClick={() => setShowAll(true)}
                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                   >
-                    Show all {photos.length} photos
+                    Show all {displayPhotos.length} photos
                   </button>
                 )}
               </div>
@@ -805,9 +845,9 @@ function CityRow({
           </td>
         </tr>
       )}
-      {lightboxIndex !== null && photos[lightboxIndex] && createPortal(
+      {lightboxIndex !== null && displayedPhotos[lightboxIndex] && createPortal(
         <CityPhotoLightbox
-          photos={showAll ? photos : photos.slice(0, 12)}
+          photos={displayedPhotos}
           currentIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
@@ -831,33 +871,54 @@ function CityCard({
   onToggleSelect: (key: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const loadPhotos = useCallback(async () => {
-    if (photos.length > 0 || city.matchedEventIds.length === 0) return;
+    if (displayPhotos.length > 0) return;
     setPhotosLoading(true);
     try {
-      const results = await Promise.all(
-        city.matchedEventIds.map(id => getPartyPhotos(id))
-      );
-      const allPhotos = results.flatMap(r => r?.photos || []);
-      setPhotos(allPhotos);
+      const [uploadedResults, gppPhotos] = await Promise.all([
+        city.matchedEventIds.length > 0
+          ? Promise.all(city.matchedEventIds.map(id => getPartyPhotos(id)))
+          : Promise.resolve([]),
+        city.city ? getGppPhotosForCity(city.city) : Promise.resolve([]),
+      ]);
+
+      const uploaded: DisplayPhoto[] = (uploadedResults as any[]).flatMap(r => r?.photos || []).map((p: any) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        source: 'uploaded' as const,
+      }));
+
+      const gpp: DisplayPhoto[] = gppPhotos.map((p, i) => ({
+        id: `gpp-${i}`,
+        url: p.url,
+        thumbnailUrl: null,
+        caption: `GPP ${p.year}`,
+        source: 'gpp' as const,
+        year: p.year,
+      }));
+
+      setDisplayPhotos([...uploaded, ...gpp]);
     } catch (err) {
       console.error('Failed to load photos:', err);
     } finally {
       setPhotosLoading(false);
     }
-  }, [city.matchedEventIds, photos.length]);
+  }, [city.matchedEventIds, city.city, displayPhotos.length]);
 
   const toggleExpand = useCallback(() => {
-    if (city.photoCount === 0) return;
     const next = !expanded;
     setExpanded(next);
     if (next) loadPhotos();
-  }, [expanded, city.photoCount, loadPhotos]);
+  }, [expanded, loadPhotos]);
+
+  const displayedPhotos = showAll ? displayPhotos : displayPhotos.slice(0, 12);
 
   return (
     <div className={`bg-theme-surface border border-theme-stroke rounded-xl p-3 space-y-2 ${isSelected ? 'ring-1 ring-red-500/30' : ''}`}>
@@ -889,12 +950,7 @@ function CityCard({
           <span>{city.country} &middot; {city.underboss || 'No underboss'}</span>
           <button
             onClick={toggleExpand}
-            disabled={city.photoCount === 0}
-            className={`inline-flex items-center gap-1 transition-colors ${
-              city.photoCount > 0
-                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
-                : 'text-theme-text-faint/40 cursor-default'
-            }`}
+            className="inline-flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
           >
             <Camera size={10} />
             <span>{city.photoCount}</span>
@@ -913,16 +969,16 @@ function CityCard({
               <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
               <span className="text-xs text-theme-text-muted">Loading photos...</span>
             </div>
-          ) : photos.length === 0 ? (
+          ) : displayPhotos.length === 0 ? (
             <p className="text-xs text-theme-text-faint py-2">No photos found</p>
           ) : (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-1.5">
-                {(showAll ? photos : photos.slice(0, 12)).map((photo, idx) => (
+                {displayedPhotos.map((photo, idx) => (
                   <button
                     key={photo.id}
                     onClick={() => setLightboxIndex(idx)}
-                    className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                    className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all relative group"
                   >
                     <img
                       src={photo.thumbnailUrl || photo.url}
@@ -930,24 +986,29 @@ function CityCard({
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />
+                    {photo.source === 'gpp' && photo.year && (
+                      <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/60 text-white/80 px-1 rounded">
+                        {photo.year}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
-              {!showAll && photos.length > 12 && (
+              {!showAll && displayPhotos.length > 12 && (
                 <button
                   onClick={() => setShowAll(true)}
                   className="text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
-                  Show all {photos.length} photos
+                  Show all {displayPhotos.length} photos
                 </button>
               )}
             </div>
           )}
         </div>
       )}
-      {lightboxIndex !== null && photos[lightboxIndex] && createPortal(
+      {lightboxIndex !== null && displayedPhotos[lightboxIndex] && createPortal(
         <CityPhotoLightbox
-          photos={showAll ? photos : photos.slice(0, 12)}
+          photos={displayedPhotos}
           currentIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
