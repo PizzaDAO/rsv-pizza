@@ -152,7 +152,7 @@ function HostTagsPills({
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
 
-  const presetTags = ['swc'];
+  const presetTags = ['review', 'swc'];
 
   async function addTag(tag: string) {
     const cleaned = tag.trim().toLowerCase();
@@ -179,6 +179,7 @@ function HostTagsPills({
   }
 
   function colorForTag(tag: string): string {
+    if (tag === 'review') return 'bg-red-500/20 text-red-400 border-red-500/30';
     if (tag === 'swc') return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     if (tag === 'global pizza party') return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
     return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
