@@ -4,7 +4,7 @@ import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNo
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos } from '../../lib/api';
-import { getGppPhotosForCity } from '../../lib/gppPhotos';
+import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface DisplayPhoto {
@@ -301,6 +301,18 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // GPP photo count for the badge (fetched once, cached at module level)
+  const [gppCount, setGppCount] = useState(0);
+
+  useEffect(() => {
+    const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+    if (!cityName) return;
+    getGppPhotoCounts().then(counts => {
+      const key = cityName.toLowerCase().replace(/\s+/g, '');
+      setGppCount(counts[key] || 0);
+    });
+  }, [event.name]);
+
   const loadPhotos = useCallback(async () => {
     if (displayPhotos.length > 0 || !event.id) return;
     setPhotosLoading(true);
@@ -506,7 +518,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
           className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
         >
           <Camera size={12} />
-          <span className="text-xs">{event.photoCount}</span>
+          <span className="text-xs">{event.photoCount + gppCount}</span>
         </button>
       </div>
 

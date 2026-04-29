@@ -4,7 +4,7 @@ import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
-import { getGppPhotosForCity } from '../../lib/gppPhotos';
+import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossMeResponse } from '../../lib/api';
 import { GPP_REGIONS } from '../../types';
 import type { UnderbossEvent } from '../../types';
@@ -63,6 +63,12 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const [gppCounts, setGppCounts] = useState<Record<string, number>>({});
+
+  // Load GPP photo counts (cached at module level)
+  useEffect(() => {
+    getGppPhotoCounts().then(setGppCounts);
+  }, []);
 
   // Load sheet cities and DB statuses
   useEffect(() => {
@@ -121,6 +127,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status = 'todo';
       }
 
+      const gppKey = sc.city.toLowerCase().replace(/\s+/g, '');
+
       return {
         key,
         city: sc.city,
@@ -131,11 +139,11 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status,
         isAuto,
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
-        photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0),
+        photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0) + (gppCounts[gppKey] || 0),
         matchedEventIds: matchedEvents.map(e => e.id),
       };
     });
-  }, [sheetCities, cityStatuses, eventCityMap]);
+  }, [sheetCities, cityStatuses, eventCityMap, gppCounts]);
 
   // Apply filters + sorting
   const filteredCities = useMemo(() => {

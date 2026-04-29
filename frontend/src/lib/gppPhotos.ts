@@ -53,6 +53,26 @@ export interface GppPhoto {
  * Get GPP manifest photos for a city, matched by customUrl or city name.
  * Returns photos sorted most-recent-year first.
  */
+/**
+ * Get a map of normalized city name → total GPP photo count.
+ * Fetches manifest if not cached yet.
+ */
+export async function getGppPhotoCounts(): Promise<Record<string, number>> {
+  const manifest = await fetchManifest();
+  if (!manifest) return {};
+
+  const counts: Record<string, number> = {};
+  for (const city of manifest.cities) {
+    const key = city.name.toLowerCase().replace(/\s+/g, '');
+    let total = 0;
+    for (const year of city.years) {
+      total += year.photos.length;
+    }
+    if (total > 0) counts[key] = total;
+  }
+  return counts;
+}
+
 export async function getGppPhotosForCity(cityNameOrUrl: string): Promise<GppPhoto[]> {
   const manifest = await fetchManifest();
   if (!manifest) return [];
