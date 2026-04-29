@@ -132,6 +132,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     meetupUrl: dbParty.meetup_url || null,
     eventbriteUrl: dbParty.eventbrite_url || null,
     externalLinks: dbParty.external_links || [],
+    telegramGroup: dbParty.telegram_group || null,
     guests,
   };
 }

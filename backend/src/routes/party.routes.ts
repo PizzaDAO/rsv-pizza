@@ -394,7 +394,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       venueReportTitle, venueReportNotes,
       hiddenGppPhotos, extraGppPhotos,
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
-      quizEnabled
+      quizEnabled,
+      telegramGroup
     } = req.body;
 
     // Verify ownership or super admin
@@ -512,6 +513,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(eventbriteUrl !== undefined && { eventbriteUrl: eventbriteUrl || null }),
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
+        ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
       },
       include: {
         user: { select: { name: true } },

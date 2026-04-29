@@ -134,6 +134,7 @@ model Party {
   meetupUrl          String?   @map("meetup_url")         // Meetup event URL
   eventbriteUrl      String?   @map("eventbrite_url")     // Eventbrite event URL
   externalLinks      Json?     @default("[]") @map("external_links") // Custom external links [{label, url}]
+  telegramGroup      String?   @map("telegram_group") @db.VarChar     // City Telegram group link
   poapEventId        String?   @map("poap_event_id")      // POAP event ID
   poapMints          Int?      @map("poap_mints")         // POAP mint count
   poapMoments        Int?      @map("poap_moments")       // POAP moments count

@@ -9,7 +9,7 @@ import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updateP
 import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
-  Wallet, TrendingUp, StickyNote,
+  Wallet, TrendingUp, StickyNote, MessageCircle,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -635,6 +635,18 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {event.telegramGroup && (
+              <a
+                href={event.telegramGroup}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#29B6F6] hover:text-[#4FC3F7] border border-[#29B6F6]/30 hover:border-[#29B6F6]/50 rounded-md transition-colors"
+                title="Join city Telegram group"
+              >
+                <MessageCircle size={12} />
+                Telegram
+              </a>
+            )}
             {event.reportPublicSlug ? (
               <a
                 href={`/report/${event.reportPublicSlug}`}

@@ -477,6 +477,8 @@ export interface DbParty {
   meetup_url?: string | null;
   eventbrite_url?: string | null;
   external_links?: Array<{label: string; url: string}>;
+  // Telegram group
+  telegram_group?: string | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -530,7 +532,8 @@ export const SAFE_PARTY_COLUMNS = `
   pinned_apps,
   region,
   hidden_gpp_photos, extra_gpp_photos,
-  quiz_enabled
+  quiz_enabled,
+  telegram_group
 `;
 
 /**
@@ -1369,6 +1372,7 @@ export async function updateParty(
     meetup_url?: string | null;
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
+    telegram_group?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1431,6 +1435,7 @@ export async function updateParty(
         meetupUrl: updates.meetup_url,
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
+        telegramGroup: updates.telegram_group,
       });
       return true;
     } catch (error) {
