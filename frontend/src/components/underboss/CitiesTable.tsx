@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
-import { fetchCityStatuses, updateCityStatus, CityStatusMap } from '../../lib/api';
+import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
 import type { UnderbossMeResponse } from '../../lib/api';
 import { GPP_REGIONS } from '../../types';
-import type { UnderbossEvent } from '../../types';
+import type { UnderbossEvent, Photo } from '../../types';
 
 type CityStatusValue = 'created' | 'skip' | 'todo';
 
@@ -19,6 +20,8 @@ interface MergedCity {
   status: CityStatusValue;
   isAuto: boolean; // true if status came from matching event (no DB override)
   matchedEventUrl: string | null; // link to the matching event if auto-detected
+  photoCount: number;
+  matchedEventIds: string[];
 }
 
 type SortField = 'city' | 'country' | 'underboss' | 'status';
@@ -72,15 +75,15 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     load();
   }, []);
 
-  // Build a set of city names that have matching GPP events
+  // Build a map of city names to their matching GPP events
   const eventCityMap = useMemo(() => {
-    const map: Record<string, string> = {}; // normalized city -> customUrl
+    const map: Record<string, UnderbossEvent[]> = {};
     for (const event of events) {
-      // Match "Global Pizza Party {City}" pattern
       const match = event.name.match(/Global Pizza Party\s+(.+)/i);
       if (match) {
         const cityName = match[1].trim().toLowerCase();
-        map[cityName] = event.customUrl || event.id;
+        if (!map[cityName]) map[cityName] = [];
+        map[cityName].push(event);
       }
     }
     return map;
@@ -91,7 +94,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     return sheetCities.map((sc) => {
       const key = sc.city.toLowerCase().trim();
       const dbStatus = cityStatuses[key];
-      const matchedEvent = eventCityMap[key];
+      const matchedEvents = eventCityMap[key] || [];
+      const matchedEvent = matchedEvents.length > 0 ? (matchedEvents[0].customUrl || matchedEvents[0].id) : null;
 
       let status: CityStatusValue;
       let isAuto = false;
@@ -99,7 +103,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       if (dbStatus) {
         // DB override takes priority
         status = dbStatus.status as CityStatusValue;
-      } else if (matchedEvent) {
+      } else if (matchedEvents.length > 0) {
         // Auto-detected from event
         status = 'created';
         isAuto = true;
@@ -117,6 +121,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status,
         isAuto,
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
+        photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0),
+        matchedEventIds: matchedEvents.map(e => e.id),
       };
     });
   }, [sheetCities, cityStatuses, eventCityMap]);
@@ -451,6 +457,12 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               <SortHeader field="country">Country</SortHeader>
               <SortHeader field="underboss">Underboss</SortHeader>
               <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Region</th>
+              <th className="py-2 px-3 text-center text-xs uppercase tracking-wider text-theme-text-faint">
+                <div className="flex items-center justify-center gap-1">
+                  <Camera size={10} />
+                  Photos
+                </div>
+              </th>
               <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Actions</th>
             </tr>
           </thead>
@@ -466,7 +478,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
             ))}
             {filteredCities.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-theme-text-faint text-sm">
+                <td colSpan={8} className="py-8 text-center text-theme-text-faint text-sm">
                   No cities match your filters
                 </td>
               </tr>
@@ -579,6 +591,81 @@ function StatusToggle({
   );
 }
 
+// === Photo Lightbox ===
+function CityPhotoLightbox({
+  photos,
+  currentIndex,
+  onClose,
+  onNavigate,
+}: {
+  photos: Photo[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[currentIndex];
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+    };
+    window.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [currentIndex, photos.length, onClose, onNavigate]);
+
+  if (!photo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {currentIndex > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {currentIndex < photos.length - 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+
+      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={photo.url}
+          alt={photo.caption || ''}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {photo.caption && (
+          <p className="text-white/70 text-sm text-center max-w-lg">{photo.caption}</p>
+        )}
+      </div>
+
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+        {currentIndex + 1} of {photos.length}
+      </p>
+    </div>
+  );
+}
+
 // === Desktop Row ===
 function CityRow({
   city,
@@ -591,48 +678,143 @@ function CityRow({
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const loadPhotos = useCallback(async () => {
+    if (photos.length > 0 || city.matchedEventIds.length === 0) return;
+    setPhotosLoading(true);
+    try {
+      const results = await Promise.all(
+        city.matchedEventIds.map(id => getPartyPhotos(id))
+      );
+      const allPhotos = results.flatMap(r => r?.photos || []);
+      setPhotos(allPhotos);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [city.matchedEventIds, photos.length]);
+
+  const toggleExpand = useCallback(() => {
+    if (city.photoCount === 0) return;
+    const next = !expanded;
+    setExpanded(next);
+    if (next) loadPhotos();
+  }, [expanded, city.photoCount, loadPhotos]);
+
   return (
-    <tr className={`border-b border-theme-stroke/50 hover:bg-theme-surface/50 transition-colors ${isSelected ? 'bg-theme-surface/30' : ''}`}>
-      <td className="py-2.5 px-3 w-8">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect(city.key)}
-          className="rounded border-theme-stroke-hover"
-        />
-      </td>
-      <td className="py-2.5 px-3">
-        <StatusBadge status={city.status} isAuto={city.isAuto} matchedEventUrl={city.matchedEventUrl} />
-      </td>
-      <td className="py-2.5 px-3">
-        <div className="flex items-center gap-1.5">
-          <MapPin size={12} className="text-theme-text-faint flex-shrink-0" />
-          <span className="text-theme-text font-medium">{city.city}</span>
-          {city.chatUrl && (
-            <a
-              href={city.chatUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-theme-text-faint hover:text-blue-500 transition-colors"
-              title="Telegram group"
-            >
-              <ExternalLink size={10} />
-            </a>
-          )}
-        </div>
-      </td>
-      <td className="py-2.5 px-3 text-theme-text-secondary">{city.country}</td>
-      <td className="py-2.5 px-3 text-theme-text-secondary">{city.underboss || '—'}</td>
-      <td className="py-2.5 px-3 text-theme-text-faint text-xs">
-        {GPP_REGIONS.find((r) => r.id === city.region.toLowerCase().replace(/\s+/g, '-'))?.label || city.region}
-      </td>
-      <td className="py-2.5 px-3">
-        <StatusToggle
-          currentStatus={city.status}
-          onStatusChange={(status) => onStatusChange(city.key, status)}
-        />
-      </td>
-    </tr>
+    <>
+      <tr className={`border-b border-theme-stroke/50 hover:bg-theme-surface/50 transition-colors ${isSelected ? 'bg-theme-surface/30' : ''}`}>
+        <td className="py-2.5 px-3 w-8">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(city.key)}
+            className="rounded border-theme-stroke-hover"
+          />
+        </td>
+        <td className="py-2.5 px-3">
+          <StatusBadge status={city.status} isAuto={city.isAuto} matchedEventUrl={city.matchedEventUrl} />
+        </td>
+        <td className="py-2.5 px-3">
+          <div className="flex items-center gap-1.5">
+            <MapPin size={12} className="text-theme-text-faint flex-shrink-0" />
+            <span className="text-theme-text font-medium">{city.city}</span>
+            {city.chatUrl && (
+              <a
+                href={city.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-theme-text-faint hover:text-blue-500 transition-colors"
+                title="Telegram group"
+              >
+                <ExternalLink size={10} />
+              </a>
+            )}
+          </div>
+        </td>
+        <td className="py-2.5 px-3 text-theme-text-secondary">{city.country}</td>
+        <td className="py-2.5 px-3 text-theme-text-secondary">{city.underboss || '—'}</td>
+        <td className="py-2.5 px-3 text-theme-text-faint text-xs">
+          {GPP_REGIONS.find((r) => r.id === city.region.toLowerCase().replace(/\s+/g, '-'))?.label || city.region}
+        </td>
+        <td className="py-2.5 px-3 text-center">
+          <button
+            onClick={toggleExpand}
+            disabled={city.photoCount === 0}
+            className={`inline-flex items-center gap-1 text-xs transition-colors ${
+              city.photoCount > 0
+                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
+                : 'text-theme-text-faint/40 cursor-default'
+            }`}
+          >
+            <Camera size={12} />
+            <span>{city.photoCount}</span>
+          </button>
+        </td>
+        <td className="py-2.5 px-3">
+          <StatusToggle
+            currentStatus={city.status}
+            onStatusChange={(status) => onStatusChange(city.key, status)}
+          />
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={8} className="py-3 px-6 bg-theme-surface/30">
+            {photosLoading ? (
+              <div className="flex items-center gap-2 py-4">
+                <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+              </div>
+            ) : photos.length === 0 ? (
+              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+                  {(showAll ? photos : photos.slice(0, 12)).map((photo, idx) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => setLightboxIndex(idx)}
+                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.caption || ''}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+                {!showAll && photos.length > 12 && (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Show all {photos.length} photos
+                  </button>
+                )}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+      {lightboxIndex !== null && photos[lightboxIndex] && createPortal(
+        <CityPhotoLightbox
+          photos={showAll ? photos : photos.slice(0, 12)}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -648,6 +830,35 @@ function CityCard({
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const loadPhotos = useCallback(async () => {
+    if (photos.length > 0 || city.matchedEventIds.length === 0) return;
+    setPhotosLoading(true);
+    try {
+      const results = await Promise.all(
+        city.matchedEventIds.map(id => getPartyPhotos(id))
+      );
+      const allPhotos = results.flatMap(r => r?.photos || []);
+      setPhotos(allPhotos);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [city.matchedEventIds, photos.length]);
+
+  const toggleExpand = useCallback(() => {
+    if (city.photoCount === 0) return;
+    const next = !expanded;
+    setExpanded(next);
+    if (next) loadPhotos();
+  }, [expanded, city.photoCount, loadPhotos]);
+
   return (
     <div className={`bg-theme-surface border border-theme-stroke rounded-xl p-3 space-y-2 ${isSelected ? 'ring-1 ring-red-500/30' : ''}`}>
       <div className="flex items-center justify-between">
@@ -674,13 +885,75 @@ function CityCard({
         )}
       </div>
       <div className="flex items-center justify-between text-xs text-theme-text-faint">
-        <span>{city.country} &middot; {city.underboss || 'No underboss'}</span>
+        <div className="flex items-center gap-2">
+          <span>{city.country} &middot; {city.underboss || 'No underboss'}</span>
+          <button
+            onClick={toggleExpand}
+            disabled={city.photoCount === 0}
+            className={`inline-flex items-center gap-1 transition-colors ${
+              city.photoCount > 0
+                ? 'text-theme-text-muted hover:text-theme-text-secondary cursor-pointer'
+                : 'text-theme-text-faint/40 cursor-default'
+            }`}
+          >
+            <Camera size={10} />
+            <span>{city.photoCount}</span>
+          </button>
+        </div>
         <span>{GPP_REGIONS.find((r) => r.id === city.region.toLowerCase().replace(/\s+/g, '-'))?.label || city.region}</span>
       </div>
       <StatusToggle
         currentStatus={city.status}
         onStatusChange={(status) => onStatusChange(city.key, status)}
       />
+      {expanded && (
+        <div className="pt-2 border-t border-theme-stroke/50">
+          {photosLoading ? (
+            <div className="flex items-center gap-2 py-3">
+              <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+              <span className="text-xs text-theme-text-muted">Loading photos...</span>
+            </div>
+          ) : photos.length === 0 ? (
+            <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-1.5">
+                {(showAll ? photos : photos.slice(0, 12)).map((photo, idx) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setLightboxIndex(idx)}
+                    className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all"
+                  >
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={photo.caption || ''}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+              {!showAll && photos.length > 12 && (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Show all {photos.length} photos
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {lightboxIndex !== null && photos[lightboxIndex] && createPortal(
+        <CityPhotoLightbox
+          photos={showAll ? photos : photos.slice(0, 12)}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />,
+        document.body
+      )}
     </div>
   );
 }
