@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, AlertCircle, Loader2, X, Wallet, Heart } from 'lucide-react';
+import { Check, AlertCircle, Loader2, X, Heart } from 'lucide-react';
 import { ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { IconInput } from './IconInput';
 import { PublicEvent } from '../lib/api';
 import { DonationStep } from './DonationStep';
 import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/useRSVPForm';
@@ -12,8 +11,6 @@ import { RSVPFormStep2 } from './RSVPFormStep2';
 import { ShareRSVP } from './ShareRSVP';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
-import { useAccount } from 'wagmi';
-import { ConnectKitButton } from 'connectkit';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -37,9 +34,6 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
   // Track closed->open transition for reset
   const wasOpenRef = useRef(false);
-
-  // Wallet connection via ConnectKit/wagmi
-  const { address: connectedAddress, isConnected: walletConnected } = useAccount();
 
   const eventData = publicEventToRSVPData(event);
 
@@ -124,14 +118,6 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     };
   }, [isOpen, existingGuest]);
 
-  // Auto-fill wallet address when user connects via ConnectKit
-  useEffect(() => {
-    if (walletConnected && connectedAddress) {
-      form.setEthereumAddress(connectedAddress);
-      form.validateWalletAddress(connectedAddress);
-    }
-  }, [walletConnected, connectedAddress]);
-
   const handleClose = () => {
     onClose();
   };
@@ -139,62 +125,6 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   if (!isOpen) return null;
 
   const isEditing = !!existingGuest;
-
-  // ---- Wallet field slot with ConnectKit ----
-  const walletFieldSlot = (
-    <div>
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <IconInput
-            icon={Wallet}
-            type="text"
-            value={form.ethereumAddress}
-            onChange={(e) => {
-              form.setEthereumAddress(e.target.value);
-              form.validateWalletAddress(e.target.value);
-            }}
-            placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
-            className={
-              form.walletValidation === 'valid'
-                ? 'border-[#39d98a]/50'
-                : form.walletValidation === 'invalid'
-                  ? 'border-[#ff393a]/50'
-                  : ''
-            }
-          />
-          {form.walletValidation === 'valid' && (
-            <Check size={14} className="absolute left-[2.35rem] top-1/2 -translate-y-1/2 text-[#39d98a]" />
-          )}
-        </div>
-        {form.ethereumAddress.trim() ? (
-          <button
-            type="button"
-            onClick={() => { form.setEthereumAddress(''); form.setWalletValidation('idle'); }}
-            className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
-          >
-            <X size={14} />
-            <span className="hidden sm:inline">Clear</span>
-          </button>
-        ) : (
-          <ConnectKitButton.Custom>
-            {({ show }) => (
-              <button
-                type="button"
-                onClick={show}
-                className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
-              >
-                <Wallet size={14} />
-                <span className="hidden sm:inline">Connect</span>
-              </button>
-            )}
-          </ConnectKitButton.Custom>
-        )}
-      </div>
-      {form.walletValidation === 'invalid' && form.ethereumAddress.trim() && (
-        <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
-      )}
-    </div>
-  );
 
   // ---- Success screen ----
   if (form.submitted) {
@@ -407,7 +337,6 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               eventName={event.name}
               isEditing={isEditing}
               showWallet={!!(event.nftEnabled || event.eventType === 'gpp')}
-              walletFieldSlot={walletFieldSlot}
             />
           </div>
         </div>

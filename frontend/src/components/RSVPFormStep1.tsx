@@ -1,15 +1,15 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Square, CheckSquare2, User, Mail, Wallet, Info, X } from 'lucide-react';
+import { ChevronRight, Square, CheckSquare2, User, Mail, Info, X } from 'lucide-react';
 import { TURTLES } from '../constants/options';
 import { IconInput } from './IconInput';
+import { WalletField } from './WalletField';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
 
 interface RSVPFormStep1Props {
   form: ReturnType<typeof useRSVPForm>;
   eventName: string;
   isEditing?: boolean;
-  walletFieldSlot?: React.ReactNode; // For ConnectKit button in modal
   showWallet?: boolean; // Whether to show wallet field at all
 }
 
@@ -17,7 +17,6 @@ export function RSVPFormStep1({
   form,
   eventName,
   isEditing,
-  walletFieldSlot,
   showWallet,
 }: RSVPFormStep1Props) {
   return (
@@ -47,32 +46,12 @@ export function RSVPFormStep1({
 
       {/* Wallet field */}
       {showWallet && (
-        walletFieldSlot ? (
-          walletFieldSlot
-        ) : (
-          <div>
-            <IconInput
-              icon={Wallet}
-              type="text"
-              value={form.ethereumAddress}
-              onChange={(e) => {
-                form.setEthereumAddress(e.target.value);
-                form.validateWalletAddress(e.target.value);
-              }}
-              placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
-              className={
-                form.walletValidation === 'valid'
-                  ? 'border-[#39d98a]/50'
-                  : form.walletValidation === 'invalid'
-                    ? 'border-[#ff393a]/50'
-                    : ''
-              }
-            />
-            {form.walletValidation === 'invalid' && form.ethereumAddress.trim() && (
-              <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
-            )}
-          </div>
-        )
+        <WalletField
+          value={form.ethereumAddress}
+          onChange={(val) => form.setEthereumAddress(val)}
+          validation={form.walletValidation}
+          onValidate={form.validateWalletAddress}
+        />
       )}
 
       {/* Role selection */}
