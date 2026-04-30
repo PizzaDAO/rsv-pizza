@@ -586,32 +586,42 @@ export const EventDetailsTab: React.FC = () => {
         </div>
 
         {/* Address */}
-        <LocationAutocomplete
-          value={address}
-          onChange={(newAddress) => {
-            setAddress(newAddress);
-          }}
-          onVenueNameChange={(newVenueName) => {
-            setVenueName(newVenueName);
-          }}
-          onTimezoneChange={setTimezone}
-          onLocationSelected={(loc) => {
-            // Store coords in ref; saveLocation will consume them
-            pendingCoordsRef.current = loc;
-          }}
-          onCitySelected={(cityData) => {
-            // Store country in ref; saveLocation will consume it
-            pendingCountryRef.current = cityData.country || null;
-          }}
-          onPlaceSelected={(newAddress, newVenueName) => {
-            // Save when a place is selected from autocomplete
-            saveLocation(newAddress, newVenueName);
-          }}
-          placeholder="Add Event Location"
-        />
-        {venueName && (
-          <p className="text-xs text-white/40 -mt-1 ml-1">Venue: {venueName}</p>
-        )}
+        <div className="relative">
+          <LocationAutocomplete
+            value={venueName ? `${venueName}, ${address}` : address}
+            onChange={(newAddress) => {
+              setVenueName(null);
+              setAddress(newAddress);
+            }}
+            onVenueNameChange={(newVenueName) => {
+              setVenueName(newVenueName);
+            }}
+            onTimezoneChange={setTimezone}
+            onLocationSelected={(loc) => {
+              pendingCoordsRef.current = loc;
+            }}
+            onCitySelected={(cityData) => {
+              pendingCountryRef.current = cityData.country || null;
+            }}
+            onPlaceSelected={(newAddress, newVenueName) => {
+              saveLocation(newAddress, newVenueName);
+            }}
+            placeholder="Add Event Location"
+          />
+          {venueName && (
+            <button
+              type="button"
+              onClick={() => {
+                setVenueName(null);
+                saveLocation(address, null);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10"
+              title="Remove venue name"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
         {/* Change Date Button */}
         <button
