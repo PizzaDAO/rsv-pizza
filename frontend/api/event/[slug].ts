@@ -63,6 +63,39 @@ async function getPartyBySlug(slug: string) {
     }
   }
 
+  // Alias fallback: check slug_aliases table
+  const aliasResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/slug_aliases?old_slug=eq.${encodeURIComponent(slug)}&select=party_id`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+
+  if (aliasResponse.ok) {
+    const aliasData = await aliasResponse.json();
+    if (aliasData && aliasData.length > 0) {
+      const partyResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/parties?id=eq.${encodeURIComponent(aliasData[0].party_id)}&select=*`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (partyResponse.ok) {
+        const partyData = await partyResponse.json();
+        if (partyData && partyData.length > 0) {
+          return partyData[0];
+        }
+      }
+    }
+  }
+
   return null;
 }
 

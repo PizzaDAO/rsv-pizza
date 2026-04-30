@@ -198,8 +198,12 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedHostName = hostName.trim();
     const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
 
-    // Generate custom URL from city name (lowercase, no spaces)
-    const customUrl = normalizedCity.toLowerCase().replace(/\s+/g, '');
+    // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars)
+    const customUrl = normalizedCity
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
 
     // Check for existing GPP event in this city
     const existingEvent = await prisma.party.findFirst({
@@ -506,13 +510,30 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
   try {
     const { citySlug } = req.params;
 
-    const event = await prisma.party.findFirst({
+    let event = await prisma.party.findFirst({
       where: {
         eventType: 'gpp',
         customUrl: citySlug.toLowerCase(),
       },
       select: gppEventSelect,
     });
+
+    // Alias fallback: check if this is an old slug
+    if (!event) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: citySlug.toLowerCase() },
+        select: { partyId: true },
+      });
+      if (alias) {
+        event = await prisma.party.findFirst({
+          where: {
+            id: alias.partyId,
+            eventType: 'gpp',
+          },
+          select: gppEventSelect,
+        });
+      }
+    }
 
     if (!event) {
       return res.status(404).json({ error: 'GPP event not found for this city' });

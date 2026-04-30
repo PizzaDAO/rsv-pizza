@@ -62,6 +62,25 @@ async function findPartyByCode(inviteCode: string) {
     });
   }
 
+  // Alias fallback: silently resolve old slugs
+  if (!party) {
+    const alias = await prisma.slugAlias.findUnique({
+      where: { oldSlug: inviteCode },
+      select: { partyId: true },
+    });
+    if (alias) {
+      party = await prisma.party.findUnique({
+        where: { id: alias.partyId },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          coHosts: true,
+        },
+      });
+    }
+  }
+
   return party;
 }
 

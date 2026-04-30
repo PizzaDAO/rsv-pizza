@@ -48,6 +48,32 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
       });
     }
 
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: inviteCode },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: {
+            id: true,
+            name: true,
+            date: true,
+            eventType: true,
+            availableBeverages: true,
+            rsvpClosedAt: true,
+            maxGuests: true,
+            user: { select: { name: true } },
+            guests: {
+              select: { status: true },
+            },
+          },
+        });
+      }
+    }
+
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
@@ -119,6 +145,20 @@ router.post('/:inviteCode/verify-password', async (req: Request, res: Response, 
       });
     }
 
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: inviteCode },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { id: true, password: true },
+        });
+      }
+    }
+
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
@@ -146,6 +186,20 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         where: { customUrl: inviteCode },
         select: { id: true },
       });
+    }
+
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: inviteCode },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { id: true },
+        });
+      }
     }
 
     if (!party) {
@@ -268,6 +322,33 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           _count: { select: { guests: true } },
         },
       });
+    }
+
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: inviteCode },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: {
+            id: true,
+            name: true,
+            date: true,
+            timezone: true,
+            address: true,
+            customUrl: true,
+            rsvpClosedAt: true,
+            maxGuests: true,
+            requireApproval: true,
+            userId: true,
+            user: { select: { name: true } },
+            _count: { select: { guests: true } },
+          },
+        });
+      }
     }
 
     if (!party) {
@@ -479,6 +560,27 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
           customUrl: true,
         },
       });
+    }
+
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: inviteCode },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: {
+            id: true,
+            name: true,
+            date: true,
+            timezone: true,
+            address: true,
+            customUrl: true,
+          },
+        });
+      }
     }
 
     if (!party) {

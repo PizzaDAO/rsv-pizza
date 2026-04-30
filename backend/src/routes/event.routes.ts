@@ -141,6 +141,18 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       });
     }
 
+    // If not found by either method, check slug_aliases for a redirect
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { party: { select: { customUrl: true, inviteCode: true } } },
+      });
+      if (alias?.party) {
+        const newSlug = alias.party.customUrl || alias.party.inviteCode;
+        return res.status(301).json({ redirect: true, slug: newSlug, url: `/${newSlug}` });
+      }
+    }
+
     if (!party) {
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
@@ -292,6 +304,19 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
         select: { coHosts: true, userId: true },
       });
     }
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { coHosts: true, userId: true },
+        });
+      }
+    }
     if (!party) {
       return res.json({ isHost: false });
     }
@@ -327,6 +352,19 @@ router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: Nex
     let party = await prisma.party.findUnique({ where: { inviteCode: slug }, select: { id: true, shareToUnlock: true } });
     if (!party) {
       party = await prisma.party.findUnique({ where: { customUrl: slug }, select: { id: true, shareToUnlock: true } });
+    }
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { id: true, shareToUnlock: true },
+        });
+      }
     }
     if (!party) {
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
