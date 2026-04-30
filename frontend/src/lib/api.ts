@@ -425,15 +425,15 @@ export async function getEventBySlug(slug: string): Promise<PublicEvent | { redi
       headers: { 'Content-Type': 'application/json' },
     });
 
-    if (!response.ok) {
-      return null;
-    }
-
     const data = await response.json();
 
-    // Handle redirect response from slug aliases
+    // Handle redirect response from slug aliases (301)
     if (data.redirect) {
       return { redirect: true, slug: data.slug };
+    }
+
+    if (!response.ok) {
+      return null;
     }
 
     return data.event || null;
