@@ -17,9 +17,19 @@ function generateSlug(cityName) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '')
-    .trim();
+    .replace(/[^a-z0-9]/g, '');
+}
+
+// Extract just the city name from the event name, stripping sponsors/suffixes
+function extractCity(eventName) {
+  const match = eventName.match(/Global Pizza Party\s+[-–—]?\s*(.+)/);
+  if (!match) return null;
+  let city = match[1].trim();
+  // Strip trailing sponsor/venue info after " - " (keep first segment only)
+  city = city.split(/\s+[-–—]\s+/)[0].trim();
+  // Strip leading dashes
+  city = city.replace(/^[-–—\s]+/, '');
+  return city || null;
 }
 
 async function main() {
@@ -35,13 +45,16 @@ async function main() {
   const existingSlugs = new Set(events.map(e => e.customUrl).filter(Boolean));
 
   for (const e of events) {
-    const match = e.name.match(/Global Pizza Party\s+(.+)/);
-    if (!match) continue;
+    const city = extractCity(e.name);
+    if (!city) continue;
 
-    const city = match[1].trim();
     const newSlug = generateSlug(city);
 
     if (!newSlug || newSlug === e.customUrl) continue;
+
+    // Skip if new slug is longer and already contains the old slug as-is
+    // (means old slug is already the clean city, event name has extra info)
+    if (newSlug.length > e.customUrl.length && newSlug.includes(e.customUrl)) continue;
 
     // Check for collision among new slugs
     if (newSlugSet.has(newSlug)) {
