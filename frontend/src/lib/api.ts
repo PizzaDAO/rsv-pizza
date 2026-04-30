@@ -418,16 +418,25 @@ export interface PublicEvent {
 }
 
 // Public Event API (no auth required)
-export async function getEventBySlug(slug: string): Promise<PublicEvent | null> {
+export async function getEventBySlug(slug: string): Promise<PublicEvent | { redirect: true; slug: string } | null> {
   try {
-    const response = await apiRequest<{ event: PublicEvent }>(
-      `/api/events/${slug}`,
-      {
-        method: 'GET',
-        requireAuth: false,
-      }
-    );
-    return response.event;
+    const response = await fetch(`${API_URL}/api/events/${slug}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Handle redirect response from slug aliases
+    if (data.redirect) {
+      return { redirect: true, slug: data.slug };
+    }
+
+    return data.event || null;
   } catch (error) {
     console.error('Error fetching event:', error);
     return null;

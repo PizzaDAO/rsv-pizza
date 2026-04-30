@@ -196,6 +196,7 @@ model Party {
   sponsorChecklistItems SponsorChecklistItem[]
   partnerEventNotes     PartnerEventNote[]
   quizQuestions         QuizQuestion[]
+  slugAliases           SlugAlias[]
 
   @@map("parties")
 }
@@ -1268,4 +1269,14 @@ model QuizAnswer {
   @@index([questionId])
   @@index([guestId])
   @@map("quiz_answers")
+}
+
+model SlugAlias {
+  oldSlug   String   @id @map("old_slug")
+  partyId   String   @map("party_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@map("slug_aliases")
 }

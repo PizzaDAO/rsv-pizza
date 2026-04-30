@@ -103,7 +103,15 @@ export function EventPage() {
   useEffect(() => {
     async function loadEvent() {
       if (slug) {
-        const foundEvent = await getEventBySlug(slug);
+        const result = await getEventBySlug(slug);
+
+        // Handle redirect from old slug alias
+        if (result && 'redirect' in result) {
+          navigate(`/${result.slug}`, { replace: true });
+          return;
+        }
+
+        const foundEvent = result;
         if (foundEvent) {
           setEvent(foundEvent);
           setCanEditAsCoHost(false);

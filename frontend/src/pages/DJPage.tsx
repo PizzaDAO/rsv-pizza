@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, AlertCircle, Music, Calendar, MapPin, Mic2, Disc3, ListMusic, ExternalLink, Clock, Instagram } from 'lucide-react';
 import { getEventBySlug, PublicEvent, getPerformers } from '../lib/api';
@@ -54,6 +54,7 @@ function formatDuration(minutes: number | null): string {
 
 export function DJPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +73,15 @@ export function DJPage() {
 
       try {
         // Load event details
-        const foundEvent = await getEventBySlug(inviteCode);
+        const result = await getEventBySlug(inviteCode);
+
+        // Handle redirect from old slug alias
+        if (result && 'redirect' in result) {
+          navigate(`/dj/${result.slug}`, { replace: true });
+          return;
+        }
+
+        const foundEvent = result;
         if (!foundEvent) {
           setError('Event not found. The link may be invalid or expired.');
           setLoading(false);

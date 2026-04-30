@@ -701,15 +701,36 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
     .eq('custom_url', customUrl.toLowerCase())
     .single();
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     console.error('Error fetching party by custom URL:', error);
     return null;
   }
-  if (data) {
-    normalizePartyCoHosts(data);
-    data.co_hosts = sanitizeCoHosts(data.co_hosts);
+
+  let party = data;
+
+  // Alias fallback: check slug_aliases if not found by custom_url
+  if (!party) {
+    const { data: aliasData } = await supabase
+      .from('slug_aliases')
+      .select('party_id')
+      .eq('old_slug', customUrl.toLowerCase())
+      .maybeSingle();
+
+    if (aliasData) {
+      const { data: partyData } = await supabase
+        .from('parties')
+        .select(SAFE_PARTY_COLUMNS)
+        .eq('id', aliasData.party_id)
+        .single();
+      party = partyData;
+    }
   }
-  return data;
+
+  if (party) {
+    normalizePartyCoHosts(party);
+    party.co_hosts = sanitizeCoHosts(party.co_hosts);
+  }
+  return party;
 }
 
 // Reserved slugs that can't be used as custom party URLs
@@ -820,8 +841,29 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     if (inviteCodeData) {
       party = inviteCodeData as DbParty;
     } else {
-      if (customUrlError) error = customUrlError;
-      if (inviteCodeError) error = inviteCodeError;
+      // Alias fallback: check slug_aliases
+      const { data: aliasData } = await supabase
+        .from('slug_aliases')
+        .select('party_id')
+        .eq('old_slug', normalizedSlug)
+        .maybeSingle();
+
+      if (aliasData) {
+        const { data: aliasPartyData } = await supabase
+          .from('parties')
+          .select(SAFE_PARTY_COLUMNS)
+          .eq('id', aliasData.party_id)
+          .maybeSingle();
+
+        if (aliasPartyData) {
+          party = aliasPartyData as DbParty;
+        }
+      }
+
+      if (!party) {
+        if (customUrlError) error = customUrlError;
+        if (inviteCodeError) error = inviteCodeError;
+      }
     }
   }
 
@@ -857,7 +899,25 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     console.error('Error fetching party:', partyError);
   }
 
-  const party: DbParty | null = partyData;
+  let party: DbParty | null = partyData;
+
+  // Alias fallback: check slug_aliases if not found
+  if (!party) {
+    const { data: aliasData } = await supabase
+      .from('slug_aliases')
+      .select('party_id')
+      .eq('old_slug', inviteCode)
+      .maybeSingle();
+
+    if (aliasData) {
+      const { data: aliasPartyData } = await supabase
+        .from('parties')
+        .select(SAFE_PARTY_COLUMNS)
+        .eq('id', aliasData.party_id)
+        .maybeSingle();
+      party = aliasPartyData;
+    }
+  }
 
   if (!party) {
     return null;
