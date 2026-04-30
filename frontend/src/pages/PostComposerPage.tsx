@@ -72,7 +72,24 @@ export function PostComposerPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<UnsplashPhoto | null>(null);
   const [composedImageUrl, setComposedImageUrl] = useState<string>('');
   const [loadingSkyline, setLoadingSkyline] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  /* ---- Load Hub 191 fonts ---- */
+  useEffect(() => {
+    const display = new FontFace('Hub 191 Display', 'url(/fonts/Hub-191-Display.otf)');
+    const regular = new FontFace('Hub 191', 'url(/fonts/Hub-191-Regular.otf)');
+    Promise.all([display.load(), regular.load()])
+      .then(([disp, reg]) => {
+        document.fonts.add(disp);
+        document.fonts.add(reg);
+        setFontsLoaded(true);
+      })
+      .catch((err) => {
+        console.warn('Failed to load Hub 191 fonts:', err);
+        setFontsLoaded(true); // render with fallback
+      });
+  }, []);
 
   /* ---- Admin check ---- */
   useEffect(() => {
@@ -174,17 +191,17 @@ export function PostComposerPage() {
     const sx = (bgImg.width - sw) / 2, sy = (bgImg.height - sh) / 2;
     ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
 
-    // Draw city name (top-left with text shadow)
+    // Draw city name (top-left with text shadow) — Hub 191 Display
     ctx.save();
-    ctx.font = 'bold 64px sans-serif';
+    ctx.font = '64px "Hub 191 Display", "Comic Sans MS", cursive';
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillText(city, 42, 82);
+    ctx.fillText(city.toUpperCase(), 42, 82);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(city, 40, 80);
+    ctx.fillText(city.toUpperCase(), 40, 80);
 
-    // Draw pizzeria name below city
+    // Draw pizzeria name below city — Hub 191 Regular
     if (pizzeria) {
-      ctx.font = '36px sans-serif';
+      ctx.font = '36px "Hub 191", "Comic Sans MS", cursive';
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillText(pizzeria, 42, 127);
       ctx.fillStyle = '#ffffff';
@@ -220,7 +237,7 @@ export function PostComposerPage() {
     } else {
       setComposedImageUrl('');
     }
-  }, [selectedPhoto, composeImage, selectedEventId, events]);
+  }, [selectedPhoto, composeImage, selectedEventId, events, fontsLoaded]);
 
   /* ---- Download handler ---- */
   const handleDownload = () => {
