@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, FileText, Search, Copy, Check } from 'lucide-react';
+import { Loader2, Shield, FileText, Search, Copy, Check, Download, Image } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
 import { fetchAdminMe } from '../lib/api';
 import { getAllParties } from '../lib/supabase';
 import type { DbParty } from '../lib/supabase';
+import { searchSkylinePhotos, UnsplashPhoto } from '../lib/unsplash';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -66,6 +67,13 @@ export function PostComposerPage() {
   const [copied, setCopied] = useState(false);
   const [eventSearch, setEventSearch] = useState<string>('');
 
+  // Image composer state
+  const [skylinePhotos, setSkylinePhotos] = useState<UnsplashPhoto[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<UnsplashPhoto | null>(null);
+  const [composedImageUrl, setComposedImageUrl] = useState<string>('');
+  const [loadingSkyline, setLoadingSkyline] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   /* ---- Admin check ---- */
   useEffect(() => {
     async function checkAdmin() {
@@ -123,6 +131,92 @@ export function PostComposerPage() {
     } catch {
       // Fallback: select text so user can Ctrl+C
     }
+  };
+
+  /* ---- Skyline fetch when event changes ---- */
+  useEffect(() => {
+    if (!selectedEventId) return;
+    const event = events.find((e) => e.id === selectedEventId);
+    if (!event) return;
+    const city = extractCity(event.name);
+
+    setLoadingSkyline(true);
+    searchSkylinePhotos(city).then((photos) => {
+      setSkylinePhotos(photos);
+      setSelectedPhoto(photos[0] || null);
+      setLoadingSkyline(false);
+    });
+  }, [selectedEventId, events]);
+
+  /* ---- Canvas compose function ---- */
+  const composeImage = useCallback(async (photo: UnsplashPhoto) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = 1200, H = 630;
+    canvas.width = W;
+    canvas.height = H;
+
+    // Load skyline photo
+    const bgImg = new window.Image();
+    bgImg.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve, reject) => {
+      bgImg.onload = () => resolve();
+      bgImg.onerror = reject;
+      bgImg.src = photo.urls.regular;
+    });
+
+    // Draw cover-fit
+    const scale = Math.max(W / bgImg.width, H / bgImg.height);
+    const sw = W / scale, sh = H / scale;
+    const sx = (bgImg.width - sw) / 2, sy = (bgImg.height - sh) / 2;
+    ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
+
+    // Load Molto Benny SVG
+    const svgImg = new window.Image();
+    await new Promise<void>((resolve, reject) => {
+      svgImg.onload = () => resolve();
+      svgImg.onerror = reject;
+      svgImg.src = '/molto-benny-btc.svg';
+    });
+
+    // Draw bottom-right with padding
+    const bennyH = 200;
+    const bennyW = (svgImg.width / svgImg.height) * bennyH;
+    const pad = 24;
+    ctx.drawImage(svgImg, W - bennyW - pad, H - bennyH - pad, bennyW, bennyH);
+
+    // Export as data URL for preview
+    setComposedImageUrl(canvas.toDataURL('image/png'));
+  }, []);
+
+  /* ---- Trigger compose when selectedPhoto changes ---- */
+  useEffect(() => {
+    if (selectedPhoto) {
+      composeImage(selectedPhoto);
+    } else {
+      setComposedImageUrl('');
+    }
+  }, [selectedPhoto, composeImage]);
+
+  /* ---- Download handler ---- */
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const event = events.find((e) => e.id === selectedEventId);
+    const city = event ? extractCity(event.name).toLowerCase().replace(/\s+/g, '-') : 'post';
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gpp-${city}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
   };
 
   /* ---- Loading state ---- */
@@ -241,6 +335,92 @@ export function PostComposerPage() {
             </>
           )}
         </button>
+
+        {/* Hidden canvas */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Image Composer Section */}
+        <div className="space-y-3 border-t border-white/10 pt-6">
+          <div className="flex items-center gap-2">
+            <Image size={20} className="text-theme-text-muted" />
+            <h2 className="text-lg font-semibold">Image Composer</h2>
+          </div>
+
+          {/* Skyline thumbnail strip */}
+          {loadingSkyline ? (
+            <div className="flex items-center gap-2 text-sm text-white/50">
+              <Loader2 size={16} className="animate-spin" />
+              Loading skyline photos...
+            </div>
+          ) : skylinePhotos.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {skylinePhotos.map((photo) => (
+                <button
+                  key={photo.id}
+                  onClick={() => setSelectedPhoto(photo)}
+                  className={`rounded-lg overflow-hidden border-2 transition-all ${
+                    selectedPhoto?.id === photo.id
+                      ? 'border-sky-400 ring-2 ring-sky-400/30'
+                      : 'border-white/10 hover:border-white/30'
+                  }`}
+                >
+                  <img
+                    src={photo.urls.small}
+                    alt="Skyline"
+                    className="w-full h-20 object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/40">No skyline photos found for this city.</p>
+          )}
+
+          {/* Composed image preview */}
+          {composedImageUrl && (
+            <div className="space-y-2">
+              <img
+                src={composedImageUrl}
+                alt="Composed post image"
+                className="w-full rounded-lg border border-white/10"
+              />
+              {/* Attribution */}
+              {selectedPhoto && (
+                <p className="text-xs text-white/40">
+                  Photo by{' '}
+                  <a
+                    href={`${selectedPhoto.user.links.html}?utm_source=rsvpizza&utm_medium=referral`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white/60"
+                  >
+                    {selectedPhoto.user.name}
+                  </a>{' '}
+                  on{' '}
+                  <a
+                    href="https://unsplash.com/?utm_source=rsvpizza&utm_medium=referral"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white/60"
+                  >
+                    Unsplash
+                  </a>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Download button */}
+          {composedImageUrl && (
+            <button
+              onClick={handleDownload}
+              className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-colors bg-emerald-500 hover:bg-emerald-600 text-white"
+            >
+              <Download size={18} />
+              Download Image
+            </button>
+          )}
+        </div>
       </div>
 
       <Footer />
