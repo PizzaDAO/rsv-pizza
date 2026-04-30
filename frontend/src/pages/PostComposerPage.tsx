@@ -149,7 +149,7 @@ export function PostComposerPage() {
   }, [selectedEventId, events]);
 
   /* ---- Canvas compose function ---- */
-  const composeImage = useCallback(async (photo: UnsplashPhoto) => {
+  const composeImage = useCallback(async (photo: UnsplashPhoto, city: string, pizzeria: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -174,6 +174,24 @@ export function PostComposerPage() {
     const sx = (bgImg.width - sw) / 2, sy = (bgImg.height - sh) / 2;
     ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
 
+    // Draw city name (top-left with text shadow)
+    ctx.save();
+    ctx.font = 'bold 64px sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(city, 42, 82);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(city, 40, 80);
+
+    // Draw pizzeria name below city
+    if (pizzeria) {
+      ctx.font = '36px sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillText(pizzeria, 42, 127);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pizzeria, 40, 125);
+    }
+    ctx.restore();
+
     // Load Molto Benny SVG
     const svgImg = new window.Image();
     await new Promise<void>((resolve, reject) => {
@@ -182,8 +200,8 @@ export function PostComposerPage() {
       svgImg.src = '/molto-benny-btc.svg';
     });
 
-    // Draw bottom-right with padding
-    const bennyH = 200;
+    // Draw bottom-right with padding (400px tall)
+    const bennyH = 400;
     const bennyW = (svgImg.width / svgImg.height) * bennyH;
     const pad = 24;
     ctx.drawImage(svgImg, W - bennyW - pad, H - bennyH - pad, bennyW, bennyH);
@@ -195,11 +213,14 @@ export function PostComposerPage() {
   /* ---- Trigger compose when selectedPhoto changes ---- */
   useEffect(() => {
     if (selectedPhoto) {
-      composeImage(selectedPhoto);
+      const event = events.find((e) => e.id === selectedEventId);
+      const city = event ? extractCity(event.name) : '';
+      const pizzeria = event ? getPizzeriaNames(event.selected_pizzerias as any[]) : '';
+      composeImage(selectedPhoto, city, pizzeria);
     } else {
       setComposedImageUrl('');
     }
-  }, [selectedPhoto, composeImage]);
+  }, [selectedPhoto, composeImage, selectedEventId, events]);
 
   /* ---- Download handler ---- */
   const handleDownload = () => {
