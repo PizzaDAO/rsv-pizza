@@ -920,7 +920,7 @@ export const KIT_TIERS: KitTierInfo[] = [
     id: 'deluxe',
     name: 'Deluxe Kit',
     description: 'The complete party package',
-    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Pins', 'Extras'],
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Extras'],
   },
 ];
 
