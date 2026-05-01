@@ -49,6 +49,7 @@ export function FlyerGenerator() {
   const [editVenueName, setEditVenueName] = useState<string | null>(savedState?.editVenueName ?? null);
   const [editStreetAddress, setEditStreetAddress] = useState<string | null>(savedState?.editStreetAddress ?? null);
   const [editCity, setEditCity] = useState<string | null>(savedState?.editCity ?? null);
+  const [editTime, setEditTime] = useState<string | null>(savedState?.editTime ?? null);
   const [logoSizes, setLogoSizes] = useState<Record<string, number>>(savedState?.logoSizes || {});
   const defaultLogoSize = 80;
   const [showAddSponsor, setShowAddSponsor] = useState(false);
@@ -66,7 +67,7 @@ export function FlyerGenerator() {
   // Hovered group logo (shows left/right reorder arrows)
   const [hoveredLogoId, setHoveredLogoId] = useState<string | null>(null);
   // Inline text editing on the flyer
-  const [editingField, setEditingField] = useState<'city' | 'venue' | 'street' | null>(null);
+  const [editingField, setEditingField] = useState<'city' | 'venue' | 'street' | 'time' | null>(null);
 
   // Draggable element positions (in 1080px canvas coordinates)
   const [positions, setPositions] = useState<FlyerPositions>(
@@ -103,6 +104,7 @@ export function FlyerGenerator() {
     setEditVenueName(null);
     setEditStreetAddress(null);
     setEditCity(null);
+    setEditTime(null);
     if (storageKey) {
       try { localStorage.removeItem(storageKey); } catch {}
     }
@@ -342,9 +344,9 @@ export function FlyerGenerator() {
   // Persist flyer customizations to localStorage
   useEffect(() => {
     if (!storageKey) return;
-    const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity };
+    const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime };
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
-  }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity]);
+  }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
   if (!party) return null;
 
@@ -389,8 +391,10 @@ export function FlyerGenerator() {
   const cityFontSize = fitText(city, 'Hub 191 Display', 64, CITY_BOX.width);
   const venueNameFontSize = fitText(venueName, 'Hub 191', 46, VENUE_BOX.width);
   const streetFontSize = streetAddress ? fitText(streetAddress, 'Hub 191', 46, VENUE_BOX.width) : 46;
+  // Use edited time if set, otherwise auto-derived value
+  const effectiveTimeDisplay = editTime !== null ? editTime : timeDisplay;
   // Fit the combined "MAY 22  6:00 PM - 9:00 PM" string within TIME_BOX
-  const fullTimeDisplay = `${dateDisplay}  ${timeDisplay || '6PM - 9PM'}`;
+  const fullTimeDisplay = `${dateDisplay}  ${effectiveTimeDisplay || '6PM - 9PM'}`;
   const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
 
   // Compute sponsor logo sizing to fit within bounding box
@@ -444,9 +448,9 @@ export function FlyerGenerator() {
       const dateWidth = ctx.measureText(dateStr).width;
       const gap = 15;
       // Draw time in white
-      if (timeDisplay) {
+      if (effectiveTimeDisplay) {
         ctx.fillStyle = TIME_COLOR;
-        ctx.fillText(timeDisplay, positions.time.x + dateWidth + gap, positions.time.y);
+        ctx.fillText(effectiveTimeDisplay, positions.time.x + dateWidth + gap, positions.time.y);
       }
     }
 
@@ -824,7 +828,46 @@ export function FlyerGenerator() {
               }}
             >
               <span style={{ color: CITY_COLOR }}>{dateDisplay}</span>
-              {timeDisplay && <span style={{ marginLeft: '0.4em', color: TIME_COLOR }}>{timeDisplay}</span>}
+              {editingField === 'time' ? (
+                <input
+                  autoFocus
+                  defaultValue={effectiveTimeDisplay || ''}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    setEditTime(val || null);
+                    setEditingField(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') setEditingField(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    marginLeft: '0.4em',
+                    color: TIME_COLOR,
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    borderRadius: 4,
+                    outline: 'none',
+                    fontFamily: TEXT_FONT,
+                    fontSize: 'inherit',
+                    textTransform: 'uppercase',
+                    width: '60%',
+                    padding: '0 4px',
+                  }}
+                />
+              ) : (
+                <span
+                  style={{ marginLeft: '0.4em', color: TIME_COLOR, cursor: 'text' }}
+                  onClick={(e) => { e.stopPropagation(); setEditingField('time'); }}
+                >
+                  {effectiveTimeDisplay || '6PM - 9PM'}
+                  {hoveredElement === 'time' && !dragging && (
+                    <Pencil size={10} style={{ marginLeft: 4, display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} />
+                  )}
+                </span>
+              )}
             </div>
           );
         })()}
