@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { updateParty, addGuestByHost } from '../lib/supabase';
+import { updateParty, addGuestByHost, proxyAvatarToStorage } from '../lib/supabase';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
@@ -109,6 +109,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const addCoHost = async () => {
     if (!newCoHostName.trim()) return;
 
+    // Proxy external avatar to storage
+    const avatarUrl = newCoHostAvatarUrl.trim()
+      ? await proxyAvatarToStorage(newCoHostAvatarUrl.trim())
+      : undefined;
+
     const newCoHost: CoHost = {
       id: uuid(),
       name: newCoHostName.trim(),
@@ -116,7 +121,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       website: newCoHostWebsite.trim() || undefined,
       twitter: newCoHostTwitter.trim() || undefined,
       instagram: newCoHostInstagram.trim() || undefined,
-      avatar_url: newCoHostAvatarUrl.trim() || undefined,
+      avatar_url: avatarUrl,
       showOnEvent: true,
     };
 
@@ -159,6 +164,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const saveHostEdit = async () => {
     if (!editHostName.trim()) return;
 
+    // Proxy external avatar to storage
+    const avatarUrl = editHostAvatarUrl.trim()
+      ? await proxyAvatarToStorage(editHostAvatarUrl.trim())
+      : undefined;
+
     const newCoHosts = coHosts.map(h =>
       h.id === editingHostId
         ? {
@@ -168,7 +178,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
           website: editHostWebsite.trim() || undefined,
           twitter: editHostTwitter.trim() || undefined,
           instagram: editHostInstagram.trim() || undefined,
-          avatar_url: editHostAvatarUrl.trim() || undefined,
+          avatar_url: avatarUrl,
         }
         : h
     );
