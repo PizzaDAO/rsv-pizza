@@ -137,6 +137,59 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 }
 
 /**
+ * Proxy an external avatar image to Supabase Storage.
+ * Skips if already a Supabase URL. Falls back to original URL on failure.
+ */
+export async function proxyAvatarToStorage(externalUrl: string): Promise<string> {
+  // Skip if empty or already a Supabase storage URL
+  if (!externalUrl || externalUrl.includes('.supabase.co/storage/')) {
+    return externalUrl;
+  }
+
+  try {
+    const response = await fetch(externalUrl);
+    if (!response.ok) return externalUrl;
+
+    const blob = await response.blob();
+
+    // Determine extension from content-type
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const extMap: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/svg+xml': 'svg',
+    };
+    const ext = extMap[contentType] || 'png';
+
+    const fileName = `co-host-avatars/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, blob, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType,
+      });
+
+    if (error) {
+      console.error('Error proxying avatar:', error);
+      return externalUrl;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error proxying avatar:', error);
+    return externalUrl;
+  }
+}
+
+/**
  * Upload an image for use in event descriptions (Markdown).
  * Stored under `description-images/{partyId}/` in the event-images bucket.
  * @param file The image file to upload

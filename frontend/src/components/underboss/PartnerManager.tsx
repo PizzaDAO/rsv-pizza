@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
 import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
+import { proxyAvatarToStorage } from '../../lib/supabase';
 import type { SponsorUser } from '../../types';
 import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
@@ -62,6 +63,11 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
     setSyncMessage(null);
 
     try {
+      // Proxy external avatar to storage
+      const proxiedAvatarUrl = data.coHostAvatarUrl
+        ? await proxyAvatarToStorage(data.coHostAvatarUrl)
+        : undefined;
+
       const payload = {
         email: data.email,
         tag: data.tag,
@@ -71,7 +77,7 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         coHostWebsite: data.website || undefined,
         coHostTwitter: data.brandTwitter || undefined,
         coHostInstagram: data.brandInstagram || undefined,
-        coHostAvatarUrl: data.coHostAvatarUrl || undefined,
+        coHostAvatarUrl: proxiedAvatarUrl,
         coHostLogoUrl: data.logoUrl || undefined,
         autoCoHost: data.autoCoHost,
         autoSponsor: data.autoSponsor,
