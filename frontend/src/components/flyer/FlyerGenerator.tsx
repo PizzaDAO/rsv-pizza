@@ -394,7 +394,9 @@ export function FlyerGenerator() {
   // Use edited time if set, otherwise auto-derived value
   const effectiveTimeDisplay = editTime !== null ? editTime : timeDisplay;
   // Fit the combined "MAY 22  6:00 PM - 9:00 PM" string within TIME_BOX
-  const fullTimeDisplay = `${dateDisplay}  ${effectiveTimeDisplay || '6PM - 9PM'}`;
+  // editTime === '' means user intentionally cleared it; null means use auto value
+  const timeForDisplay = editTime === '' ? '' : (effectiveTimeDisplay || '6PM - 9PM');
+  const fullTimeDisplay = timeForDisplay ? `${dateDisplay}  ${timeForDisplay}` : dateDisplay;
   const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
 
   // Compute sponsor logo sizing to fit within bounding box
@@ -834,7 +836,7 @@ export function FlyerGenerator() {
                   defaultValue={effectiveTimeDisplay || ''}
                   onBlur={(e) => {
                     const val = e.target.value.trim();
-                    setEditTime(val || null);
+                    setEditTime(val);
                     setEditingField(null);
                   }}
                   onKeyDown={(e) => {
@@ -859,10 +861,10 @@ export function FlyerGenerator() {
                 />
               ) : (
                 <span
-                  style={{ marginLeft: '0.4em', color: TIME_COLOR, cursor: 'text' }}
+                  style={{ marginLeft: timeForDisplay ? '0.4em' : 0, color: TIME_COLOR, cursor: 'text' }}
                   onClick={(e) => { e.stopPropagation(); setEditingField('time'); }}
                 >
-                  {effectiveTimeDisplay || '6PM - 9PM'}
+                  {timeForDisplay}
                   {hoveredElement === 'time' && !dragging && (
                     <Pencil size={10} style={{ marginLeft: 4, display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} />
                   )}
