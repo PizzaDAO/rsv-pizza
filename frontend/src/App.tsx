@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
@@ -32,6 +32,8 @@ function SponsorIntakeRedirect() {
   return <Navigate to={`/partner-intake/${token}`} replace />;
 }
 
+const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
+
 function App() {
   return (
     <HelmetProvider>
@@ -62,6 +64,7 @@ function App() {
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner-dashboard" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
+            <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
             <Route path="/post" element={<PostComposerPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />

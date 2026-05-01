@@ -155,6 +155,7 @@ export interface UpdatePartyData {
   venueReportNotes?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  flyerGeneratedAt?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   lumaUrl?: string | null;
@@ -245,6 +246,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       venueReportNotes: data.venueReportNotes,
       pinnedApps: data.pinnedApps,
       region: data.region,
+      flyerGeneratedAt: data.flyerGeneratedAt,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
       lumaUrl: data.lumaUrl,
@@ -742,7 +744,7 @@ export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
 export interface SponsorFilters {
   status?: SponsorStatus;
   sortBy?: 'createdAt' | 'name' | 'amount' | 'lastContactedAt' | 'status';
-  sortOrder?: 'asc' | 'desc';
+  sortDir?: 'asc' | 'desc';
 }
 
 // Get all sponsors for a party
@@ -754,7 +756,7 @@ export async function getSponsors(
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
-    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
     const queryString = params.toString();
     const url = `/api/parties/${partyId}/sponsors${queryString ? `?${queryString}` : ''}`;
@@ -766,6 +768,26 @@ export async function getSponsors(
   } catch (error) {
     console.error('Error fetching sponsors:', error);
     return null;
+  }
+}
+
+// Reorder sponsors (host only) — persists sortOrder for flyer logo row
+export async function reorderSponsors(
+  partyId: string,
+  sponsorIds: string[]
+): Promise<{ sponsors: Sponsor[] } | null> {
+  try {
+    return await apiRequest<{ sponsors: Sponsor[] }>(
+      `/api/parties/${partyId}/sponsors/reorder`,
+      {
+        method: 'PATCH',
+        body: { sponsorIds },
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error reordering sponsors:', error);
+    throw error;
   }
 }
 
@@ -980,18 +1002,6 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
     console.error('Error deleting sponsor:', error);
     return false;
   }
-}
-
-// Reorder sponsors for a party (host)
-export async function reorderSponsors(
-  partyId: string,
-  sponsorIds: string[]
-): Promise<{ sponsors: Sponsor[] }> {
-  return apiRequest<{ sponsors: Sponsor[] }>(`/api/parties/${partyId}/sponsors/reorder`, {
-    method: 'PATCH',
-    body: { sponsorIds },
-    requireAuth: true,
-  });
 }
 
 // Unified sponsors (event + underboss partners)
@@ -2952,6 +2962,9 @@ export interface SponsorUserCreateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: string[] | null;
   category?: string;
   brandDescription?: string;
 }
@@ -2977,6 +2990,9 @@ export interface SponsorUserUpdateData {
   coHostLogoUrl?: string;
   autoCoHost?: boolean;
   autoSponsor?: boolean;
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: string[] | null;
   category?: string;
   brandDescription?: string;
 }

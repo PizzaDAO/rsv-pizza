@@ -22,6 +22,7 @@ export const VALID_TAB_IDS = [
   'checklist',
   'gpp',
   'promo',
+  'flyer',
   'apps',
 ] as const;
 

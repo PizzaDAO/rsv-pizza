@@ -521,6 +521,7 @@ export interface DbParty {
   region?: string | null;
   event_type?: string | null;
   event_tags?: string[];
+  flyer_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
   hidden_gpp_photos?: string[];
@@ -584,6 +585,7 @@ export const SAFE_PARTY_COLUMNS = `
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
   region,
+  flyer_generated_at,
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
   telegram_group
@@ -1479,6 +1481,7 @@ export async function updateParty(
     venue_report_notes?: string | null;
     pinned_apps?: string[];
     region?: string | null;
+    flyer_generated_at?: string | null;
     hidden_gpp_photos?: string[];
     extra_gpp_photos?: string[];
     luma_url?: string | null;
@@ -1542,6 +1545,7 @@ export async function updateParty(
         venueReportNotes: updates.venue_report_notes,
         pinnedApps: updates.pinned_apps,
         region: updates.region,
+        flyerGeneratedAt: updates.flyer_generated_at,
         hiddenGppPhotos: updates.hidden_gpp_photos,
         extraGppPhotos: updates.extra_gpp_photos,
         lumaUrl: updates.luma_url,

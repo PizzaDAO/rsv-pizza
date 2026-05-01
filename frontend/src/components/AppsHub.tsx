@@ -141,7 +141,8 @@ const apps: AppItem[] = [
     name: 'Flyer',
     description: 'Generate event flyers',
     icon: FileImage,
-    status: 'coming-soon',
+    status: 'live',
+    tab: 'flyer',
   },
   {
     id: 'payment-portal',

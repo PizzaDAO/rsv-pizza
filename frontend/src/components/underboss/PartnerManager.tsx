@@ -81,6 +81,9 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         coHostLogoUrl: data.logoUrl || undefined,
         autoCoHost: data.autoCoHost,
         autoSponsor: data.autoSponsor,
+        coHostShowOnEvent: data.coHostShowOnEvent,
+        coHostCanEdit: data.coHostCanEdit,
+        coHostAllowedTabs: data.coHostAllowedTabs,
         category: data.category || undefined,
         brandDescription: data.brandDescription || undefined,
       };

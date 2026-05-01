@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, MessageCircle } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
@@ -677,32 +677,44 @@ export const EventDetailsTab: React.FC = () => {
         </button>
 
         {/* Event Image - Change Image Button */}
-        <button
-          type="button"
-          onClick={() => setShowImageModal(true)}
-          className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ImageIcon size={18} className="text-theme-text-muted flex-shrink-0" />
-              {imagePreview ? (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={imagePreview}
-                    alt="Event flyer preview"
-                    className="w-12 h-12 rounded-lg object-cover border border-theme-stroke-hover"
-                  />
-                  <span className="text-theme-text font-medium">Event Image</span>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-theme-text-secondary">No image set</span>
-                  <div className="text-theme-text-muted text-sm mt-1">Click to add event image</div>
-                </div>
-              )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowImageModal(true)}
+            className="flex-1 bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ImageIcon size={18} className="text-theme-text-muted flex-shrink-0" />
+                {imagePreview ? (
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={imagePreview}
+                      alt="Event flyer preview"
+                      className="w-12 h-12 rounded-lg object-cover border border-theme-stroke-hover"
+                    />
+                    <span className="text-theme-text font-medium">Event Image</span>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-theme-text-secondary">No image set</span>
+                    <div className="text-theme-text-muted text-sm mt-1">Click to add event image</div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
+          {party?.eventType === 'gpp' && (
+            <button
+              type="button"
+              onClick={() => navigate(`/host/${party.inviteCode}/flyer`)}
+              className="flex flex-col items-center justify-center gap-1 px-4 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors"
+            >
+              <Wand2 size={18} className="text-theme-text-muted" />
+              <span className="text-xs text-theme-text-secondary whitespace-nowrap">Generate Flyer</span>
+            </button>
+          )}
+        </div>
         {imageError && (
           <p className="text-xs text-red-400 mt-1">{imageError}</p>
         )}

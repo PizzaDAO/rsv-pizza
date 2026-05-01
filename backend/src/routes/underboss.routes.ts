@@ -162,7 +162,7 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
 }
 
 // Helper: format event for response
-function formatEvent(party: any, underbossEmails: string[] = []) {
+function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMap?: Map<string, Date>) {
   const guestCount = party._count?.guests || 0;
   const approvedCount = party.guests?.filter((g: any) => g.approved !== false).length || 0;
   const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
@@ -175,6 +175,14 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     }
     return sum;
   }, 0) || 0;
+
+  // Flyer staleness detection
+  const flyerGeneratedAt = party.flyerGeneratedAt ? new Date(party.flyerGeneratedAt).toISOString() : null;
+  const latestSponsorAt = latestSponsorMap?.get(party.id) ?? null;
+  const latestSponsorAtStr = latestSponsorAt ? new Date(latestSponsorAt).toISOString() : null;
+  const flyerStale = latestSponsorAt !== null && (
+    flyerGeneratedAt === null || new Date(latestSponsorAt) > new Date(flyerGeneratedAt)
+  );
 
   return {
     id: party.id,
@@ -208,6 +216,9 @@ function formatEvent(party: any, underbossEmails: string[] = []) {
     underbossNotes: party.underbossNotes || null,
     expectedGuests: party.expectedGuests || null,
     createdAt: party.createdAt,
+    flyerGeneratedAt,
+    latestSponsorAt: latestSponsorAtStr,
+    flyerStale,
   };
 }
 
@@ -377,8 +388,27 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
     });
     const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
 
+    // Get latest sponsor timestamp per party for flyer staleness detection
+    const partyIds = events.map(e => e.id);
+    const latestSponsorMap = new Map<string, Date>();
+    if (partyIds.length > 0) {
+      const sponsorTimestamps = await prisma.sponsor.groupBy({
+        by: ['partyId'],
+        where: {
+          partyId: { in: partyIds },
+          status: { in: ['yes', 'paid'] },
+        },
+        _max: { createdAt: true },
+      });
+      for (const row of sponsorTimestamps) {
+        if (row._max.createdAt) {
+          latestSponsorMap.set(row.partyId, row._max.createdAt);
+        }
+      }
+    }
+
     const stats = computeStats(events, ubEmails);
-    const formattedEvents = events.map(e => formatEvent(e, ubEmails));
+    const formattedEvents = events.map(e => formatEvent(e, ubEmails, latestSponsorMap));
 
     res.json({
       region,
@@ -427,8 +457,27 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     ]);
     const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
 
+    // Get latest sponsor timestamp per party for flyer staleness detection
+    const partyIds = events.map(e => e.id);
+    const latestSponsorMap = new Map<string, Date>();
+    if (partyIds.length > 0) {
+      const sponsorTimestamps = await prisma.sponsor.groupBy({
+        by: ['partyId'],
+        where: {
+          partyId: { in: partyIds },
+          status: { in: ['yes', 'paid'] },
+        },
+        _max: { createdAt: true },
+      });
+      for (const row of sponsorTimestamps) {
+        if (row._max.createdAt) {
+          latestSponsorMap.set(row.partyId, row._max.createdAt);
+        }
+      }
+    }
+
     res.json({
-      events: events.map(e => formatEvent(e, ubEmails)),
+      events: events.map(e => formatEvent(e, ubEmails, latestSponsorMap)),
       pagination: {
         page,
         limit,

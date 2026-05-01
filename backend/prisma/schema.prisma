@@ -71,6 +71,7 @@ model Party {
   selectedPizzerias  Json?     @map("selected_pizzerias")
   password           String?
   eventImageUrl      String?   @map("event_image_url")
+  flyerGeneratedAt   DateTime? @map("flyer_generated_at") @db.Timestamptz
   description        String?
   rsvpClosedAt       DateTime? @map("rsvp_closed_at") @db.Timestamptz
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz

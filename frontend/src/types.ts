@@ -267,6 +267,7 @@ export interface Party {
   donationEthAddress?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  flyerGeneratedAt?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];
@@ -452,6 +453,8 @@ export interface Sponsor {
   name: string;
   website: string | null;
   brandTwitter: string | null;
+  brandInstagram: string | null;
+  brandDescription: string | null;
   pointPerson: string | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -998,6 +1001,9 @@ export interface UnderbossEvent {
   address: string | null;
   venueName: string | null;
   region?: string | null;
+  eventImageUrl: string | null;
+  timezone: string | null;
+  duration: number | null;
   country?: string | null;
   host: { name: string | null; email: string | null };
   coHosts: any[];
@@ -1016,6 +1022,9 @@ export interface UnderbossEvent {
   underbossNotes: string | null;
   expectedGuests: number | null;
   createdAt: string;
+  flyerGeneratedAt: string | null;
+  latestSponsorAt: string | null;
+  flyerStale: boolean;
 }
 
 export interface UnderbossStats {
@@ -1145,6 +1154,9 @@ export interface SponsorUser {
   coHostLogoUrl: string | null;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  coHostShowOnEvent: boolean;
+  coHostCanEdit: boolean;
+  coHostAllowedTabs: string[] | null;
   category: string | null;
   brandDescription: string | null;
   descriptionSortOrder: number;
