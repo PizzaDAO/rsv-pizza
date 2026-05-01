@@ -221,6 +221,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   maxGuests: number | null;
+  expectedGuests?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;
@@ -228,6 +229,9 @@ export interface Party {
   eventImageUrl: string | null;
   description: string | null;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  country?: string | null;
   venueName: string | null;
   // Venue tracking fields
   venueStatus: VenueStatus | null;
@@ -266,6 +270,14 @@ export interface Party {
   flyerGeneratedAt?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
+  // External event links
+  lumaUrl?: string | null;
+  meetupUrl?: string | null;
+  eventbriteUrl?: string | null;
+  externalLinks?: Array<{label: string; url: string}>;
+  telegramGroup?: string | null;
 }
 
 export interface Donation {
@@ -328,6 +340,7 @@ export interface Pizzeria {
     lat: number;
     lng: number;
   };
+  description?: string;
   photos?: string[];
   orderingOptions: OrderingOption[];
 }
@@ -422,6 +435,17 @@ export interface PhotoStats {
 // Sponsor CRM types
 export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
 export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
+export type SponsorCategory = 'hardware_wallet' | 'software_wallet' | 'cex' | 'blockchain' | 'dex' | 'community' | 'custom';
+
+export const SPONSOR_CATEGORIES: { id: SponsorCategory; label: string }[] = [
+  { id: 'hardware_wallet', label: 'Hardware Wallet' },
+  { id: 'software_wallet', label: 'Software Wallet' },
+  { id: 'cex', label: 'CEX' },
+  { id: 'blockchain', label: 'Blockchain' },
+  { id: 'dex', label: 'DEX' },
+  { id: 'community', label: 'Community' },
+  { id: 'custom', label: 'Custom' },
+];
 
 export interface Sponsor {
   id: string;
@@ -444,8 +468,9 @@ export interface Sponsor {
   sponsorshipType: SponsorshipType | null;
   productService: string | null;
   logoUrl: string | null;
-  sortOrder: number;
+  category: string | null;
   notes: string | null;
+  sortOrder: number;
   lastContactedAt: string | null;
   intakeToken: string | null;
   intakeSubmittedAt: string | null;
@@ -526,7 +551,7 @@ export interface Playlist {
 export interface SocialPost {
   id: string;
   partyId: string;
-  platform: 'twitter' | 'farcaster' | 'instagram';
+  platform: 'twitter' | 'farcaster' | 'instagram' | 'facebook' | 'linkedin';
   url: string;
   authorHandle: string | null;
   title: string | null;
@@ -898,7 +923,7 @@ export const KIT_TIERS: KitTierInfo[] = [
     id: 'deluxe',
     name: 'Deluxe Kit',
     description: 'The complete party package',
-    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Pins', 'Extras'],
+    contents: ['Stickers', 'Tablecloth', 'Flyers', 'Name Tags', 'Table Tents', 'Keychain', 'Extras'],
   },
 ];
 
@@ -933,9 +958,7 @@ export interface ChecklistData {
   seeded: boolean;
 }
 
-// ============================================
 // Underboss Dashboard types
-// ============================================
 
 export type GPPRegion = 'usa' | 'canada' | 'central-america' | 'south-america' | 'western-europe' | 'eastern-europe' | 'west-africa' | 'east-africa' | 'south-africa' | 'india' | 'china' | 'middle-east' | 'asia' | 'oceania';
 
@@ -981,6 +1004,7 @@ export interface UnderbossEvent {
   eventImageUrl: string | null;
   timezone: string | null;
   duration: number | null;
+  country?: string | null;
   host: { name: string | null; email: string | null };
   coHosts: any[];
   progress: UnderbossEventProgress;
@@ -995,6 +1019,8 @@ export interface UnderbossEvent {
   underbossApproved: boolean;
   hostTags: string[];
   eventTags: string[];
+  underbossNotes: string | null;
+  expectedGuests: number | null;
   createdAt: string;
   flyerGeneratedAt: string | null;
   latestSponsorAt: string | null;
@@ -1023,9 +1049,7 @@ export interface UnderbossDashboardData {
   events: UnderbossEvent[];
 }
 
-// ============================================
 // Admin Management types
-// ============================================
 
 export interface AdminUser {
   id: string;
@@ -1047,9 +1071,7 @@ export interface UnderbossAdmin {
   createdAt: string;
 }
 
-// ============================================
 // Shipping Dashboard types
-// ============================================
 
 export interface ShippingKit {
   id: string;
@@ -1059,6 +1081,9 @@ export interface ShippingKit {
   region: string | null;
   hostName: string | null;
   hostEmail: string | null;
+  eventAddress: string | null;
+  eventVenue: string | null;
+  underbossApproved: boolean;
   requestedTier: KitTier;
   allocatedTier: KitTier | null;
   recipientName: string;
@@ -1109,9 +1134,7 @@ export interface ShippingMeResponse {
   email: string;
 }
 
-// ============================================
 // Sponsor Dashboard types
-// ============================================
 
 export interface SponsorUser {
   id: string;
@@ -1134,6 +1157,9 @@ export interface SponsorUser {
   coHostShowOnEvent: boolean;
   coHostCanEdit: boolean;
   coHostAllowedTabs: string[] | null;
+  category: string | null;
+  brandDescription: string | null;
+  descriptionSortOrder: number;
 }
 
 export interface SponsorChecklistItem {
@@ -1155,6 +1181,7 @@ export interface SponsorDashboardEvent {
   address: string | null;
   venueName: string | null;
   region: string | null;
+  telegramGroup: string | null;
   eventImageUrl: string | null;
   hostName: string | null;
   hostProfile: {
@@ -1168,6 +1195,7 @@ export interface SponsorDashboardEvent {
   rsvpCount: number;
   approvedCount: number;
   maxGuests: number | null;
+  expectedGuests?: number | null;
   budget: {
     total: number;
     spent: number;
@@ -1186,6 +1214,7 @@ export interface SponsorDashboardEvent {
   };
   sponsorStatuses?: string[];
   sponsorCount?: number;
+  partnerNotes: string | null;
   checklist: SponsorChecklistItem[];
 }
 
@@ -1209,4 +1238,17 @@ export interface SponsorDashboardData {
   isAdmin: boolean;
   tag: string | null;
   events: SponsorDashboardEvent[];
+}
+
+// Unified partner (merges event-level Sponsor with underboss SponsorUser)
+export interface UnifiedPartner {
+  id: string;
+  sponsorId?: string;
+  sponsorUserId?: string;
+  source: 'event' | 'underboss';
+  name: string;
+  brandDescription: string;
+  logoUrl: string | null;
+  website: string | null;
+  sortOrder: number;
 }

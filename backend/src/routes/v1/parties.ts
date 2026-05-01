@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js';
 import { requireApiKey, ApiKeyRequest, SCOPES } from '../../middleware/apiKey.js';
 import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
+import { setDeleteContext } from '../../helpers/auditContext.js';
 import guestsRouter from './guests.js';
 
 const router = Router();
@@ -339,7 +340,10 @@ router.delete('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyReq
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.party.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, `api_key:${req.apiKey!.userId}`, 'api_v1');
+      await tx.party.delete({ where: { id } });
+    });
 
     // Trigger webhook
     await triggerWebhook('party.deleted', { id }, req.apiKey!.userId);

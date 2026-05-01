@@ -30,6 +30,7 @@ import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { FlyerTab } from '../components/flyer';
+import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
 
@@ -374,14 +375,23 @@ function HostPageContent() {
               )}
 
               {activeTab === 'photos' && party && (
-                <div className="card p-6 space-y-4">
-                  <PhotoGallery
-                    partyId={party.id}
-                    isHost={true}
-                    uploaderName={user?.name || undefined}
-                    uploaderEmail={user?.email}
-                    photoModeration={true}
-                  />
+                <div className="space-y-4">
+                  <div className="card p-6 space-y-4">
+                    <PhotoGallery
+                      partyId={party.id}
+                      isHost={true}
+                      uploaderName={user?.name || undefined}
+                      uploaderEmail={user?.email}
+                      photoModeration={true}
+                    />
+                  </div>
+
+                  {/* Previous Year Photos — GPP events only */}
+                  {party.eventType === 'gpp' && party.customUrl && (
+                    <div className="card p-6">
+                      <PreviousYearPhotos />
+                    </div>
+                  )}
                 </div>
               )}
 

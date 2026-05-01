@@ -35,6 +35,9 @@ import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
+import preferencesRoutes from './routes/preferences.routes.js';
+import quizTemplateRoutes from './routes/quiz-template.routes.js';
+import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -76,8 +79,8 @@ app.use(express.json());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: { error: 'Too many requests, please try again later' },
+  max: 500, // limit each IP to 500 requests per windowMs
+  message: { error: 'You\'ve been rate limited. Please wait a few minutes before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,
   // Skip rate limit validation errors
@@ -98,6 +101,7 @@ app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
+app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
@@ -116,11 +120,14 @@ app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
+app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
+app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
 app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
+app.use('/api/events', quizPublicRouter); // Public quiz endpoints (before eventRoutes)
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
@@ -139,6 +146,163 @@ app.use('/api/ai-phone', aiPhoneRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.1.0' });
+});
+
+// API documentation page
+app.get('/api', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSV.Pizza API</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0a0a0a; color: #e0e0e0; padding: 2rem; max-width: 900px; margin: 0 auto; line-height: 1.6; }
+  h1 { color: #ff393a; font-size: 2rem; margin-bottom: 0.5rem; }
+  h2 { color: #ff393a; font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 1px solid #222; padding-bottom: 0.5rem; }
+  h3 { color: #ccc; font-size: 1rem; margin: 1.5rem 0 0.5rem; }
+  p, li { color: #aaa; }
+  a { color: #ff393a; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: #1a1a1a; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: #f0f0f0; }
+  pre { background: #111; border: 1px solid #222; border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 0.5rem 0 1rem; font-size: 0.85em; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .endpoint { background: #111; border: 1px solid #222; border-radius: 8px; padding: 1rem 1.2rem; margin: 0.75rem 0; }
+  .method { display: inline-block; background: #1a3a1a; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.8em; margin-right: 0.5rem; }
+  .path { color: #f0f0f0; font-family: monospace; font-size: 0.95em; }
+  .param { color: #facc15; }
+  .desc { color: #888; font-size: 0.9em; margin-top: 0.3rem; }
+  .badge { display: inline-block; background: #1a1a2e; color: #818cf8; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; margin-left: 0.5rem; }
+  .note { background: #1a1a0a; border: 1px solid #333; border-radius: 8px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.9em; color: #cca; }
+  ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.25rem 0; }
+  .subtitle { color: #666; font-size: 1rem; margin-bottom: 2rem; }
+</style>
+</head>
+<body>
+
+<h1>RSV.Pizza API</h1>
+<p class="subtitle">Public API for accessing Global Pizza Party events</p>
+
+<div class="note">
+  Base URL: <code>https://api.rsv.pizza</code><br>
+  All responses are JSON. No authentication required for public endpoints.<br>
+  Responses are cached for 5 minutes.
+</div>
+
+<h2>Events</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/gpp/events</span>
+  <span class="badge">public</span>
+  <p class="desc">List all Global Pizza Party events. Supports filtering.</p>
+</div>
+
+<h3>Query Parameters</h3>
+<ul>
+  <li><code><span class="param">city</span></code> — Filter by city name (case-insensitive, partial match). Example: <code>?city=london</code></li>
+  <li><code><span class="param">country</span></code> — Filter by country (case-insensitive, partial match). Example: <code>?country=nigeria</code></li>
+  <li><code><span class="param">region</span></code> — Filter by region slug. Example: <code>?region=western-europe</code></li>
+  <li><code><span class="param">limit</span></code> — Max results (default: 500, max: 500)</li>
+  <li><code><span class="param">offset</span></code> — Pagination offset (default: 0)</li>
+</ul>
+
+<h3>Regions</h3>
+<p><code>usa</code>, <code>canada</code>, <code>central-america</code>, <code>south-america</code>, <code>western-europe</code>, <code>eastern-europe</code>, <code>india</code>, <code>china</code>, <code>asia</code>, <code>middle-east</code>, <code>west-africa</code>, <code>east-africa</code>, <code>south-africa</code>, <code>oceania</code></p>
+
+<h3>Example Request</h3>
+<pre><code>curl https://api.rsv.pizza/api/gpp/events?country=brazil</code></pre>
+
+<h3>Response</h3>
+<pre><code>{
+  "events": [
+    {
+      "id": "abc123",
+      "name": "Global Pizza Party S\u00e3o Paulo",
+      "city": "S\u00e3o Paulo",
+      "customUrl": "saopaulo",
+      "inviteCode": "abc123",
+      "url": "https://rsv.pizza/saopaulo",
+      "date": "2026-05-22T21:00:00.000Z",
+      "endTime": "2026-05-23T00:00:00.000Z",
+      "timezone": "America/Sao_Paulo",
+      "country": "Brazil",
+      "region": "south-america",
+      "address": "R. Example 123, S\u00e3o Paulo",
+      "venueName": "Pizza Place",
+      "latitude": -23.5505,
+      "longitude": -46.6333,
+      "eventImageUrl": "https://...",
+      "guestCount": 42,
+      "rsvpOpen": true
+    }
+  ],
+  "total": 4,
+  "limit": 500,
+  "offset": 0
+}</code></pre>
+
+<h2>Single Event by City</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/gpp/events/by-city/<span class="param">:citySlug</span></span>
+  <span class="badge">public</span>
+  <p class="desc">Look up a single GPP event by its city URL slug (lowercase, no spaces).</p>
+</div>
+
+<h3>Example</h3>
+<pre><code>curl https://api.rsv.pizza/api/gpp/events/by-city/london</code></pre>
+
+<h3>Response</h3>
+<pre><code>{
+  "event": {
+    "name": "Global Pizza Party London",
+    "city": "London",
+    "customUrl": "london",
+    "url": "https://rsv.pizza/london",
+    "date": "2026-05-22T17:00:00.000Z",
+    "endTime": "2026-05-22T20:00:00.000Z",
+    "timezone": "Europe/London",
+    "country": "United Kingdom",
+    "region": "western-europe",
+    "guestCount": 87,
+    "rsvpOpen": true
+  }
+}</code></pre>
+
+<h2>Single Event by Slug</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/events/<span class="param">:slug</span></span>
+  <span class="badge">public</span>
+  <p class="desc">Get full public details for any event (not just GPP) by invite code or custom URL.</p>
+</div>
+
+<h3>Example</h3>
+<pre><code>curl https://api.rsv.pizza/api/events/london</code></pre>
+
+<h2>Health Check</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/health</span>
+  <span class="badge">public</span>
+  <p class="desc">Returns API status and version.</p>
+</div>
+
+<div class="note" style="margin-top: 2rem;">
+  <strong>Rate limits:</strong> 500 requests per 15 minutes per IP.<br>
+  <strong>Questions?</strong> Reach out on <a href="https://t.me/pizzadao">Telegram</a> or email <a href="mailto:hello@rarepizzas.com">hello@rarepizzas.com</a>.
+</div>
+
+<p style="margin-top: 2rem; color: #444; font-size: 0.8em;">Powered by <a href="https://rsv.pizza" style="color: #555;">RSV.Pizza</a></p>
+
+</body>
+</html>`);
 });
 
 // Error handler (must be last)

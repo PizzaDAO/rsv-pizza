@@ -1,0 +1,30 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel
+
+      - name: Deploy to Production
+        working-directory: backend
+        run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --scope=pizza-dao

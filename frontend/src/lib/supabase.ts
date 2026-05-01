@@ -137,6 +137,94 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 }
 
 /**
+ * Proxy an external avatar image to Supabase Storage.
+ * Skips if already a Supabase URL. Falls back to original URL on failure.
+ */
+export async function proxyAvatarToStorage(externalUrl: string): Promise<string> {
+  // Skip if empty or already a Supabase storage URL
+  if (!externalUrl || externalUrl.includes('.supabase.co/storage/')) {
+    return externalUrl;
+  }
+
+  try {
+    const response = await fetch(externalUrl);
+    if (!response.ok) return externalUrl;
+
+    const blob = await response.blob();
+
+    // Determine extension from content-type
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const extMap: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/svg+xml': 'svg',
+    };
+    const ext = extMap[contentType] || 'png';
+
+    const fileName = `co-host-avatars/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, blob, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType,
+      });
+
+    if (error) {
+      console.error('Error proxying avatar:', error);
+      return externalUrl;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error proxying avatar:', error);
+    return externalUrl;
+  }
+}
+
+/**
+ * Upload an image for use in event descriptions (Markdown).
+ * Stored under `description-images/{partyId}/` in the event-images bucket.
+ * @param file The image file to upload
+ * @param partyId The party ID for organizing uploads
+ * @returns The public URL of the uploaded image, or null if upload failed
+ */
+export async function uploadDescriptionImage(file: File, partyId: string): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `description-images/${partyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error uploading description image:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading description image:', error);
+    return null;
+  }
+}
+
+/**
  * Upload a receipt file (image or PDF) to Supabase Storage and return the public URL
  * @param file The receipt file to upload (JPEG, PNG, WebP, or PDF)
  * @param partyId The party ID for organizing uploads
@@ -396,6 +484,7 @@ export interface DbParty {
   available_beverages: string[];
   available_toppings: string[];
   max_guests: number | null;
+  expected_guests?: number | null;
   hide_guests: boolean;
   require_approval: boolean;
   password?: string | null;
@@ -403,6 +492,9 @@ export interface DbParty {
   event_image_url: string | null;
   description: string | null;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  country?: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
   selected_pizzerias: any[] | null;
@@ -432,6 +524,15 @@ export interface DbParty {
   flyer_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
+  hidden_gpp_photos?: string[];
+  extra_gpp_photos?: string[];
+  // External event links
+  luma_url?: string | null;
+  meetup_url?: string | null;
+  eventbrite_url?: string | null;
+  external_links?: Array<{label: string; url: string}>;
+  // Telegram group
+  telegram_group?: string | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -466,9 +567,9 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, max_guests, hide_guests,
+  pizza_style, available_beverages, available_toppings, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
-  event_image_url, description, address, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
+  event_image_url, description, address, latitude, longitude, country, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
   donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
@@ -478,12 +579,16 @@ export const SAFE_PARTY_COLUMNS = `
   kit_enabled, kit_deadline,
   fundraising_goal, report_recap, report_video_url, report_photos_url,
   flyer_artist, x_post_url, x_post_views, farcaster_post_url, farcaster_views,
-  luma_url, luma_views, poap_event_id, poap_mints, poap_moments,
+  luma_url, luma_views, meetup_url, eventbrite_url, external_links,
+  poap_event_id, poap_mints, poap_moments,
   report_published, report_public_slug,
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
   region,
-  flyer_generated_at
+  flyer_generated_at,
+  hidden_gpp_photos, extra_gpp_photos,
+  quiz_enabled,
+  telegram_group
 `;
 
 /**
@@ -648,18 +753,39 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
   const { data, error } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
-    .eq('custom_url', customUrl)
+    .eq('custom_url', customUrl.toLowerCase())
     .single();
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     console.error('Error fetching party by custom URL:', error);
     return null;
   }
-  if (data) {
-    normalizePartyCoHosts(data);
-    data.co_hosts = sanitizeCoHosts(data.co_hosts);
+
+  let party = data;
+
+  // Alias fallback: check slug_aliases if not found by custom_url
+  if (!party) {
+    const { data: aliasData } = await supabase
+      .from('slug_aliases')
+      .select('party_id')
+      .eq('old_slug', customUrl.toLowerCase())
+      .maybeSingle();
+
+    if (aliasData) {
+      const { data: partyData } = await supabase
+        .from('parties')
+        .select(SAFE_PARTY_COLUMNS)
+        .eq('id', aliasData.party_id)
+        .single();
+      party = partyData;
+    }
   }
-  return data;
+
+  if (party) {
+    normalizePartyCoHosts(party);
+    party.co_hosts = sanitizeCoHosts(party.co_hosts);
+  }
+  return party;
 }
 
 // Reserved slugs that can't be used as custom party URLs
@@ -746,6 +872,7 @@ export async function verifyPartyPassword(inviteCode: string, passwordAttempt: s
 }
 
 export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbParty | null> {
+  const normalizedSlug = slug.toLowerCase();
   let party: DbParty | null = null;
   let error = null;
 
@@ -753,7 +880,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   const { data: customUrlData, error: customUrlError } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
-    .eq('custom_url', slug)
+    .eq('custom_url', normalizedSlug)
     .maybeSingle();
 
   if (customUrlData) {
@@ -763,14 +890,35 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     const { data: inviteCodeData, error: inviteCodeError } = await supabase
       .from('parties')
       .select(SAFE_PARTY_COLUMNS)
-      .eq('invite_code', slug)
+      .eq('invite_code', normalizedSlug)
       .maybeSingle();
 
     if (inviteCodeData) {
       party = inviteCodeData as DbParty;
     } else {
-      if (customUrlError) error = customUrlError;
-      if (inviteCodeError) error = inviteCodeError;
+      // Alias fallback: check slug_aliases
+      const { data: aliasData } = await supabase
+        .from('slug_aliases')
+        .select('party_id')
+        .eq('old_slug', normalizedSlug)
+        .maybeSingle();
+
+      if (aliasData) {
+        const { data: aliasPartyData } = await supabase
+          .from('parties')
+          .select(SAFE_PARTY_COLUMNS)
+          .eq('id', aliasData.party_id)
+          .maybeSingle();
+
+        if (aliasPartyData) {
+          party = aliasPartyData as DbParty;
+        }
+      }
+
+      if (!party) {
+        if (customUrlError) error = customUrlError;
+        if (inviteCodeError) error = inviteCodeError;
+      }
     }
   }
 
@@ -795,28 +943,35 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
 }
 
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
-  // Try custom URL first, then invite code (same pattern as getPartyByInviteCodeOrCustomUrl)
-  let party: DbParty | null = null;
-
-  const { data: customUrlData } = await supabase
+  // Single query: match on custom_url OR invite_code
+  const { data: partyData, error: partyError } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
-    .eq('custom_url', inviteCode)
+    .or(`custom_url.eq.${inviteCode},invite_code.eq.${inviteCode}`)
     .maybeSingle();
 
-  if (customUrlData) {
-    party = customUrlData;
-  } else {
-    const { data: inviteCodeData, error: partyError } = await supabase
-      .from('parties')
-      .select(SAFE_PARTY_COLUMNS)
-      .eq('invite_code', inviteCode)
+  if (partyError) {
+    console.error('Error fetching party:', partyError);
+  }
+
+  let party: DbParty | null = partyData;
+
+  // Alias fallback: check slug_aliases if not found
+  if (!party) {
+    const { data: aliasData } = await supabase
+      .from('slug_aliases')
+      .select('party_id')
+      .eq('old_slug', inviteCode)
       .maybeSingle();
 
-    if (partyError) {
-      console.error('Error fetching party:', partyError);
+    if (aliasData) {
+      const { data: aliasPartyData } = await supabase
+        .from('parties')
+        .select(SAFE_PARTY_COLUMNS)
+        .eq('id', aliasData.party_id)
+        .maybeSingle();
+      party = aliasPartyData;
     }
-    party = inviteCodeData;
   }
 
   if (!party) {
@@ -1009,6 +1164,8 @@ export interface ExistingGuestData {
   pizzeriaRankings: string[];
   suggestedPizzerias: any[];
   status: DbGuestStatus;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
 }
 
 export async function getExistingGuest(
@@ -1044,6 +1201,8 @@ export async function getExistingGuest(
       pizzeriaRankings: guest.pizzeriaRankings || [],
       suggestedPizzerias: guest.suggestedPizzerias || [],
       status: guest.status || 'CONFIRMED',
+      checkedInAt: guest.checkedInAt || null,
+      checkedInBy: guest.checkedInBy || null,
     };
   } catch (error) {
     console.error('Error fetching guest:', error);
@@ -1276,6 +1435,9 @@ export async function updateParty(
     date?: string | null;
     duration?: number | null;
     address?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    country?: string | null;
     venue_name?: string | null;
     // Venue tracking fields
     venueStatus?: string | null;
@@ -1293,6 +1455,7 @@ export async function updateParty(
     custom_url?: string | null;
     event_image_url?: string | null;
     max_guests?: number | null;
+    expected_guests?: number | null;
     hide_guests?: boolean;
     require_approval?: boolean;
     co_hosts?: any[];
@@ -1319,6 +1482,13 @@ export async function updateParty(
     pinned_apps?: string[];
     region?: string | null;
     flyer_generated_at?: string | null;
+    hidden_gpp_photos?: string[];
+    extra_gpp_photos?: string[];
+    luma_url?: string | null;
+    meetup_url?: string | null;
+    eventbrite_url?: string | null;
+    external_links?: Array<{label: string; url: string}>;
+    telegram_group?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1330,6 +1500,9 @@ export async function updateParty(
         duration: updates.duration,
         timezone: updates.timezone,
         address: updates.address,
+        latitude: updates.latitude,
+        longitude: updates.longitude,
+        country: updates.country,
         venueName: updates.venue_name,
         // Venue tracking fields
         venueStatus: updates.venueStatus as any,
@@ -1343,6 +1516,7 @@ export async function updateParty(
         venueWebsite: updates.venueWebsite,
         venueNotes: updates.venueNotes,
         maxGuests: updates.max_guests,
+        expectedGuests: updates.expected_guests,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
@@ -1372,6 +1546,13 @@ export async function updateParty(
         pinnedApps: updates.pinned_apps,
         region: updates.region,
         flyerGeneratedAt: updates.flyer_generated_at,
+        hiddenGppPhotos: updates.hidden_gpp_photos,
+        extraGppPhotos: updates.extra_gpp_photos,
+        lumaUrl: updates.luma_url,
+        meetupUrl: updates.meetup_url,
+        eventbriteUrl: updates.eventbrite_url,
+        externalLinks: updates.external_links,
+        telegramGroup: updates.telegram_group,
       });
       return true;
     } catch (error) {
@@ -1560,48 +1741,50 @@ export interface UserPreferences {
 }
 
 export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
-  const { data, error } = await supabase
-    .from('user_preferences')
-    .select('dietary_restrictions, liked_toppings, disliked_toppings, liked_beverages, disliked_beverages')
-    .eq('email', email)
-    .maybeSingle();
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/preferences?email=${encodeURIComponent(email)}`);
 
-  if (error || !data) {
+    if (!response.ok) return null;
+
+    const { preferences } = await response.json();
+    if (!preferences) return null;
+
+    return {
+      dietary_restrictions: preferences.dietary_restrictions || [],
+      liked_toppings: preferences.liked_toppings || [],
+      disliked_toppings: preferences.disliked_toppings || [],
+      liked_beverages: preferences.liked_beverages || [],
+      disliked_beverages: preferences.disliked_beverages || [],
+    };
+  } catch (error) {
+    console.error('Error loading user preferences:', error);
     return null;
   }
-
-  return {
-    dietary_restrictions: data.dietary_restrictions || [],
-    liked_toppings: data.liked_toppings || [],
-    disliked_toppings: data.disliked_toppings || [],
-    liked_beverages: data.liked_beverages || [],
-    disliked_beverages: data.disliked_beverages || [],
-  };
 }
 
 export async function saveUserPreferences(
   email: string,
   preferences: UserPreferences
 ): Promise<boolean> {
-  // Use upsert to insert or update based on email
-  const { error } = await supabase
-    .from('user_preferences')
-    .upsert({
-      email,
-      dietary_restrictions: preferences.dietary_restrictions,
-      liked_toppings: preferences.liked_toppings,
-      disliked_toppings: preferences.disliked_toppings,
-      liked_beverages: preferences.liked_beverages,
-      disliked_beverages: preferences.disliked_beverages,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'email',
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, preferences }),
     });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('Error saving user preferences:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('Error saving user preferences:', error);
     return false;
   }
-
-  return true;
 }
+
+// ============================================

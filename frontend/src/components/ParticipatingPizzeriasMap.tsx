@@ -3,6 +3,8 @@ import { Pizzeria } from '../types';
 
 interface ParticipatingPizzeriasMapProps {
   pizzerias: Pizzeria[];
+  venueLocation?: { lat: number; lng: number } | null;
+  venueName?: string;
   height?: number;
 }
 
@@ -14,6 +16,8 @@ interface ParticipatingPizzeriasMapProps {
  */
 export default function ParticipatingPizzeriasMap({
   pizzerias,
+  venueLocation,
+  venueName,
   height = 320,
 }: ParticipatingPizzeriasMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +108,23 @@ export default function ParticipatingPizzeriasMap({
         bounds.extend(position);
       }
 
+      // Venue pin (Molto Benny mascot)
+      if (venueLocation) {
+        const venueMarker = new google.maps.Marker({
+          position: venueLocation,
+          map,
+          title: venueName || 'Venue',
+          clickable: false,
+          icon: {
+            url: '/molto-benny.png',
+            scaledSize: new google.maps.Size(45, 45),
+            anchor: new google.maps.Point(22, 45),
+          },
+        });
+        markersRef.current.push(venueMarker);
+        bounds.extend(venueLocation);
+      }
+
       // Fit bounds — if only one marker, center with zoom 14 instead of
       // fitBounds (which can over-zoom on a single point).
       if (markersRef.current.length === 1) {
@@ -145,7 +166,7 @@ export default function ParticipatingPizzeriasMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validPizzerias]);
+  }, [validPizzerias, venueLocation, venueName]);
 
   // If we have nothing to show on the map, render nothing and let the parent
   // collapse the grid.

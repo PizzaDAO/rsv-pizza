@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download, ChevronDown } from 'lucide-react';
+import { Search, Download, Upload, Package } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { KitStatus } from '../../types';
 
@@ -30,6 +30,8 @@ interface KitFiltersProps {
   countries: string[];
   onExport: () => void;
   exporting?: boolean;
+  onImport?: () => void;
+  onShowKitContents?: () => void;
 }
 
 export function KitFilters({
@@ -42,6 +44,8 @@ export function KitFilters({
   countries,
   onExport,
   exporting,
+  onImport,
+  onShowKitContents,
 }: KitFiltersProps) {
   return (
     <div className="space-y-3">
@@ -90,7 +94,6 @@ export function KitFilters({
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
         </div>
 
         <button
@@ -101,6 +104,26 @@ export function KitFilters({
           <Download size={14} />
           {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
+
+        {onImport && (
+          <button
+            onClick={onImport}
+            className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-sm text-theme-text hover:border-theme-stroke-hover transition-colors"
+          >
+            <Upload size={14} />
+            Import Tracking
+          </button>
+        )}
+
+        {onShowKitContents && (
+          <button
+            onClick={onShowKitContents}
+            className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-sm text-theme-text hover:border-theme-stroke-hover transition-colors"
+          >
+            <Package size={14} />
+            Kit Contents
+          </button>
+        )}
       </div>
     </div>
   );

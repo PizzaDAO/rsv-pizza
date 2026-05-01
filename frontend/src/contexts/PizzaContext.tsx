@@ -92,6 +92,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
     maxGuests: dbParty.max_guests,
+    expectedGuests: dbParty.expected_guests || null,
     hideGuests: dbParty.hide_guests || false,
     requireApproval: dbParty.require_approval || false,
     password: dbParty.password,
@@ -99,6 +100,9 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventImageUrl: dbParty.event_image_url,
     description: dbParty.description,
     address: dbParty.address,
+    latitude: dbParty.latitude || null,
+    longitude: dbParty.longitude || null,
+    country: dbParty.country || null,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || dbParty.co_hosts_public || [],
     selectedPizzerias: dbParty.selected_pizzerias || [],
@@ -123,6 +127,13 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventTags: dbParty.event_tags || [],
     canEdit: dbParty.can_edit || false,
     allowedTabs: dbParty.allowed_tabs,
+    hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],
+    extraGppPhotos: (dbParty.extra_gpp_photos as string[]) || [],
+    lumaUrl: dbParty.luma_url || null,
+    meetupUrl: dbParty.meetup_url || null,
+    eventbriteUrl: dbParty.eventbrite_url || null,
+    externalLinks: dbParty.external_links || [],
+    telegramGroup: dbParty.telegram_group || null,
     guests,
   };
 }
@@ -312,6 +323,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const dbParty = await db.updatePartyBeverages(party.id, beverages);
     if (dbParty) {
       const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
       setParty(updatedParty);
       // Regenerate beverage recommendations with new beverage selection
       if (beverages.length > 0) {
@@ -334,6 +348,9 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const dbParty = await db.updatePartyToppings(party.id, toppings);
     if (dbParty) {
       const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
       setParty(updatedParty);
     }
   };

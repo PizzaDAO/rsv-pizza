@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
@@ -88,6 +88,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -96,6 +97,20 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showTagSubmenu, setShowTagSubmenu] = useState<'add' | 'remove' | null>(null);
   const [customTag, setCustomTag] = useState('');
+  const [showCopyCitiesModal, setShowCopyCitiesModal] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+
+  // Alphabetized city names from the currently-selected events.
+  // Reuses the same extraction logic as the Send Telegram action: strip
+  // the "Global Pizza Party " prefix from event names, fall back to the
+  // customUrl slug, then the raw name.
+  const selectedCitiesSorted = useMemo(() => {
+    const prefix = 'Global Pizza Party ';
+    return events
+      .filter(e => selectedIds.has(e.id))
+      .map(e => e.name.startsWith(prefix) ? e.name.slice(prefix.length) : (e.customUrl || e.name))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [events, selectedIds]);
 
   // Three-state progress filters: includes (must have) and excludes (must NOT have)
   const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
@@ -164,9 +179,14 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     // Country filter (only when showRegion is active)
     if (showRegion && regionFilter !== 'all') {
       result = result.filter((e) => {
-        const country = e.address?.split(',').pop()?.trim() || '';
+        const country = e.country || '';
         return country === regionFilter;
       });
+    }
+
+    // Tag filter
+    if (tagFilter !== 'all') {
+      result = result.filter((e) => e.eventTags?.includes(tagFilter));
     }
 
     result = [...result].sort((a, b) => {
@@ -192,7 +212,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter]);
+
+  const availableTags = useMemo(
+    () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
+    [events]
+  );
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
@@ -228,13 +253,14 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     );
   }
 
-  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all';
+  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all' || tagFilter !== 'all';
 
   return (
     <div className="space-y-3">
-      {/* Search */}
-      <div className="max-w-sm">
-        <IconInput
+      {/* Search + count */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="max-w-sm flex-1">
+          <IconInput
           icon={Search}
           iconSize={14}
           type="text"
@@ -243,6 +269,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           placeholder="Search events, hosts, venues..."
           className="bg-theme-surface border border-theme-stroke rounded-lg pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
         />
+        </div>
+        <div className="text-xs text-theme-text-faint whitespace-nowrap">
+          {filteredEvents.length} of {events.length} events
+        </div>
       </div>
 
       {/* Filters — topping-style pills */}
@@ -271,8 +301,22 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
           >
             <option value="all">Country: All</option>
-            {[...new Set(events.map(e => e.address?.split(',').pop()?.trim()).filter(Boolean))].sort().map((c) => (
+            {[...new Set(events.map(e => e.country).filter(Boolean))].sort().map((c) => (
               <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Tag filter */}
+        {availableTags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
+          >
+            <option value="all">Tag: All</option>
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>Tag: {tag}</option>
             ))}
           </select>
         )}
@@ -284,6 +328,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setProgressIncludes([]);
               setProgressExcludes([]);
               setRegionFilter('all');
+              setTagFilter('all');
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
@@ -292,9 +337,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         )}
       </div>
 
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+      {/* Bulk action bar — always visible */}
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+        {selectedIds.size > 0 ? (
+          <>
           <span className="text-sm text-theme-text-secondary font-medium">
             {selectedIds.size} selected
           </span>
@@ -356,6 +402,15 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   >
                     Send Telegram
                   </button>
+                  <button
+                    onClick={() => {
+                      setShowActionDropdown(false);
+                      setShowCopyCitiesModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                  >
+                    Copy Cities
+                  </button>
 
                   {/* Divider */}
                   <div className="border-t border-theme-stroke my-1" />
@@ -370,7 +425,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     </button>
                     {showTagSubmenu === 'add' && (
                       <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
-                        {['swc', 'Global Pizza Party'].map((tag) => (
+                        {['review', 'swc', 'Global Pizza Party'].map((tag) => (
                           <button
                             key={tag}
                             onClick={async () => {
@@ -492,8 +547,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           >
             Deselect all
           </button>
-        </div>
-      )}
+          </>
+        ) : (
+          <span className="text-theme-text-faint text-sm">No events selected</span>
+        )}
+      </div>
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && createPortal(
@@ -521,6 +579,84 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                 className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
               >
                 Delete {selectedIds.size} Event{selectedIds.size > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Copy Cities modal */}
+      {showCopyCitiesModal && createPortal(
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowCopyCitiesModal(false)}
+        >
+          <div
+            className="bg-theme-header border border-theme-stroke rounded-2xl p-5 max-w-md w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-theme-text">
+                Copy Cities ({selectedCitiesSorted.length} selected)
+              </h3>
+              <button
+                onClick={() => setShowCopyCitiesModal(false)}
+                className="text-theme-text-faint hover:text-theme-text transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <textarea
+              readOnly
+              value={selectedCitiesSorted.join('\n')}
+              onFocus={e => e.currentTarget.select()}
+              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text font-mono resize-none focus:outline-none focus:border-theme-stroke-hover"
+              style={{ maxHeight: '40vh', minHeight: '8rem', height: `${Math.min(Math.max(selectedCitiesSorted.length, 4), 16) * 1.5}rem`, overflowY: 'auto' }}
+            />
+
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowCopyCitiesModal(false)}
+                className="px-4 py-2 text-sm text-theme-text-muted hover:text-theme-text transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(selectedCitiesSorted.join('\n'));
+                    setCopiedToClipboard(true);
+                    setTimeout(() => setCopiedToClipboard(false), 2000);
+                  } catch (err) {
+                    console.error('Copy to clipboard failed', err);
+                  }
+                }}
+                disabled={selectedCitiesSorted.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: copiedToClipboard ? '#39d98a' : '#ff393a',
+                }}
+                onMouseEnter={e => {
+                  if (!copiedToClipboard && selectedCitiesSorted.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#ff5a5b';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!copiedToClipboard) {
+                    e.currentTarget.style.backgroundColor = '#ff393a';
+                  }
+                }}
+              >
+                {copiedToClipboard ? (
+                  <>
+                    <Check size={14} /> Copied!
+                  </>
+                ) : (
+                  'Copy to Clipboard'
+                )}
               </button>
             </div>
           </div>
@@ -596,10 +732,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         </table>
       </div>
 
-      {/* Count */}
-      <div className="text-xs text-theme-text-faint text-right">
-        {filteredEvents.length} of {events.length} events
-      </div>
     </div>
   );
 }

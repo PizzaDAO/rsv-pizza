@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Package, MapPin, Truck, User, Calendar, FileText, ExternalLink } from 'lucide-react';
+import { X, Package, MapPin, Truck, User, Calendar, FileText, ExternalLink, Gift, Star, Check } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
-import { GPP_REGIONS } from '../../types';
+import { GPP_REGIONS, KIT_TIERS } from '../../types';
+import { detectCarrier, detectTrackingUrl } from '../../lib/trackingUtils';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-700',
@@ -101,7 +102,27 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
               <p className="text-sm text-theme-text">{kit.hostName || '--'}</p>
               {kit.hostEmail && <p className="text-xs text-theme-text-faint">{kit.hostEmail}</p>}
             </div>
+            <div>
+              <p className="text-xs text-theme-text-muted mb-1">Event Approved</p>
+              <p className={`text-sm font-medium ${kit.underbossApproved ? 'text-green-500' : 'text-yellow-500'}`}>
+                {kit.underbossApproved ? 'Yes' : 'Pending'}
+              </p>
+            </div>
           </div>
+
+          {/* Event Location */}
+          {(kit.eventVenue || kit.eventAddress) && (
+            <div className="bg-theme-surface rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin size={16} className="text-theme-text-muted" />
+                <p className="text-sm font-medium text-theme-text">Event Location</p>
+              </div>
+              <div className="text-sm text-theme-text space-y-0.5">
+                {kit.eventVenue && <p className="font-medium">{kit.eventVenue}</p>}
+                {kit.eventAddress && <p className="text-theme-text-muted">{kit.eventAddress}</p>}
+              </div>
+            </div>
+          )}
 
           {/* Shipping address */}
           <div className="bg-theme-surface rounded-xl p-4">
@@ -159,13 +180,48 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
               </div>
             </div>
 
+            {/* Kit Contents */}
+            {(() => {
+              const tierInfo = KIT_TIERS.find((t) => t.id === allocatedTier);
+              const tierIcon = allocatedTier === 'deluxe' ? <Star size={16} className="text-theme-text-muted" /> : allocatedTier === 'large' ? <Package size={16} className="text-theme-text-muted" /> : <Gift size={16} className="text-theme-text-muted" />;
+              return tierInfo ? (
+                <div className="bg-theme-surface rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {tierIcon}
+                    <p className="text-sm font-medium text-theme-text">Kit Contents ({tierInfo.name})</p>
+                  </div>
+                  <p className="text-xs text-theme-text-muted mb-3">{tierInfo.description}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {tierInfo.contents.map((item, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center gap-1 text-xs bg-theme-surface-hover text-theme-text-secondary px-2 py-0.5 rounded"
+                      >
+                        <Check size={10} className="text-[#ff393a]" />
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             <div>
               <IconInput
                 icon={Truck}
                 placeholder="Tracking number"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber((e.target as HTMLInputElement).value)}
+                onBlur={() => {
+                  if (trackingNumber && !trackingUrl) {
+                    const detected = detectTrackingUrl(trackingNumber);
+                    if (detected) setTrackingUrl(detected);
+                  }
+                }}
               />
+              {trackingNumber && detectCarrier(trackingNumber) && (
+                <p className="text-xs text-theme-text-muted mt-1 ml-1">Detected: {detectCarrier(trackingNumber)}</p>
+              )}
             </div>
 
             <div>

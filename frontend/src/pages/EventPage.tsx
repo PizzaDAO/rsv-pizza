@@ -30,7 +30,9 @@ import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
+import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
+import { CheckInButton } from '../components/CheckInButton';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -59,6 +61,7 @@ export function EventPage() {
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [canEditAsCoHost, setCanEditAsCoHost] = useState(false);
+  const [isHostUser, setIsHostUser] = useState(false);
   const [showTweetInput, setShowTweetInput] = useState(false);
   const [tweetUrl, setTweetUrl] = useState('');
   const [tweetError, setTweetError] = useState<string | null>(null);
@@ -100,7 +103,15 @@ export function EventPage() {
   useEffect(() => {
     async function loadEvent() {
       if (slug) {
-        const foundEvent = await getEventBySlug(slug);
+        const result = await getEventBySlug(slug);
+
+        // Handle redirect from old slug alias
+        if (result && 'redirect' in result) {
+          navigate(`/${result.slug}`, { replace: true });
+          return;
+        }
+
+        const foundEvent = result;
         if (foundEvent) {
           setEvent(foundEvent);
           setCanEditAsCoHost(false);
@@ -137,6 +148,9 @@ export function EventPage() {
               console.warn('Could not check host status:', e);
             }
           }
+
+          // Store host status for check-in button
+          setIsHostUser(isHost);
 
           // Skip password for hosts and already-RSVP'd guests
           if (isHost || hasRSVPd) {
@@ -467,6 +481,25 @@ export function EventPage() {
 
   const isFutureEvent = eventDate ? eventDate.getTime() > Date.now() : false;
 
+  // Check-in: visible 1hr before event start through 1hr after event end (or +4hr if no duration)
+  const isEventDay = (() => {
+    if (!eventDate) return false;
+    const now = Date.now();
+    const startWindow = eventDate.getTime() - 60 * 60 * 1000; // 1hr before
+    const durationMs = (event?.duration || 4) * 3600000;
+    const endWindow = eventDate.getTime() + durationMs + 60 * 60 * 1000; // 1hr after end
+    return now >= startWindow && now <= endWindow;
+  })();
+
+  // Show check-in: event day + (RSVPd guest or host)
+  const showCheckIn = isEventDay && user && (userHasRSVPd || isHostUser);
+
+  const handleCheckIn = (checkedInAt: string) => {
+    setExistingGuestData((prev) =>
+      prev ? { ...prev, checkedInAt } : prev
+    );
+  };
+
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
   const googleMapsUrl = event.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
@@ -725,6 +758,8 @@ export function EventPage() {
                     <VenueMap
                       address={event.address}
                       venueName={event.venueName}
+                      latitude={event.latitude}
+                      longitude={event.longitude}
                       className="w-full h-full"
                     />
                   </div>
@@ -837,22 +872,49 @@ export function EventPage() {
                       </a>
                     )}
 
-                    {/* RSVP Button - Desktop */}
+                    {/* RSVP Button (+ Check In) - Desktop */}
                     <div className="pt-1">
-                      <button
-                        ref={mobileRsvpRef}
-                        data-testid="rsvp-button-desktop"
-                        onClick={(e) => {
-                          if (isGPP) {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                          }
-                          handleRSVP();
-                        }}
-                        className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
-                      >
-                        {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-                      </button>
+                      {showCheckIn ? (
+                        <div className="flex gap-2">
+                          <button
+                            ref={mobileRsvpRef}
+                            data-testid="rsvp-button-desktop"
+                            onClick={(e) => {
+                              if (isGPP) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                              }
+                              handleRSVP();
+                            }}
+                            className="flex-1 btn-primary flex items-center justify-center gap-2 text-base py-3"
+                          >
+                            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                          </button>
+                          <CheckInButton
+                            inviteCode={event.customUrl || event.inviteCode}
+                            guestId={existingGuestData?.id || ''}
+                            checkedInAt={existingGuestData?.checkedInAt || null}
+                            isHost={isHostUser}
+                            guestName={existingGuestData?.name || user?.name || ''}
+                            onCheckIn={handleCheckIn}
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          ref={mobileRsvpRef}
+                          data-testid="rsvp-button-desktop"
+                          onClick={(e) => {
+                            if (isGPP) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                            }
+                            handleRSVP();
+                          }}
+                          className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
+                        >
+                          {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -864,6 +926,8 @@ export function EventPage() {
                       <VenueMap
                         address={event.address}
                         venueName={event.venueName}
+                        latitude={event.latitude}
+                        longitude={event.longitude}
                         className="w-full h-full"
                       />
                     </div>
@@ -919,21 +983,47 @@ export function EventPage() {
                   </a>
                 )}
 
-                {/* RSVP Button - Mobile only (desktop version is inside the map layout above) */}
+                {/* RSVP Button (+ Check In) - Mobile only */}
                 <div className="pt-4 md:hidden">
-                  <button
-                    data-testid="rsvp-button"
-                    onClick={(e) => {
-                      if (isGPP) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                      }
-                      handleRSVP();
-                    }}
-                    className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
-                  >
-                    {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-                  </button>
+                  {showCheckIn ? (
+                    <div className="flex gap-2 w-[85%] mx-auto">
+                      <button
+                        data-testid="rsvp-button"
+                        onClick={(e) => {
+                          if (isGPP) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                          }
+                          handleRSVP();
+                        }}
+                        className="flex-1 btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                      >
+                        {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                      </button>
+                      <CheckInButton
+                        inviteCode={event.customUrl || event.inviteCode}
+                        guestId={existingGuestData?.id || ''}
+                        checkedInAt={existingGuestData?.checkedInAt || null}
+                        isHost={isHostUser}
+                        guestName={existingGuestData?.name || user?.name || ''}
+                        onCheckIn={handleCheckIn}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      data-testid="rsvp-button"
+                      onClick={(e) => {
+                        if (isGPP) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }
+                        handleRSVP();
+                      }}
+                      className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
+                    >
+                      {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                    </button>
+                  )}
                 </div>
                 {event.rsvpClosedAt && (
                   <p className="text-theme-text-muted text-sm">
@@ -962,63 +1052,110 @@ export function EventPage() {
                   </div>
                 )}
 
-                {/* Description */}
-                {event.description && (
-                  <div className="border-t border-theme-stroke pt-4 mt-4">
+                {/* Description + Sponsor Blurbs */}
+                {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
+                  <div className="border-y border-theme-stroke/50 py-4 mt-4">
                     <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
-                        components={{
-                          a: ({ node, ...props }) => (
+                      {event.description && (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a
+                                {...props}
+                                className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  if (slug && props.href) {
+                                    trackLinkClick(slug, props.href, 'description', typeof props.children === 'string' ? props.children : undefined);
+                                  }
+                                }}
+                              />
+                            ),
+                            p: ({ node, ...props }) => (
+                              <p {...props} className="mb-3 last:mb-0" />
+                            ),
+                            ul: ({ node, ...props }) => (
+                              <ul {...props} className="list-disc list-inside mb-3 space-y-1" />
+                            ),
+                            ol: ({ node, ...props }) => (
+                              <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
+                            ),
+                            h1: ({ node, ...props }) => (
+                              <h1 {...props} className="text-xl font-bold text-theme-text mt-4 mb-2 first:mt-0" />
+                            ),
+                            h2: ({ node, ...props }) => (
+                              <h2 {...props} className="text-lg font-bold text-theme-text mt-4 mb-2 first:mt-0" />
+                            ),
+                            h3: ({ node, ...props }) => (
+                              <h3 {...props} className="text-base font-semibold text-theme-text mt-3 mb-2 first:mt-0" />
+                            ),
+                            strong: ({ node, ...props }) => (
+                              <strong {...props} className="font-semibold text-theme-text" />
+                            ),
+                            em: ({ node, ...props }) => (
+                              <em {...props} className="italic" />
+                            ),
+                            blockquote: ({ node, ...props }) => (
+                              <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
+                            ),
+                            code: ({ node, inline, ...props }) =>
+                              inline ? (
+                                <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
+                              ) : (
+                                <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
+                              ),
+                            img: ({ node, ...props }) => (
+                              <img
+                                {...props}
+                                className="rounded-lg max-w-full h-auto my-3"
+                                loading="lazy"
+                                style={{ maxHeight: '400px', objectFit: 'contain' }}
+                              />
+                            ),
+                          }}
+                        >
+                          {event.description}
+                        </ReactMarkdown>
+                      )}
+                      <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
+                        {/* PizzaDAO — always first */}
+                        <p className="mb-2 last:mb-0 text-base">
+                          <strong>
                             <a
-                              {...props}
+                              href="https://pizzadao.org"
                               className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={() => {
-                                if (slug && props.href) {
-                                  trackLinkClick(slug, props.href, 'description', typeof props.children === 'string' ? props.children : undefined);
-                                }
-                              }}
-                            />
-                          ),
-                          p: ({ node, ...props }) => (
-                            <p {...props} className="mb-3 last:mb-0" />
-                          ),
-                          ul: ({ node, ...props }) => (
-                            <ul {...props} className="list-disc list-inside mb-3 space-y-1" />
-                          ),
-                          ol: ({ node, ...props }) => (
-                            <ol {...props} className="list-decimal list-inside mb-3 space-y-1" />
-                          ),
-                          h1: ({ node, ...props }) => (
-                            <h1 {...props} className="text-xl font-bold text-theme-text mt-4 mb-2 first:mt-0" />
-                          ),
-                          h2: ({ node, ...props }) => (
-                            <h2 {...props} className="text-lg font-bold text-theme-text mt-4 mb-2 first:mt-0" />
-                          ),
-                          h3: ({ node, ...props }) => (
-                            <h3 {...props} className="text-base font-semibold text-theme-text mt-3 mb-2 first:mt-0" />
-                          ),
-                          strong: ({ node, ...props }) => (
-                            <strong {...props} className="font-semibold text-theme-text" />
-                          ),
-                          em: ({ node, ...props }) => (
-                            <em {...props} className="italic" />
-                          ),
-                          blockquote: ({ node, ...props }) => (
-                            <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
-                          ),
-                          code: ({ node, inline, ...props }) =>
-                            inline ? (
-                              <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
-                            ) : (
-                              <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
-                            ),
-                        }}
-                      >
-                        {event.description}
-                      </ReactMarkdown>
+                            >
+                              PizzaDAO
+                            </a>
+                          </strong>{' '}
+                          is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.
+                        </p>
+                        {event.sponsors && event.sponsors
+                          .filter(s => s.brandDescription)
+                          .map(sponsor => (
+                            <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
+                              <strong>
+                                {sponsor.website ? (
+                                  <a
+                                    href={sponsor.website}
+                                    className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {sponsor.name}
+                                  </a>
+                                ) : (
+                                  sponsor.name
+                                )}
+                              </strong>{' '}
+                              {sponsor.brandDescription}
+                            </p>
+                          ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1029,12 +1166,14 @@ export function EventPage() {
                     {event.venueName && (
                       <p className="text-theme-text font-medium mb-1">{event.venueName}</p>
                     )}
-                    <p className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3`}>{event.address}</p>
+                    <a href={googleMapsUrl!} target="_blank" rel="noopener noreferrer" className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3 block hover:underline`}>{event.address}</a>
                     {/* Interactive venue map */}
                     <div className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative">
                       <VenueMap
                         address={event.address}
                         venueName={event.venueName}
+                        latitude={event.latitude}
+                        longitude={event.longitude}
                         className="w-full h-full"
                       />
                     </div>
@@ -1080,6 +1219,15 @@ export function EventPage() {
                     pizzerias={event.selectedPizzerias}
                     venueAddress={event.address}
                     eventSlug={slug}
+                  />
+                )}
+
+                {/* Last Year's Party Photos — GPP events only */}
+                {event.eventType === 'gpp' && event.customUrl && (
+                  <LastYearPhotos
+                    customUrl={event.customUrl}
+                    hiddenGppPhotos={event.hiddenGppPhotos}
+                    extraGppPhotos={event.extraGppPhotos}
                   />
                 )}
 
@@ -1139,18 +1287,43 @@ export function EventPage() {
       {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}
       {showStickyRsvp && (
         <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-theme-card/95 backdrop-blur-sm border-b border-theme-stroke px-4 py-2.5">
-          <button
-            onClick={(e) => {
-              if (isGPP) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-              }
-              handleRSVP();
-            }}
-            className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
-          >
-            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
-          </button>
+          {showCheckIn ? (
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => {
+                  if (isGPP) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                  }
+                  handleRSVP();
+                }}
+                className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+              >
+                {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+              </button>
+              <CheckInButton
+                inviteCode={event!.customUrl || event!.inviteCode}
+                guestId={existingGuestData?.id || ''}
+                checkedInAt={existingGuestData?.checkedInAt || null}
+                isHost={isHostUser}
+                guestName={existingGuestData?.name || user?.name || ''}
+                onCheckIn={handleCheckIn}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                if (isGPP) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                }
+                handleRSVP();
+              }}
+              className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
+            >
+              {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+            </button>
+          )}
         </div>
       )}
 

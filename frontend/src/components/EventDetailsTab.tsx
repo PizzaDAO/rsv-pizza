@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2 } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
@@ -13,6 +13,7 @@ import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
+import { DescriptionEditor } from './DescriptionEditor';
 
 export const EventDetailsTab: React.FC = () => {
   const { party } = usePizza();
@@ -43,6 +44,7 @@ export const EventDetailsTab: React.FC = () => {
   const [shareTweetText, setShareTweetText] = useState('');
   const [nftEnabled, setNftEnabled] = useState(false);
   const [nftChain, setNftChain] = useState<string>('base');
+  const [telegramGroup, setTelegramGroup] = useState('');
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
@@ -57,6 +59,11 @@ export const EventDetailsTab: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [toast, setToast] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+
+  // Pending lat/lng from LocationAutocomplete (fires before onPlaceSelected)
+  const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  // Pending country from LocationAutocomplete (fires before onPlaceSelected)
+  const pendingCountryRef = useRef<string | null>(null);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
@@ -121,6 +128,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyShareTweetText = party.shareTweetText || '';
       const partyNftEnabled = party.nftEnabled || false;
       const partyNftChain = party.nftChain || 'base';
+      const partyTelegramGroup = party.telegramGroup || '';
 
       // Set form values
       setName(partyName);
@@ -145,6 +153,7 @@ export const EventDetailsTab: React.FC = () => {
       setShareTweetText(partyShareTweetText);
       setNftEnabled(partyNftEnabled);
       setNftChain(partyNftChain);
+      setTelegramGroup(partyTelegramGroup);
 
       // Store original values
       setOriginalValues({
@@ -487,9 +496,16 @@ export const EventDetailsTab: React.FC = () => {
 
   // Save location
   const saveLocation = async (newAddress: string, newVenueName: string | null) => {
+    const coords = pendingCoordsRef.current;
+    pendingCoordsRef.current = null;
+    const country = pendingCountryRef.current;
+    pendingCountryRef.current = null;
     const success = await saveField('location', {
       address: newAddress.trim() || null,
       venue_name: newVenueName || null,
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
+      country: country || null,
     });
     if (success) {
       setOriginalValues((prev: any) => ({
@@ -570,24 +586,42 @@ export const EventDetailsTab: React.FC = () => {
         </div>
 
         {/* Address */}
-        <LocationAutocomplete
-          value={address}
-          onChange={(newAddress) => {
-            setAddress(newAddress);
-          }}
-          onVenueNameChange={(newVenueName) => {
-            setVenueName(newVenueName);
-          }}
-          onTimezoneChange={setTimezone}
-          onPlaceSelected={(newAddress, newVenueName) => {
-            // Save when a place is selected from autocomplete
-            saveLocation(newAddress, newVenueName);
-          }}
-          placeholder="Add Event Location"
-        />
-        {venueName && (
-          <p className="text-xs text-white/40 -mt-1 ml-1">Venue: {venueName}</p>
-        )}
+        <div className="relative">
+          <LocationAutocomplete
+            value={venueName ? `${venueName}, ${address}` : address}
+            onChange={(newAddress) => {
+              setVenueName(null);
+              setAddress(newAddress);
+            }}
+            onVenueNameChange={(newVenueName) => {
+              setVenueName(newVenueName);
+            }}
+            onTimezoneChange={setTimezone}
+            onLocationSelected={(loc) => {
+              pendingCoordsRef.current = loc;
+            }}
+            onCitySelected={(cityData) => {
+              pendingCountryRef.current = cityData.country || null;
+            }}
+            onPlaceSelected={(newAddress, newVenueName) => {
+              saveLocation(newAddress, newVenueName);
+            }}
+            placeholder="Add Event Location"
+          />
+          {venueName && (
+            <button
+              type="button"
+              onClick={() => {
+                setVenueName(null);
+                saveLocation(address, null);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10"
+              title="Remove venue name"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
         {/* Change Date Button */}
         <button
@@ -814,6 +848,17 @@ export const EventDetailsTab: React.FC = () => {
                 }}
               />
 
+              <IconInput
+                icon={MessageCircle}
+                type="url"
+                value={telegramGroup}
+                onChange={(e) => setTelegramGroup(e.target.value)}
+                onBlur={() => {
+                  saveOptions({ telegram_group: telegramGroup.trim() || null });
+                }}
+                placeholder="Telegram group link (e.g. https://t.me/+abc123)"
+              />
+
               {/* NFT Settings — hidden for GPP events (managed from /admin) */}
               {party?.eventType !== 'gpp' && (
                 <>
@@ -974,9 +1019,10 @@ export const EventDetailsTab: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  disabled={party?.eventType === 'gpp'}
-                  onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}
-                  className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] ${party?.eventType === 'gpp' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  min={startDate || undefined}
+                  max={party?.eventType === 'gpp' ? '2026-05-23' : undefined}
+                  onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
@@ -1125,40 +1171,18 @@ export const EventDetailsTab: React.FC = () => {
       )}
 
       {/* Description Modal */}
-      {showDescriptionModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDescriptionModal(false)}>
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">Description</h2>
-
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your event..."
-              className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
-              autoFocus
-            />
-
-            <button
-              type="button"
-              onClick={async () => {
-                await saveDescription();
-                setShowDescriptionModal(false);
-              }}
-              disabled={savingField === 'description'}
-              className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-            >
-              {savingField === 'description' ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Done'
-              )}
-            </button>
-          </div>
-        </div>,
-        document.body
+      {showDescriptionModal && (
+        <DescriptionEditor
+          value={description}
+          onChange={setDescription}
+          onSave={async () => {
+            await saveDescription();
+            setShowDescriptionModal(false);
+          }}
+          onClose={() => setShowDescriptionModal(false)}
+          saving={savingField === 'description'}
+          partyId={party!.id}
+        />
       )}
 
     </div>

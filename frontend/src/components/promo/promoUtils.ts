@@ -99,6 +99,19 @@ export function getCityFromAddress(party: Party): string {
   return '';
 }
 
+/**
+ * Get Instagram @handles for partner co-hosts.
+ * Filters co-hosts where isPartner is true and instagram is set,
+ * normalizes handles (strips leading @, re-adds it).
+ */
+export function getPartnerInstagramTags(coHosts: any[] | undefined | null): string {
+  if (!coHosts || coHosts.length === 0) return '';
+  const handles = coHosts
+    .filter((ch: any) => ch.isPartner && ch.instagram)
+    .map((ch: any) => `@${ch.instagram.replace(/^@/, '')}`);
+  return handles.join(' ');
+}
+
 // ---------- Content Generators ----------
 
 export type SocialPlatform = 'twitter' | 'instagram' | 'facebook' | 'linkedin';
@@ -210,6 +223,12 @@ export function generateSocialPost(party: Party, platform: SocialPlatform): stri
       if (location !== 'TBD') lines.push(`Where: ${location}`);
       lines.push('');
       lines.push(`RSVP link in bio or visit ${rsvpUrl}`);
+      // Append partner Instagram tags
+      const partnerTags = getPartnerInstagramTags(party.coHosts);
+      if (partnerTags) {
+        lines.push('');
+        lines.push(partnerTags);
+      }
       lines.push('');
       lines.push(hashtags.join(' '));
       return lines.join('\n');

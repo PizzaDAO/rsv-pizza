@@ -8,6 +8,8 @@ const PLATFORMS = {
   twitter: { name: 'X (Twitter)', color: 'bg-blue-500', icon: 'X' },
   farcaster: { name: 'Farcaster', color: 'bg-purple-500', icon: 'F' },
   instagram: { name: 'Instagram', color: 'bg-pink-500', icon: 'IG' },
+  facebook: { name: 'Facebook', color: 'bg-blue-600', icon: 'FB' },
+  linkedin: { name: 'LinkedIn', color: 'bg-sky-700', icon: 'LI' },
 };
 
 interface SocialPostsListProps {
@@ -156,6 +158,10 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
       setNewPlatform('farcaster');
     } else if (url.includes('instagram.com')) {
       setNewPlatform('instagram');
+    } else if (url.includes('facebook.com') || url.includes('fb.com') || url.includes('fb.watch')) {
+      setNewPlatform('facebook');
+    } else if (url.includes('linkedin.com')) {
+      setNewPlatform('linkedin');
     }
   };
 

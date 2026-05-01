@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle } from 'lucide-react';
-import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser } from '../../lib/api';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
+import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
+import { proxyAvatarToStorage } from '../../lib/supabase';
 import type { SponsorUser } from '../../types';
 import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
@@ -18,6 +19,7 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -61,6 +63,11 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
     setSyncMessage(null);
 
     try {
+      // Proxy external avatar to storage
+      const proxiedAvatarUrl = data.coHostAvatarUrl
+        ? await proxyAvatarToStorage(data.coHostAvatarUrl)
+        : undefined;
+
       const payload = {
         email: data.email,
         tag: data.tag,
@@ -70,13 +77,15 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         coHostWebsite: data.website || undefined,
         coHostTwitter: data.brandTwitter || undefined,
         coHostInstagram: data.brandInstagram || undefined,
-        coHostAvatarUrl: data.coHostAvatarUrl || undefined,
+        coHostAvatarUrl: proxiedAvatarUrl,
         coHostLogoUrl: data.logoUrl || undefined,
         autoCoHost: data.autoCoHost,
         autoSponsor: data.autoSponsor,
         coHostShowOnEvent: data.coHostShowOnEvent,
         coHostCanEdit: data.coHostCanEdit,
         coHostAllowedTabs: data.coHostAllowedTabs,
+        category: data.category || undefined,
+        brandDescription: data.brandDescription || undefined,
       };
 
       let newSyncMessage: string | null = null;
@@ -107,6 +116,35 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
       throw new Error(err.message || 'Failed to save partner');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newPartners = [...partners];
+    const draggedItem = newPartners[draggedIndex];
+    newPartners.splice(draggedIndex, 1);
+    newPartners.splice(index, 0, draggedItem);
+
+    setPartners(newPartners);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    // Persist new order to backend
+    try {
+      await reorderSponsorUsers(partners.map(p => p.id));
+    } catch (err) {
+      console.error('Failed to save partner order:', err);
+      // Reload to get correct order from server
+      await loadPartners();
     }
   };
 
@@ -164,16 +202,25 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
         </p>
       ) : (
         <div className="space-y-2">
-          {partners.map((partner) => (
+          {partners.map((partner, index) => (
             <div
               key={partner.id}
-              className={`p-3 rounded-xl border transition-colors ${
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              className={`p-3 rounded-xl border transition-colors cursor-move ${
                 partner.isActive
                   ? 'bg-theme-surface border-theme-stroke'
                   : 'bg-theme-surface/50 border-theme-stroke/50 opacity-60'
-              }`}
+              } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
             >
               <div className="flex items-start gap-3">
+                {/* Drag handle */}
+                <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
+                  <GripVertical size={16} />
+                </div>
+
                 {/* Avatar */}
                 {partner.coHostAvatarUrl ? (
                   <img

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -111,6 +111,8 @@ export interface UpdatePartyData {
   duration?: number | null;
   timezone?: string | null;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName?: string | null;
   // Venue tracking fields
   venueStatus?: VenueStatus | null;
@@ -154,6 +156,12 @@ export interface UpdatePartyData {
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
+  lumaUrl?: string | null;
+  meetupUrl?: string | null;
+  eventbriteUrl?: string | null;
+  externalLinks?: Array<{label: string; url: string}>;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -194,6 +202,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       duration: data.duration,
       timezone: data.timezone,
       address: data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
       venueName: data.venueName,
       // Venue tracking fields
       venueStatus: data.venueStatus,
@@ -237,6 +247,12 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       pinnedApps: data.pinnedApps,
       region: data.region,
       flyerGeneratedAt: data.flyerGeneratedAt,
+      hiddenGppPhotos: data.hiddenGppPhotos,
+      extraGppPhotos: data.extraGppPhotos,
+      lumaUrl: data.lumaUrl,
+      meetupUrl: data.meetupUrl,
+      eventbriteUrl: data.eventbriteUrl,
+      externalLinks: data.externalLinks,
     },
   });
 }
@@ -285,6 +301,28 @@ export async function promoteGuestApi(partyId: string, guestId: string) {
   });
 }
 
+// Bulk CSV invites (Promo app → POST /api/v1/parties/:partyId/guests/bulk-invite)
+export interface BulkInviteResult {
+  sent: string[];
+  failed: Array<{ email: string; reason: string }>;
+  skipped: Array<{ email: string; reason: string }>;
+  createdGuestIds: string[];
+}
+
+export async function bulkInviteGuests(
+  partyId: string,
+  guests: Array<{ name: string; email: string }>,
+  customMessage?: string
+): Promise<BulkInviteResult> {
+  return apiRequest<BulkInviteResult>(
+    `/api/v1/parties/${partyId}/guests/bulk-invite`,
+    {
+      method: 'POST',
+      body: { guests, customMessage },
+    }
+  );
+}
+
 // Public RSVP API (no auth required)
 export async function submitRsvpApi(
   inviteCode: string,
@@ -325,6 +363,15 @@ export interface HostProfile {
 }
 
 // Public event data type
+export interface PublicEventSponsor {
+  id: string;
+  name: string;
+  website: string | null;
+  brandDescription: string | null;
+  logoUrl: string | null;
+  brandTwitter: string | null;
+}
+
 export interface PublicEvent {
   id: string;
   name: string;
@@ -337,6 +384,8 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
@@ -364,19 +413,32 @@ export interface PublicEvent {
   photoModeration?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
+  hiddenGppPhotos?: string[];
+  extraGppPhotos?: string[];
+  telegramGroup?: string | null;
+  sponsors?: PublicEventSponsor[];
 }
 
 // Public Event API (no auth required)
-export async function getEventBySlug(slug: string): Promise<PublicEvent | null> {
+export async function getEventBySlug(slug: string): Promise<PublicEvent | { redirect: true; slug: string } | null> {
   try {
-    const response = await apiRequest<{ event: PublicEvent }>(
-      `/api/events/${slug}`,
-      {
-        method: 'GET',
-        requireAuth: false,
-      }
-    );
-    return response.event;
+    const response = await fetch(`${API_URL}/api/events/${slug}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const data = await response.json();
+
+    // Handle redirect response from slug aliases (301)
+    if (data.redirect) {
+      return { redirect: true, slug: data.slug };
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return data.event || null;
   } catch (error) {
     console.error('Error fetching event:', error);
     return null;
@@ -653,9 +715,7 @@ export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; d
   }
 }
 
-// ============================================
 // Sponsor CRM API functions
-// ============================================
 
 export interface CreateSponsorData {
   name: string;
@@ -676,6 +736,7 @@ export interface CreateSponsorData {
   logoUrl?: string;
   notes?: string;
   lastContactedAt?: string | null;
+  category?: string;
 }
 
 export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
@@ -730,9 +791,7 @@ export async function reorderSponsors(
   }
 }
 
-// ============================================
 // Performer/Music API functions
-// ============================================
 
 export interface CreatePerformerData {
   name: string;
@@ -945,9 +1004,37 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
   }
 }
 
-// ============================================
+// Reorder sponsors for a party (host)
+export async function reorderSponsors(
+  partyId: string,
+  sponsorIds: string[]
+): Promise<{ sponsors: Sponsor[] }> {
+  return apiRequest<{ sponsors: Sponsor[] }>(`/api/parties/${partyId}/sponsors/reorder`, {
+    method: 'PATCH',
+    body: { sponsorIds },
+    requireAuth: true,
+  });
+}
+
+// Unified sponsors (event + underboss partners)
+export async function getUnifiedSponsors(partyId: string): Promise<{ partners: UnifiedPartner[] }> {
+  return apiRequest<{ partners: UnifiedPartner[] }>(`/api/parties/${partyId}/sponsors/unified`);
+}
+
+export async function ensureUnderbossSponsors(
+  partyId: string,
+  sponsorUserIds: string[]
+): Promise<{ createdSponsorIds: string[] }> {
+  return apiRequest<{ createdSponsorIds: string[] }>(
+    `/api/parties/${partyId}/sponsors/ensure-from-underboss`,
+    {
+      method: 'POST',
+      body: { sponsorUserIds },
+    }
+  );
+}
+
 // Partner Intake Form API functions
-// ============================================
 
 export interface PartnerIntakeData {
   name?: string;
@@ -1066,9 +1153,7 @@ export async function updateFundraisingGoal(
   }
 }
 
-// ============================================
 // Venue API functions
-// ============================================
 
 export interface VenueCreateData {
   name: string;
@@ -1253,9 +1338,7 @@ export async function reorderPerformers(
   }
 }
 
-// =====================
 // Report API functions
-// =====================
 
 // Get full report data (host only)
 export async function getReport(partyId: string): Promise<{ report: EventReport } | null> {
@@ -1522,9 +1605,7 @@ export async function getLinkClickStats(partyId: string): Promise<LinkClickStats
   }
 }
 
-// ============================================
 // Staff API functions (host only)
-// ============================================
 
 export interface StaffListResponse {
   staff: Staff[];
@@ -1645,9 +1726,7 @@ export async function deleteStaff(partyId: string, staffId: string): Promise<boo
   }
 }
 
-// ============================================
 // Display API functions
-// ============================================
 
 export interface CreateDisplayData {
   name: string;
@@ -1786,9 +1865,7 @@ export async function getDisplayPhotos(
   }
 }
 
-// ============================================
 // Raffle API Functions
-// ============================================
 
 export async function getRaffles(partyId: string): Promise<{ raffles: Raffle[] } | null> {
   try {
@@ -1970,7 +2047,6 @@ export async function unclaimRafflePrize(
 }
 
 // Budget API functions
-// ============================================
 
 // Get budget overview and items
 export async function getBudget(partyId: string): Promise<BudgetOverview | null> {
@@ -2087,7 +2163,6 @@ export async function toggleBudgetItemStatus(
 }
 
 // Party Kit API functions
-// ============================================
 
 export interface KitRequestData {
   requestedTier?: KitTier;
@@ -2169,9 +2244,7 @@ export async function cancelKitRequest(partyId: string): Promise<boolean> {
   }
 }
 
-// ============================================
 // Checklist API functions
-// ============================================
 
 // Get checklist items + auto-complete states
 export async function getChecklist(partyId: string): Promise<ChecklistData | null> {
@@ -2270,13 +2343,9 @@ export async function toggleChecklistItem(
   }
 }
 
-// ============================================
 // Underboss Dashboard API
-// ============================================
 
-// ============================================
 // Admin Management API
-// ============================================
 
 export async function fetchAdminMe(): Promise<{ isAdmin: boolean; role?: string; email?: string; name?: string; id?: string }> {
   return apiRequest('/api/admin/me');
@@ -2299,9 +2368,7 @@ export async function removeAdmin(id: string): Promise<void> {
   await apiRequest(`/api/admin/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
 // Underboss Admin API (management)
-// ============================================
 
 export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   const result = await apiRequest<{ underbosses: UnderbossAdmin[] }>('/api/underboss/admin/list');
@@ -2373,9 +2440,7 @@ export async function deleteChecklistDefault(name: string): Promise<{ success: b
   });
 }
 
-// ============================================
 // Underboss Dashboard API
-// ============================================
 
 // Fetch current user's underboss status
 export interface UnderbossMeResponse {
@@ -2431,6 +2496,28 @@ export async function updateHostTags(
   });
 }
 
+// Update underboss notes on an event (underboss auth)
+export async function updateUnderbossNotes(
+  partyId: string,
+  notes: string | null
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/notes`, {
+    method: 'PATCH',
+    body: { notes },
+  });
+}
+
+// Update expected guests on an event (underboss auth)
+export async function updateExpectedGuests(
+  partyId: string,
+  expectedGuests: number | null
+): Promise<void> {
+  await apiRequest(`/api/underboss/event/${partyId}/expected-guests`, {
+    method: 'PATCH',
+    body: { expectedGuests },
+  });
+}
+
 // Bulk approve events (underboss auth)
 export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-approve', {
@@ -2459,9 +2546,7 @@ export async function bulkUpdateEventTags(
   });
 }
 
-// ============================================
 // City Status API (Underboss)
-// ============================================
 
 export interface CityStatusMap {
   [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
@@ -2481,9 +2566,7 @@ export async function updateCityStatus(
   });
 }
 
-// ============================================
 // Shipping Dashboard API
-// ============================================
 
 // Fetch current user's shipping role
 export async function fetchShippingMe(): Promise<ShippingMeResponse> {
@@ -2544,6 +2627,14 @@ export async function bulkUpdateShippingKits(kitIds: string[], updates: {
   });
 }
 
+// Import tracking numbers in bulk from CSV
+export async function importShippingTracking(items: { kitId: string; trackingNumber?: string; trackingUrl?: string }[]): Promise<{ updated: number; skipped: number; notFound: string[] }> {
+  return apiRequest<{ updated: number; skipped: number; notFound: string[] }>('/api/shipping/kits/import-tracking', {
+    method: 'POST',
+    body: { items },
+  });
+}
+
 // Export shipping kits CSV
 export async function exportShippingKitsCsv(filters?: ShippingKitFilters): Promise<Blob> {
   const params = new URLSearchParams();
@@ -2589,9 +2680,7 @@ export async function deactivateShippingCoordinator(id: string): Promise<void> {
   await apiRequest(`/api/shipping/admin/coordinators/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
 // Venue Photo API functions
-// ============================================
 
 // Create venue photo record
 export async function createVenuePhoto(
@@ -2688,9 +2777,7 @@ export async function deleteVenuePhoto(
   }
 }
 
-// ============================================
 // Venue Report API functions
-// ============================================
 
 // Get venue report data (host only)
 export async function getVenueReport(partyId: string): Promise<VenueReport | null> {
@@ -2801,9 +2888,7 @@ export async function fetchPublicVenueReport(
   }
 }
 
-// ============================================
 // Telegram broadcast API functions
-// ============================================
 
 export interface BroadcastGroup {
   chatId: string;
@@ -2827,7 +2912,7 @@ export interface BroadcastResponse {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' = 'HTML'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
@@ -2838,7 +2923,7 @@ export async function sendTelegramBroadcast(
 export async function sendTelegramTest(
   chatId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' = 'HTML'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
     method: 'POST',
@@ -2846,9 +2931,7 @@ export async function sendTelegramTest(
   });
 }
 
-// ============================================
 // Sponsor Dashboard API
-// ============================================
 
 export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
   return apiRequest<SponsorMeResponse>('/api/sponsor/me');
@@ -2865,9 +2948,14 @@ export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item
   });
 }
 
-// ============================================
+export async function updatePartnerEventNote(partyId: string, notes: string): Promise<{ success: boolean; notes: string }> {
+  return apiRequest<{ success: boolean; notes: string }>('/api/sponsor/notes', {
+    method: 'PUT',
+    body: { partyId, notes },
+  });
+}
+
 // Sponsor User Admin API
-// ============================================
 
 export async function fetchSponsorUsers(): Promise<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }> {
   return apiRequest<{ sponsorUsers: SponsorUser[]; tagCounts: Record<string, number> }>('/api/sponsor-users/list');
@@ -2889,6 +2977,8 @@ export interface SponsorUserCreateData {
   coHostShowOnEvent?: boolean;
   coHostCanEdit?: boolean;
   coHostAllowedTabs?: string[] | null;
+  category?: string;
+  brandDescription?: string;
 }
 
 export async function createSponsorUser(data: SponsorUserCreateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
@@ -2915,6 +3005,8 @@ export interface SponsorUserUpdateData {
   coHostShowOnEvent?: boolean;
   coHostCanEdit?: boolean;
   coHostAllowedTabs?: string[] | null;
+  category?: string;
+  brandDescription?: string;
 }
 
 export async function updateSponsorUser(id: string, data: SponsorUserUpdateData): Promise<{ sponsorUser: SponsorUser; syncedCount: number }> {
@@ -2928,9 +3020,15 @@ export async function deleteSponsorUser(id: string): Promise<void> {
   await apiRequest(`/api/sponsor-users/${id}`, { method: 'DELETE' });
 }
 
-// ============================================
+// Reorder sponsor users (admin) — updates descriptionSortOrder based on array position
+export async function reorderSponsorUsers(sponsorUserIds: string[]): Promise<void> {
+  await apiRequest('/api/sponsor-users/reorder', {
+    method: 'PATCH',
+    body: { sponsorUserIds },
+  });
+}
+
 // User Sponsorship Profile
-// ============================================
 
 export interface UserSponsorshipEntry {
   id: string;
@@ -2953,5 +3051,64 @@ export interface UserSponsorshipEntry {
 
 export async function getUserSponsorships(): Promise<UserSponsorshipEntry[]> {
   return apiRequest<UserSponsorshipEntry[]>('/api/user/sponsorships');
+}
+
+// GPP Default Description Admin API
+
+export interface GppDescriptionData {
+  defaultDescription: string;
+  totalGppEvents: number;
+  defaultCount: number;
+  customizedEvents: Array<{
+    id: string;
+    name: string;
+    customUrl: string | null;
+    inviteCode: string;
+    descriptionPreview: string;
+  }>;
+}
+
+export async function fetchGppDescription(): Promise<GppDescriptionData> {
+  return apiRequest<GppDescriptionData>('/api/admin/gpp-description');
+}
+
+export async function updateGppDescription(description: string): Promise<{
+  success: boolean;
+  updatedCount: number;
+  skippedCount: number;
+  newDefault: string;
+}> {
+  return apiRequest('/api/admin/gpp-description', {
+    method: 'PATCH',
+    body: { description },
+  });
+}
+
+// ── QR Peer Attestation Check-In ──
+
+export interface VouchResponse {
+  success: boolean;
+  alreadyCheckedIn?: boolean;
+  guest?: {
+    id: string;
+    name: string;
+    checkedInAt: string;
+  };
+  message?: string;
+}
+
+/** Host/co-host self-check-in (bootstraps the chain of trust) */
+export async function hostSelfCheckIn(inviteCode: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/self-host`, {
+    method: 'POST',
+  });
+}
+
+/** Vouch for another guest — caller must already be checked in */
+export async function vouchForGuest(inviteCode: string, targetGuestId: string): Promise<VouchResponse> {
+  return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/vouch`, {
+    method: 'POST',
+    body: { targetGuestId },
+  });
 }
 

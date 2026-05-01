@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -12,9 +13,6 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
     where: { id: partyId },
     include: {
       user: { select: { name: true } },
-      guests: {
-        orderBy: { submittedAt: 'desc' },
-      },
     },
   });
 
@@ -384,9 +382,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
       availableBeverages, availableToppings, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
+      expectedGuests,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes, photoModeration,
@@ -394,7 +393,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       pinnedApps,
       region,
       venueReportTitle, venueReportNotes,
-      flyerGeneratedAt
+      flyerGeneratedAt,
+      hiddenGppPhotos, extraGppPhotos,
+      lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
+      quizEnabled,
+      telegramGroup
     } = req.body;
 
     // Verify ownership or super admin
@@ -413,7 +416,23 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // Validate externalLinks if provided
+    if (externalLinks !== undefined && externalLinks !== null) {
+      if (!Array.isArray(externalLinks)) {
+        throw new AppError('externalLinks must be an array', 400, 'VALIDATION_ERROR');
+      }
+      if (externalLinks.length > 10) {
+        throw new AppError('Maximum 10 external links allowed', 400, 'VALIDATION_ERROR');
+      }
+      for (const link of externalLinks) {
+        if (typeof link.label !== 'string' || typeof link.url !== 'string') {
+          throw new AppError('Each external link must have a label and url string', 400, 'VALIDATION_ERROR');
+        }
+      }
+    }
+
     // Protect underboss and partner co-host entries: preserve them on co-hosts update
+    // Respects client-specified ordering so hosts can reorder protected entries
     let mergedCoHosts = coHosts;
     if (coHosts !== undefined) {
       const existingParty = await prisma.party.findUnique({
@@ -425,24 +444,37 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       const protectedEntries = existingCoHosts.filter(
         (h: any) => h.isUnderboss === true || h.isPartner === true
       );
-      const protectedIds = new Set(protectedEntries.map((h: any) => h.id));
-      // Strip isUnderboss and isPartner from client-submitted entries (prevent spoofing)
-      // and remove any client entries that duplicate a protected entry (to prevent duplicates)
-      // Also validate allowedTabs: strip invalid tab IDs
-      const clientCoHosts = (coHosts as any[])
-        .map((h: any) => {
-          const { isUnderboss: _ub, isPartner: _p, partnerTag: _pt, ...rest } = h;
+      // Build a map of protected entries by ID for O(1) lookups
+      const protectedById = new Map(protectedEntries.map((h: any) => [h.id, h]));
+      const usedProtectedIds = new Set<string>();
+
+      const ordered: any[] = [];
+      for (const clientEntry of coHosts as any[]) {
+        if (protectedById.has(clientEntry.id)) {
+          // Client referenced a protected entry — use DB version at this position
+          // Protected entries keep all DB values (including showOnEvent)
+          const dbEntry = protectedById.get(clientEntry.id)!;
+          ordered.push(dbEntry);
+          usedProtectedIds.add(clientEntry.id);
+        } else {
+          // Regular client entry — strip protected flags (anti-spoofing)
+          const { isUnderboss: _ub, isPartner: _p, partnerTag: _pt, ...rest } = clientEntry;
           // Validate allowedTabs if present
           if (Array.isArray(rest.allowedTabs)) {
             rest.allowedTabs = rest.allowedTabs.filter(
               (tab: string) => VALID_TAB_IDS.includes(tab as any)
             );
           }
-          return rest;
-        })
-        .filter((h: any) => !protectedIds.has(h.id));
-      // Merge: client entries + preserved protected entries
-      mergedCoHosts = [...clientCoHosts, ...protectedEntries];
+          ordered.push(rest);
+        }
+      }
+      // Append any protected entries not referenced by the client (backward compat)
+      for (const entry of protectedEntries) {
+        if (!usedProtectedIds.has(entry.id)) {
+          ordered.push(entry);
+        }
+      }
+      mergedCoHosts = ordered;
     }
 
     const party = await prisma.party.update({
@@ -455,8 +487,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(timezone !== undefined && { timezone }),
         ...(pizzaStyle && { pizzaStyle }),
         ...(address !== undefined && { address }),
+        ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
+        ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
+        ...(country !== undefined && { country: country || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
+        ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),
         ...(hideGuests !== undefined && { hideGuests }),
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
@@ -487,6 +523,14 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(venueReportTitle !== undefined && { venueReportTitle: venueReportTitle || null }),
         ...(venueReportNotes !== undefined && { venueReportNotes: venueReportNotes || null }),
         ...(flyerGeneratedAt !== undefined && { flyerGeneratedAt: flyerGeneratedAt ? new Date(flyerGeneratedAt) : null }),
+        ...(hiddenGppPhotos !== undefined && { hiddenGppPhotos }),
+        ...(extraGppPhotos !== undefined && { extraGppPhotos }),
+        ...(lumaUrl !== undefined && { lumaUrl: lumaUrl || null }),
+        ...(meetupUrl !== undefined && { meetupUrl: meetupUrl || null }),
+        ...(eventbriteUrl !== undefined && { eventbriteUrl: eventbriteUrl || null }),
+        ...(externalLinks !== undefined && { externalLinks }),
+        ...(quizEnabled !== undefined && { quizEnabled }),
+        ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
       },
       include: {
         user: { select: { name: true } },
@@ -520,7 +564,10 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.party.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
+      await tx.party.delete({ where: { id } });
+    });
 
     // Trigger webhook for party deletion
     await triggerWebhook('party.deleted', { id }, req.userId!);
@@ -684,8 +731,11 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
       throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    await prisma.guest.delete({
-      where: { id: guestId, partyId },
+    await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
+      await tx.guest.delete({
+        where: { id: guestId, partyId },
+      });
     });
 
     // Trigger webhook for guest removal

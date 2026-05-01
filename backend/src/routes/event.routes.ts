@@ -7,7 +7,7 @@ const router = Router();
 // GET /api/events/:slug - Get public event details with host profile (public)
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
 
     // Find party by invite code OR custom URL
     let party = await prisma.party.findUnique({
@@ -24,6 +24,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         availableBeverages: true,
         availableToppings: true,
         address: true,
+        latitude: true,
+        longitude: true,
         venueName: true,
         maxGuests: true,
         hideGuests: true,
@@ -46,8 +48,12 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         photoModeration: true,
         nftEnabled: true,
         nftChain: true,
+        quizEnabled: true,
         photosEnabled: true,
         photosPublic: true,
+        hiddenGppPhotos: true,
+        extraGppPhotos: true,
+        telegramGroup: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -84,6 +90,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           availableBeverages: true,
           availableToppings: true,
           address: true,
+          latitude: true,
+          longitude: true,
           venueName: true,
           maxGuests: true,
           hideGuests: true,
@@ -106,8 +114,12 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           photoModeration: true,
           nftEnabled: true,
           nftChain: true,
+          quizEnabled: true,
           photosEnabled: true,
           photosPublic: true,
+          hiddenGppPhotos: true,
+          extraGppPhotos: true,
+          telegramGroup: true,
           password: true,
           userId: true,
           user: {
@@ -129,9 +141,39 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       });
     }
 
+    // If not found by either method, check slug_aliases for a redirect
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { party: { select: { customUrl: true, inviteCode: true } } },
+      });
+      if (alias?.party) {
+        const newSlug = alias.party.customUrl || alias.party.inviteCode;
+        return res.status(301).json({ redirect: true, slug: newSlug, url: `/${newSlug}` });
+      }
+    }
+
     if (!party) {
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
+
+    // Fetch confirmed sponsors with descriptions for public display
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        partyId: party.id,
+        status: { in: ['yes', 'billed', 'paid'] },
+        brandDescription: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        website: true,
+        brandDescription: true,
+        logoUrl: true,
+        brandTwitter: true,
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
 
     // Enrich coHosts with user profile data (avatar, socials) then strip emails
     const rawCoHosts = (party.coHosts as any[] || []);
@@ -198,6 +240,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         availableBeverages: party.availableBeverages,
         availableToppings: party.availableToppings,
         address: party.address,
+        latitude: party.latitude,
+        longitude: party.longitude,
         venueName: party.venueName,
         maxGuests: party.maxGuests,
         hideGuests: party.hideGuests,
@@ -220,13 +264,18 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         photoModeration: party.photoModeration,
         nftEnabled: party.nftEnabled,
         nftChain: party.nftChain,
+        quizEnabled: party.quizEnabled,
         photosEnabled: party.photosEnabled,
         photosPublic: party.photosPublic,
+        hiddenGppPhotos: party.hiddenGppPhotos || [],
+        extraGppPhotos: party.extraGppPhotos || [],
+        telegramGroup: party.telegramGroup || null,
         hasPassword: !!party.password,
         hostName: party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         hostProfile,
         guestCount: party._count.guests,
         userId: party.userId,
+        sponsors,
       },
     });
   } catch (error) {
@@ -237,7 +286,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 // POST /api/events/:slug/check-host - Check if an email belongs to a co-host (public, no auth)
 router.post('/:slug/check-host', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
     const { email } = req.body;
 
     if (!email || typeof email !== 'string') {
@@ -254,6 +303,19 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
         where: { customUrl: slug },
         select: { coHosts: true, userId: true },
       });
+    }
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { coHosts: true, userId: true },
+        });
+      }
     }
     if (!party) {
       return res.json({ isHost: false });
@@ -273,7 +335,7 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
 // POST /api/events/:slug/verify-tweet - Verify a tweet exists via oEmbed
 router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug.toLowerCase();
     const { tweetUrl } = req.body;
 
     if (!tweetUrl || typeof tweetUrl !== 'string') {
@@ -290,6 +352,19 @@ router.post('/:slug/verify-tweet', async (req: Request, res: Response, next: Nex
     let party = await prisma.party.findUnique({ where: { inviteCode: slug }, select: { id: true, shareToUnlock: true } });
     if (!party) {
       party = await prisma.party.findUnique({ where: { customUrl: slug }, select: { id: true, shareToUnlock: true } });
+    }
+    // Alias fallback: silently resolve old slugs
+    if (!party) {
+      const alias = await prisma.slugAlias.findUnique({
+        where: { oldSlug: slug },
+        select: { partyId: true },
+      });
+      if (alias) {
+        party = await prisma.party.findUnique({
+          where: { id: alias.partyId },
+          select: { id: true, shareToUnlock: true },
+        });
+      }
     }
     if (!party) {
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');

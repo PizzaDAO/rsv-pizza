@@ -38,14 +38,21 @@ async function canUserCheckIn(partyId: string, userId?: string, userEmail?: stri
   return false;
 }
 
-// POST /api/checkin/:inviteCode/:guestId - Check in a guest (requires auth, host/co-host only)
-router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { inviteCode, guestId } = req.params;
+// Helper: find party by inviteCode or customUrl
+async function findPartyByCode(inviteCode: string) {
+  let party = await prisma.party.findUnique({
+    where: { inviteCode },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+      coHosts: true,
+    },
+  });
 
-    // Find party by invite code or custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode },
+  if (!party) {
+    party = await prisma.party.findUnique({
+      where: { customUrl: inviteCode },
       select: {
         id: true,
         name: true,
@@ -53,10 +60,17 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
         coHosts: true,
       },
     });
+  }
 
-    if (!party) {
+  // Alias fallback: silently resolve old slugs
+  if (!party) {
+    const alias = await prisma.slugAlias.findUnique({
+      where: { oldSlug: inviteCode },
+      select: { partyId: true },
+    });
+    if (alias) {
       party = await prisma.party.findUnique({
-        where: { customUrl: inviteCode },
+        where: { id: alias.partyId },
         select: {
           id: true,
           name: true,
@@ -65,30 +79,49 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
         },
       });
     }
+  }
 
+  return party;
+}
+
+// POST /api/checkin/:inviteCode/self-host — Host/co-host self-check-in (bootstrap)
+router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    // Verify user can check in guests for this party
-    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
-    if (!canCheckIn) {
-      throw new AppError('You are not authorized to check in guests for this event', 403, 'UNAUTHORIZED');
+    // Verify user is host or co-host
+    const canCheck = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheck) {
+      throw new AppError('Only hosts and co-hosts can self-check in', 403, 'UNAUTHORIZED');
     }
 
-    // Find the guest
-    const guest = await prisma.guest.findFirst({
+    // Find existing guest record for this user
+    let guest = await prisma.guest.findFirst({
       where: {
-        id: guestId,
         partyId: party.id,
+        email: req.userEmail?.toLowerCase(),
       },
     });
 
+    // If host hasn't RSVPd, auto-create a guest record
     if (!guest) {
-      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+      guest = await prisma.guest.create({
+        data: {
+          name: req.userEmail?.split('@')[0] || 'Host',
+          email: req.userEmail?.toLowerCase() || null,
+          partyId: party.id,
+          status: 'CONFIRMED',
+          submittedVia: 'host-checkin',
+        },
+      });
     }
 
-    // Check if already checked in
+    // Already checked in
     if (guest.checkedInAt) {
       return res.status(200).json({
         success: true,
@@ -96,32 +129,108 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
         guest: {
           id: guest.id,
           name: guest.name,
-          email: guest.email,
           checkedInAt: guest.checkedInAt,
-          checkedInBy: guest.checkedInBy,
         },
-        message: `${guest.name} was already checked in`,
+        message: `${guest.name} is already checked in`,
       });
     }
 
-    // Check in the guest
+    // Check in the host
     const updatedGuest = await prisma.guest.update({
-      where: { id: guestId },
+      where: { id: guest.id },
       data: {
         checkedInAt: new Date(),
-        checkedInBy: req.userId,
+        checkedInBy: guest.id, // self-vouch
       },
     });
 
     res.status(200).json({
       success: true,
-      alreadyCheckedIn: false,
       guest: {
         id: updatedGuest.id,
         name: updatedGuest.name,
-        email: updatedGuest.email,
         checkedInAt: updatedGuest.checkedInAt,
-        checkedInBy: updatedGuest.checkedInBy,
+      },
+      message: `${updatedGuest.name} has checked in!`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/checkin/:inviteCode/vouch — Vouch for another guest (peer attestation)
+router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+    const { targetGuestId } = req.body;
+
+    if (!targetGuestId) {
+      throw new AppError('targetGuestId is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the voucher's guest record (caller)
+    const voucher = await prisma.guest.findFirst({
+      where: {
+        partyId: party.id,
+        email: req.userEmail?.toLowerCase(),
+      },
+    });
+
+    if (!voucher) {
+      throw new AppError('You must be an RSVPd guest to vouch for others', 403, 'NOT_A_GUEST');
+    }
+
+    // Voucher must be checked in
+    if (!voucher.checkedInAt) {
+      throw new AppError('You must be checked in to vouch for others', 403, 'NOT_CHECKED_IN');
+    }
+
+    // Find the target guest
+    const targetGuest = await prisma.guest.findFirst({
+      where: {
+        id: targetGuestId,
+        partyId: party.id,
+      },
+    });
+
+    if (!targetGuest) {
+      throw new AppError('Guest not found or belongs to a different event', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Already checked in
+    if (targetGuest.checkedInAt) {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        guest: {
+          id: targetGuest.id,
+          name: targetGuest.name,
+          checkedInAt: targetGuest.checkedInAt,
+        },
+        message: `${targetGuest.name} is already checked in`,
+      });
+    }
+
+    // Vouch: check in the target guest
+    const updatedGuest = await prisma.guest.update({
+      where: { id: targetGuestId },
+      data: {
+        checkedInAt: new Date(),
+        checkedInBy: voucher.id, // voucher's guest ID
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        checkedInAt: updatedGuest.checkedInAt,
       },
       message: `${updatedGuest.name} has been checked in!`,
     });
@@ -130,41 +239,19 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
   }
 });
 
-// GET /api/checkin/:inviteCode/:guestId - Get guest check-in status (requires auth, host/co-host only)
+// GET /api/checkin/:inviteCode/:guestId — Get guest check-in status (requires auth, host/co-host only)
 router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, guestId } = req.params;
 
-    // Find party by invite code or custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        userId: true,
-        coHosts: true,
-      },
-    });
-
-    if (!party) {
-      party = await prisma.party.findUnique({
-        where: { customUrl: inviteCode },
-        select: {
-          id: true,
-          name: true,
-          userId: true,
-          coHosts: true,
-        },
-      });
-    }
-
+    const party = await findPartyByCode(inviteCode);
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
     // Verify user can check in guests for this party
-    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
-    if (!canCheckIn) {
+    const canCheck = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheck) {
       throw new AppError('You are not authorized to view check-in status for this event', 403, 'UNAUTHORIZED');
     }
 

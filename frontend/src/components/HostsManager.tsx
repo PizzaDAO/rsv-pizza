@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { updateParty, addGuestByHost } from '../lib/supabase';
+import { updateParty, addGuestByHost, proxyAvatarToStorage } from '../lib/supabase';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
@@ -21,16 +21,15 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   initialCoHosts,
   onCoHostsChange,
 }) => {
-  // Separate protected co-hosts (underboss + partner, hidden, not editable) from regular co-hosts
-  const protectedCoHosts = initialCoHosts.filter(h => h.isUnderboss === true || h.isPartner === true);
-  const editableInitialCoHosts = initialCoHosts.filter(h => h.isUnderboss !== true && h.isPartner !== true);
+  // Helper: check if a co-host is protected (auto-added partner or underboss)
+  const isProtected = (h: CoHost) => h.isUnderboss === true || h.isPartner === true;
 
-  // Co-hosts state (only editable ones)
-  const [coHosts, setCoHosts] = useState<CoHost[]>(editableInitialCoHosts);
+  // Co-hosts state — includes ALL co-hosts (manual + protected)
+  const [coHosts, setCoHosts] = useState<CoHost[]>(initialCoHosts);
 
   // Sync from props when enriched data arrives asynchronously
   useEffect(() => {
-    setCoHosts(initialCoHosts.filter(h => h.isUnderboss !== true && h.isPartner !== true));
+    setCoHosts(initialCoHosts);
   }, [initialCoHosts]);
 
   const [newCoHostName, setNewCoHostName] = useState('');
@@ -90,17 +89,17 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
   const saveCoHostsArray = async (coHostsToSave: CoHost[]) => {
     try {
-      // Merge protected entries (underboss + partner) back before sending to API
-      // (server also protects these, but this avoids unnecessary churn)
-      const allCoHosts = [...coHostsToSave, ...protectedCoHosts];
-      const success = await updateParty(partyId, { co_hosts: allCoHosts });
+      // Send full array including protected entries — backend respects ordering
+      // and preserves protected entry data from DB
+      const success = await updateParty(partyId, { co_hosts: coHostsToSave });
       if (success) {
+        // Only add as guest for non-protected co-hosts with email
         for (const coHost of coHostsToSave) {
-          if (coHost.email) {
+          if (coHost.email && !isProtected(coHost)) {
             await addGuestByHost(partyId, coHost.name, [], [], [], [], [], coHost.email);
           }
         }
-        onCoHostsChange?.(allCoHosts);
+        onCoHostsChange?.(coHostsToSave);
       }
     } catch (error) {
       console.error('Error saving co-hosts:', error);
@@ -110,6 +109,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const addCoHost = async () => {
     if (!newCoHostName.trim()) return;
 
+    // Proxy external avatar to storage
+    const avatarUrl = newCoHostAvatarUrl.trim()
+      ? await proxyAvatarToStorage(newCoHostAvatarUrl.trim())
+      : undefined;
+
     const newCoHost: CoHost = {
       id: uuid(),
       name: newCoHostName.trim(),
@@ -117,7 +121,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       website: newCoHostWebsite.trim() || undefined,
       twitter: newCoHostTwitter.trim() || undefined,
       instagram: newCoHostInstagram.trim() || undefined,
-      avatar_url: newCoHostAvatarUrl.trim() || undefined,
+      avatar_url: avatarUrl,
       showOnEvent: true,
     };
 
@@ -160,6 +164,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const saveHostEdit = async () => {
     if (!editHostName.trim()) return;
 
+    // Proxy external avatar to storage
+    const avatarUrl = editHostAvatarUrl.trim()
+      ? await proxyAvatarToStorage(editHostAvatarUrl.trim())
+      : undefined;
+
     const newCoHosts = coHosts.map(h =>
       h.id === editingHostId
         ? {
@@ -169,7 +178,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
           website: editHostWebsite.trim() || undefined,
           twitter: editHostTwitter.trim() || undefined,
           instagram: editHostInstagram.trim() || undefined,
-          avatar_url: editHostAvatarUrl.trim() || undefined,
+          avatar_url: avatarUrl,
         }
         : h
     );
@@ -262,15 +271,17 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
           </div>
         )}
 
-        {/* Co-Hosts */}
-        {coHosts.map((coHost, index) => (
+        {/* Co-Hosts (manual + protected) */}
+        {coHosts.map((coHost, index) => {
+          const protected_ = isProtected(coHost);
+          return (
           <div
             key={coHost.id}
             draggable
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            className={`p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
+            className={`p-3 bg-white/5 rounded-xl border ${protected_ ? 'border-white/20' : 'border-white/10'} transition-all cursor-move ${draggedIndex === index ? 'opacity-50' : 'opacity-100'
               }`}
           >
             {/* Top row: identity + remove button */}
@@ -286,7 +297,15 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate">{coHost.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-white font-medium truncate">{coHost.name}</p>
+                  {coHost.isPartner && (
+                    <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">Partner</span>
+                  )}
+                  {coHost.isUnderboss && (
+                    <span className="text-[10px] font-semibold bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">Auto</span>
+                  )}
+                </div>
                 {coHost.email && (
                   <p className="text-white/50 text-xs truncate">{coHost.email}</p>
                 )}
@@ -310,41 +329,53 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => removeCoHost(coHost.id)}
-                className="text-[#ff393a] hover:text-[#ff5a5b] shrink-0"
-              >
-                <X size={18} />
-              </button>
+              {protected_ ? (
+                <div className="shrink-0 text-white/20 cursor-not-allowed" title="Auto-added hosts cannot be removed">
+                  <X size={18} />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => removeCoHost(coHost.id)}
+                  className="text-[#ff393a] hover:text-[#ff5a5b] shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              )}
             </div>
             {/* Bottom row: controls */}
             <div className="flex items-center gap-3 mt-2 pl-9">
-              <Checkbox
-                checked={coHost.showOnEvent !== false}
-                onChange={() => toggleCoHostShowOnEvent(coHost.id)}
-                label="Show"
-                size={16}
-                labelClassName="text-xs font-medium text-white/60"
-              />
-              <Checkbox
-                checked={coHost.canEdit === true}
-                onChange={() => toggleCoHostCanEdit(coHost.id)}
-                label="Editor"
-                size={16}
-                labelClassName="text-xs font-medium text-white/60"
-              />
-              <button
-                type="button"
-                onClick={() => startEditingHost(coHost)}
-                className="text-white/50 hover:text-white text-sm font-medium"
-              >
-                Edit
-              </button>
+              {!protected_ && (
+                <Checkbox
+                  checked={coHost.showOnEvent !== false}
+                  onChange={() => toggleCoHostShowOnEvent(coHost.id)}
+                  label="Show"
+                  size={16}
+                  labelClassName="text-xs font-medium text-white/60"
+                />
+              )}
+              {!protected_ && (
+                <>
+                  <Checkbox
+                    checked={coHost.canEdit === true}
+                    onChange={() => toggleCoHostCanEdit(coHost.id)}
+                    label="Editor"
+                    size={16}
+                    labelClassName="text-xs font-medium text-white/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startEditingHost(coHost)}
+                    className="text-white/50 hover:text-white text-sm font-medium"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Tab permissions expander (only when canEdit is true) */}
-            {coHost.canEdit && (
+            {/* Tab permissions expander (only when canEdit is true and not protected) */}
+            {coHost.canEdit && !protected_ && (
               <div className="mt-2 pl-9">
                 <button
                   type="button"
@@ -387,7 +418,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Add Host Button */}

@@ -4,7 +4,7 @@ import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check } from '
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { KitStats, KitFilters, KitTable, KitDetailModal, CoordinatorManager } from '../components/shipping';
+import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager, KitContentsModal } from '../components/shipping';
 import {
   fetchShippingMe,
   fetchShippingKits,
@@ -53,6 +53,12 @@ export function ShippingDashboard() {
   // Exporting
   const [exporting, setExporting] = useState(false);
 
+  // CSV import modal
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Kit contents modal
+  const [showKitContents, setShowKitContents] = useState(false);
+
   // Available regions based on role
   const availableRegions = useMemo(() => {
     if (!meData) return [];
@@ -76,7 +82,6 @@ export function ShippingDashboard() {
       if (countryFilter) filters.country = countryFilter;
       if (searchTerm) filters.search = searchTerm;
       if (selectedRegion) filters.region = selectedRegion;
-      filters.sort = `${sortField}${sortDir === 'desc' ? '_desc' : ''}`;
 
       const [kitsResult, statsResult] = await Promise.all([
         fetchShippingKits(filters),
@@ -88,7 +93,7 @@ export function ShippingDashboard() {
     } catch (err: any) {
       console.error('Failed to load shipping data:', err);
     }
-  }, [statusFilter, countryFilter, searchTerm, selectedRegion, sortField, sortDir]);
+  }, [statusFilter, countryFilter, searchTerm, selectedRegion]);
 
   // Initial access check
   useEffect(() => {
@@ -145,6 +150,19 @@ export function ShippingDashboard() {
       setSortDir('asc');
     }
   };
+
+  // Client-side sort
+  const sortedKits = useMemo(() => {
+    const sorted = [...kits];
+    sorted.sort((a, b) => {
+      const aVal = (a as any)[sortField] ?? '';
+      const bVal = (b as any)[sortField] ?? '';
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [kits, sortField, sortDir]);
 
   // Handle single kit status change
   const handleStatusChange = async (kitId: string, status: string) => {
@@ -412,6 +430,8 @@ export function ShippingDashboard() {
               countries={countries}
               onExport={handleExport}
               exporting={exporting}
+              onImport={() => setShowImportModal(true)}
+              onShowKitContents={() => setShowKitContents(true)}
             />
           </section>
 
@@ -421,7 +441,7 @@ export function ShippingDashboard() {
               Kit Requests ({kits.length})
             </h2>
             <KitTable
-              kits={kits}
+              kits={sortedKits}
               onStatusChange={handleStatusChange}
               onTierChange={handleTierChange}
               onTrackingChange={handleTrackingChange}
@@ -447,6 +467,21 @@ export function ShippingDashboard() {
           kit={detailKit}
           onClose={() => setDetailKit(null)}
           onUpdate={handleDetailUpdate}
+        />
+      )}
+
+      {/* CSV Import Modal */}
+      {showImportModal && (
+        <CsvImportModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => loadData()}
+        />
+      )}
+
+      {/* Kit Contents Modal */}
+      {showKitContents && (
+        <KitContentsModal
+          onClose={() => setShowKitContents(false)}
         />
       )}
     </div>

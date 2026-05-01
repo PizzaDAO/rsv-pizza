@@ -1,8 +1,20 @@
-import React, { useState } from 'react';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
-import { updateHostStatus, updateHostTags } from '../../lib/api';
+import { IconInput } from '../IconInput';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos } from '../../lib/api';
+import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
+
+interface DisplayPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  source: 'uploaded' | 'gpp';
+  year?: number;
+}
 
 interface EventCardProps {
   event: UnderbossEvent;
@@ -125,7 +137,7 @@ function HostTagsPills({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
-  const presetTags = ['swc'];
+  const presetTags = ['review', 'swc'];
 
   async function addTag(tag: string) {
     const cleaned = tag.trim().toLowerCase();
@@ -134,16 +146,17 @@ function HostTagsPills({
     onUpdate(newTags);
     setNewTag('');
     setIsAdding(false);
-    try { await updateHostTags(eventId, newTags); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [cleaned], 'add'); } catch { onUpdate(tags); }
   }
 
   async function removeTag(tag: string) {
     const newTags = tags.filter((t) => t !== tag);
     onUpdate(newTags);
-    try { await updateHostTags(eventId, newTags); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [tag], 'remove'); } catch { onUpdate(tags); }
   }
 
   const tagColors: Record<string, string> = {
+    review: 'bg-red-500/20 text-red-400 border-red-500/30',
     swc: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   };
 
@@ -201,9 +214,175 @@ function HostTagsPills({
   );
 }
 
+function PhotoLightbox({
+  photos,
+  currentIndex,
+  onClose,
+  onNavigate,
+}: {
+  photos: DisplayPhoto[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[currentIndex];
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+    };
+    window.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [currentIndex, photos.length, onClose, onNavigate]);
+
+  if (!photo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {currentIndex > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {currentIndex < photos.length - 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+
+      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={photo.url}
+          alt={photo.caption || ''}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {photo.caption && (
+          <p className="text-white/70 text-sm text-center max-w-lg">{photo.caption}</p>
+        )}
+      </div>
+
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+        {currentIndex + 1} of {photos.length}
+      </p>
+    </div>
+  );
+}
+
 export function EventCard({ event, showRegion, onEventUpdate, isSelected, onToggleSelect }: EventCardProps) {
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [photosExpanded, setPhotosExpanded] = useState(false);
+  const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // GPP photo count for the badge (fetched once, cached at module level)
+  const [gppCount, setGppCount] = useState(0);
+
+  useEffect(() => {
+    const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+    if (!cityName) return;
+    getGppPhotoCounts().then(counts => {
+      const key = cityName.toLowerCase().replace(/\s+/g, '');
+      setGppCount(counts[key] || 0);
+    });
+  }, [event.name]);
+
+  const loadPhotos = useCallback(async () => {
+    if (displayPhotos.length > 0 || !event.id) return;
+    setPhotosLoading(true);
+    try {
+      const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+
+      const [uploadedResult, gppPhotos] = await Promise.all([
+        getPartyPhotos(event.id),
+        cityName ? getGppPhotosForCity(cityName) : Promise.resolve([]),
+      ]);
+
+      const uploaded: DisplayPhoto[] = (uploadedResult?.photos || []).map((p) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        source: 'uploaded' as const,
+      }));
+
+      const gpp: DisplayPhoto[] = gppPhotos.map((p, i) => ({
+        id: `gpp-${i}`,
+        url: p.url,
+        thumbnailUrl: null,
+        caption: `GPP ${p.year}`,
+        source: 'gpp' as const,
+        year: p.year,
+      }));
+
+      setDisplayPhotos([...uploaded, ...gpp]);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [event.id, event.name, displayPhotos.length]);
+
+  const togglePhotos = useCallback(() => {
+    const next = !photosExpanded;
+    setPhotosExpanded(next);
+    if (next) loadPhotos();
+  }, [photosExpanded, loadPhotos]);
+
+  const saveNotes = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    const newValue = trimmed || null;
+    setNotesSaving(true);
+    onEventUpdate?.(event.id, { underbossNotes: newValue });
+    try {
+      await updateUnderbossNotes(event.id, newValue);
+    } catch {
+      setNotesValue(event.underbossNotes || '');
+      onEventUpdate?.(event.id, { underbossNotes: event.underbossNotes });
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [event.id, event.underbossNotes, onEventUpdate]);
+
+  const handleNotesChange = useCallback((value: string) => {
+    setNotesValue(value);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => saveNotes(value), 1000);
+  }, [saveNotes]);
+
+  const handleNotesBlur = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveNotes(notesValue);
+  }, [notesValue, saveNotes]);
+
+  const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
   const eventUrl = event.customUrl ? `https://rsv.pizza/${event.customUrl}` : null;
   const relTime = formatRelativeTime(event.date);
@@ -236,6 +415,17 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
                 <ExternalLink size={12} />
               </a>
             )}
+            <button
+              onClick={() => setNotesOpen(!notesOpen)}
+              className={`transition-colors shrink-0 ${
+                hasNotes
+                  ? 'text-amber-400 hover:text-amber-300'
+                  : 'text-theme-text-faint hover:text-theme-text-secondary'
+              }`}
+              title={hasNotes ? 'Edit notes' : 'Add notes'}
+            >
+              <StickyNote size={12} />
+            </button>
           </div>
 
           {/* Date */}
@@ -244,15 +434,45 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
               {relTime.text}
             </span>
-            {showRegion && event.address && (
+            {showRegion && event.country && (
               <>
                 <span className="text-theme-text-faint">·</span>
                 <span className="text-xs text-theme-text-muted">
-                  {event.address.split(',').pop()?.trim() || ''}
+                  {event.country || ''}
                 </span>
               </>
             )}
           </div>
+
+          {/* Inline notes editor */}
+          {notesOpen && (
+            <div className="mt-1.5">
+              <IconInput
+                icon={StickyNote}
+                iconSize={12}
+                placeholder="Underboss notes..."
+                value={notesValue}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
+                onBlur={handleNotesBlur}
+                multiline
+                rows={2}
+                className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
+              />
+              {notesSaving && (
+                <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+              )}
+            </div>
+          )}
+          {/* Show notes preview when collapsed */}
+          {!notesOpen && hasNotes && (
+            <button
+              onClick={() => setNotesOpen(true)}
+              className="text-[11px] text-amber-400/70 truncate max-w-full mt-0.5 text-left hover:text-amber-400 transition-colors block"
+              title={notesValue}
+            >
+              {notesValue}
+            </button>
+          )}
         </div>
       </div>
 
@@ -294,11 +514,60 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             <span className="text-xs text-green-400/60">({event.checkedInCount})</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <Camera size={12} className="text-theme-text-faint" />
-          <span className="text-xs text-theme-text-muted">{event.photoCount}</span>
-        </div>
+        <button
+          onClick={togglePhotos}
+          className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
+        >
+          <Camera size={12} />
+          <span className="text-xs">{event.photoCount + gppCount}</span>
+        </button>
       </div>
+
+      {/* Expandable photo grid */}
+      {photosExpanded && (
+        <div className="mt-3 pt-3 border-t border-theme-stroke/50">
+          {photosLoading ? (
+            <div className="flex items-center gap-2 py-3">
+              <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+              <span className="text-xs text-theme-text-muted">Loading photos...</span>
+            </div>
+          ) : displayPhotos.length === 0 ? (
+            <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-1.5">
+                {(showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12)).map((photo, idx) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setLightboxIndex(idx)}
+                    className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all relative group"
+                  >
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={photo.caption || ''}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {photo.source === 'gpp' && photo.year && (
+                      <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/60 text-white/80 px-1 rounded">
+                        {photo.year}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {!showAllPhotos && displayPhotos.length > 12 && (
+                <button
+                  onClick={() => setShowAllPhotos(true)}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Show all {displayPhotos.length} photos
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-theme-stroke">
@@ -312,6 +581,16 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
         <ProgressIndicator done={event.progress.hasSocialPosts} label="Social" />
         <ProgressIndicator done={event.progress.hasThrown} label="Thrown" />
       </div>
+
+      {lightboxIndex !== null && (showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12))[lightboxIndex] && createPortal(
+        <PhotoLightbox
+          photos={showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12)}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />,
+        document.body
+      )}
     </div>
   );
 }

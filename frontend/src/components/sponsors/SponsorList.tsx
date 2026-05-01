@@ -3,7 +3,7 @@ import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
   Mail, Phone, User, Building2, Calendar
 } from 'lucide-react';
-import { Sponsor, SponsorStatus } from '../../types';
+import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
 
 interface SponsorListProps {
@@ -268,6 +268,14 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                               <ExternalLink size={12} />
                             </a>
                           )}
+                          {sponsor.category && (() => {
+                            const cat = SPONSOR_CATEGORIES.find(c => c.id === sponsor.category);
+                            return cat ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                {cat.label}
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                         {sponsor.organization && (
                           <div className="text-xs text-theme-text-muted truncate">{sponsor.organization}</div>

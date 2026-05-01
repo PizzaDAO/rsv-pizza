@@ -3,15 +3,15 @@ import { BookOpen, MessageCircle, HelpCircle, Presentation, ExternalLink } from 
 
 const resources = [
   {
-    title: 'Sponsor One Sheet',
-    description: 'Everything you need to talk to sponsors about the Global Pizza Party.',
+    title: 'Partner One Sheet',
+    description: 'Everything you need to talk to partners about the Global Pizza Party.',
     href: 'https://docs.google.com/presentation/d/e/2PACX-1vQHSFx8OYH1yznE4XjiqD9TTOyCqkPVNyeOTVpkOghZleUKm-ISp09JNvksbo_hvfzDG-4MQLRV9u1q/pub?start=false&loop=false&delayms=3000',
     icon: BookOpen,
     color: '#ff393a',
   },
   {
-    title: 'Sponsor Intro',
-    description: 'A presentation to introduce potential sponsors to the Global Pizza Party.',
+    title: 'Partner Intro',
+    description: 'A presentation to introduce potential partners to the Global Pizza Party.',
     href: 'https://docs.google.com/presentation/d/e/2PACX-1vT5ORtWk-nHCBckmOSGXWbjosenIXB8p1kJx9DuZMl1IgN9UU3ohcpj--kFobe92YHCbgQVYDSRQzkJ/pub?start=false&loop=false&delayms=3000',
     icon: Presentation,
     color: '#f59e0b',

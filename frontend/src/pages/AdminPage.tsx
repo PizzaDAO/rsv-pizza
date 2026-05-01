@@ -6,7 +6,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -14,8 +14,9 @@ import {
   fetchGppNftSettings, updateGppNftSettings,
   fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault, deleteChecklistDefault,
   fetchSponsorUsers, createSponsorUser, deleteSponsorUser,
+  fetchGppDescription, updateGppDescription,
 } from '../lib/api';
-import type { ChecklistDefault } from '../lib/api';
+import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser } from '../types';
 
@@ -72,6 +73,16 @@ export function AdminPage() {
   const [addingSponsor, setAddingSponsor] = useState(false);
   const [sponsorMessage, setSponsorMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // GPP Default Description state
+  const [gppDescription, setGppDescription] = useState('');
+  const [gppDescOriginal, setGppDescOriginal] = useState('');
+  const [gppCustomEvents, setGppCustomEvents] = useState<GppDescriptionData['customizedEvents']>([]);
+  const [gppTotalEvents, setGppTotalEvents] = useState(0);
+  const [gppDefaultCount, setGppDefaultCount] = useState(0);
+  const [savingDesc, setSavingDesc] = useState(false);
+  const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showCustomized, setShowCustomized] = useState(false);
+
   const isSuperAdmin = currentRole === 'super_admin';
 
   // Set body class for elements outside React tree
@@ -93,12 +104,14 @@ export function AdminPage() {
         setCurrentRole(me.role || '');
         setCurrentEmail(me.email || '');
 
-        const [adminList, ubList, nftSettings, clDefaults, spList] = await Promise.all([
+        const isSA = me.role === 'super_admin';
+        const [adminList, ubList, nftSettings, clDefaults, spList, gppDescData] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
           fetchGppNftSettings(),
           fetchChecklistDefaults(),
           fetchSponsorUsers(),
+          isSA ? fetchGppDescription().catch(() => null) : Promise.resolve(null),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
@@ -106,6 +119,13 @@ export function AdminPage() {
         setGppNftChain(nftSettings.nftChain || 'base');
         setChecklistItems(clDefaults.items);
         setSponsorUsers(spList.sponsorUsers);
+        if (gppDescData) {
+          setGppDescription(gppDescData.defaultDescription);
+          setGppDescOriginal(gppDescData.defaultDescription);
+          setGppCustomEvents(gppDescData.customizedEvents);
+          setGppTotalEvents(gppDescData.totalGppEvents);
+          setGppDefaultCount(gppDescData.defaultCount);
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
       } finally {
@@ -149,6 +169,35 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [sponsorMessage]);
+
+  useEffect(() => {
+    if (descMessage) {
+      const t = setTimeout(() => setDescMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [descMessage]);
+
+  async function handleSaveGppDescription() {
+    setSavingDesc(true);
+    setDescMessage(null);
+    try {
+      const result = await updateGppDescription(gppDescription);
+      setGppDescOriginal(result.newDefault);
+      setDescMessage({
+        type: 'success',
+        text: `Updated ${result.updatedCount} events. ${result.skippedCount} skipped (customized).`,
+      });
+      // Refresh stats
+      const fresh = await fetchGppDescription();
+      setGppCustomEvents(fresh.customizedEvents);
+      setGppTotalEvents(fresh.totalGppEvents);
+      setGppDefaultCount(fresh.defaultCount);
+    } catch (err: any) {
+      setDescMessage({ type: 'error', text: err.message || 'Failed to update' });
+    } finally {
+      setSavingDesc(false);
+    }
+  }
 
   async function handleAddSponsor(e: React.FormEvent) {
     e.preventDefault();
@@ -811,7 +860,7 @@ export function AdminPage() {
 
           {/* Event Setup Checklist — super admin only */}
           {isSuperAdmin && (
-            <section className="card p-6">
+            <section className="card p-6 mt-6">
               <div className="flex items-center gap-2 mb-4">
                 <ListChecks size={20} className="text-theme-text-secondary" />
                 <h2 className="text-lg font-semibold text-theme-text">Event Setup Checklist</h2>
@@ -892,9 +941,81 @@ export function AdminPage() {
             </section>
           )}
 
+          {/* GPP Default Description — super admin only */}
+          {isSuperAdmin && (
+            <section className="card p-6 mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText size={20} className="text-theme-text-secondary" />
+                <h2 className="text-lg font-semibold text-theme-text">GPP Default Description</h2>
+              </div>
+
+              <p className="text-sm text-theme-text-muted mb-4">
+                {gppDefaultCount} of {gppTotalEvents} events use the default
+              </p>
+
+              {descMessage && (
+                <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  descMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+                }`}>
+                  {descMessage.text}
+                </div>
+              )}
+
+              <IconInput
+                icon={FileText}
+                multiline
+                rows={8}
+                placeholder="Default description for new GPP events..."
+                value={gppDescription}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setGppDescription(e.target.value)}
+              />
+
+              <button
+                onClick={handleSaveGppDescription}
+                disabled={gppDescription === gppDescOriginal || savingDesc}
+                className="mt-4 px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
+              >
+                {savingDesc ? 'Saving...' : 'Save & Apply to Default Events'}
+              </button>
+
+              {gppCustomEvents.length > 0 && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomized(!showCustomized)}
+                    className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+                  >
+                    {showCustomized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {gppCustomEvents.length} event{gppCustomEvents.length !== 1 ? 's' : ''} with custom descriptions
+                  </button>
+
+                  {showCustomized && (
+                    <div className="mt-2 space-y-2">
+                      {gppCustomEvents.map((ev) => (
+                        <div key={ev.id} className="flex flex-col gap-0.5 py-2 px-3 rounded-lg bg-white/30 border border-theme-stroke">
+                          <a
+                            href={`/host/${ev.inviteCode}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-theme-text hover:underline"
+                          >
+                            {ev.name}
+                          </a>
+                          <span className="text-xs text-theme-text-muted truncate">
+                            {ev.descriptionPreview}{ev.descriptionPreview.length >= 100 ? '...' : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* GPP NFT Settings — super admin only */}
           {isSuperAdmin && (
-            <section className="card p-6">
+            <section className="card p-6 mt-6">
               <div className="flex items-center gap-2 mb-4">
                 <Shield size={20} className="text-theme-text-secondary" />
                 <h2 className="text-lg font-semibold text-theme-text">GPP NFT Settings</h2>

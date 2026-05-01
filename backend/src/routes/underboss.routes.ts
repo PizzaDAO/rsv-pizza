@@ -4,6 +4,7 @@ import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
+import { setDeleteContext } from '../helpers/auditContext.js';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -191,6 +192,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     address: party.address,
     venueName: party.venueName,
     region: party.region || null,
+    country: party.country || null,
     eventImageUrl: party.eventImageUrl || null,
     timezone: party.timezone || null,
     duration: party.duration ? Number(party.duration) : null,
@@ -211,6 +213,8 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     underbossApproved: party.underbossApproved || false,
     hostTags: party.hostTags || [],
     eventTags: party.eventTags || [],
+    underbossNotes: party.underbossNotes || null,
+    expectedGuests: party.expectedGuests || null,
     createdAt: party.createdAt,
     flyerGeneratedAt,
     latestSponsorAt: latestSponsorAtStr,
@@ -617,8 +621,11 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
 
-    const result = await prisma.party.deleteMany({
-      where: { id: { in: partyIds } },
+    const result = await prisma.$transaction(async (tx) => {
+      await setDeleteContext(tx, req.userEmail, 'underboss_bulk');
+      return tx.party.deleteMany({
+        where: { id: { in: partyIds } },
+      });
     });
 
     res.json({ deleted: result.count });
@@ -801,6 +808,53 @@ router.patch('/event/:partyId/tags', requireAuth, requireUnderbossAuth, async (r
       where: { id: partyId },
       data: { hostTags: cleanTags },
       select: { id: true, hostTags: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/expected-guests - Set expected guests
+router.patch('/event/:partyId/expected-guests', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { expectedGuests } = req.body;
+
+    if (expectedGuests !== null && expectedGuests !== undefined) {
+      const num = Number(expectedGuests);
+      if (!Number.isInteger(num) || num < 0) {
+        throw new AppError('expectedGuests must be a non-negative integer or null', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { expectedGuests: expectedGuests != null ? Number(expectedGuests) : null },
+      select: { id: true, expectedGuests: true },
+    });
+
+    res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/event/:partyId/notes - Set underboss notes
+router.patch('/event/:partyId/notes', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { notes } = req.body;
+
+    if (notes !== null && typeof notes !== 'string') {
+      throw new AppError('notes must be a string or null', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await prisma.party.update({
+      where: { id: partyId },
+      data: { underbossNotes: notes || null },
+      select: { id: true, underbossNotes: true },
     });
 
     res.json({ party });

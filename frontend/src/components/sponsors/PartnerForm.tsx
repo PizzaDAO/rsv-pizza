@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, MessageSquare, Loader2 } from 'lucide-react';
-import { Sponsor, SponsorStatus, SponsorshipType, SponsorUser } from '../../types';
+import { Sponsor, SponsorStatus, SponsorshipType, SponsorCategory, SPONSOR_CATEGORIES, SponsorUser } from '../../types';
 import { CreateSponsorData, PartnerIntakeResponse } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -48,6 +48,7 @@ export interface PartnerFormData {
   status: SponsorStatus;
   amount: number | null;
   lastContactedAt: string | null;
+  category: SponsorCategory | null;
 
   // Partner-only
   email: string;
@@ -79,6 +80,7 @@ export function extractSponsorData(data: PartnerFormData): CreateSponsorData {
     logoUrl: data.logoUrl || undefined,
     notes: data.notes || undefined,
     lastContactedAt: data.lastContactedAt,
+    category: data.category || undefined,
   };
 }
 
@@ -114,7 +116,7 @@ function getDefaultFormData(): PartnerFormData {
     contactTwitter: '', telegram: '',
     sponsorshipType: null, productService: '', sponsorMessage: '',
     pointPerson: '', status: 'todo' as SponsorStatus,
-    amount: null, lastContactedAt: null,
+    amount: null, lastContactedAt: null, category: null,
     email: '', tag: '', contactPersonName: '', coHostAvatarUrl: '',
     autoCoHost: false, autoSponsor: false,
   };
@@ -142,6 +144,7 @@ function sponsorToFormData(s: Sponsor): PartnerFormData {
     productService: s.productService || '',
     sponsorMessage: s.sponsorMessage || '',
     lastContactedAt: s.lastContactedAt ? s.lastContactedAt.split('T')[0] : null,
+    category: (s.category as SponsorCategory) || null,
   };
 }
 
@@ -155,11 +158,13 @@ function sponsorUserToFormData(su: SponsorUser): PartnerFormData {
     website: su.coHostWebsite || '',
     brandTwitter: su.coHostTwitter || '',
     brandInstagram: su.coHostInstagram || '',
+    brandDescription: su.brandDescription || '',
     coHostAvatarUrl: su.coHostAvatarUrl || '',
     logoUrl: su.coHostLogoUrl || '',
     autoCoHost: su.autoCoHost,
     autoSponsor: su.autoSponsor,
     notes: su.notes || '',
+    category: (su.category as SponsorCategory) || null,
   };
 }
 
@@ -240,6 +245,7 @@ export function PartnerForm({
   const [logoPreview, setLogoPreview] = useState<string | null>(() => {
     if (isCrm && sponsor?.logoUrl) return sponsor.logoUrl;
     if (isIntake && intakeInitialData?.logoUrl) return intakeInitialData.logoUrl;
+    if (isPartner && partnerData?.coHostLogoUrl) return partnerData.coHostLogoUrl;
     return null;
   });
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -257,6 +263,7 @@ export function PartnerForm({
   useEffect(() => {
     if (isPartner && partnerData) {
       setFormData(sponsorUserToFormData(partnerData));
+      if (partnerData.coHostLogoUrl) setLogoPreview(partnerData.coHostLogoUrl);
     }
   }, [partnerData, isPartner]);
 
@@ -316,8 +323,8 @@ export function PartnerForm({
     try {
       let logoUrl = formData.logoUrl;
 
-      // Upload logo if a new file was selected (CRM and intake modes)
-      if ((isCrm || isIntake) && logoFile) {
+      // Upload logo if a new file was selected (CRM, intake, and partner modes)
+      if ((isCrm || isIntake || isPartner) && logoFile) {
         setUploadingLogo(true);
         const uploadedUrl = await uploadSponsorLogo(logoFile);
         if (uploadedUrl) {
@@ -425,14 +432,14 @@ export function PartnerForm({
             />
           )}
         </div>
-        {(isCrm || isIntake) && (
+        {(isCrm || isIntake || isPartner) && (
           <IconInput
             icon={FileText}
             multiline
             rows={2}
             value={formData.brandDescription}
             onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-            placeholder="1-2 sentence description"
+            placeholder="1-2 sentence brand description (shown on event page)"
           />
         )}
       </div>
@@ -462,6 +469,26 @@ export function PartnerForm({
               <span className="text-xs text-theme-text-muted">Avatar preview</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Category — Partner mode */}
+      {isPartner && (
+        <div className="relative">
+          <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
+          <select
+            value={formData.category || ''}
+            onChange={e => handleChange('category', (e.target.value as SponsorCategory) || null)}
+            className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+            {SPONSOR_CATEGORIES.map(opt => (
+              <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -539,6 +566,22 @@ export function PartnerForm({
               >
                 {STATUS_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="relative">
+              <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
+              <select
+                value={formData.category || ''}
+                onChange={e => handleChange('category', (e.target.value as SponsorCategory) || null)}
+                className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
+                style={{ colorScheme: 'dark' }}
+              >
+                <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+                {SPONSOR_CATEGORIES.map(opt => (
+                  <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
                     {opt.label}
                   </option>
                 ))}
@@ -648,74 +691,54 @@ export function PartnerForm({
         </div>
       )}
 
-      {/* Logo — CRM + Intake have file upload, partner has URL only */}
+      {/* Logo — file upload + URL fallback (shared across CRM, Intake, Partner) */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
           <Image size={16} />
           Logo
         </h3>
-        {(isCrm || isIntake) ? (
-          logoPreview ? (
-            <div className="flex items-center gap-4">
-              <img
-                src={logoPreview}
-                alt="Logo preview"
-                className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-              />
-              <button
-                type="button"
-                onClick={removeLogo}
-                className="text-sm text-red-400 hover:text-red-300 transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-              >
-                <Upload size={16} />
-                Upload Logo
-              </button>
-              <div className="flex-1">
-                <IconInput
-                  icon={Globe}
-                  type="url"
-                  value={formData.logoUrl}
-                  onChange={e => handleChange('logoUrl', e.target.value)}
-                  placeholder="Or paste logo URL"
-                />
-              </div>
-            </div>
-          )
-        ) : (
-          <>
-            <IconInput
-              icon={Globe}
-              type="url"
-              value={formData.logoUrl}
-              onChange={e => handleChange('logoUrl', e.target.value)}
-              placeholder="Logo URL (for sponsor records)"
+        {logoPreview ? (
+          <div className="flex items-center gap-4">
+            <img
+              src={logoPreview}
+              alt="Logo preview"
+              className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
             />
-            {formData.logoUrl && (
-              <img
-                src={formData.logoUrl}
-                alt="Logo preview"
-                className="w-16 h-16 object-contain rounded-lg border border-theme-stroke bg-theme-surface"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            <button
+              type="button"
+              onClick={removeLogo}
+              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+            >
+              <Upload size={16} />
+              Upload Logo
+            </button>
+            <div className="flex-1">
+              <IconInput
+                icon={Globe}
+                type="url"
+                value={formData.logoUrl}
+                onChange={e => handleChange('logoUrl', e.target.value)}
+                placeholder="Or paste logo URL"
               />
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
 

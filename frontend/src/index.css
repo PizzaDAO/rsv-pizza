@@ -710,6 +710,6 @@ body.gpp-theme-active .pac-item-query {
   transform-origin: bottom right;
 }
 .venue-map-thumbnail a[href^="https://maps.google.com/maps"] {
-  transform: scale(0.7);
+  transform: scale(0.175);
   transform-origin: bottom left;
 }

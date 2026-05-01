@@ -3,5 +3,7 @@ export { KitFilters } from './KitFilters';
 export { KitRow } from './KitRow';
 export { KitTable } from './KitTable';
 export { KitDetailModal } from './KitDetailModal';
+export { KitContentsModal } from './KitContentsModal';
+export { CsvImportModal } from './CsvImportModal';
 export { CoordinatorManager } from './CoordinatorManager';
 export { CoordinatorModal } from './CoordinatorModal';

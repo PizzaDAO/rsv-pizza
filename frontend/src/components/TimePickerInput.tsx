@@ -13,7 +13,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Generate time options in 30-minute intervals
+  // Generate time options in 30-minute intervals + 11:59 PM
   const generateTimeOptions = () => {
     const options: string[] = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -22,6 +22,7 @@ export function TimePickerInput({ value, onChange, placeholder = '12:00 PM', cla
         options.push(time24);
       }
     }
+    options.push('23:59');
     return options;
   };
 

@@ -30,5 +30,6 @@ export const wagmiConfig = createConfig(
     appName: 'RSV.Pizza',
     appDescription: 'Pizza party RSVP and donation platform',
     appUrl: 'https://rsv.pizza',
+    enableAaveAccount: false,
   })
 );

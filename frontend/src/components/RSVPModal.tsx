@@ -9,6 +9,7 @@ import { DonationStep } from './DonationStep';
 import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/useRSVPForm';
 import { RSVPFormStep1 } from './RSVPFormStep1';
 import { RSVPFormStep2 } from './RSVPFormStep2';
+import { ShareRSVP } from './ShareRSVP';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 import { useAccount } from 'wagmi';
@@ -205,7 +206,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     };
 
     const getSuccessTitle = () => {
-      if (form.wasUpdated) return 'RSVP Updated!';
+      if (form.wasUpdated) return 'RSVP Updated';
       if (form.alreadyRegistered) return "You're already registered!";
       if (form.waitlisted) return "You're on the Waitlist!";
       if (form.pendingApproval) return 'RSVP Submitted!';
@@ -227,7 +228,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
 
     return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center px-2 py-4 sm:p-4 bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
       >
         <div
@@ -262,6 +263,30 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
             </p>
           )}
+          {/* Share Section */}
+          {(!form.alreadyRegistered || form.wasUpdated) && (() => {
+            const twitterHandles: string[] = [];
+            if (event.hostProfile?.twitter) twitterHandles.push(event.hostProfile.twitter);
+            if (event.coHosts) {
+              for (const host of event.coHosts) {
+                if (host.twitter && host.showOnEvent !== false) twitterHandles.push(host.twitter);
+              }
+            }
+            if (event.sponsors) {
+              for (const sponsor of event.sponsors) {
+                if (sponsor.brandTwitter) twitterHandles.push(sponsor.brandTwitter);
+              }
+            }
+            return (
+              <ShareRSVP
+                eventName={event.name}
+                eventImageUrl={event.eventImageUrl}
+                customUrl={event.customUrl}
+                inviteCode={event.inviteCode}
+                twitterHandles={twitterHandles}
+              />
+            );
+          })()}
           {/* NFT Minting Status */}
           {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && (
             <div className="mt-4 pt-4 border-t border-theme-stroke">
@@ -360,7 +385,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         data-testid="rsvp-modal"
         onClick={handleClose}
       >
-        <div className="min-h-full flex items-center justify-center p-4">
+        <div className="min-h-full flex items-center justify-center px-2 py-4 sm:p-4">
           <div
             className="card p-8 max-w-lg w-full relative"
             onClick={(e) => e.stopPropagation()}
@@ -397,7 +422,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onClick={handleClose}
     >
-      <div className="min-h-full flex items-center justify-center p-4">
+      <div className="min-h-full flex items-center justify-center px-2 py-4 sm:p-4">
         <div
           className="card p-8 max-w-2xl w-full relative"
           onClick={(e) => e.stopPropagation()}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot } from 'lucide-react';
+import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot, Pencil } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
@@ -42,6 +42,9 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       localStorage.setItem(storageKey, JSON.stringify(existing));
     }
   };
+
+  // Tagline editing state
+  const [editingTaglineId, setEditingTaglineId] = useState<string | null>(null);
 
   // Pizzeria selection state
   const [selectedPizzerias, setSelectedPizzerias] = useState<Pizzeria[]>([]);
@@ -340,6 +343,48 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                     </div>
                     {pizzeria.address && (
                       <p className="text-theme-text-muted text-xs truncate">{pizzeria.address}</p>
+                    )}
+                    {editingTaglineId === pizzeria.id ? (
+                      <div className="mt-1">
+                        <IconInput
+                          icon={Pencil}
+                          iconSize={12}
+                          multiline
+                          rows={2}
+                          defaultValue={pizzeria.description || ''}
+                          placeholder="Add tagline..."
+                          className="text-xs !py-1.5"
+                          autoFocus
+                          onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => {
+                            const newDescription = (e.target as HTMLTextAreaElement).value.trim();
+                            const updated = selectedPizzerias.map(p =>
+                              p.id === pizzeria.id ? { ...p, description: newDescription || undefined } : p
+                            );
+                            setSelectedPizzerias(updated);
+                            savePizzerias(updated);
+                            setEditingTaglineId(null);
+                          }}
+                          onKeyDown={(e: React.KeyboardEvent) => {
+                            if (e.key === 'Escape') {
+                              setEditingTaglineId(null);
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTaglineId(pizzeria.id);
+                        }}
+                        className="flex items-center gap-1 mt-0.5 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors group"
+                      >
+                        <span className={pizzeria.description ? '' : 'italic opacity-50'}>
+                          {pizzeria.description || 'Add tagline...'}
+                        </span>
+                        <Pencil size={10} className="opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
+                      </button>
                     )}
                     {hasVotes && scores && (
                       <div className="flex items-center gap-2 mt-0.5">

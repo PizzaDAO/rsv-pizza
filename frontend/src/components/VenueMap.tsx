@@ -5,6 +5,8 @@ import { geocodeAddress } from '../lib/ordering';
 interface VenueMapProps {
   address: string;
   venueName?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   className?: string;
   zoom?: number;
 }
@@ -19,6 +21,8 @@ interface VenueMapProps {
 export default function VenueMap({
   address,
   venueName,
+  latitude,
+  longitude,
   className,
   zoom = 17,
 }: VenueMapProps) {
@@ -28,15 +32,23 @@ export default function VenueMap({
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState(false);
 
-  // Geocode the venue address once (or whenever it changes). We use the
-  // existing `geocodeAddress` helper so behavior matches the distance badges
-  // in ParticipatingPizzerias.
+  // Use stored lat/lng if available; otherwise geocode the venue address.
+  // We use the existing `geocodeAddress` helper as the fallback so behavior
+  // matches the distance badges in ParticipatingPizzerias.
   useEffect(() => {
     let cancelled = false;
     if (!address) {
       setLocation(null);
       return;
     }
+
+    // If stored coordinates are provided, use them directly (no network call)
+    if (latitude != null && longitude != null) {
+      setLocation({ lat: latitude, lng: longitude });
+      return;
+    }
+
+    // Fallback: client-side geocoding via Nominatim
     (async () => {
       try {
         const result = await geocodeAddress(address);
@@ -54,7 +66,7 @@ export default function VenueMap({
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, latitude, longitude]);
 
   // Once we have coordinates, load the Google Maps JS SDK (if needed) and
   // render the map + single red marker.
@@ -93,13 +105,10 @@ export default function VenueMap({
         position: location,
         map: mapRef.current,
         title: venueName || address,
-        label: {
-          text: '\u{1F389}',
-          fontSize: '28px',
-        },
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 0,
+          url: '/molto-benny.png',
+          scaledSize: new google.maps.Size(54, 54),
+          anchor: new google.maps.Point(27, 54),
         },
       });
     };

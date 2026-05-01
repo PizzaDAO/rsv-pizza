@@ -50,6 +50,8 @@ model Party {
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
   address            String?
+  latitude           Float?
+  longitude          Float?
   venueName          String?   @map("venue_name")
   venueStatus        String?   @map("venue_status")
   venueCapacity      Int?      @map("venue_capacity")
@@ -62,6 +64,7 @@ model Party {
   venueWebsite       String?   @map("venue_website")
   venueNotes         String?   @map("venue_notes")
   maxGuests          Int?      @map("max_guests")
+  expectedGuests     Int?      @map("expected_guests")
   hideGuests         Boolean   @default(false) @map("hide_guests")
   requireApproval    Boolean   @default(false) @map("require_approval")
   coHosts            Json      @default("[]") @map("co_hosts")
@@ -129,6 +132,10 @@ model Party {
   farcasterViews     Int?      @map("farcaster_views")    // Farcaster view count
   lumaUrl            String?   @map("luma_url")           // Luma event URL
   lumaViews          Int?      @map("luma_views")         // Luma page views
+  meetupUrl          String?   @map("meetup_url")         // Meetup event URL
+  eventbriteUrl      String?   @map("eventbrite_url")     // Eventbrite event URL
+  externalLinks      Json?     @default("[]") @map("external_links") // Custom external links [{label, url}]
+  telegramGroup      String?   @map("telegram_group") @db.VarChar     // City Telegram group link
   poapEventId        String?   @map("poap_event_id")      // POAP event ID
   poapMints          Int?      @map("poap_mints")         // POAP mint count
   poapMoments        Int?      @map("poap_moments")       // POAP moments count
@@ -151,11 +158,20 @@ model Party {
 
   // Region (for underboss dashboard)
   region  String?
+  country String?
 
   // Underboss dashboard fields
   hostStatus        String?  @map("host_status")
   underbossApproved Boolean  @default(false) @map("underboss_approved")
   hostTags          Json     @default("[]") @map("host_tags")
+  underbossNotes    String?  @map("underboss_notes")
+
+  // GPP (Global Pizza Party/Previous year) photo management
+  hiddenGppPhotos  Json  @default("[]") @map("hidden_gpp_photos")  // Array of hidden app.gpp.day photo src paths
+  extraGppPhotos   Json  @default("[]") @map("extra_gpp_photos")   // Array of host-uploaded previous year photo URLs
+
+  // Quiz settings
+  quizEnabled Boolean @default(false) @map("quiz_enabled")
 
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -179,6 +195,9 @@ model Party {
   pageViews             PageView[]
   linkClicks            LinkClick[]
   sponsorChecklistItems SponsorChecklistItem[]
+  partnerEventNotes     PartnerEventNote[]
+  quizQuestions         QuizQuestion[]
+  slugAliases           SlugAlias[]
 
   @@map("parties")
 }
@@ -228,6 +247,7 @@ model Guest {
   raffleEntries    RaffleEntry[]
   raffleWins       RaffleWinner[]
   notableAttendees NotableAttendee[]
+  quizAnswers      QuizAnswer[]
 
   @@index([email])
   @@map("guests")
@@ -239,7 +259,7 @@ model SocialPost {
   partyId      String   @map("party_id") @db.Uuid
   party        Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  platform     String   // "twitter", "farcaster", "instagram"
+  platform     String   // "twitter", "farcaster", "instagram", "facebook", "linkedin"
   url          String   // Full URL to the post
   authorHandle String?  @map("author_handle")
   title        String?  // Title/description of what the post is about
@@ -845,8 +865,8 @@ model Sponsor {
   // Assets (for confirmed sponsors)
   logoUrl String? @map("logo_url")
 
-  // Display order (for flyer sponsor row reordering)
-  sortOrder Int @default(0) @map("sort_order")
+  // Category
+  category String? // hardware_wallet, software_wallet, cex, blockchain, dex, community, custom
 
   // Tracking
   notes           String? // Communication history, notes
@@ -857,12 +877,18 @@ model Sponsor {
   intakeSubmittedAt DateTime? @map("intake_submitted_at") @db.Timestamptz
   sponsorMessage    String?   @map("sponsor_message")
 
+  // Display order (for flyer logo row)
+  sortOrder Int @default(0) @map("sort_order")
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  quizQuestions QuizQuestion[]
+
   @@index([partyId, status])
   @@index([partyId, createdAt])
+  @@index([partyId, sortOrder])
   @@map("sponsors")
 }
 
@@ -1107,13 +1133,20 @@ model SponsorUser {
   coHostLogoUrl   String?   @map("co_host_logo_url")
   autoCoHost      Boolean   @default(false) @map("auto_co_host")
   autoSponsor     Boolean   @default(false) @map("auto_sponsor")
+  category        String?
+
+  // Brand info (synced to Sponsor records)
+  brandDescription     String? @map("brand_description")
+  descriptionSortOrder Int     @default(0) @map("description_sort_order")
 
   // Granular co-host permissions (applied when autoCoHost adds them to events)
   coHostShowOnEvent Boolean @default(true)  @map("co_host_show_on_event")
   coHostCanEdit     Boolean @default(false) @map("co_host_can_edit")
   coHostAllowedTabs Json?   @map("co_host_allowed_tabs")
 
-  checklistItems SponsorChecklistItem[]
+  checklistItems        SponsorChecklistItem[]
+  quizQuestionTemplates QuizQuestionTemplate[]
+  partnerEventNotes     PartnerEventNote[]
 
   @@index([tag])
   @@map("sponsor_users")
@@ -1137,4 +1170,114 @@ model SponsorChecklistItem {
   @@index([sponsorUserId])
   @@index([partyId])
   @@map("sponsor_checklist_items")
+}
+
+model PartnerEventNote {
+  id            String      @id @default(uuid()) @db.Uuid
+  sponsorUserId String      @map("sponsor_user_id") @db.Uuid
+  sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
+  partyId       String      @map("party_id") @db.Uuid
+  party         Party       @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  notes         String      @default("")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([sponsorUserId, partyId])
+  @@index([sponsorUserId])
+  @@index([partyId])
+  @@map("partner_event_notes")
+}
+
+// ============================================
+// App Config (key-value store)
+// ============================================
+
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("app_config")
+}
+
+// ============================================
+// Quiz Models
+// ============================================
+
+// Quiz question templates (global, per partner — managed by underboss)
+model QuizQuestionTemplate {
+  id            String      @id @default(uuid()) @db.Uuid
+  sponsorUserId String      @map("sponsor_user_id") @db.Uuid
+  sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
+
+  question     String
+  options      Json    @default("[]") // ["Option A", "Option B", "Option C", "Option D"]
+  correctIndex Int     @map("correct_index")
+  explanation  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  quizQuestions QuizQuestion[]
+
+  @@index([sponsorUserId])
+  @@map("quiz_question_templates")
+}
+
+// Quiz questions (per event, copied from templates or created by host)
+model QuizQuestion {
+  id       String  @id @default(uuid()) @db.Uuid
+  partyId  String  @map("party_id") @db.Uuid
+  party    Party   @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  sponsorId  String?  @map("sponsor_id") @db.Uuid
+  sponsor    Sponsor? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+
+  templateId String?               @map("template_id") @db.Uuid
+  template   QuizQuestionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  question     String
+  options      Json    @default("[]") // ["Option A", "Option B", "Option C", "Option D"]
+  correctIndex Int     @map("correct_index")
+  explanation  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  answers QuizAnswer[]
+
+  @@index([partyId])
+  @@map("quiz_questions")
+}
+
+// Quiz answers (guest responses)
+model QuizAnswer {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  guestId String @map("guest_id") @db.Uuid
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  selectedIndex Int     @map("selected_index")
+  isCorrect     Boolean @map("is_correct")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([questionId, guestId])
+  @@index([questionId])
+  @@index([guestId])
+  @@map("quiz_answers")
+}
+
+model SlugAlias {
+  oldSlug   String   @id @map("old_slug")
+  partyId   String   @map("party_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@map("slug_aliases")
 }
