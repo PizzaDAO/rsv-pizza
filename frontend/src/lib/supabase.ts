@@ -429,6 +429,7 @@ export interface DbParty {
   region?: string | null;
   event_type?: string | null;
   event_tags?: string[];
+  flyer_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
 }
@@ -481,7 +482,8 @@ export const SAFE_PARTY_COLUMNS = `
   report_published, report_public_slug,
   venue_report_published, venue_report_slug, venue_report_title, venue_report_notes,
   pinned_apps,
-  region
+  region,
+  flyer_generated_at
 `;
 
 /**
@@ -1316,6 +1318,7 @@ export async function updateParty(
     venue_report_notes?: string | null;
     pinned_apps?: string[];
     region?: string | null;
+    flyer_generated_at?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1368,6 +1371,7 @@ export async function updateParty(
         venueReportNotes: updates.venue_report_notes,
         pinnedApps: updates.pinned_apps,
         region: updates.region,
+        flyerGeneratedAt: updates.flyer_generated_at,
       });
       return true;
     } catch (error) {

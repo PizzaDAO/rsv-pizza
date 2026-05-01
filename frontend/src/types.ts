@@ -263,6 +263,7 @@ export interface Party {
   donationEthAddress?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  flyerGeneratedAt?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
 }
@@ -995,6 +996,9 @@ export interface UnderbossEvent {
   hostTags: string[];
   eventTags: string[];
   createdAt: string;
+  flyerGeneratedAt: string | null;
+  latestSponsorAt: string | null;
+  flyerStale: boolean;
 }
 
 export interface UnderbossStats {

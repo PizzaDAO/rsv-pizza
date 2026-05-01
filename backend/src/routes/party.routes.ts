@@ -393,7 +393,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       nftEnabled, nftChain,
       pinnedApps,
       region,
-      venueReportTitle, venueReportNotes
+      venueReportTitle, venueReportNotes,
+      flyerGeneratedAt
     } = req.body;
 
     // Verify ownership or super admin
@@ -485,6 +486,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(region !== undefined && { region: region || null }),
         ...(venueReportTitle !== undefined && { venueReportTitle: venueReportTitle || null }),
         ...(venueReportNotes !== undefined && { venueReportNotes: venueReportNotes || null }),
+        ...(flyerGeneratedAt !== undefined && { flyerGeneratedAt: flyerGeneratedAt ? new Date(flyerGeneratedAt) : null }),
       },
       include: {
         user: { select: { name: true } },

@@ -8,6 +8,11 @@ import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag'
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 import { uploadEventImage, updateParty } from '../../lib/supabase';
+import {
+  fitText, loadImg, uses12Hour, formatFlyerTime,
+  CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
+  CITY_BOX, VENUE_BOX, TIME_BOX, DEFAULT_SPONSOR_BOX,
+} from './renderFlyer';
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -16,90 +21,6 @@ function parseCityFromAddress(address: string): string {
   return parts[0];
 }
 
-/**
- * Measure text with an offscreen canvas and return the optimal font size
- * that fits within maxWidth, starting from maxFontSize down to minFontSize.
- */
-function fitText(
-  text: string,
-  fontFamily: string,
-  maxFontSize: number,
-  maxWidth: number,
-  minFontSize: number = 14,
-): number {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return maxFontSize;
-
-  let size = maxFontSize;
-  // Quote font family names with spaces for canvas API
-  const quotedFont = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily;
-  while (size > minFontSize) {
-    ctx.font = `${size}px ${quotedFont}`;
-    const measured = ctx.measureText(text.toUpperCase());
-    if (measured.width <= maxWidth) break;
-    size -= 1;
-  }
-  return Math.max(size, minFontSize);
-}
-
-/** Load an image as a promise for canvas drawing */
-function loadImg(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-/**
- * Determine whether the given IANA timezone's country conventionally uses
- * 12-hour time (e.g. "6:00 PM") or 24-hour time (e.g. "18:00").
- */
-function uses12Hour(tz: string): boolean {
-  const TWELVE_HOUR_ZONES = new Set([
-    'Asia/Kolkata', 'Asia/Calcutta',  // India
-    'Asia/Manila',                     // Philippines
-    'Asia/Riyadh', 'Asia/Jeddah',     // Saudi Arabia
-    'Asia/Dubai',                      // UAE
-  ]);
-  if (TWELVE_HOUR_ZONES.has(tz)) return true;
-  // America/ covers US, Canada, Mexico, Colombia, etc. — all 12-hour
-  // Australia/ — 12-hour
-  if (tz.startsWith('America/') || tz.startsWith('Australia/')) return true;
-  // Default: 24-hour (Europe, most of Asia, Africa)
-  return false;
-}
-
-/**
- * Format a 24-hour "HH:MM" time string to the appropriate display format.
- * - 12-hour mode: "6 PM" (or "6:30 PM" when minutes are non-zero)
- * - 24-hour mode: "18:00"
- */
-function formatFlyerTime(timeStr: string, is12h: boolean): string {
-  if (!is12h) return timeStr; // already "HH:MM"
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  return minutes === 0
-    ? `${hours12} ${period}`
-    : `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-}
-
-const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';
-const TEXT_FONT = '"Hub 191", "Comic Sans MS", "Comic Sans", cursive';
-const CITY_COLOR = '#FE332C';
-const TIME_COLOR = '#FFFFFF';
-const VENUE_COLOR = '#0497C1';
-
-// Bounding box dimensions (measured from boxes overlay at 1080px)
-const CITY_BOX = { width: 587, height: 72 };
-const VENUE_BOX = { width: 600, height: 110 };
-const TIME_BOX = { width: 600, height: 60 }; // sized for "MAY 22  6 PM - 9 PM"
-/** Default sponsor logo bounding box. Width/height are user-resizable at runtime. */
-const DEFAULT_SPONSOR_BOX = { width: 759, height: 171 };
 /** Min/max sponsor box dimensions in 1080px canvas units. */
 const SPONSOR_BOX_MIN = 100;
 const SPONSOR_BOX_MAX = 1080;
@@ -640,7 +561,10 @@ export function FlyerGenerator() {
       const uploadedUrl = await uploadEventImage(file);
       if (!uploadedUrl) throw new Error('Upload failed');
 
-      const success = await updateParty(party.id, { event_image_url: uploadedUrl });
+      const success = await updateParty(party.id, {
+        event_image_url: uploadedUrl,
+        flyer_generated_at: new Date().toISOString(),
+      });
       if (!success) throw new Error('Failed to update party');
 
       if (party.inviteCode) {

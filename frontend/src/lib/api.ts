@@ -153,6 +153,7 @@ export interface UpdatePartyData {
   venueReportNotes?: string | null;
   pinnedApps?: string[];
   region?: string | null;
+  flyerGeneratedAt?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -235,6 +236,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       venueReportNotes: data.venueReportNotes,
       pinnedApps: data.pinnedApps,
       region: data.region,
+      flyerGeneratedAt: data.flyerGeneratedAt,
     },
   });
 }
