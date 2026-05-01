@@ -1004,18 +1004,6 @@ export async function deleteSponsor(partyId: string, sponsorId: string): Promise
   }
 }
 
-// Reorder sponsors for a party (host)
-export async function reorderSponsors(
-  partyId: string,
-  sponsorIds: string[]
-): Promise<{ sponsors: Sponsor[] }> {
-  return apiRequest<{ sponsors: Sponsor[] }>(`/api/parties/${partyId}/sponsors/reorder`, {
-    method: 'PATCH',
-    body: { sponsorIds },
-    requireAuth: true,
-  });
-}
-
 // Unified sponsors (event + underboss partners)
 export async function getUnifiedSponsors(partyId: string): Promise<{ partners: UnifiedPartner[] }> {
   return apiRequest<{ partners: UnifiedPartner[] }>(`/api/parties/${partyId}/sponsors/unified`);
