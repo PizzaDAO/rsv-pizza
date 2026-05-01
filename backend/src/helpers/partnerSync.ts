@@ -204,6 +204,15 @@ export async function removePartnerFromParty(
       data: { coHosts: filtered },
     });
   }
+
+  // Also remove auto-created sponsor records for this tag
+  const autoNote = `Auto-created from partner tag "${tag}"`;
+  await prisma.sponsor.deleteMany({
+    where: {
+      partyId,
+      notes: autoNote,
+    },
+  });
 }
 
 /**
