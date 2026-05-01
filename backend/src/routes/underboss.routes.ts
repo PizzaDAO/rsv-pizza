@@ -398,11 +398,11 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
           partyId: { in: partyIds },
           status: { in: ['yes', 'paid'] },
         },
-        _max: { createdAt: true },
+        _max: { updatedAt: true },
       });
       for (const row of sponsorTimestamps) {
-        if (row._max.createdAt) {
-          latestSponsorMap.set(row.partyId, row._max.createdAt);
+        if (row._max.updatedAt) {
+          latestSponsorMap.set(row.partyId, row._max.updatedAt);
         }
       }
     }
@@ -467,11 +467,11 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
           partyId: { in: partyIds },
           status: { in: ['yes', 'paid'] },
         },
-        _max: { createdAt: true },
+        _max: { updatedAt: true },
       });
       for (const row of sponsorTimestamps) {
-        if (row._max.createdAt) {
-          latestSponsorMap.set(row.partyId, row._max.createdAt);
+        if (row._max.updatedAt) {
+          latestSponsorMap.set(row.partyId, row._max.updatedAt);
         }
       }
     }
