@@ -331,6 +331,146 @@ export function RSVPFormStep1({
         </>
       )}
 
+      {/* SWC EU checkbox + info modal */}
+      {form.isSwcEuEvent && (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcEuOptIn(!form.swcEuOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcEuOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcEuInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {/* SWC EU Info Modal */}
+          {form.showSwcEuInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcEuInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcEuInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto EU</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Europe. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/eu/en/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC EU Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/eu/en/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
+      )}
+
+      {/* SWC UK checkbox + info modal */}
+      {form.isSwcUkEvent && (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcUkOptIn(!form.swcUkOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcUkOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcUkInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {/* SWC UK Info Modal */}
+          {form.showSwcUkInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcUkInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcUkInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto UK</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in the UK. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/gb/en/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC UK Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/gb/en/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
+      )}
+
       {/* ETHConf discount opt-in */}
       {form.isEthconfEvent && (
         <button
