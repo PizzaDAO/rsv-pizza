@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ What to expect:
 
 RSVP to secure your slice!`,
   eventType: 'gpp',
-  eventTags: ['Global Pizza Party'],
+  eventTags: ['Global Pizza Party', 'wpc', 'ens'],
   requireApproval: true,
   hideGuests: false,
   photosEnabled: true,
@@ -354,6 +355,16 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         user: { select: { name: true } },
       },
     });
+
+    // Auto-sync partner co-hosts + sponsors for default tags
+    try {
+      const partners = await getAutoCoHostPartners(GPP_DEFAULTS.eventTags);
+      for (const partner of partners) {
+        await addPartnerToParty(party as any, partner);
+      }
+    } catch (err) {
+      console.error('Failed to sync auto partners:', err);
+    }
 
     // Add the host as a guest
     await prisma.guest.create({
