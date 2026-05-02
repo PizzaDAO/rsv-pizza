@@ -554,6 +554,7 @@ export interface DbGuest {
   suggested_pizzerias?: any[];
   swc_opt_in?: boolean;
   swc_ca_opt_in?: boolean;
+  swc_au_opt_in?: boolean;
   ethconf_opt_in?: boolean;
   submitted_at: string;
   submitted_via: string;
@@ -1080,6 +1081,7 @@ export async function addGuestToParty(
   suggestedPizzerias?: any[],
   swcOptIn?: boolean,
   swcCaOptIn?: boolean,
+  swcAuOptIn?: boolean,
   ethconfOptIn?: boolean
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
@@ -1106,6 +1108,7 @@ export async function addGuestToParty(
         suggestedPizzerias: suggestedPizzerias || [],
         swcOptIn: swcOptIn || false,
         swcCaOptIn: swcCaOptIn || false,
+        swcAuOptIn: swcAuOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
       }),
     });
@@ -1136,6 +1139,7 @@ export async function addGuestToParty(
       suggested_pizzerias: suggestedPizzerias || [],
       swc_opt_in: swcOptIn || false,
       swc_ca_opt_in: swcCaOptIn || false,
+      swc_au_opt_in: swcAuOptIn || false,
       ethconf_opt_in: ethconfOptIn || false,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),

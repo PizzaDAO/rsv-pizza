@@ -212,6 +212,7 @@ model Guest {
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   swcOptIn            Boolean  @default(false) @map("swc_opt_in")
   swcCaOptIn          Boolean  @default(false) @map("swc_ca_opt_in")
+  swcAuOptIn          Boolean  @default(false) @map("swc_au_opt_in")
   ethconfOptIn        Boolean  @default(false) @map("ethconf_opt_in")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")

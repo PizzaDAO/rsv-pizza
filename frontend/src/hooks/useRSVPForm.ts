@@ -113,6 +113,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [showSwcInfoModal, setShowSwcInfoModal] = useState(false);
   const [swcCaOptIn, setSwcCaOptIn] = useState(false);
   const [showSwcCaInfoModal, setShowSwcCaInfoModal] = useState(false);
+  const [swcAuOptIn, setSwcAuOptIn] = useState(false);
+  const [showSwcAuInfoModal, setShowSwcAuInfoModal] = useState(false);
   const [ethconfOptIn, setEthconfOptIn] = useState(false);
 
   // Step 2 - Pizza Preferences
@@ -146,6 +148,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   // Computed values
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
   const isSwcCaEvent = (eventData.eventTags || []).includes('swccanada');
+  const isSwcAuEvent = (eventData.eventTags || []).includes('swcau');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
@@ -387,6 +390,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         suggestedPizzerias.length > 0 ? suggestedPizzerias : undefined,
         swcOptIn || undefined,
         swcCaOptIn || undefined,
+        swcAuOptIn || undefined,
         ethconfOptIn || undefined,
       );
 
@@ -428,7 +432,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, ethconfOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, ethconfOptIn,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -460,6 +464,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setSwcCaOptIn,
     showSwcCaInfoModal,
     setShowSwcCaInfoModal,
+    swcAuOptIn,
+    setSwcAuOptIn,
+    showSwcAuInfoModal,
+    setShowSwcAuInfoModal,
     ethconfOptIn,
     setEthconfOptIn,
 
@@ -523,6 +531,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     // Computed
     isSwcEvent,
     isSwcCaEvent,
+    isSwcAuEvent,
     isEthconfEvent,
     isEditing,
     excludedToppings,
