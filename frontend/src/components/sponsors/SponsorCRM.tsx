@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, GripVertical, FileText, Globe } from 'lucide-react';
 import { Sponsor, SponsorStats, SponsorStatus, UnifiedPartner } from '../../types';
 import {
@@ -37,6 +37,17 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
   const [descDragIndex, setDescDragIndex] = useState<number | null>(null);
   const [unifiedPartners, setUnifiedPartners] = useState<UnifiedPartner[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+
+  // Build avatar URL map from unified partners for the sponsor table
+  const sponsorAvatarUrls = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of unifiedPartners) {
+      if (p.sponsorId && p.avatarUrl) {
+        map[p.sponsorId] = p.avatarUrl;
+      }
+    }
+    return map;
+  }, [unifiedPartners]);
 
   // Load sponsors and stats
   const loadData = useCallback(async (showRefresh = false) => {
@@ -301,6 +312,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
         onSponsorUpdate={(updated) => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
         onStatusChange={handleStatusChange}
         isLoading={isRefreshing}
+        avatarUrls={sponsorAvatarUrls}
       />
 
       {/* Brand Description Order (Unified) */}
@@ -329,8 +341,8 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
                 <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0">
                   <GripVertical size={16} />
                 </div>
-                {partner.logoUrl && (
-                  <img src={partner.logoUrl} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                {(partner.avatarUrl || partner.logoUrl) && (
+                  <img src={partner.avatarUrl || partner.logoUrl!} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                 )}
                 <span className="text-sm text-theme-text font-medium truncate">{partner.name}</span>
                 {partner.source === 'underboss' && (

@@ -14,6 +14,7 @@ interface SponsorListProps {
   onSponsorUpdate: (sponsor: Sponsor) => void;
   onStatusChange: (sponsor: Sponsor, newStatus: SponsorStatus) => void;
   isLoading?: boolean;
+  avatarUrls?: Record<string, string>;
 }
 
 type SortField = 'name' | 'status' | 'amount' | 'lastContactedAt' | 'createdAt';
@@ -41,7 +42,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, onStatusChange, isLoading }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, onStatusChange, isLoading, avatarUrls }: SponsorListProps) {
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterStatus, setFilterStatus] = useState<SponsorStatus | 'all'>('all');
@@ -233,7 +234,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                         value={sponsor.status}
                         onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
                         className={`appearance-none rounded-full px-2.5 py-0.5 pr-6 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
-                        style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+                        style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }}
                       >
                         {Object.entries(STATUS_CONFIG).map(([status, config]) => (
                           <option key={status} value={status} className="bg-theme-header text-theme-text">
@@ -248,11 +249,11 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   {/* Sponsor Name & Organization */}
                   <td className="p-3">
                     <div className="flex items-start gap-2">
-                      {sponsor.logoUrl && (
+                      {(avatarUrls?.[sponsor.id] || sponsor.logoUrl) && (
                         <img
-                          src={sponsor.logoUrl}
+                          src={avatarUrls?.[sponsor.id] || sponsor.logoUrl!}
                           alt=""
-                          className="w-8 h-8 rounded object-cover flex-shrink-0"
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                         />
                       )}
                       <div className="min-w-0">

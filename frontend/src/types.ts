@@ -1257,6 +1257,7 @@ export interface UnifiedPartner {
   name: string;
   brandDescription: string;
   logoUrl: string | null;
+  avatarUrl: string | null;
   website: string | null;
   sortOrder: number;
 }

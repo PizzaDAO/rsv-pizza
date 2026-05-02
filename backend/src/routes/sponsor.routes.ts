@@ -125,6 +125,7 @@ router.get('/:partyId/sponsors/unified', requireAuth, async (req: AuthRequest, r
         name: s.name,
         brandDescription: s.brandDescription,
         logoUrl: s.logoUrl,
+        avatarUrl: null,
         website: s.website,
         sortOrder: s.sortOrder ?? 0,
       });
@@ -142,6 +143,7 @@ router.get('/:partyId/sponsors/unified', requireAuth, async (req: AuthRequest, r
         if (existing) {
           existing.sponsorUserId = su.id;
           existing.source = 'event'; // keep as event since it has a Sponsor record
+          existing.avatarUrl = su.coHostAvatarUrl;
         }
         continue;
       }
@@ -154,6 +156,7 @@ router.get('/:partyId/sponsors/unified', requireAuth, async (req: AuthRequest, r
         name: su.coHostName || su.name || su.email,
         brandDescription: su.brandDescription,
         logoUrl: su.coHostLogoUrl,
+        avatarUrl: su.coHostAvatarUrl,
         website: su.coHostWebsite,
         sortOrder: 9999 + su.descriptionSortOrder,
       });
