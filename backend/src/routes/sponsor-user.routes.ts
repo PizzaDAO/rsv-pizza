@@ -653,7 +653,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         id: event.id,
         name: event.name,
         slug: event.customUrl || event.inviteCode,
-        reportPublicSlug: event.reportPublished ? (event.reportPublicSlug || null) : null,
+        reportPublicSlug: event.reportPublicSlug || event.customUrl || event.inviteCode,
         date: event.date,
         timezone: event.timezone,
         address: event.address,

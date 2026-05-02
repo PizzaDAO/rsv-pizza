@@ -323,35 +323,43 @@ router.delete('/:partyId/report/publish', requireAuth, async (req: AuthRequest, 
   }
 });
 
-// Helper: check if user is a sponsor tagged on an event (by public slug)
-async function isSponsorForReport(publicSlug: string, userEmail?: string): Promise<boolean> {
+// Helper: find a party by reportPublicSlug, customUrl, or inviteCode
+async function findPartyBySlug(slug: string) {
+  // Try reportPublicSlug first
+  let party = await prisma.party.findUnique({ where: { reportPublicSlug: slug } });
+  if (party) return party;
+  // Try customUrl
+  party = await prisma.party.findFirst({ where: { customUrl: slug } });
+  if (party) return party;
+  // Try inviteCode
+  party = await prisma.party.findFirst({ where: { inviteCode: slug } });
+  return party;
+}
+
+// Helper: check if user is a sponsor tagged on an event (by any slug)
+async function isSponsorForReport(slug: string, userEmail?: string): Promise<boolean> {
   if (!userEmail) return false;
   const sponsorUser = await prisma.sponsorUser.findFirst({
     where: { email: userEmail.toLowerCase(), isActive: true },
   });
   if (!sponsorUser) return false;
-  const party = await prisma.party.findUnique({
-    where: { reportPublicSlug: publicSlug },
-    select: { eventTags: true },
-  });
-  return !!(party?.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag));
+  const party = await findPartyBySlug(slug);
+  return !!(party?.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).includes(sponsorUser.tag));
 }
 
 // GET /api/reports/:publicSlug/check - Check if report requires password (public, optionalAuth)
 router.get('/public/:publicSlug/check', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { publicSlug } = req.params;
-    const party = await prisma.party.findUnique({
-      where: { reportPublicSlug: publicSlug },
-      select: { reportPublished: true, reportPassword: true, name: true },
-    });
+    const party = await findPartyBySlug(publicSlug);
 
-    if (!party || !party.reportPublished) {
+    // Sponsors tagged on this event bypass both publish and password checks
+    const sponsorBypass = party ? await isSponsorForReport(publicSlug, req.userEmail) : false;
+
+    if (!party || (!party.reportPublished && !sponsorBypass)) {
       throw new AppError('Report not found', 404, 'NOT_FOUND');
     }
 
-    // Sponsors tagged on this event bypass the password
-    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
     res.json({ requiresPassword: !sponsorBypass && !!party.reportPassword, name: party.name });
   } catch (error) {
     next(error);
@@ -364,20 +372,21 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
     const { publicSlug } = req.params;
     const password = req.query.password as string | undefined;
 
-    // Quick password check before loading full data
-    const check = await prisma.party.findUnique({
-      where: { reportPublicSlug: publicSlug },
-      select: { reportPassword: true, reportPublished: true },
-    });
+    // Find party by any slug type
+    const check = await findPartyBySlug(publicSlug);
 
-    // Sponsors tagged on this event bypass the password
-    const sponsorBypass = await isSponsorForReport(publicSlug, req.userEmail);
+    // Sponsors tagged on this event bypass publish + password
+    const sponsorBypass = check ? await isSponsorForReport(publicSlug, req.userEmail) : false;
     if (check?.reportPassword && !sponsorBypass && check.reportPassword !== password) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 
+    if (!check) {
+      throw new AppError('Report not found', 404, 'NOT_FOUND');
+    }
+
     const party = await prisma.party.findUnique({
-      where: { reportPublicSlug: publicSlug },
+      where: { id: check.id },
       include: {
         socialPosts: { orderBy: { sortOrder: 'asc' } },
         notableAttendees: {
@@ -412,7 +421,7 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
       throw new AppError('Report not found', 404, 'NOT_FOUND');
     }
 
-    if (!party.reportPublished) {
+    if (!party.reportPublished && !sponsorBypass) {
       throw new AppError('Report is not published', 404, 'NOT_PUBLISHED');
     }
 
