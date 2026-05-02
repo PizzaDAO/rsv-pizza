@@ -392,13 +392,18 @@ export function PartnerDashboardPage() {
         {allEvents.length > 0 && (() => {
           const totalRsvps = allEvents.reduce((sum, e) => sum + (e.rsvpCount || 0), 0);
           const avgRsvps = allEvents.length > 0 ? Math.round(totalRsvps / allEvents.length) : 0;
+          const totalImpressions = allEvents.reduce((sum, e) => sum + (e.impressions?.totalViews || 0), 0);
+          const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
+          const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
+          const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
+          const isSwc = dashboardData?.tag === 'swc';
           const withVenue = allEvents.filter(e => e.progress?.hasVenue).length;
           const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
           const venueRate = allEvents.length > 0 ? Math.round((withVenue / allEvents.length) * 100) : 0;
           const budgetRate = allEvents.length > 0 ? Math.round((withBudget / allEvents.length) * 100) : 0;
           return (
             <div className="mb-6 space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className={`grid grid-cols-2 gap-3 ${isSwc ? 'md:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20 text-blue-400"><BarChart3 size={16} /></div>
@@ -416,36 +421,56 @@ export function PartnerDashboardPage() {
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-orange-500/20 text-orange-400"><MapPin size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Venue</span>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-cyan-500/20 text-cyan-400"><Eye size={16} /></div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Impressions</span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{withVenue}</div>
+                  <div className="text-2xl font-bold text-theme-text">{totalImpressions.toLocaleString()}</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueVisitors.toLocaleString()} unique</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-yellow-500/20 text-yellow-400"><Wallet size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Budget</span>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/20 text-green-400"><MousePointerClick size={16} /></div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Clicks</span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{withBudget}</div>
+                  <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
                 </div>
-                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 col-span-2 md:col-span-3 lg:col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp size={14} className="text-theme-text-muted" />
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-theme-text-muted w-14 shrink-0">Venue</span>
-                      <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${venueRate}%` }} /></div>
-                      <span className="text-xs text-theme-text-secondary w-10 text-right">{venueRate}%</span>
+                {isSwc && (
+                  <>
+                    <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-orange-500/20 text-orange-400"><MapPin size={16} /></div>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Venue</span>
+                      </div>
+                      <div className="text-2xl font-bold text-theme-text">{withVenue}</div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-theme-text-muted w-14 shrink-0">Budget</span>
-                      <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${budgetRate}%` }} /></div>
-                      <span className="text-xs text-theme-text-secondary w-10 text-right">{budgetRate}%</span>
+                    <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-yellow-500/20 text-yellow-400"><Wallet size={16} /></div>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Budget</span>
+                      </div>
+                      <div className="text-2xl font-bold text-theme-text">{withBudget}</div>
                     </div>
-                  </div>
-                </div>
+                    <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 col-span-2 md:col-span-3 lg:col-span-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingUp size={14} className="text-theme-text-muted" />
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-theme-text-muted w-14 shrink-0">Venue</span>
+                          <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${venueRate}%` }} /></div>
+                          <span className="text-xs text-theme-text-secondary w-10 text-right">{venueRate}%</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-theme-text-muted w-14 shrink-0">Budget</span>
+                          <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${budgetRate}%` }} /></div>
+                          <span className="text-xs text-theme-text-secondary w-10 text-right">{budgetRate}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );

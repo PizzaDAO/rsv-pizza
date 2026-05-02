@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
@@ -67,8 +67,8 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
 // POST /api/sponsor-users - Create a sponsor user (super admin only)
 sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const {
@@ -249,8 +249,8 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
 // PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -374,8 +374,8 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
 // DELETE /api/sponsor-users/:id - Deactivate a sponsor user (super admin only)
 sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isSuperAdmin(req.userEmail))) {
-      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -553,13 +553,15 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     });
     const clickCountMap = new Map(clickStats.map(r => [r.partyId, r._count]));
 
-    const uniqueClickStats = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
-      SELECT party_id, COUNT(DISTINCT visitor_hash) as unique_count
-      FROM link_clicks
-      WHERE party_id = ANY(${eventIds}::uuid[])
-      AND link_type IN ('sponsor', 'host_social')
-      GROUP BY party_id
-    `;
+    const uniqueClickStats = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
+        SELECT party_id::text, COUNT(DISTINCT visitor_hash) as unique_count
+        FROM link_clicks
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+        AND link_type IN ('sponsor', 'host_social')
+        GROUP BY party_id
+      `
+      : [];
     const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     // Get page view (impression) counts per party
@@ -570,12 +572,14 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     });
     const viewCountMap = new Map(viewStats.map(r => [r.partyId, r._count]));
 
-    const uniqueViewStats = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
-      SELECT party_id, COUNT(DISTINCT visitor_hash) as unique_count
-      FROM page_views
-      WHERE party_id = ANY(${eventIds}::uuid[])
-      GROUP BY party_id
-    `;
+    const uniqueViewStats = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
+        SELECT party_id::text, COUNT(DISTINCT visitor_hash) as unique_count
+        FROM page_views
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+        GROUP BY party_id
+      `
+      : [];
     const uniqueViewMap = new Map(uniqueViewStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     const formattedEvents = events.map(event => {
