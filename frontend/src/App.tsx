@@ -67,6 +67,7 @@ function App() {
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
             <Route path="/post" element={<PostComposerPage />} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />
+            <Route path="/cmohhr0640003jp047krjarz0" element={<Navigate to="/nashville" replace />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>
