@@ -232,7 +232,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                     <select
                       value={sponsor.status}
                       onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
+                      className={`status-pill rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
                     >
                       {Object.entries(STATUS_CONFIG).map(([status, config]) => (
                         <option key={status} value={status} className="bg-theme-header text-theme-text">
