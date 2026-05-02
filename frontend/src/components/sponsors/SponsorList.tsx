@@ -229,21 +229,17 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                 >
                   {/* Status */}
                   <td className="p-3">
-                    <div className="relative inline-flex items-center">
-                      <select
-                        value={sponsor.status}
-                        onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
-                        className={`appearance-none rounded-full px-2.5 py-0.5 pr-6 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
-                        style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }}
-                      >
-                        {Object.entries(STATUS_CONFIG).map(([status, config]) => (
-                          <option key={status} value={status} className="bg-theme-header text-theme-text">
-                            {config.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                    <select
+                      value={sponsor.status}
+                      onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
+                    >
+                      {Object.entries(STATUS_CONFIG).map(([status, config]) => (
+                        <option key={status} value={status} className="bg-theme-header text-theme-text">
+                          {config.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
 
                   {/* Sponsor Name & Organization */}
