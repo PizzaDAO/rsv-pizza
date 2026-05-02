@@ -191,6 +191,76 @@ export function RSVPFormStep1({
         </>
       )}
 
+      {/* SWC Canada checkbox + info modal */}
+      {form.isSwcCaEvent && (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcCaOptIn(!form.swcCaOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcCaOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcCaInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {/* SWC Canada Info Modal */}
+          {form.showSwcCaInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcCaInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcCaInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto Canada</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Canada. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/ca/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC Canada Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/ca/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
+      )}
+
       {/* Error display */}
       {form.error && (
         <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">

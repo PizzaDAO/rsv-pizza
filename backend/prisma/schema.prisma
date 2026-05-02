@@ -211,6 +211,7 @@ model Guest {
   role                String?  // Single role for report chart: "dev", "designer", "artist", etc.
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   swcOptIn            Boolean  @default(false) @map("swc_opt_in")
+  swcCaOptIn          Boolean  @default(false) @map("swc_ca_opt_in")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")
   dislikedToppings    String[] @map("disliked_toppings")
