@@ -1214,6 +1214,10 @@ export interface SponsorDashboardEvent {
   };
   sponsorStatuses?: string[];
   sponsorCount?: number;
+  clickStats?: {
+    totalClicks: number;
+    uniqueClickers: number;
+  };
   partnerNotes: string | null;
   checklist: SponsorChecklistItem[];
 }

@@ -9,7 +9,7 @@ import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updateP
 import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
-  Wallet, TrendingUp, StickyNote, MessageCircle,
+  Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick,
 } from 'lucide-react';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
@@ -701,6 +701,15 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                 <span className="text-xs text-theme-text-faint">/</span>
                 <span className="text-lg font-bold text-theme-text">{event.expectedGuests}</span>
                 <span className="text-xs text-theme-text-muted">expected</span>
+              </div>
+            )}
+            {event.clickStats && event.clickStats.totalClicks > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted">
+                <MousePointerClick size={12} />
+                <span>{event.clickStats.totalClicks} clicks</span>
+                {event.clickStats.uniqueClickers > 0 && (
+                  <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+                )}
               </div>
             )}
           </div>

@@ -541,6 +541,27 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
     }
 
+    // Get link click stats per party (sponsor clicks only)
+    const eventIds = events.map(e => e.id);
+    const clickStats = await prisma.linkClick.groupBy({
+      by: ['partyId'],
+      where: {
+        partyId: { in: eventIds },
+        linkType: 'sponsor',
+      },
+      _count: true,
+    });
+    const clickCountMap = new Map(clickStats.map(r => [r.partyId, r._count]));
+
+    const uniqueClickStats = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
+      SELECT party_id, COUNT(DISTINCT visitor_hash) as unique_count
+      FROM link_clicks
+      WHERE party_id = ANY(${eventIds}::uuid[])
+      AND link_type = 'sponsor'
+      GROUP BY party_id
+    `;
+    const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
+
     const formattedEvents = events.map(event => {
       const guestCount = event._count.guests;
       const approvedCount = event.guests.filter(g => g.approved !== false).length;
@@ -635,6 +656,10 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         expectedGuests: event.expectedGuests || null,
         budget,
         progress,
+        clickStats: {
+          totalClicks: clickCountMap.get(event.id) || 0,
+          uniqueClickers: uniqueClickMap.get(event.id) || 0,
+        },
         sponsorStatuses,
         sponsorCount,
         partnerNotes: event.partnerEventNotes.length > 0 ? event.partnerEventNotes[0].notes : null,

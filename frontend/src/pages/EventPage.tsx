@@ -1145,6 +1145,7 @@ export function EventPage() {
                                     className="text-[#ff393a] hover:text-[#ff5a5b] font-semibold no-underline"
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => slug && trackLinkClick(slug, sponsor.website!, 'sponsor', sponsor.name)}
                                   >
                                     {sponsor.name}
                                   </a>
