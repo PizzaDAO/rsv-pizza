@@ -145,7 +145,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   // Computed values
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
-  const isSwcCaEvent = (eventData.eventTags || []).includes('swc-ca');
+  const isSwcCaEvent = (eventData.eventTags || []).includes('swccanada');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
