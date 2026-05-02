@@ -113,6 +113,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [showSwcInfoModal, setShowSwcInfoModal] = useState(false);
   const [swcCaOptIn, setSwcCaOptIn] = useState(false);
   const [showSwcCaInfoModal, setShowSwcCaInfoModal] = useState(false);
+  const [ethconfOptIn, setEthconfOptIn] = useState(false);
 
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -145,6 +146,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   // Computed values
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
   const isSwcCaEvent = (eventData.eventTags || []).includes('swc-ca');
+  const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
   // ---- Validate wallet address ----
@@ -385,6 +387,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         suggestedPizzerias.length > 0 ? suggestedPizzerias : undefined,
         swcOptIn || undefined,
         swcCaOptIn || undefined,
+        ethconfOptIn || undefined,
       );
 
       if (result) {
@@ -425,7 +428,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, ethconfOptIn,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -457,6 +460,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setSwcCaOptIn,
     showSwcCaInfoModal,
     setShowSwcCaInfoModal,
+    ethconfOptIn,
+    setEthconfOptIn,
 
     // Step 2 fields
     dietaryRestrictions,
@@ -518,6 +523,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     // Computed
     isSwcEvent,
     isSwcCaEvent,
+    isEthconfEvent,
     isEditing,
     excludedToppings,
     availableBeverages: eventData.availableBeverages,

@@ -261,6 +261,24 @@ export function RSVPFormStep1({
         </>
       )}
 
+      {/* ETHConf discount opt-in */}
+      {form.isEthconfEvent && (
+        <button
+          type="button"
+          onClick={() => form.setEthconfOptIn(!form.ethconfOptIn)}
+          className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
+        >
+          {form.ethconfOptIn ? (
+            <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+          ) : (
+            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+          )}
+          <span className="text-sm text-theme-text">
+            Send me an ETHConf Discount
+          </span>
+        </button>
+      )}
+
       {/* Error display */}
       {form.error && (
         <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
