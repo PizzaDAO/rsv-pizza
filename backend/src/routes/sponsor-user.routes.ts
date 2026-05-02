@@ -541,13 +541,13 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
     }
 
-    // Get link click stats per party (sponsor clicks only)
+    // Get link click stats per party (sponsor + host_social clicks)
     const eventIds = events.map(e => e.id);
     const clickStats = await prisma.linkClick.groupBy({
       by: ['partyId'],
       where: {
         partyId: { in: eventIds },
-        linkType: 'sponsor',
+        linkType: { in: ['sponsor', 'host_social'] },
       },
       _count: true,
     });
@@ -557,10 +557,26 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       SELECT party_id, COUNT(DISTINCT visitor_hash) as unique_count
       FROM link_clicks
       WHERE party_id = ANY(${eventIds}::uuid[])
-      AND link_type = 'sponsor'
+      AND link_type IN ('sponsor', 'host_social')
       GROUP BY party_id
     `;
     const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
+
+    // Get page view (impression) counts per party
+    const viewStats = await prisma.pageView.groupBy({
+      by: ['partyId'],
+      where: { partyId: { in: eventIds } },
+      _count: true,
+    });
+    const viewCountMap = new Map(viewStats.map(r => [r.partyId, r._count]));
+
+    const uniqueViewStats = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
+      SELECT party_id, COUNT(DISTINCT visitor_hash) as unique_count
+      FROM page_views
+      WHERE party_id = ANY(${eventIds}::uuid[])
+      GROUP BY party_id
+    `;
+    const uniqueViewMap = new Map(uniqueViewStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     const formattedEvents = events.map(event => {
       const guestCount = event._count.guests;
@@ -659,6 +675,10 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         clickStats: {
           totalClicks: clickCountMap.get(event.id) || 0,
           uniqueClickers: uniqueClickMap.get(event.id) || 0,
+        },
+        impressions: {
+          totalViews: viewCountMap.get(event.id) || 0,
+          uniqueVisitors: uniqueViewMap.get(event.id) || 0,
         },
         sponsorStatuses,
         sponsorCount,

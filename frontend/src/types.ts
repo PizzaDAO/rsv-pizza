@@ -1218,6 +1218,10 @@ export interface SponsorDashboardEvent {
     totalClicks: number;
     uniqueClickers: number;
   };
+  impressions?: {
+    totalViews: number;
+    uniqueVisitors: number;
+  };
   partnerNotes: string | null;
   checklist: SponsorChecklistItem[];
 }
