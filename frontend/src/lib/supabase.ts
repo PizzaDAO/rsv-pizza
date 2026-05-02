@@ -553,6 +553,11 @@ export interface DbGuest {
   pizzeria_rankings?: string[];
   suggested_pizzerias?: any[];
   swc_opt_in?: boolean;
+  swc_ca_opt_in?: boolean;
+  swc_au_opt_in?: boolean;
+  swc_eu_opt_in?: boolean;
+  swc_uk_opt_in?: boolean;
+  ethconf_opt_in?: boolean;
   submitted_at: string;
   submitted_via: string;
   checked_in_at?: string | null;
@@ -1076,7 +1081,12 @@ export async function addGuestToParty(
   inviteCode?: string,
   pizzeriaRankings?: string[],
   suggestedPizzerias?: any[],
-  swcOptIn?: boolean
+  swcOptIn?: boolean,
+  swcCaOptIn?: boolean,
+  swcAuOptIn?: boolean,
+  swcEuOptIn?: boolean,
+  swcUkOptIn?: boolean,
+  ethconfOptIn?: boolean
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -1101,6 +1111,11 @@ export async function addGuestToParty(
         pizzeriaRankings: pizzeriaRankings || [],
         suggestedPizzerias: suggestedPizzerias || [],
         swcOptIn: swcOptIn || false,
+        swcCaOptIn: swcCaOptIn || false,
+        swcAuOptIn: swcAuOptIn || false,
+        swcEuOptIn: swcEuOptIn || false,
+        swcUkOptIn: swcUkOptIn || false,
+        ethconfOptIn: ethconfOptIn || false,
       }),
     });
 
@@ -1129,6 +1144,11 @@ export async function addGuestToParty(
       pizzeria_rankings: pizzeriaRankings || [],
       suggested_pizzerias: suggestedPizzerias || [],
       swc_opt_in: swcOptIn || false,
+      swc_ca_opt_in: swcCaOptIn || false,
+      swc_au_opt_in: swcAuOptIn || false,
+      swc_eu_opt_in: swcEuOptIn || false,
+      swc_uk_opt_in: swcUkOptIn || false,
+      ethconf_opt_in: ethconfOptIn || false,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
       status: data.guest.status || 'CONFIRMED',

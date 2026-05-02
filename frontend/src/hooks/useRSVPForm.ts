@@ -111,6 +111,15 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [mailingListOptIn, setMailingListOptIn] = useState(false);
   const [swcOptIn, setSwcOptIn] = useState(false);
   const [showSwcInfoModal, setShowSwcInfoModal] = useState(false);
+  const [swcCaOptIn, setSwcCaOptIn] = useState(false);
+  const [showSwcCaInfoModal, setShowSwcCaInfoModal] = useState(false);
+  const [swcAuOptIn, setSwcAuOptIn] = useState(false);
+  const [showSwcAuInfoModal, setShowSwcAuInfoModal] = useState(false);
+  const [swcEuOptIn, setSwcEuOptIn] = useState(false);
+  const [showSwcEuInfoModal, setShowSwcEuInfoModal] = useState(false);
+  const [swcUkOptIn, setSwcUkOptIn] = useState(false);
+  const [showSwcUkInfoModal, setShowSwcUkInfoModal] = useState(false);
+  const [ethconfOptIn, setEthconfOptIn] = useState(false);
 
   // Step 2 - Pizza Preferences
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -142,6 +151,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   // Computed values
   const isSwcEvent = (eventData.eventTags || []).includes('swc');
+  const isSwcCaEvent = (eventData.eventTags || []).includes('swccanada');
+  const isSwcAuEvent = (eventData.eventTags || []).includes('swcau');
+  const isSwcEuEvent = (eventData.eventTags || []).includes('swceu');
+  const isSwcUkEvent = (eventData.eventTags || []).includes('swcuk');
+  const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
   // ---- Validate wallet address ----
@@ -381,6 +395,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         pizzeriaRankings.length > 0 ? pizzeriaRankings : undefined,
         suggestedPizzerias.length > 0 ? suggestedPizzerias : undefined,
         swcOptIn || undefined,
+        swcCaOptIn || undefined,
+        swcAuOptIn || undefined,
+        swcEuOptIn || undefined,
+        swcUkOptIn || undefined,
+        ethconfOptIn || undefined,
       );
 
       if (result) {
@@ -421,7 +440,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, ethconfOptIn,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -449,6 +468,24 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setSwcOptIn,
     showSwcInfoModal,
     setShowSwcInfoModal,
+    swcCaOptIn,
+    setSwcCaOptIn,
+    showSwcCaInfoModal,
+    setShowSwcCaInfoModal,
+    swcAuOptIn,
+    setSwcAuOptIn,
+    showSwcAuInfoModal,
+    setShowSwcAuInfoModal,
+    swcEuOptIn,
+    setSwcEuOptIn,
+    showSwcEuInfoModal,
+    setShowSwcEuInfoModal,
+    swcUkOptIn,
+    setSwcUkOptIn,
+    showSwcUkInfoModal,
+    setShowSwcUkInfoModal,
+    ethconfOptIn,
+    setEthconfOptIn,
 
     // Step 2 fields
     dietaryRestrictions,
@@ -509,6 +546,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
     // Computed
     isSwcEvent,
+    isSwcCaEvent,
+    isSwcAuEvent,
+    isSwcEuEvent,
+    isSwcUkEvent,
+    isEthconfEvent,
     isEditing,
     excludedToppings,
     availableBeverages: eventData.availableBeverages,
