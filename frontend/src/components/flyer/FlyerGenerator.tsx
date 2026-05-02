@@ -866,7 +866,7 @@ export function FlyerGenerator() {
                 >
                   {timeForDisplay}
                   {hoveredElement === 'time' && !dragging && (
-                    <Pencil size={10} style={{ marginLeft: 4, display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} />
+                    <Pencil size={36} style={{ marginLeft: 4, display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} />
                   )}
                 </span>
               )}
