@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Loader2, Users, Building2, User, Link } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { NotableAttendee, Guest } from '../../types';
@@ -133,6 +134,7 @@ function OrgCard({
 }
 
 export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, onDelete, onRefresh, editable = true }: NotableAttendeesListProps) {
+  const { t } = useTranslation('host');
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newLink, setNewLink] = useState('');
@@ -199,7 +201,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-theme-text">Industry RSVPs</h3>
+        <h3 className="text-lg font-semibold text-theme-text">{t('report.industryRsvps')}</h3>
         <div className="flex flex-wrap gap-2">
           {orgGroups.map((group) => (
             <OrgCard
@@ -219,7 +221,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-theme-text">Industry RSVPs</h3>
+        <h3 className="text-lg font-semibold text-theme-text">{t('report.industryRsvps')}</h3>
         <div className="flex items-center gap-2">
           {!isAdding && (
             <>
@@ -229,7 +231,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
                   className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                 >
                   <Users size={16} />
-                  Browse All
+                  {t('report.browseAll')}
                 </button>
               )}
               <button
@@ -237,7 +239,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
                 className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
                 <Plus size={16} />
-                Add Manually
+                {t('report.addManually')}
               </button>
             </>
           )}
@@ -263,14 +265,14 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Name or company"
+            placeholder={t('report.nameOrCompany')}
           />
           <IconInput
             icon={Link}
             type="url"
             value={newLink}
             onChange={(e) => setNewLink(e.target.value)}
-            placeholder="Link to profile or website (optional)"
+            placeholder={t('report.linkToProfile')}
           />
           <div className="flex gap-2">
             <button
@@ -279,7 +281,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
               className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Add
+              {t('report.add')}
             </button>
             <button
               onClick={() => {
@@ -289,7 +291,7 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
               }}
               className="btn-secondary text-sm py-2"
             >
-              Cancel
+              {t('report.cancel')}
             </button>
           </div>
         </div>
@@ -312,8 +314,8 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
       ) : (
         !isAdding && (
           <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
-            <p className="text-theme-text-muted text-sm">No industry RSVPs added yet</p>
-            <p className="text-theme-text-faint text-xs mt-1">Add VIPs, notable companies, or influencers who attended</p>
+            <p className="text-theme-text-muted text-sm">{t('report.noIndustryRsvpsYet')}</p>
+            <p className="text-theme-text-faint text-xs mt-1">{t('report.addVipsHint')}</p>
           </div>
         )
       )}

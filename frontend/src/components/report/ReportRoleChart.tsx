@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart3 } from 'lucide-react';
 
 interface ReportRoleChartProps {
@@ -34,6 +35,7 @@ function getRoleColor(role: string, index: number): string {
 }
 
 export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartProps) {
+  const { t } = useTranslation('host');
   const entries = Object.entries(roleBreakdown).filter(([_, count]) => count > 0);
   const totalSelections = entries.reduce((sum, [_, count]) => sum + count, 0);
 
@@ -41,7 +43,7 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
     return (
       <div className="card p-6 text-center">
         <BarChart3 className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
-        <p className="text-theme-text-muted text-sm">No role data available</p>
+        <p className="text-theme-text-muted text-sm">{t('report.noRoleData')}</p>
       </div>
     );
   }
@@ -54,12 +56,12 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-theme-text">RSVP Roles</h3>
+      <h3 className="text-lg font-semibold text-theme-text">{t('report.rsvpRoles')}</h3>
       <div className="card p-6">
         {/* Summary line */}
         <p className="text-theme-text-muted text-xs mb-4">
-          {base} RSVPs / {totalSelections} role selections
-          {totalSelections > base && ' (guests can select multiple roles)'}
+          {t('report.rsvpRoleSummary', { base, selections: totalSelections })}
+          {totalSelections > base && t('report.multipleRolesNote')}
         </p>
 
         {/* Horizontal bar chart */}
@@ -80,7 +82,7 @@ export function ReportRoleChart({ roleBreakdown, totalRsvps }: ReportRoleChartPr
                     <span className="text-sm text-theme-text">{role}</span>
                   </div>
                   <span className="text-sm text-theme-text-muted">
-                    {count} ({percentage.toFixed(0)}% of guests)
+                    {t('report.ofGuests', { count, percent: percentage.toFixed(0) })}
                   </span>
                 </div>
                 {/* Bar */}

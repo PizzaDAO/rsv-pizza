@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { User, Mail, Phone, FileText, X, Check, Clock, LogIn } from 'lucide-react';
 import { Staff, StaffStatus } from '../../types';
 
@@ -9,27 +10,27 @@ interface StaffCardProps {
   onStatusChange: (staffId: string, status: StaffStatus) => void;
 }
 
-const STATUS_CONFIG: Record<StaffStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
+const STATUS_CONFIG: Record<StaffStatus, { labelKey: string; color: string; bgColor: string; icon: React.ReactNode }> = {
   invited: {
-    label: 'Invited',
+    labelKey: 'staffing.invited',
     color: 'text-gray-400',
     bgColor: 'bg-gray-500/20',
     icon: <Clock size={12} />,
   },
   confirmed: {
-    label: 'Confirmed',
+    labelKey: 'staffing.confirmedStatus',
     color: 'text-green-400',
     bgColor: 'bg-green-500/20',
     icon: <Check size={12} />,
   },
   declined: {
-    label: 'Declined',
+    labelKey: 'staffing.declined',
     color: 'text-red-400',
     bgColor: 'bg-red-500/20',
     icon: <X size={12} />,
   },
   checked_in: {
-    label: 'Checked In',
+    labelKey: 'staffing.checkedIn',
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/20',
     icon: <LogIn size={12} />,
@@ -42,6 +43,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
   onDelete,
   onStatusChange,
 }) => {
+  const { t } = useTranslation('host');
   const statusConfig = STATUS_CONFIG[staff.status];
 
   return (
@@ -58,7 +60,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
             <p className="text-theme-text font-medium truncate">{staff.name}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusConfig.bgColor} ${statusConfig.color} flex items-center gap-1`}>
               {statusConfig.icon}
-              {statusConfig.label}
+              {t(statusConfig.labelKey)}
             </span>
           </div>
 
@@ -105,16 +107,16 @@ export const StaffCard: React.FC<StaffCardProps> = ({
             className="text-green-400 hover:text-green-300 text-xs font-medium px-2 py-1 rounded bg-green-500/10 hover:bg-green-500/20 transition-colors"
             title="Mark as confirmed"
           >
-            Confirm
+            {t('staffing.confirm')}
           </button>
         )}
         {staff.status === 'confirmed' && (
           <button
             onClick={() => onStatusChange(staff.id, 'checked_in')}
             className="text-blue-400 hover:text-blue-300 text-xs font-medium px-2 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
-            title="Check in"
+            title={t('staffing.checkIn')}
           >
-            Check In
+            {t('staffing.checkIn')}
           </button>
         )}
 
@@ -122,7 +124,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
           onClick={() => onEdit(staff)}
           className="text-theme-text-muted hover:text-theme-text text-sm font-medium"
         >
-          Edit
+          {t('staffing.edit')}
         </button>
         <button
           onClick={() => onDelete(staff.id)}

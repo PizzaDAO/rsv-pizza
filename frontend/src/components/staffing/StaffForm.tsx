@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { X, Loader2, User, Mail, Phone, FileText, Briefcase, DollarSign, Clock } from 'lucide-react';
 import { IconInput } from '../IconInput';
@@ -45,6 +46,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
   onClose,
   saving,
 }) => {
+  const { t } = useTranslation('host');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -121,7 +123,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-theme-text">
-            {isEditing ? 'Edit Staff Member' : 'Add Staff Member'}
+            {isEditing ? t('staffing.editStaffMember') : t('staffing.addStaffMember')}
           </h2>
           <button onClick={onClose} className="text-theme-text-muted hover:text-theme-text">
             <X size={20} />
@@ -216,7 +218,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                     : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
                 }`}
               >
-                Hourly
+                {t('staffing.hourly')}
               </button>
               <button
                 type="button"
@@ -227,7 +229,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                     : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
                 }`}
               >
-                Flat Fee
+                {t('staffing.flatFee')}
               </button>
             </div>
 
@@ -240,7 +242,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                   step="0.01"
                   value={hourlyRate}
                   onChange={(e) => setHourlyRate(e.target.value)}
-                  placeholder="Hourly rate"
+                  placeholder={t('staffing.hourlyRate')}
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <IconInput
@@ -248,19 +250,19 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    placeholder="Start time"
+                    placeholder={t('staffing.startTime')}
                   />
                   <IconInput
                     icon={Clock}
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    placeholder="End time"
+                    placeholder={t('staffing.endTime')}
                   />
                 </div>
                 {totalCost && (
                   <p className="text-xs text-[#39d98a] font-medium px-1">
-                    Total: ${totalCost}
+                    {t('staffing.totalCost', { amount: totalCost })}
                   </p>
                 )}
               </div>
@@ -273,7 +275,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
                   step="0.01"
                   value={flatFee}
                   onChange={(e) => setFlatFee(e.target.value)}
-                  placeholder="Flat fee amount"
+                  placeholder={t('staffing.flatFeeAmount')}
                 />
               </div>
             )}
@@ -296,7 +298,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
               onClick={onClose}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2 rounded-xl transition-colors text-sm"
             >
-              Cancel
+              {t('staffing.cancel')}
             </button>
             <button
               type="submit"
@@ -306,12 +308,12 @@ export const StaffForm: React.FC<StaffFormProps> = ({
               {saving ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Saving...
+                  {t('staffing.savingEllipsis')}
                 </>
               ) : isEditing ? (
-                'Save Changes'
+                t('staffing.saveChanges')
               ) : (
-                'Add Staff'
+                t('staffing.addStaff')
               )}
             </button>
           </div>

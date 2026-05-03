@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MousePointerClick, Users, ExternalLink } from 'lucide-react';
 import { LinkClickStats as LinkClickStatsType } from '../../types';
 
@@ -6,14 +7,15 @@ interface LinkClickStatsProps {
   stats: LinkClickStatsType;
 }
 
-// Link type badge colors
-const linkTypeBadge: Record<string, { label: string; color: string }> = {
-  description: { label: 'Description', color: 'bg-blue-500/20 text-blue-400' },
-  host_social: { label: 'Host Social', color: 'bg-purple-500/20 text-purple-400' },
-  donation: { label: 'Donation', color: 'bg-green-500/20 text-green-400' },
+// Link type badge colors - labels are translation keys
+const linkTypeBadge: Record<string, { labelKey: string; color: string }> = {
+  description: { labelKey: 'report.description', color: 'bg-blue-500/20 text-blue-400' },
+  host_social: { labelKey: 'report.hostSocial', color: 'bg-purple-500/20 text-purple-400' },
+  donation: { labelKey: 'report.donation', color: 'bg-green-500/20 text-green-400' },
 };
 
 export function LinkClickStats({ stats }: LinkClickStatsProps) {
+  const { t } = useTranslation('host');
   const maxDailyTotal = Math.max(...stats.dailyClicks.map(d => d.total), 1);
 
   // Format URL for display: strip protocol, trim trailing slash, truncate
@@ -29,14 +31,14 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-theme-text">Link Clicks</h3>
+      <h3 className="text-lg font-semibold text-theme-text">{t('report.linkClicks')}</h3>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           <div className="flex items-center gap-2 mb-2">
             <MousePointerClick size={16} className="text-[#ff393a]" />
-            <span className="text-xs text-theme-text-secondary">Total Clicks</span>
+            <span className="text-xs text-theme-text-secondary">{t('report.totalClicks')}</span>
           </div>
           <div className="text-2xl font-bold text-theme-text">
             {stats.totalClicks.toLocaleString()}
@@ -45,7 +47,7 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           <div className="flex items-center gap-2 mb-2">
             <Users size={16} className="text-[#ff393a]" />
-            <span className="text-xs text-theme-text-secondary">Unique Clickers</span>
+            <span className="text-xs text-theme-text-secondary">{t('report.uniqueClickers')}</span>
           </div>
           <div className="text-2xl font-bold text-theme-text">
             {stats.uniqueClickers.toLocaleString()}
@@ -56,10 +58,10 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
       {/* Per-link breakdown */}
       {stats.links.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-theme-text mb-3">Links Clicked</h4>
+          <h4 className="text-sm font-medium text-theme-text mb-3">{t('report.linksClicked')}</h4>
           <div className="bg-theme-surface rounded-xl border border-theme-stroke divide-y divide-theme-stroke">
             {stats.links.map((link, i) => {
-              const badge = linkTypeBadge[link.linkType] || { label: link.linkType, color: 'bg-gray-500/20 text-gray-400' };
+              const badge = linkTypeBadge[link.linkType] || { labelKey: link.linkType, color: 'bg-gray-500/20 text-gray-400' };
               return (
                 <div key={i} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
@@ -77,7 +79,7 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${badge.color}`}>
-                        {badge.label}
+                        {t(badge.labelKey)}
                       </span>
                       <span className="text-sm font-medium text-theme-text">
                         {link.totalClicks.toLocaleString()}
@@ -86,7 +88,7 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
                   </div>
                   <div className="flex items-center gap-3 mt-1 ml-6">
                     <span className="text-xs text-theme-text-muted">
-                      {link.uniqueClicks.toLocaleString()} unique
+                      {link.uniqueClicks.toLocaleString()} {t('report.unique')}
                     </span>
                   </div>
                 </div>
@@ -99,7 +101,7 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
       {/* Daily clicks chart (last 30 days) */}
       {stats.dailyClicks.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-theme-text mb-3">Daily Clicks (Last 30 Days)</h4>
+          <h4 className="text-sm font-medium text-theme-text mb-3">{t('report.dailyClicksLast30')}</h4>
           <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
             <div className="flex items-end gap-[2px] h-32">
               {stats.dailyClicks.map((day) => {
@@ -145,11 +147,11 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
             <div className="flex items-center gap-4 mt-3 text-xs text-theme-text-muted">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(255, 57, 58, 0.3)' }} />
-                <span>Total</span>
+                <span>{t('report.total')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(255, 57, 58, 0.7)' }} />
-                <span>Unique</span>
+                <span>{t('report.unique')}</span>
               </div>
             </div>
           </div>
@@ -160,8 +162,8 @@ export function LinkClickStats({ stats }: LinkClickStatsProps) {
       {stats.totalClicks === 0 && (
         <div className="text-center py-6">
           <MousePointerClick className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
-          <p className="text-theme-text-muted text-sm">No link clicks recorded yet</p>
-          <p className="text-theme-text-faint text-xs mt-1">Clicks are tracked on description links, host social links, and donation links</p>
+          <p className="text-theme-text-muted text-sm">{t('report.noLinkClicksYet')}</p>
+          <p className="text-theme-text-faint text-xs mt-1">{t('report.linkClicksTracked')}</p>
         </div>
       )}
     </div>
