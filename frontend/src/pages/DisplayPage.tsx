@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
 import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo } from '../types';
 
 export function DisplayPage() {
+  const { t } = useTranslation('partner');
   const { partyId, slug } = useParams<{ partyId: string; slug: string }>();
   const [data, setData] = useState<DisplayViewerData | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -24,10 +26,10 @@ export function DisplayPage() {
         setData(result);
         if (result.photos) setPhotos(result.photos);
       } else {
-        setError('Display not found');
+        setError(t('display.notFound'));
       }
     } catch (err) {
-      setError('Failed to load display');
+      setError(t('display.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ export function DisplayPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-white/50">{error || 'Display not found'}</p>
+        <p className="text-white/50">{error || t('display.notFound')}</p>
       </div>
     );
   }
@@ -174,6 +176,7 @@ function EventInfoDisplay({ config, party }: { config: EventInfoConfig; party: D
 }
 
 function CountdownTimer({ date }: { date: string }) {
+  const { t } = useTranslation('partner');
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -185,7 +188,7 @@ function CountdownTimer({ date }: { date: string }) {
   const diff = target.getTime() - now.getTime();
 
   if (diff <= 0) {
-    return <p className="text-3xl text-green-400 font-semibold">Event is live!</p>;
+    return <p className="text-3xl text-green-400 font-semibold">{t('display.eventIsLive')}</p>;
   }
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -195,10 +198,10 @@ function CountdownTimer({ date }: { date: string }) {
 
   return (
     <div className="flex gap-6 justify-center">
-      {days > 0 && <TimeUnit value={days} label="days" />}
-      <TimeUnit value={hours} label="hours" />
-      <TimeUnit value={minutes} label="min" />
-      <TimeUnit value={seconds} label="sec" />
+      {days > 0 && <TimeUnit value={days} label={t('display.days')} />}
+      <TimeUnit value={hours} label={t('display.hours')} />
+      <TimeUnit value={minutes} label={t('display.min')} />
+      <TimeUnit value={seconds} label={t('display.sec')} />
     </div>
   );
 }
@@ -213,8 +216,9 @@ function TimeUnit({ value, label }: { value: number; label: string }) {
 }
 
 function SlideshowDisplay({ config }: { config: SlideshowConfig }) {
+  const { t } = useTranslation('partner');
   if (!config.googleSlidesUrl) {
-    return <p className="text-white/50 text-xl">No Google Slides URL configured</p>;
+    return <p className="text-white/50 text-xl">{t('display.noSlides')}</p>;
   }
 
   // Convert share URL to embed URL
@@ -241,8 +245,9 @@ function SlideshowDisplay({ config }: { config: SlideshowConfig }) {
 }
 
 function PhotosDisplay({ config, photos, currentIndex }: { config: PhotosConfig; photos: Photo[]; currentIndex: number }) {
+  const { t } = useTranslation('partner');
   if (!photos.length) {
-    return <p className="text-white/50 text-xl">No photos yet</p>;
+    return <p className="text-white/50 text-xl">{t('display.noPhotos')}</p>;
   }
 
   if (config.layout === 'slideshow') {
@@ -277,8 +282,9 @@ function PhotosDisplay({ config, photos, currentIndex }: { config: PhotosConfig;
 }
 
 function UploadDisplay({ config }: { config: UploadConfig }) {
+  const { t } = useTranslation('partner');
   if (!config.mediaUrl) {
-    return <p className="text-white/50 text-xl">No media uploaded</p>;
+    return <p className="text-white/50 text-xl">{t('display.noMedia')}</p>;
   }
 
   if (config.mediaType === 'video') {

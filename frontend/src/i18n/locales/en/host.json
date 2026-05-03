@@ -1,0 +1,38 @@
+{
+  "tabs": {
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "guests": "Guests",
+    "pizzaAndDrinks": "Pizza & Drinks",
+    "photos": "Photos",
+    "apps": "Apps"
+  },
+  "errors": {
+    "partyNotFound": "Party Not Found",
+    "partyNotFoundDesc": "Party not found. The link may be invalid or expired.",
+    "unableToLoad": "Unable to load party.",
+    "goHome": "Go to Home"
+  },
+  "pizza": {
+    "expectedGuests": "Expected Guests",
+    "adjustForNonRespondents": "Adjust for non-respondents",
+    "requests": "{{count}} requests",
+    "rsvps": "{{count}} RSVPs"
+  },
+  "gpp": {
+    "title": "Global Pizza Party",
+    "description": "Request party kits and access GPP-specific features for your event."
+  },
+  "guests": {
+    "title": "Guests",
+    "noGuestsYet": "No Guests Yet",
+    "shareLink": "Share your event link to start receiving RSVPs.",
+    "checkedIn": "{{count}} checked in",
+    "exportCsv": "Export CSV",
+    "searchPlaceholder": "Search guests by name or email...",
+    "showingOf": "Showing {{filtered}} of {{total}} guests",
+    "noMatch": "No guests match \"{{query}}\"",
+    "noConfirmed": "No confirmed guests yet.",
+    "waitlist": "Waitlist"
+  }
+}

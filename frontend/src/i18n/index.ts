@@ -10,6 +10,9 @@ import enDonation from './locales/en/donation.json';
 import enGpp from './locales/en/gpp.json';
 import enAccount from './locales/en/account.json';
 import enCheckin from './locales/en/checkin.json';
+import enHost from './locales/en/host.json';
+import enAdmin from './locales/en/admin.json';
+import enPartner from './locales/en/partner.json';
 import esCommon from './locales/es/common.json';
 import esRsvp from './locales/es/rsvp.json';
 import esEvent from './locales/es/event.json';
@@ -18,6 +21,9 @@ import esDonation from './locales/es/donation.json';
 import esGpp from './locales/es/gpp.json';
 import esAccount from './locales/es/account.json';
 import esCheckin from './locales/es/checkin.json';
+import esHost from './locales/es/host.json';
+import esAdmin from './locales/es/admin.json';
+import esPartner from './locales/es/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -33,6 +39,9 @@ i18n
         gpp: enGpp,
         account: enAccount,
         checkin: enCheckin,
+        host: enHost,
+        admin: enAdmin,
+        partner: enPartner,
       },
       es: {
         common: esCommon,
@@ -43,6 +52,9 @@ i18n
         gpp: esGpp,
         account: esAccount,
         checkin: esCheckin,
+        host: esHost,
+        admin: esAdmin,
+        partner: esPartner,
       },
     },
     fallbackLng: 'en',

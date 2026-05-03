@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
@@ -84,6 +85,7 @@ function FilterPill({
 }
 
 export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [] }: EventTableProps) {
+  const { t } = useTranslation('partner');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -266,12 +268,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           type="text"
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-          placeholder="Search events, hosts, venues..."
+          placeholder={t('eventTable.searchPlaceholder')}
           className="bg-theme-surface border border-theme-stroke rounded-lg pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
         />
         </div>
         <div className="text-xs text-theme-text-faint whitespace-nowrap">
-          {filteredEvents.length} of {events.length} events
+          {t('eventTable.eventsOf', { filtered: filteredEvents.length, total: events.length })}
         </div>
       </div>
 
@@ -300,7 +302,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             onChange={(e) => setRegionFilter(e.target.value)}
             className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
           >
-            <option value="all">Country: All</option>
+            <option value="all">{t('eventTable.countryAll')}</option>
             {[...new Set(events.map(e => e.country).filter(Boolean))].sort().map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
@@ -314,9 +316,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             onChange={(e) => setTagFilter(e.target.value)}
             className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
           >
-            <option value="all">Tag: All</option>
+            <option value="all">{t('eventTable.tagAll')}</option>
             {availableTags.map((tag) => (
-              <option key={tag} value={tag}>Tag: {tag}</option>
+              <option key={tag} value={tag}>{t('eventTable.tagPrefix', { tag })}</option>
             ))}
           </select>
         )}
@@ -332,7 +334,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
-            Clear filters
+            {t('eventTable.clearFilters')}
           </button>
         )}
       </div>
@@ -342,7 +344,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         {selectedIds.size > 0 ? (
           <>
           <span className="text-sm text-theme-text-secondary font-medium">
-            {selectedIds.size} selected
+            {t('eventTable.selected', { count: selectedIds.size })}
           </span>
 
           {/* Action dropdown */}
@@ -352,7 +354,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               disabled={bulkLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theme-card border border-theme-stroke text-sm text-theme-text hover:bg-theme-surface-hover transition-colors disabled:opacity-50"
             >
-              Actions <ChevronDown size={14} />
+              {t('eventTable.actions')} <ChevronDown size={14} />
             </button>
             {showActionDropdown && (
               <>
@@ -371,7 +373,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
-                    Approve
+                    {t('eventTable.approve')}
                   </button>
                   <button
                     onClick={() => {
@@ -380,7 +382,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
                   >
-                    Cancel Event
+                    {t('eventTable.cancelEvent')}
                   </button>
                   <button
                     onClick={() => {
@@ -400,7 +402,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
-                    Send Telegram
+                    {t('eventTable.sendTelegram')}
                   </button>
                   <button
                     onClick={() => {
@@ -409,7 +411,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
-                    Copy Cities
+                    {t('eventTable.copyCities')}
                   </button>
 
                   {/* Divider */}
@@ -545,11 +547,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             onClick={() => setSelectedIds(new Set())}
             className="text-xs text-theme-text-faint hover:text-theme-text-muted transition-colors"
           >
-            Deselect all
+            {t('eventTable.deselectAll')}
           </button>
           </>
         ) : (
-          <span className="text-theme-text-faint text-sm">No events selected</span>
+          <span className="text-theme-text-faint text-sm">{t('eventTable.noEventsSelected')}</span>
         )}
       </div>
 
@@ -557,13 +559,13 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       {showDeleteConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
           <div className="bg-theme-card border border-theme-stroke rounded-xl p-6 max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-theme-text mb-2">Cancel Events?</h3>
+            <h3 className="text-lg font-bold text-theme-text mb-2">{t('eventTable.cancelEventsTitle')}</h3>
             <p className="text-sm text-theme-text-muted mb-4">
-              This will permanently delete {selectedIds.size} event{selectedIds.size > 1 ? 's' : ''}. This action cannot be undone.
+              {t('eventTable.cancelEventsDesc', { count: selectedIds.size })}
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 text-sm text-theme-text-muted hover:text-theme-text transition-colors">
-                Keep Events
+                {t('eventTable.keepEvents')}
               </button>
               <button
                 onClick={async () => {
@@ -578,7 +580,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                 }}
                 className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
               >
-                Delete {selectedIds.size} Event{selectedIds.size > 1 ? 's' : ''}
+                {t('eventTable.deleteEvents', { count: selectedIds.size })}
               </button>
             </div>
           </div>
@@ -598,7 +600,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-theme-text">
-                Copy Cities ({selectedCitiesSorted.length} selected)
+                {t('eventTable.copyCitiesTitle', { count: selectedCitiesSorted.length })}
               </h3>
               <button
                 onClick={() => setShowCopyCitiesModal(false)}
@@ -652,10 +654,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               >
                 {copiedToClipboard ? (
                   <>
-                    <Check size={14} /> Copied!
+                    <Check size={14} /> {t('eventTable.copied')}
                   </>
                 ) : (
-                  'Copy to Clipboard'
+                  t('eventTable.copyToClipboard')
                 )}
               </button>
             </div>
@@ -668,7 +670,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       <div className="md:hidden space-y-3">
         {filteredEvents.length === 0 ? (
           <div className="py-12 text-center text-theme-text-faint text-sm">
-            {search ? 'No events match your search' : 'No events in this region yet'}
+            {search ? t('eventTable.noEventsSearch') : t('eventTable.noEventsRegion')}
           </div>
         ) : (
           filteredEvents.map((event) => (
@@ -720,7 +722,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             {filteredEvents.length === 0 ? (
               <tr>
                 <td colSpan={showRegion ? 8 : 7} className="py-12 text-center text-theme-text-faint text-sm">
-                  {search ? 'No events match your search' : 'No events in this region yet'}
+                  {search ? t('eventTable.noEventsSearch') : t('eventTable.noEventsRegion')}
                 </td>
               </tr>
             ) : (

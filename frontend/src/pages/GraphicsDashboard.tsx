@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -17,6 +18,7 @@ import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
 
 export function GraphicsDashboard() {
+  const { t } = useTranslation('admin');
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -193,15 +195,15 @@ export function GraphicsDashboard() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-white/20 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Graphics Dashboard</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('graphics.title')}</h1>
           <p className="text-white/50 text-center max-w-md mb-6">
-            Log in to review event flyers.
+            {t('graphics.loginPrompt')}
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="px-6 py-2 bg-[#ff393a] text-white rounded-xl text-sm font-medium hover:bg-[#e62e2f] transition-colors"
           >
-            Log In
+            {t('graphics.logIn')}
           </button>
         </div>
         <Footer />
@@ -217,10 +219,10 @@ export function GraphicsDashboard() {
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-white/20 mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">
-            {error ? 'Error' : 'Access Denied'}
+            {error ? t('graphics.error') : t('graphics.accessDenied')}
           </h1>
           <p className="text-white/50 text-center max-w-md">
-            {error || 'You need underboss or admin access to view this page.'}
+            {error || t('graphics.accessDeniedDesc')}
           </p>
         </div>
         <Footer />
@@ -244,10 +246,10 @@ export function GraphicsDashboard() {
               <Image size={20} className="text-[#ff393a]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Graphics Dashboard</h1>
+              <h1 className="text-2xl font-bold text-white">{t('graphics.title')}</h1>
               <p className="text-sm text-white/50">
-                {events.length} events
-                {filtered.length !== events.length && ` \u2022 showing ${filtered.length}`}
+                {t('graphics.events', { count: events.length })}
+                {filtered.length !== events.length && ` \u2022 ${t('graphics.showing', { count: filtered.length })}`}
               </p>
             </div>
           </div>
@@ -259,7 +261,7 @@ export function GraphicsDashboard() {
             <IconInput
               icon={Search}
               type="search"
-              placeholder="Search events, hosts..."
+              placeholder={t('graphics.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
             />
@@ -270,7 +272,7 @@ export function GraphicsDashboard() {
             onChange={(e) => setRegionFilter(e.target.value)}
             className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/20"
           >
-            <option value="all">Region: All</option>
+            <option value="all">{t('graphics.regionAll')}</option>
             {GPP_REGIONS.map((r) => (
               <option key={r.id} value={r.id}>{r.label}</option>
             ))}
@@ -283,7 +285,7 @@ export function GraphicsDashboard() {
             }`}
           >
             <AlertTriangle size={14} className="inline mr-1.5 -mt-0.5" />
-            Stale flyers
+            {t('graphics.staleFlyers')}
           </button>
 
           <button
@@ -292,8 +294,8 @@ export function GraphicsDashboard() {
             className="px-3 py-2 rounded-lg text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {massGenerating
-              ? `Generating ${massProgress.current}/${massProgress.total}...`
-              : `Generate Missing (${missingFlyerCount})`
+              ? t('graphics.generating', { current: massProgress.current, total: massProgress.total })
+              : t('graphics.generateMissing', { count: missingFlyerCount })
             }
           </button>
         </div>
@@ -302,7 +304,7 @@ export function GraphicsDashboard() {
         {filtered.length === 0 ? (
           <div className="text-center py-16">
             <Image size={48} className="text-white/10 mx-auto mb-4" />
-            <p className="text-white/40">No events match your filters.</p>
+            <p className="text-white/40">{t('graphics.noEventsMatch')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -328,7 +330,7 @@ export function GraphicsDashboard() {
                   {event.flyerStale && (
                     <div className="absolute top-2 right-2 bg-amber-500 text-black text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       <AlertTriangle size={10} />
-                      New partners
+                      {t('graphics.newPartners')}
                     </div>
                   )}
                   {/* Hover overlay */}

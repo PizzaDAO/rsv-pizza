@@ -1,0 +1,126 @@
+{
+  "title": "Panel de Administracion",
+  "subtitle": "Gestionar administradores y underbosses",
+  "accessDenied": "Acceso Denegado",
+  "accessDeniedDesc": "No tienes acceso de administrador. Inicia sesion con una cuenta de administrador.",
+  "admins": {
+    "title": "Administradores",
+    "emailPlaceholder": "Direccion de email",
+    "namePlaceholder": "Nombre (opcional)",
+    "addAdmin": "Agregar Admin",
+    "noAdmins": "No se encontraron administradores",
+    "superAdmin": "Super Admin",
+    "admin": "Admin",
+    "removeAdmin": "Eliminar administrador",
+    "tableHeaders": {
+      "email": "Email",
+      "name": "Nombre",
+      "role": "Rol",
+      "added": "Agregado"
+    }
+  },
+  "underboss": {
+    "title": "Underbosses",
+    "namePlaceholder": "Nombre",
+    "emailPlaceholder": "Email",
+    "regions": "Regiones",
+    "addUnderboss": "Agregar Underboss",
+    "noUnderbosses": "Aun no hay underbosses",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "deactivate": "Desactivar",
+    "tableHeaders": {
+      "name": "Nombre",
+      "email": "Email",
+      "regions": "Regiones",
+      "status": "Estado",
+      "actions": "Acciones"
+    }
+  },
+  "partners": {
+    "title": "Socios",
+    "emailPlaceholder": "Direccion de email",
+    "tagPlaceholder": "Etiqueta de socio (ej. swc)",
+    "namePlaceholder": "Nombre (opcional)",
+    "addPartner": "Agregar Socio",
+    "noPartners": "Aun no hay socios",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "deactivatePartner": "Desactivar socio",
+    "tableHeaders": {
+      "email": "Email",
+      "name": "Nombre",
+      "tag": "Etiqueta",
+      "status": "Estado",
+      "added": "Agregado"
+    }
+  },
+  "checklist": {
+    "title": "Checklist de Configuracion del Evento",
+    "auto": "(auto)",
+    "noItems": "No se encontraron elementos del checklist. Los elementos se crean cuando un host de GPP ve su checklist por primera vez.",
+    "saving": "Guardando...",
+    "saveChecklistDates": "Guardar Fechas del Checklist",
+    "newItemPlaceholder": "Nuevo elemento del checklist...",
+    "adding": "Agregando...",
+    "addItem": "Agregar Elemento"
+  },
+  "gppDescription": {
+    "title": "Descripcion Predeterminada de GPP",
+    "statsText": "{{defaultCount}} de {{totalEvents}} eventos usan la predeterminada",
+    "placeholder": "Descripcion predeterminada para nuevos eventos GPP...",
+    "saving": "Guardando...",
+    "saveAndApply": "Guardar y Aplicar a Eventos Predeterminados",
+    "customDescriptions": "{{count}} evento con descripcion personalizada",
+    "customDescriptions_plural": "{{count}} eventos con descripciones personalizadas"
+  },
+  "nft": {
+    "title": "Configuracion de NFT GPP",
+    "enableNft": "Habilitar acunacion de NFT para todos los eventos GPP",
+    "saving": "Guardando...",
+    "saveSettings": "Guardar Configuracion de NFT GPP"
+  },
+  "underbossDashboard": {
+    "title": "Panel del Underboss",
+    "loginPrompt": "Inicia sesion para acceder al panel del underboss.",
+    "logIn": "Iniciar Sesion",
+    "loadingDashboard": "Cargando panel...",
+    "error": "Error",
+    "notAuthorized": "No estas autorizado para acceder al panel del underboss.",
+    "gppSubtitle": "Global Pizza Party",
+    "underbossSubtitle": "Panel del Underboss",
+    "signedInAdmin": "Sesion iniciada como Admin ({{email}})",
+    "signedInAs": "Sesion iniciada como {{name}}",
+    "addUnderboss": "Agregar Underboss",
+    "noRegions": "Sin Regiones",
+    "allRegions": "Todas las Regiones",
+    "regionsCount": "{{count}} Regiones",
+    "selectAll": "Todas las Regiones",
+    "underbossCreated": "Underboss creado!",
+    "creating": "Creando...",
+    "createUnderboss": "Crear Underboss",
+    "tabs": {
+      "events": "Eventos",
+      "cities": "Ciudades",
+      "partners": "Socios"
+    }
+  },
+  "graphics": {
+    "title": "Panel de Graficos",
+    "loginPrompt": "Inicia sesion para revisar los flyers de eventos.",
+    "logIn": "Iniciar Sesion",
+    "error": "Error",
+    "accessDenied": "Acceso Denegado",
+    "accessDeniedDesc": "Necesitas acceso de underboss o admin para ver esta pagina.",
+    "events": "{{count}} eventos",
+    "showing": "mostrando {{count}}",
+    "searchPlaceholder": "Buscar eventos, hosts...",
+    "regionAll": "Region: Todas",
+    "staleFlyers": "Flyers desactualizados",
+    "generateMissing": "Generar Faltantes ({{count}})",
+    "generating": "Generando {{current}}/{{total}}...",
+    "noEventsMatch": "Ningun evento coincide con tus filtros.",
+    "newPartners": "Nuevos socios",
+    "viewEvent": "Ver evento"
+  }
+}

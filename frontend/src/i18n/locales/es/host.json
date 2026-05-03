@@ -1,0 +1,38 @@
+{
+  "tabs": {
+    "dashboard": "Panel",
+    "settings": "Ajustes",
+    "guests": "Invitados",
+    "pizzaAndDrinks": "Pizza y Bebidas",
+    "photos": "Fotos",
+    "apps": "Apps"
+  },
+  "errors": {
+    "partyNotFound": "Evento No Encontrado",
+    "partyNotFoundDesc": "Evento no encontrado. El enlace puede ser invalido o haber expirado.",
+    "unableToLoad": "No se pudo cargar el evento.",
+    "goHome": "Ir al Inicio"
+  },
+  "pizza": {
+    "expectedGuests": "Invitados Esperados",
+    "adjustForNonRespondents": "Ajustar para los que no respondieron",
+    "requests": "{{count}} solicitudes",
+    "rsvps": "{{count}} RSVPs"
+  },
+  "gpp": {
+    "title": "Global Pizza Party",
+    "description": "Solicita kits de fiesta y accede a funciones especificas de GPP para tu evento."
+  },
+  "guests": {
+    "title": "Invitados",
+    "noGuestsYet": "Aun No Hay Invitados",
+    "shareLink": "Comparte el enlace de tu evento para empezar a recibir RSVPs.",
+    "checkedIn": "{{count}} registrados",
+    "exportCsv": "Exportar CSV",
+    "searchPlaceholder": "Buscar invitados por nombre o email...",
+    "showingOf": "Mostrando {{filtered}} de {{total}} invitados",
+    "noMatch": "Ningun invitado coincide con \"{{query}}\"",
+    "noConfirmed": "Aun no hay invitados confirmados.",
+    "waitlist": "Lista de espera"
+  }
+}
