@@ -7,7 +7,7 @@ import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, Im
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { uploadEventImage, updateParty } from '../../lib/supabase';
+import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
@@ -1164,7 +1164,7 @@ export function FlyerGenerator() {
                     style={{ position: 'relative', display: 'inline-block' }}
                   >
                     <img
-                      src={s.logoUrl!}
+                      src={cdnUrl(s.logoUrl!)}
                       alt={s.name}
                       crossOrigin="anonymous"
                       onDoubleClick={(e) => handleLogoDoubleClick(s.id, e)}
@@ -1331,7 +1331,7 @@ export function FlyerGenerator() {
               }}
             >
               <img
-                src={s.logoUrl!}
+                src={cdnUrl(s.logoUrl!)}
                 alt={s.name}
                 crossOrigin="anonymous"
                 onMouseDown={(e) => handleLogoDragStart(s.id, e)}

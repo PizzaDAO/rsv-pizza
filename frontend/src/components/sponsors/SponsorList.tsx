@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
+import { cdnUrl } from '../../lib/supabase';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
@@ -247,7 +248,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                     <div className="flex items-start gap-2">
                       {(avatarUrls?.[sponsor.id] || sponsor.logoUrl) && (
                         <img
-                          src={avatarUrls?.[sponsor.id] || sponsor.logoUrl!}
+                          src={cdnUrl(avatarUrls?.[sponsor.id] || sponsor.logoUrl!)}
                           alt=""
                           className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                         />

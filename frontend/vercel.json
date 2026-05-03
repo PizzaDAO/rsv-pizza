@@ -1,11 +1,24 @@
 {
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "source": "/cdn/:path*",
+      "destination": "https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/:path*"
+    },
+    {
+      "source": "/((?!assets/|cdn/).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/cdn/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=31536000, immutable"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [
