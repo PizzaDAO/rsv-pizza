@@ -78,7 +78,7 @@ export function RSVPFormStep1({
       {/* Role selection */}
       <div>
         <label className="block text-sm font-medium text-theme-text mb-2">
-          What role(s) do you play?
+          What ninja turtle(s) are you most like?
         </label>
         <div className="grid grid-cols-2 gap-2">
           {TURTLES.map((t) => {
