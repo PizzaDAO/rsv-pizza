@@ -116,7 +116,7 @@ export function RSVPFormStep1({
         </button>
 
         {turtleDropdownOpen && (
-          <div className="absolute z-20 left-0 right-0 mt-1 bg-theme-surface border border-theme-stroke rounded-xl shadow-lg overflow-hidden">
+          <div className="absolute z-20 left-0 right-0 mt-1 card shadow-lg overflow-hidden !p-0">
             {TURTLES.map((t) => {
               const selected = form.roles.includes(t.id);
               return (
@@ -220,24 +220,6 @@ export function RSVPFormStep1({
           </div>
         </div>,
         document.body
-      )}
-
-      {/* ETHConf discount opt-in */}
-      {form.isEthconfEvent && (
-        <button
-          type="button"
-          onClick={() => form.setEthconfOptIn(!form.ethconfOptIn)}
-          className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
-        >
-          {form.ethconfOptIn ? (
-            <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-          ) : (
-            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-          )}
-          <span className="text-sm text-theme-text">
-            Send me an ETHConf Discount
-          </span>
-        </button>
       )}
 
       {/* Error display */}
