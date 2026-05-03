@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
@@ -26,6 +27,7 @@ const SPONSOR_BOX_MIN = 100;
 const SPONSOR_BOX_MAX = 1080;
 
 export function FlyerGenerator() {
+  const { t } = useTranslation('host');
   const { party, loadParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -965,7 +967,7 @@ export function FlyerGenerator() {
                   <div
                     onMouseDown={handleBoxResizeStart}
                     onTouchStart={handleBoxTouchResizeStart}
-                    title="Drag to resize sponsor area"
+                    title={t('flyer.dragToResize')}
                     style={{
                       position: 'absolute',
                       bottom: -4,
@@ -1414,7 +1416,7 @@ export function FlyerGenerator() {
           className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
         >
           <Plus className="w-4 h-4" />
-          Add Logo
+          {t('flyer.addLogo')}
         </button>
         <button
           onClick={handleDownload}
@@ -1424,12 +1426,12 @@ export function FlyerGenerator() {
           {downloading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Generating...
+              {t('flyer.generating')}
             </>
           ) : (
             <>
               <Download className="w-5 h-5" />
-              Download
+              {t('flyer.download')}
             </>
           )}
         </button>
@@ -1443,27 +1445,27 @@ export function FlyerGenerator() {
               ? 'bg-red-500/20 text-red-300'
               : 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white'
           }`}
-          title="Use this flyer as the event image"
+          title={t('flyer.useAsEventImage')}
         >
           {setImageState === 'uploading' ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Uploading...
+              {t('flyer.uploading')}
             </>
           ) : setImageState === 'success' ? (
             <>
               <Check className="w-4 h-4" />
-              Set!
+              {t('flyer.set')}
             </>
           ) : setImageState === 'error' ? (
             <>
               <ImagePlus className="w-4 h-4" />
-              Upload failed
+              {t('flyer.uploadFailed')}
             </>
           ) : (
             <>
               <ImagePlus className="w-4 h-4" />
-              Use for Event
+              {t('flyer.useForEvent')}
             </>
           )}
         </button>
@@ -1471,10 +1473,10 @@ export function FlyerGenerator() {
           <button
             onClick={handleResetPositions}
             className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
-            title="Reset element positions to defaults"
+            title={t('flyer.resetPositions')}
           >
             <RotateCcw className="w-4 h-4" />
-            Reset
+            {t('flyer.reset')}
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
 import { VenuePhotoCategory } from '../../types';
 import { uploadVenuePhoto } from '../../lib/supabase';
@@ -10,15 +11,16 @@ interface VenuePhotoUploadProps {
   onPhotoAdded: () => void;
 }
 
-const CATEGORIES: { value: VenuePhotoCategory; label: string }[] = [
-  { value: 'interior', label: 'Interior' },
-  { value: 'exterior', label: 'Exterior' },
-  { value: 'capacity', label: 'Capacity' },
-  { value: 'amenities', label: 'Amenities' },
-  { value: 'other', label: 'Other' },
+const CATEGORIES: { value: VenuePhotoCategory; labelKey: string }[] = [
+  { value: 'interior', labelKey: 'venue.interior' },
+  { value: 'exterior', labelKey: 'venue.exterior' },
+  { value: 'capacity', labelKey: 'venue.capacityCategory' },
+  { value: 'amenities', labelKey: 'venue.amenities' },
+  { value: 'other', labelKey: 'venue.other' },
 ];
 
 export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, venueId, onPhotoAdded }) => {
+  const { t } = useTranslation('host');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [category, setCategory] = useState<VenuePhotoCategory>('interior');
@@ -32,7 +34,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setProgress(`Uploading ${i + 1} of ${files.length}...`);
+      setProgress(t('venue.uploading', { current: i + 1, total: files.length }));
 
       try {
         // Upload to storage
@@ -79,7 +81,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
         >
           {CATEGORIES.map((cat) => (
             <option key={cat.value} value={cat.value} className="bg-theme-header">
-              {cat.label}
+              {t(cat.labelKey)}
             </option>
           ))}
         </select>
@@ -99,7 +101,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
           ) : (
             <>
               <ImagePlus size={14} />
-              Add Photos
+              {t('venue.addPhotos')}
             </>
           )}
         </button>

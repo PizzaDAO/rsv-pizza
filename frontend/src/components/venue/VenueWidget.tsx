@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Users, DollarSign, Plus, Pencil, Trash2, Check, Globe, Loader2, Phone, Mail, Building2, ChevronDown, ChevronUp, Camera, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
 import { getVenues, createVenue, updateVenue, deleteVenue, selectVenue, deselectVenue, VenueCreateData } from '../../lib/api';
@@ -12,14 +13,14 @@ interface VenueWidgetProps {
 }
 
 // Status badge configuration
-const statusConfig: Record<VenueStatus, { label: string; color: string; bgColor: string }> = {
-  researching: { label: 'Researching', color: 'text-gray-300', bgColor: 'bg-gray-500/20' },
-  contacted: { label: 'Contacted', color: 'text-orange-300', bgColor: 'bg-orange-500/20' },
-  negotiating: { label: 'Negotiating', color: 'text-yellow-300', bgColor: 'bg-yellow-500/20' },
-  confirmed: { label: 'Confirmed', color: 'text-green-300', bgColor: 'bg-green-500/20' },
-  deposit_paid: { label: 'Deposit Paid', color: 'text-blue-300', bgColor: 'bg-blue-500/20' },
-  paid_in_full: { label: 'Paid in Full', color: 'text-purple-300', bgColor: 'bg-purple-500/20' },
-  declined: { label: 'Declined', color: 'text-red-300', bgColor: 'bg-red-500/20' },
+const statusConfig: Record<VenueStatus, { labelKey: string; color: string; bgColor: string }> = {
+  researching: { labelKey: 'venue.researching', color: 'text-gray-300', bgColor: 'bg-gray-500/20' },
+  contacted: { labelKey: 'venue.contacted', color: 'text-orange-300', bgColor: 'bg-orange-500/20' },
+  negotiating: { labelKey: 'venue.negotiating', color: 'text-yellow-300', bgColor: 'bg-yellow-500/20' },
+  confirmed: { labelKey: 'venue.confirmedStatus', color: 'text-green-300', bgColor: 'bg-green-500/20' },
+  deposit_paid: { labelKey: 'venue.depositPaid', color: 'text-blue-300', bgColor: 'bg-blue-500/20' },
+  paid_in_full: { labelKey: 'venue.paidInFull', color: 'text-purple-300', bgColor: 'bg-purple-500/20' },
+  declined: { labelKey: 'venue.declinedStatus', color: 'text-red-300', bgColor: 'bg-red-500/20' },
 };
 
 // Format currency
@@ -34,6 +35,7 @@ const formatCost = (cost: number | null) => {
 };
 
 export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect }) => {
+  const { t } = useTranslation('host');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -87,7 +89,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
 
   // Handle delete venue
   const handleDelete = async (venueId: string) => {
-    if (!confirm('Are you sure you want to delete this venue option?')) return;
+    if (!confirm(t('venue.deleteConfirm'))) return;
 
     setActionLoading(venueId);
     try {
@@ -159,7 +161,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin size={20} className="text-[#ff393a]" />
-          <h2 className="text-lg font-semibold text-theme-text">Venue Options</h2>
+          <h2 className="text-lg font-semibold text-theme-text">{t('venue.venueOptions')}</h2>
           {venues.length > 0 && (
             <span className="text-sm text-theme-text-muted">({venues.length})</span>
           )}
@@ -170,7 +172,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
           className="flex items-center gap-1.5 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
         >
           <Plus size={16} />
-          Add Venue
+          {t('venue.addVenue')}
         </button>
       </div>
 
@@ -178,14 +180,14 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       {venues.length === 0 ? (
         <div className="card p-8 text-center">
           <MapPin size={32} className="mx-auto mb-3 text-theme-text-faint" />
-          <p className="text-theme-text-secondary mb-4">No venue options yet</p>
+          <p className="text-theme-text-secondary mb-4">{t('venue.noVenueOptionsYet')}</p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={18} />
-            Add Your First Venue
+            {t('venue.addYourFirstVenue')}
           </button>
         </div>
       ) : (
@@ -216,11 +218,11 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                         {venue.isSelected && (
                           <span className="flex items-center gap-1 text-xs font-medium text-[#ff393a] bg-[#ff393a]/20 px-2 py-0.5 rounded-full">
                             <Check size={12} />
-                            Selected
+                            {t('venue.selected')}
                           </span>
                         )}
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}>
-                          {statusInfo.label}
+                          {t(statusInfo.labelKey)}
                         </span>
                       </div>
                       <h3 className="font-medium text-theme-text truncate">{venue.name}</h3>
@@ -251,7 +253,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                             className="flex items-center gap-1 text-[#ff393a] hover:text-[#ff5a5b]"
                           >
                             <Globe size={12} />
-                            Website
+                            {t('venue.website')}
                           </a>
                         )}
                         {venue.photos && venue.photos.length > 0 && (
@@ -284,7 +286,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     {/* Point Person */}
                     {venue.pointPerson && (
                       <div className="text-sm">
-                        <span className="text-theme-text-muted">Point Person: </span>
+                        <span className="text-theme-text-muted">{t('venue.pointPerson')}</span>
                         <span className="text-theme-text">{venue.pointPerson}</span>
                       </div>
                     )}
@@ -292,7 +294,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     {/* Contact Info */}
                     {hasContactInfo && (
                       <div className="space-y-1">
-                        <p className="text-xs text-theme-text-muted">Venue Contact</p>
+                        <p className="text-xs text-theme-text-muted">{t('venue.venueContact')}</p>
                         {venue.contactName && (
                           <p className="text-sm text-theme-text">{venue.contactName}</p>
                         )}
@@ -324,7 +326,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           <div className="text-sm">
                             <p className="flex items-center gap-1 text-xs text-green-400/60 mb-1">
                               <ThumbsUp size={10} />
-                              Pros
+                              {t('venue.pros')}
                             </p>
                             <p className="text-theme-text-secondary whitespace-pre-wrap text-xs">{venue.pros}</p>
                           </div>
@@ -333,7 +335,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           <div className="text-sm">
                             <p className="flex items-center gap-1 text-xs text-red-400/60 mb-1">
                               <ThumbsDown size={10} />
-                              Cons
+                              {t('venue.cons')}
                             </p>
                             <p className="text-theme-text-secondary whitespace-pre-wrap text-xs">{venue.cons}</p>
                           </div>
@@ -344,7 +346,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                     {/* Notes */}
                     {venue.notes && (
                       <div className="text-sm">
-                        <p className="text-xs text-theme-text-muted mb-1">Notes</p>
+                        <p className="text-xs text-theme-text-muted mb-1">{t('venue.notes')}</p>
                         <p className="text-theme-text-secondary whitespace-pre-wrap">{venue.notes}</p>
                       </div>
                     )}
@@ -354,7 +356,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-theme-text-muted flex items-center gap-1">
                           <Camera size={12} />
-                          Photos {venue.photos && venue.photos.length > 0 && `(${venue.photos.length})`}
+                          {t('venue.photos')} {venue.photos && venue.photos.length > 0 && `(${venue.photos.length})`}
                         </p>
                       </div>
                       <VenuePhotoUpload
@@ -386,7 +388,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           ) : (
                             <Check size={14} />
                           )}
-                          Select as Location
+                          {t('venue.selectAsLocation')}
                         </button>
                       ) : (
                         <button
@@ -398,7 +400,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                           {isLoading ? (
                             <Loader2 size={14} className="animate-spin" />
                           ) : (
-                            'Deselect'
+                            t('venue.deselect')
                           )}
                         </button>
                       )}
@@ -408,7 +410,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                         className="flex items-center gap-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
                       >
                         <Pencil size={14} />
-                        Edit
+                        {t('venue.edit')}
                       </button>
                       <button
                         type="button"
@@ -421,7 +423,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
                         ) : (
                           <Trash2 size={14} />
                         )}
-                        Delete
+                        {t('venue.delete')}
                       </button>
                     </div>
                   </div>

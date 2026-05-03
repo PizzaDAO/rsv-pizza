@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChecklistItem, AutoCompleteStates, ChecklistData } from '../../types';
@@ -24,6 +25,7 @@ function isItemCompleted(item: ChecklistItem, autoStates: AutoCompleteStates): b
 }
 
 export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
+  const { t } = useTranslation('host');
   const [data, setData] = useState<ChecklistData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +59,10 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
         setData(result);
       }
     } else {
-      setError('Failed to load checklist');
+      setError(t('checklist.failedToLoad'));
     }
     setLoading(false);
-  }, [partyId]);
+  }, [partyId, t]);
 
   useEffect(() => {
     loadChecklist();
@@ -129,7 +131,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
           className="btn-secondary inline-flex items-center gap-2"
         >
           <RefreshCw size={16} />
-          Try Again
+          {t('checklist.tryAgain')}
         </button>
       </div>
     );
@@ -145,9 +147,9 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-theme-text">Event Checklist</h2>
+            <h2 className="text-lg font-semibold text-theme-text">{t('checklist.eventChecklist')}</h2>
             <p className="text-xs text-theme-text-muted mt-0.5">
-              {completedCount} of {totalCount} tasks complete
+              {t('checklist.tasksComplete', { completed: completedCount, total: totalCount })}
             </p>
           </div>
           <button
@@ -155,7 +157,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
             className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2"
           >
             <Plus size={16} />
-            Add Task
+            {t('checklist.addTask')}
           </button>
         </div>
 
@@ -176,13 +178,13 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       <div className="card p-6">
         {data.items.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-theme-text-muted mb-4">No tasks yet</p>
+            <p className="text-theme-text-muted mb-4">{t('checklist.noTasks')}</p>
             <button
               onClick={() => setShowForm(true)}
               className="btn-secondary inline-flex items-center gap-2"
             >
               <Plus size={16} />
-              Add Your First Task
+              {t('checklist.addFirstTask')}
             </button>
           </div>
         ) : (
@@ -214,22 +216,22 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(null)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-theme-text mb-3">Delete Task?</h2>
+            <h2 className="text-xl font-bold text-theme-text mb-3">{t('checklist.deleteTask')}</h2>
             <p className="text-theme-text-secondary mb-6">
-              This will permanently delete this task. This action cannot be undone.
+              {t('checklist.deleteTaskDesc')}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
                 className="flex-1 btn-secondary"
               >
-                Cancel
+                {t('checklist.cancel')}
               </button>
               <button
                 onClick={() => handleDeleteItem(showDeleteConfirm)}
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-6 py-3 rounded-xl transition-all"
               >
-                Delete
+                {t('checklist.delete')}
               </button>
             </div>
           </div>

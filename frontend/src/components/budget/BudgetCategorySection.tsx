@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Pizza, Wine, Home, Package, Music, Heart, MoreHorizontal } from 'lucide-react';
 import { BudgetItem, BudgetCategory, BudgetCategoryTotal, BUDGET_CATEGORIES } from '../../types';
 import { BudgetItemRow } from './BudgetItemRow';
@@ -30,6 +31,7 @@ export const BudgetCategorySection: React.FC<BudgetCategorySectionProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { t } = useTranslation('host');
   const [isExpanded, setIsExpanded] = useState(items.length > 0);
 
   const formatCurrency = (amount: number) => {
@@ -62,13 +64,13 @@ export const BudgetCategorySection: React.FC<BudgetCategorySectionProps> = ({
           <Icon size={18} className="text-[#ff393a]" />
           <span className="font-medium text-theme-text">{categoryInfo?.label || category}</span>
           <span className="text-xs text-theme-text-muted bg-theme-surface-hover px-2 py-0.5 rounded-full">
-            {totals.count} item{totals.count !== 1 ? 's' : ''}
+            {t('budget.item', { count: totals.count })}
           </span>
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold text-theme-text">{formatCurrency(totals.total)}</p>
           {totals.pending > 0 && (
-            <p className="text-xs text-yellow-400">{formatCurrency(totals.pending)} pending</p>
+            <p className="text-xs text-yellow-400">{t('budget.pending', { amount: formatCurrency(totals.pending) })}</p>
           )}
         </div>
       </button>

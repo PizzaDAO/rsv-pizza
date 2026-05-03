@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Monitor, Loader2, AlertCircle, Map, Link, MapPin, X } from 'lucide-react';
 import { Display } from '../../types';
 import { getPartyDisplays, createDisplay, updateDisplay, deleteDisplay } from '../../lib/api';
@@ -22,6 +23,7 @@ interface DisplaysWidgetProps {
 }
 
 export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
+  const { t } = useTranslation('host');
   const [displays, setDisplays] = useState<Display[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,7 +154,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
   };
 
   const handleDelete = async (display: Display) => {
-    if (!confirm(`Delete "${display.name}"? This cannot be undone.`)) return;
+    if (!confirm(t('displays.deleteConfirm', { name: display.name }))) return;
 
     try {
       const success = await deleteDisplay(partyId, display.id);
@@ -393,9 +395,9 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
         <div className="flex items-center gap-3">
           <Monitor className="text-[#ff393a]" size={20} />
           <div>
-            <h3 className="font-medium text-theme-text">Displays</h3>
+            <h3 className="font-medium text-theme-text">{t('displays.displays')}</h3>
             <p className="text-sm text-theme-text-muted">
-              Create screens for TVs, projectors, and tablets
+              {t('displays.createScreens')}
             </p>
           </div>
         </div>
@@ -404,7 +406,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
           className="flex items-center gap-2 px-4 py-2 bg-[#ff393a] hover:bg-[#ff393a]/90 text-white rounded-lg transition-colors"
         >
           <Plus size={18} />
-          New Display
+          {t('displays.newDisplay')}
         </button>
       </div>
 
@@ -413,13 +415,13 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <Map className="text-theme-text-muted" size={18} />
-            <h3 className="font-medium text-theme-text text-sm">Venue Floorplan</h3>
+            <h3 className="font-medium text-theme-text text-sm">{t('displays.venueFloorplan')}</h3>
           </div>
           <button
             onClick={() => setShowFloorplanInput(!showFloorplanInput)}
             className="text-xs text-[#ff393a] hover:underline"
           >
-            {floorplanUrl ? 'Change' : 'Add Floorplan'}
+            {floorplanUrl ? t('displays.change') : t('displays.addFloorplan')}
           </button>
         </div>
 
@@ -431,7 +433,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                 type="url"
                 value={floorplanInput}
                 onChange={(e) => setFloorplanInput(e.target.value)}
-                placeholder="Floorplan image URL"
+                placeholder={t('displays.floorplanImageUrl')}
               />
             </div>
             <button
@@ -465,7 +467,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                 <div className="bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-theme-stroke">
                   <p className="text-theme-text-secondary text-sm flex items-center gap-2">
                     <MapPin size={14} className="text-[#ff393a]" />
-                    Click to place displays
+                    {t('displays.clickToPlaceDisplays')}
                   </p>
                 </div>
               </div>
@@ -536,7 +538,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                         className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-theme-surface rounded transition-colors"
                       >
                         <X size={12} />
-                        Remove from floorplan
+                        {t('displays.removeFromFloorplan')}
                       </button>
                     </div>
                   </div>
@@ -552,7 +554,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
                 style={getPopoverStyle(pendingClick.x, pendingClick.y)}
               >
                 <div className="bg-black/90 backdrop-blur border border-theme-stroke rounded-lg shadow-xl p-2 min-w-[160px] max-h-[200px] overflow-y-auto">
-                  <div className="text-xs text-theme-text-muted px-2 py-1 mb-1">Place a display here</div>
+                  <div className="text-xs text-theme-text-muted px-2 py-1 mb-1">{t('displays.placeDisplayHere')}</div>
                   {unplacedDisplays.map((d) => (
                     <button
                       key={d.id}
@@ -585,7 +587,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
           </div>
         ) : (
           <p className="text-xs text-theme-text-faint text-center py-3">
-            Add a floorplan image to see where displays are placed
+            {t('displays.addFloorplanHint')}
           </p>
         )}
 
@@ -603,7 +605,7 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
             ))}
             {unplacedDisplays.length > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] text-theme-text-faint">
-                +{unplacedDisplays.length} unplaced
+                {t('displays.unplaced', { count: unplacedDisplays.length })}
               </span>
             )}
           </div>
@@ -614,16 +616,16 @@ export function DisplaysWidget({ partyId }: DisplaysWidgetProps) {
       {displays.length === 0 ? (
         <div className="card p-8 text-center">
           <Monitor className="w-12 h-12 text-theme-text-faint mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-theme-text mb-2">No displays yet</h3>
+          <h3 className="text-lg font-medium text-theme-text mb-2">{t('displays.noDisplaysYet')}</h3>
           <p className="text-theme-text-muted mb-4">
-            Create displays for TVs, projectors, or tablets at your event.
+            {t('displays.noDisplaysDesc')}
           </p>
           <button
             onClick={handleCreate}
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff393a] hover:bg-[#ff393a]/90 text-white rounded-lg transition-colors"
           >
             <Plus size={18} />
-            Create Your First Display
+            {t('displays.createFirstDisplay')}
           </button>
         </div>
       ) : (

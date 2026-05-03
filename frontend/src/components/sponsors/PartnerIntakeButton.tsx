@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { generatePartnerIntakeToken, revokePartnerIntakeToken } from '../../lib/api';
@@ -10,6 +11,7 @@ interface PartnerIntakeButtonProps {
 }
 
 export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntakeButtonProps) {
+  const { t } = useTranslation('host');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -95,7 +97,7 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
         title="Generate partner intake form link"
       >
         <Link2 size={12} />
-        Form
+        {t('sponsors.form')}
       </button>
     );
   }
@@ -115,7 +117,7 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
           title={`Submitted ${submittedDate}`}
         >
           <CheckCircle size={12} />
-          Submitted
+          {t('sponsors.submitted')}
         </button>
         {showMenu && (
           <div className="absolute top-full right-0 mt-1 z-10 bg-theme-header border border-theme-stroke rounded-lg shadow-lg py-1 min-w-[140px]">
@@ -124,21 +126,21 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
               className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
             >
               <ExternalLink size={12} />
-              Open Link
+              {t('sponsors.openLink')}
             </button>
             <button
               onClick={handleCopyUrl}
               className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
             >
               {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-              {copied ? 'Copied!' : 'Copy Link'}
+              {copied ? t('sponsors.copiedLink') : t('sponsors.copyLink')}
             </button>
             <button
               onClick={handleRevoke}
               className="w-full px-3 py-1.5 text-xs text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
             >
               <X size={12} />
-              Revoke Link
+              {t('sponsors.revokeLink')}
             </button>
           </div>
         )}
@@ -162,7 +164,7 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
         title="Intake link sent, awaiting response"
       >
         <Clock size={12} />
-        Pending
+        {t('sponsors.pending')}
       </button>
       {showMenu && (
         <div className="absolute top-full right-0 mt-1 z-10 bg-theme-header border border-theme-stroke rounded-lg shadow-lg py-1 min-w-[140px]">
@@ -171,21 +173,21 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
             className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
           >
             <ExternalLink size={12} />
-            Open Link
+            {t('sponsors.openLink')}
           </button>
           <button
             onClick={handleCopyUrl}
             className="w-full px-3 py-1.5 text-xs text-left text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface transition-colors flex items-center gap-2"
           >
             {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-            {copied ? 'Copied!' : 'Copy Link'}
+            {copied ? t('sponsors.copiedLink') : t('sponsors.copyLink')}
           </button>
           <button
             onClick={handleRevoke}
             className="w-full px-3 py-1.5 text-xs text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
           >
             <X size={12} />
-            Revoke Link
+            {t('sponsors.revokeLink')}
           </button>
         </div>
       )}

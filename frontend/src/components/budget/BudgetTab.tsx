@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   BudgetOverview as BudgetOverviewType,
@@ -25,6 +26,7 @@ interface BudgetTabProps {
 }
 
 export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
+  const { t } = useTranslation('host');
   const [budget, setBudget] = useState<BudgetOverviewType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +42,10 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
     if (data) {
       setBudget(data);
     } else {
-      setError('Failed to load budget');
+      setError(t('budget.failedToLoad'));
     }
     setLoading(false);
-  }, [partyId]);
+  }, [partyId, t]);
 
   useEffect(() => {
     loadBudget();
@@ -141,7 +143,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
           className="btn-secondary inline-flex items-center gap-2"
         >
           <RefreshCw size={16} />
-          Try Again
+          {t('budget.tryAgain')}
         </button>
       </div>
     );
@@ -156,13 +158,13 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       {/* Budget Overview Card */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-theme-text">Budget Overview</h2>
+          <h2 className="text-lg font-semibold text-theme-text">{t('budget.budgetOverview')}</h2>
           <button
             onClick={() => setShowForm(true)}
             className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2"
           >
             <Plus size={16} />
-            Add Expense
+            {t('budget.addExpense')}
           </button>
         </div>
 
@@ -184,17 +186,17 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
 
       {/* Expenses by Category */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-theme-text mb-4">Expenses</h2>
+        <h2 className="text-lg font-semibold text-theme-text mb-4">{t('budget.expenses')}</h2>
 
         {budget.items.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-theme-text-muted mb-4">No expenses recorded yet</p>
+            <p className="text-theme-text-muted mb-4">{t('budget.noExpenses')}</p>
             <button
               onClick={() => setShowForm(true)}
               className="btn-secondary inline-flex items-center gap-2"
             >
               <Plus size={16} />
-              Add Your First Expense
+              {t('budget.addFirstExpense')}
             </button>
           </div>
         ) : (
@@ -234,22 +236,22 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(null)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-theme-text mb-3">Delete Expense?</h2>
+            <h2 className="text-xl font-bold text-theme-text mb-3">{t('budget.deleteExpense')}</h2>
             <p className="text-theme-text-secondary mb-6">
-              This will permanently delete this expense item. This action cannot be undone.
+              {t('budget.deleteExpenseDesc')}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
                 className="flex-1 btn-secondary"
               >
-                Cancel
+                {t('budget.cancel')}
               </button>
               <button
                 onClick={() => handleDeleteItem(showDeleteConfirm)}
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-6 py-3 rounded-xl transition-all"
               >
-                Delete
+                {t('budget.delete')}
               </button>
             </div>
           </div>

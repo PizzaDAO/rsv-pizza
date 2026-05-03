@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
   Mail, Phone, User, Building2, Calendar
@@ -20,15 +21,15 @@ interface SponsorListProps {
 type SortField = 'name' | 'status' | 'amount' | 'lastContactedAt' | 'createdAt';
 type SortOrder = 'asc' | 'desc';
 
-const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgColor: string }> = {
-  todo: { label: 'To Do', color: 'text-gray-300', bgColor: 'bg-gray-500' },
-  asked: { label: 'Asked', color: 'text-orange-300', bgColor: 'bg-orange-500' },
-  yes: { label: 'Yes', color: 'text-green-300', bgColor: 'bg-green-500' },
-  billed: { label: 'Billed', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
-  paid: { label: 'Paid', color: 'text-blue-300', bgColor: 'bg-blue-500' },
-  stuck: { label: 'Stuck', color: 'text-red-300', bgColor: 'bg-red-500' },
-  alum: { label: 'Alum', color: 'text-purple-300', bgColor: 'bg-purple-500' },
-  skip: { label: 'Skip', color: 'text-gray-400', bgColor: 'bg-gray-700' },
+const STATUS_CONFIG: Record<SponsorStatus, { labelKey: string; color: string; bgColor: string }> = {
+  todo: { labelKey: 'sponsors.toDo', color: 'text-gray-300', bgColor: 'bg-gray-500' },
+  asked: { labelKey: 'sponsors.asked', color: 'text-orange-300', bgColor: 'bg-orange-500' },
+  yes: { labelKey: 'sponsors.yes', color: 'text-green-300', bgColor: 'bg-green-500' },
+  billed: { labelKey: 'sponsors.billed', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
+  paid: { labelKey: 'sponsors.paid', color: 'text-blue-300', bgColor: 'bg-blue-500' },
+  stuck: { labelKey: 'sponsors.stuck', color: 'text-red-300', bgColor: 'bg-red-500' },
+  alum: { labelKey: 'sponsors.alum', color: 'text-purple-300', bgColor: 'bg-purple-500' },
+  skip: { labelKey: 'sponsors.skip', color: 'text-gray-400', bgColor: 'bg-gray-700' },
 };
 
 const STATUS_ORDER: Record<SponsorStatus, number> = {
@@ -43,6 +44,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
 };
 
 export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, onStatusChange, isLoading, avatarUrls }: SponsorListProps) {
+  const { t } = useTranslation('host');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterStatus, setFilterStatus] = useState<SponsorStatus | 'all'>('all');
@@ -131,9 +133,9 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
     return (
       <div className="card p-8 bg-theme-header border-theme-stroke text-center">
         <Building2 size={48} className="mx-auto text-theme-text-faint mb-4" />
-        <h3 className="text-lg font-medium text-theme-text mb-2">No partners yet</h3>
+        <h3 className="text-lg font-medium text-theme-text mb-2">{t('sponsors.noPartnersYet')}</h3>
         <p className="text-theme-text-secondary text-sm">
-          Add your first partner to start tracking your fundraising pipeline.
+          {t('sponsors.noPartnersDesc')}
         </p>
       </div>
     );
@@ -143,7 +145,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
     <div className="card bg-theme-header border-theme-stroke overflow-hidden">
       {/* Filter Row */}
       <div className="p-3 border-b border-theme-stroke flex items-center gap-2">
-        <span className="text-sm text-theme-text-secondary">Filter:</span>
+        <span className="text-sm text-theme-text-secondary">{t('sponsors.filter')}</span>
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as SponsorStatus | 'all')}
@@ -155,13 +157,13 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
             if (count === 0) return null;
             return (
               <option key={status} value={status}>
-                {config.label} ({count})
+                {t(config.labelKey)} ({count})
               </option>
             );
           })}
         </select>
         <span className="text-sm text-theme-text-muted ml-auto">
-          {filteredAndSortedSponsors.length} partner{filteredAndSortedSponsors.length !== 1 ? 's' : ''}
+          {t('sponsors.partner', { count: filteredAndSortedSponsors.length })}
         </span>
       </div>
 
@@ -175,7 +177,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   onClick={() => handleSort('status')}
                   className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
-                  Status <SortIcon field="status" />
+                  {t('sponsors.status')} <SortIcon field="status" />
                 </button>
               </th>
               <th className="text-left p-3">
@@ -183,12 +185,12 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   onClick={() => handleSort('name')}
                   className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
-                  Partner <SortIcon field="name" />
+                  {t('sponsors.partnerCol')} <SortIcon field="name" />
                 </button>
               </th>
               <th className="text-left p-3 hidden md:table-cell">
                 <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
-                  Contact
+                  {t('sponsors.contact')}
                 </span>
               </th>
               <th className="text-left p-3">
@@ -196,12 +198,12 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   onClick={() => handleSort('amount')}
                   className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
-                  Amount <SortIcon field="amount" />
+                  {t('sponsors.amount')} <SortIcon field="amount" />
                 </button>
               </th>
               <th className="text-left p-3 hidden lg:table-cell">
                 <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
-                  Type
+                  {t('sponsors.type')}
                 </span>
               </th>
               <th className="text-left p-3 hidden lg:table-cell">
@@ -209,12 +211,12 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   onClick={() => handleSort('lastContactedAt')}
                   className="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text font-medium uppercase tracking-wider"
                 >
-                  Last Contact <SortIcon field="lastContactedAt" />
+                  {t('sponsors.lastContact')} <SortIcon field="lastContactedAt" />
                 </button>
               </th>
               <th className="text-right p-3">
                 <span className="text-xs text-theme-text-secondary font-medium uppercase tracking-wider">
-                  Actions
+                  {t('sponsors.actions')}
                 </span>
               </th>
             </tr>
@@ -236,7 +238,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                     >
                       {Object.entries(STATUS_CONFIG).map(([status, config]) => (
                         <option key={status} value={status} className="bg-theme-header text-theme-text">
-                          {config.label}
+                          {t(config.labelKey)}
                         </option>
                       ))}
                     </select>

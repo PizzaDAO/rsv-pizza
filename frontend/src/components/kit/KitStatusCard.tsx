@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Package, Truck, CheckCircle, Clock, XCircle, ExternalLink } from 'lucide-react';
 import { PartyKit, KIT_TIERS, KitStatus } from '../../types';
 
@@ -8,40 +9,42 @@ interface KitStatusCardProps {
   onEdit?: () => void;
 }
 
-const STATUS_CONFIG: Record<KitStatus, { color: string; bgColor: string; icon: React.ReactNode; label: string }> = {
-  pending: {
-    color: 'text-yellow-500',
-    bgColor: 'bg-yellow-500',
-    icon: <Clock size={16} />,
-    label: 'Pending',
-  },
-  approved: {
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-500',
-    icon: <CheckCircle size={16} />,
-    label: 'Approved',
-  },
-  shipped: {
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-500',
-    icon: <Truck size={16} />,
-    label: 'Shipped',
-  },
-  delivered: {
-    color: 'text-green-500',
-    bgColor: 'bg-green-500',
-    icon: <CheckCircle size={16} />,
-    label: 'Delivered',
-  },
-  declined: {
-    color: 'text-red-500',
-    bgColor: 'bg-red-500',
-    icon: <XCircle size={16} />,
-    label: 'Declined',
-  },
-};
-
 export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onEdit }) => {
+  const { t } = useTranslation('host');
+
+  const STATUS_CONFIG: Record<KitStatus, { color: string; bgColor: string; icon: React.ReactNode; label: string }> = {
+    pending: {
+      color: 'text-yellow-500',
+      bgColor: 'bg-yellow-500',
+      icon: <Clock size={16} />,
+      label: t('kit.statusPending'),
+    },
+    approved: {
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500',
+      icon: <CheckCircle size={16} />,
+      label: t('kit.statusApproved'),
+    },
+    shipped: {
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500',
+      icon: <Truck size={16} />,
+      label: t('kit.statusShipped'),
+    },
+    delivered: {
+      color: 'text-green-500',
+      bgColor: 'bg-green-500',
+      icon: <CheckCircle size={16} />,
+      label: t('kit.statusDelivered'),
+    },
+    declined: {
+      color: 'text-red-500',
+      bgColor: 'bg-red-500',
+      icon: <XCircle size={16} />,
+      label: t('kit.statusDeclined'),
+    },
+  };
+
   const statusConfig = STATUS_CONFIG[kit.status];
   const allocatedTier = kit.allocatedTier ? KIT_TIERS.find(t => t.id === kit.allocatedTier) : null;
 
@@ -63,7 +66,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
           <div className="p-2 bg-theme-surface-hover rounded-lg">
             <Package size={20} className="text-theme-text-secondary" />
           </div>
-          <span className="font-medium text-theme-text">Party Kit</span>
+          <span className="font-medium text-theme-text">{t('kit.partyKit')}</span>
         </div>
         <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${statusConfig.bgColor}/20 ${statusConfig.color}`}>
           {statusConfig.icon}
@@ -75,19 +78,19 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
       <div className="p-4 space-y-4">
         {/* Kit Tier */}
         <div>
-          <p className="text-sm text-theme-text-muted mb-1">Kit Tier</p>
+          <p className="text-sm text-theme-text-muted mb-1">{t('kit.kitTier')}</p>
           {allocatedTier ? (
             <p className="text-theme-text font-medium">{allocatedTier.name}</p>
           ) : (
             <p className="text-theme-text-secondary text-sm italic">
-              PizzaDAO will assign the appropriate tier for your event
+              {t('kit.tierAssignNote')}
             </p>
           )}
         </div>
 
         {/* Shipping Address */}
         <div>
-          <p className="text-sm text-theme-text-muted mb-1">Shipping to</p>
+          <p className="text-sm text-theme-text-muted mb-1">{t('kit.shippingTo')}</p>
           <p className="text-theme-text font-medium">{kit.recipientName}</p>
           {formatAddress().map((line, i) => (
             <p key={i} className="text-sm text-theme-text-secondary">{line}</p>
@@ -98,7 +101,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
         {/* Tracking Info */}
         {kit.trackingNumber && (
           <div>
-            <p className="text-sm text-theme-text-muted mb-1">Tracking</p>
+            <p className="text-sm text-theme-text-muted mb-1">{t('kit.tracking')}</p>
             <div className="flex items-center gap-2">
               <code className="text-sm text-theme-text bg-theme-surface-hover px-2 py-0.5 rounded">
                 {kit.trackingNumber}
@@ -110,7 +113,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
                   rel="noopener noreferrer"
                   className="text-[#ff393a] hover:text-[#ff5a5b] flex items-center gap-1 text-sm"
                 >
-                  Track Package
+                  {t('kit.trackPackage')}
                   <ExternalLink size={14} />
                 </a>
               )}
@@ -121,7 +124,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
         {/* Notes */}
         {kit.notes && (
           <div>
-            <p className="text-sm text-theme-text-muted mb-1">Your Notes</p>
+            <p className="text-sm text-theme-text-muted mb-1">{t('kit.yourNotes')}</p>
             <p className="text-sm text-theme-text-secondary">{kit.notes}</p>
           </div>
         )}
@@ -129,10 +132,10 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
         {/* Timeline */}
         <div className="pt-2 border-t border-theme-stroke">
           <p className="text-xs text-theme-text-muted">
-            Requested {new Date(kit.requestedAt).toLocaleDateString()}
-            {kit.approvedAt && ` | Approved ${new Date(kit.approvedAt).toLocaleDateString()}`}
-            {kit.shippedAt && ` | Shipped ${new Date(kit.shippedAt).toLocaleDateString()}`}
-            {kit.deliveredAt && ` | Delivered ${new Date(kit.deliveredAt).toLocaleDateString()}`}
+            {t('kit.requested', { date: new Date(kit.requestedAt).toLocaleDateString() })}
+            {kit.approvedAt && ` | ${t('kit.approved', { date: new Date(kit.approvedAt).toLocaleDateString() })}`}
+            {kit.shippedAt && ` | ${t('kit.shipped', { date: new Date(kit.shippedAt).toLocaleDateString() })}`}
+            {kit.deliveredAt && ` | ${t('kit.delivered', { date: new Date(kit.deliveredAt).toLocaleDateString() })}`}
           </p>
         </div>
       </div>
@@ -145,7 +148,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
               onClick={onEdit}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2 rounded-lg transition-colors text-sm"
             >
-              Edit Request
+              {t('kit.editRequest')}
             </button>
           )}
           {onCancel && (
@@ -153,7 +156,7 @@ export const KitStatusCard: React.FC<KitStatusCardProps> = ({ kit, onCancel, onE
               onClick={onCancel}
               className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium py-2 rounded-lg transition-colors text-sm"
             >
-              Cancel Request
+              {t('kit.cancelRequest')}
             </button>
           )}
         </div>

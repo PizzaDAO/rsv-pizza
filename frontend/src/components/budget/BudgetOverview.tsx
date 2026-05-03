@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { DollarSign, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 
 interface BudgetOverviewProps {
@@ -16,6 +17,8 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
   totalPending,
   remaining,
 }) => {
+  const { t } = useTranslation('host');
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -42,7 +45,7 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
       {budgetTotal !== null && budgetTotal > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-theme-text">Budget Progress</span>
+            <span className="text-sm font-medium text-theme-text">{t('budget.budgetProgress')}</span>
             <span className="text-sm font-medium text-theme-text">
               {formatCurrency(totalSpent)} / {formatCurrency(budgetTotal)}
             </span>
@@ -54,10 +57,10 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
             />
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-xs text-theme-text-muted">{percentSpent.toFixed(0)}% used</span>
+            <span className="text-xs text-theme-text-muted">{t('budget.percentUsed', { percent: percentSpent.toFixed(0) })}</span>
             {remaining !== null && (
               <span className={`text-xs ${remaining >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {remaining >= 0 ? `${formatCurrency(remaining)} remaining` : `${formatCurrency(Math.abs(remaining))} over budget`}
+                {remaining >= 0 ? t('budget.remaining', { amount: formatCurrency(remaining) }) : t('budget.overBudget', { amount: formatCurrency(Math.abs(remaining)) })}
               </span>
             )}
           </div>
@@ -70,7 +73,7 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
         <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={16} className="text-[#ff393a]" />
-            <span className="text-xs font-medium text-theme-text-secondary">Total Spent</span>
+            <span className="text-xs font-medium text-theme-text-secondary">{t('budget.totalSpent')}</span>
           </div>
           <p className="text-xl font-bold text-theme-text">{formatCurrency(totalSpent)}</p>
         </div>
@@ -80,7 +83,7 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
           <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={16} className="text-green-400" />
-              <span className="text-xs font-medium text-theme-text-secondary">Remaining</span>
+              <span className="text-xs font-medium text-theme-text-secondary">{t('budget.remainingLabel')}</span>
             </div>
             <p className={`text-xl font-bold ${remaining !== null && remaining >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {remaining !== null ? formatCurrency(remaining) : '--'}
@@ -90,9 +93,9 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
           <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={16} className="text-theme-text-muted" />
-              <span className="text-xs font-medium text-theme-text-secondary">Budget</span>
+              <span className="text-xs font-medium text-theme-text-secondary">{t('budget.budgetLabel')}</span>
             </div>
-            <p className="text-sm text-theme-text-muted">Not set</p>
+            <p className="text-sm text-theme-text-muted">{t('budget.notSet')}</p>
           </div>
         )}
 
@@ -100,7 +103,7 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
         <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle size={16} className="text-green-400" />
-            <span className="text-xs font-medium text-theme-text-secondary">Paid</span>
+            <span className="text-xs font-medium text-theme-text-secondary">{t('budget.paid')}</span>
           </div>
           <p className="text-xl font-bold text-theme-text">{formatCurrency(totalPaid)}</p>
         </div>
@@ -109,7 +112,7 @@ export const BudgetOverview: React.FC<BudgetOverviewProps> = ({
         <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock size={16} className="text-yellow-400" />
-            <span className="text-xs font-medium text-theme-text-secondary">Pending</span>
+            <span className="text-xs font-medium text-theme-text-secondary">{t('budget.statusPending')}</span>
           </div>
           <p className="text-xl font-bold text-theme-text">{formatCurrency(totalPending)}</p>
         </div>
