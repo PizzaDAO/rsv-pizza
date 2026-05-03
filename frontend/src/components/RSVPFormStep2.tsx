@@ -3,6 +3,7 @@ import { ThumbsUp, ThumbsDown, Loader2, ChevronLeft, X, Square, CheckSquare2, St
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
+import { useTranslation } from 'react-i18next';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
 
 interface RSVPFormStep2Props {
@@ -18,14 +19,15 @@ export function RSVPFormStep2({
   donationSlot,
   submitLabel,
 }: RSVPFormStep2Props) {
-  const label = submitLabel ?? (isEditing ? 'Edit RSVP' : 'RSVP');
+  const { t } = useTranslation('rsvp');
+  const label = submitLabel ?? (isEditing ? t('step2.editSubmit') : t('step2.submit'));
 
   return (
     <form onSubmit={form.handleSubmit} className="space-y-3">
       {/* Dietary Restrictions */}
       <div>
         <label className="block text-sm font-medium text-theme-text mb-3">
-          Diet
+          {t('step2.diet')}
         </label>
         <div className="flex flex-wrap gap-2">
           {DIETARY_OPTIONS.map((option) => (
@@ -39,7 +41,7 @@ export function RSVPFormStep2({
                   : 'border-theme-stroke bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-surface-hover'
               }`}
             >
-              {option}
+              {t(`dietary.${option}`)}
             </button>
           ))}
         </div>
@@ -48,7 +50,7 @@ export function RSVPFormStep2({
       {/* Toppings */}
       <div>
         <label className="block text-sm font-medium text-theme-text mb-3">
-          Toppings
+          {t('step2.toppings')}
         </label>
         <div className="flex flex-wrap gap-2">
           {TOPPINGS.filter(t => form.availableToppings.length === 0 || form.availableToppings.includes(t.id)).map((topping) => {
@@ -145,7 +147,7 @@ export function RSVPFormStep2({
       {form.availableBeverages.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-theme-text mb-3">
-            Drink Preferences
+            {t('step2.drinkPreferences')}
           </label>
           <div className="flex flex-wrap gap-2">
             {DRINKS.filter(d => form.availableBeverages.includes(d.id)).map((drink) => {
@@ -238,7 +240,7 @@ export function RSVPFormStep2({
       {form.nearbyPizzerias.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-theme-text mb-3">
-            Favorite Pizzerias <span className="text-theme-text-muted font-normal">(click to rank 1-3)</span>
+            {t('step2.favoritePizzerias')} <span className="text-theme-text-muted font-normal">{t('step2.clickToRank')}</span>
           </label>
           {form.loadingPizzerias ? (
             <div className="flex items-center justify-center py-4">
@@ -302,7 +304,7 @@ export function RSVPFormStep2({
             className="w-full flex items-center justify-center gap-2 p-2.5 mt-2 rounded-xl border border-dashed border-theme-stroke-hover text-theme-text-muted hover:text-theme-text hover:border-theme-stroke-hover hover:bg-theme-surface transition-all text-sm"
           >
             <Plus size={14} />
-            Suggest a Pizzeria
+            {t('step2.suggestPizzeria')}
           </button>
         </div>
       )}
@@ -311,7 +313,7 @@ export function RSVPFormStep2({
       {form.showSuggestModal && (
         <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-theme-text">Suggest a pizzeria</p>
+            <p className="text-sm font-medium text-theme-text">{t('step2.suggestPizzeriaPrompt')}</p>
             <button
               type="button"
               onClick={() => form.setShowSuggestModal(false)}
@@ -322,7 +324,7 @@ export function RSVPFormStep2({
           </div>
           <PlaceAutocomplete
             onPlaceSelected={(place) => form.handleSuggestPizzeria(place)}
-            placeholder="Search for a pizzeria..."
+            placeholder={t('step2.searchPizzeria')}
             autoFocus
           />
         </div>
@@ -351,8 +353,8 @@ export function RSVPFormStep2({
             <Square size={20} className="text-theme-text-muted flex-shrink-0" />
           )}
           <div className="text-left">
-            <span className="text-sm font-medium text-theme-text">Save to profile</span>
-            <p className="text-xs text-theme-text-muted">Remember my preferences for future events</p>
+            <span className="text-sm font-medium text-theme-text">{t('step2.saveToProfile')}</span>
+            <p className="text-xs text-theme-text-muted">{t('step2.saveToProfileDesc')}</p>
           </div>
         </button>
       )}
@@ -365,7 +367,7 @@ export function RSVPFormStep2({
           className="btn-secondary flex items-center gap-2"
         >
           <ChevronLeft size={18} />
-          Back
+          {t('step2.back')}
         </button>
         <button
           type="submit"
@@ -376,7 +378,7 @@ export function RSVPFormStep2({
           {form.submitting ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              {isEditing ? 'Saving...' : 'Submitting...'}
+              {isEditing ? t('step2.saving') : t('step2.submitting')}
             </>
           ) : (
             label

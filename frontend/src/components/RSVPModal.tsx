@@ -14,6 +14,7 @@ import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 import { useAccount } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
+import { useTranslation } from 'react-i18next';
 
 interface RSVPModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ interface RSVPModalProps {
 
 export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess }: RSVPModalProps) {
   const { user } = useAuth();
+  const { t } = useTranslation('rsvp');
+  const { t: tCommon } = useTranslation('common');
 
   // NFT minting state (stays in modal — not shared)
   const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
@@ -153,7 +156,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               form.setEthereumAddress(e.target.value);
               form.validateWalletAddress(e.target.value);
             }}
-            placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
+            placeholder={t('step1.walletPlaceholder')}
             className={
               form.walletValidation === 'valid'
                 ? 'border-[#39d98a]/50'
@@ -173,7 +176,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
           >
             <X size={14} />
-            <span className="hidden sm:inline">Clear</span>
+            <span className="hidden sm:inline">{tCommon('buttons.clear')}</span>
           </button>
         ) : (
           <ConnectKitButton.Custom>
@@ -184,14 +187,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                 className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
               >
                 <Wallet size={14} />
-                <span className="hidden sm:inline">Connect</span>
+                <span className="hidden sm:inline">{tCommon('buttons.connect')}</span>
               </button>
             )}
           </ConnectKitButton.Custom>
         )}
       </div>
       {form.walletValidation === 'invalid' && form.ethereumAddress.trim() && (
-        <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
+        <span className="text-xs text-[#ff393a] mt-1 block">{tCommon('errors.invalidWallet')}</span>
       )}
     </div>
   );
@@ -206,11 +209,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
     };
 
     const getSuccessTitle = () => {
-      if (form.wasUpdated) return 'RSVP Updated';
-      if (form.alreadyRegistered) return "You're already registered!";
-      if (form.waitlisted) return "You're on the Waitlist!";
-      if (form.pendingApproval) return 'RSVP Submitted!';
-      return `See you at ${event.name}!`;
+      if (form.wasUpdated) return t('success.rsvpUpdated');
+      if (form.alreadyRegistered) return t('success.alreadyRegistered');
+      if (form.waitlisted) return t('success.waitlisted');
+      if (form.pendingApproval) return t('success.rsvpSubmitted');
+      return t('success.seeYou', { eventName: event.name });
     };
 
     const getSuccessIconComponent = () => {
@@ -244,23 +247,22 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </h1>
           {form.alreadyRegistered && !form.wasUpdated && (
             <p className="text-theme-text-secondary mb-4">
-              This email has already been used to RSVP to this event.
+              {t('success.alreadyRegisteredDesc')}
             </p>
           )}
           {form.wasUpdated && (
             <p className="text-theme-text-secondary mb-4">
-              Your preferences have been saved.
+              {t('success.preferenceSaved')}
             </p>
           )}
           {form.waitlisted && !form.wasUpdated && (
             <p className="text-theme-text-secondary mb-4">
-              This event is currently at capacity, but you're #{form.waitlistPosition} on the waitlist!
-              We'll notify you if a spot opens up.
+              {t('success.waitlistedDesc', { position: form.waitlistPosition })}
             </p>
           )}
           {form.pendingApproval && !form.alreadyRegistered && !form.waitlisted && (
             <p className="text-theme-text-secondary mb-4">
-              Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
+              {t('success.pendingApproval')}
             </p>
           )}
           {/* Share Section */}
@@ -293,13 +295,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               {mintStatus === 'minting' && (
                 <div className="flex items-center gap-2 text-theme-text-secondary justify-center">
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Minting your NFT...</span>
+                  <span>{t('nft.minting')}</span>
                 </div>
               )}
               {mintStatus === 'success' && (mintResult.txHash || mintResult.tokenId) && (
                 <div className="space-y-2">
                   <p className="text-[#39d98a] font-medium">
-                    {mintResult.alreadyMinted ? 'NFT Already Claimed!' : 'NFT Minted!'}
+                    {mintResult.alreadyMinted ? t('nft.alreadyClaimed') : t('nft.minted')}
                   </p>
                   {mintResult.tokenId ? (
                     <a
@@ -308,7 +310,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       rel="noopener noreferrer"
                       className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                     >
-                      View on OpenSea
+                      {t('nft.viewOnOpenSea')}
                     </a>
                   ) : mintResult.txHash ? (
                     <a
@@ -317,13 +319,13 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                       rel="noopener noreferrer"
                       className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                     >
-                      View Transaction
+                      {t('nft.viewTransaction')}
                     </a>
                   ) : null}
                 </div>
               )}
               {mintStatus === 'error' && (
-                <p className="text-[#ff393a] text-sm">{mintResult.error || 'NFT minting failed'}</p>
+                <p className="text-[#ff393a] text-sm">{mintResult.error || t('nft.mintFailed')}</p>
               )}
             </div>
           )}
@@ -335,12 +337,12 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                 className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 hover:bg-theme-surface-hover transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-theme-text"
               >
                 <Heart size={18} className="text-[#ff393a]" />
-                Donate
+                {t('donation.donate')}
               </button>
               <p className="text-theme-text-secondary text-sm text-center mt-1">
                 {event.donationRecipient ? (
-                  <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
-                ) : `Buy Pizza for ${event.name}`}
+                  <>{t('donation.buyPizzaFor', { recipient: event.donationRecipient })}{event.donationRecipientUrl ? <> (<a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a>)</> : null}</>
+                ) : t('donation.buyPizzaForEventName', { eventName: event.name })}
               </p>
             </>
           )}
@@ -362,14 +364,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           {donationComplete && (
             <div className="flex items-center justify-center gap-2 mt-4 text-[#39d98a]">
               <Check size={16} />
-              <span className="text-sm">Thanks for your support!</span>
+              <span className="text-sm">{t('donation.thanksForSupport')}</span>
             </div>
           )}
           <button
             onClick={handleClose}
             className="btn-secondary mt-4"
           >
-            Close
+            {tCommon('buttons.close')}
           </button>
         </div>
       </div>,
@@ -398,8 +400,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             </button>
 
             <div className="mb-6">
-              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${event.name}`}</h1>
-              <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
+              <h1 className="text-2xl font-bold text-theme-text">{isEditing ? t('step1.editTitle') : t('step1.title', { eventName: event.name })}</h1>
+              <p className="text-sm text-theme-text-secondary">{t('step1.stepIndicator')}</p>
             </div>
 
             <RSVPFormStep1
@@ -435,8 +437,8 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </button>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
-            <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
+            <h1 className="text-2xl font-bold text-theme-text">{isEditing ? t('step2.editTitle') : t('step2.title')}</h1>
+            <p className="text-sm text-theme-text-secondary">{t('step2.stepIndicator')}</p>
           </div>
 
           <RSVPFormStep2

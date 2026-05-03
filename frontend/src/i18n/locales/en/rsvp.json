@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "RSVP to {{eventName}}",
+    "editTitle": "Edit RSVP",
+    "stepIndicator": "Step 1 of 2",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Email",
+    "walletPlaceholder": "Wallet Address or ENS (e.g. vitalik.eth)",
+    "roleQuestion": "What role(s) do you play?",
+    "mailingList": "Join PizzaDAO's mailing list",
+    "swcJoin": "Join Stand with Crypto",
+    "swcNotify": "Notify me about future Stand With Crypto events.",
+    "ethconfDiscount": "Send me an ETHConf Discount",
+    "next": "Next"
+  },
+  "step2": {
+    "title": "Pizza Requests",
+    "editTitle": "Edit Pizza Preferences",
+    "stepIndicator": "Step 2 of 2",
+    "diet": "Diet",
+    "toppings": "Toppings",
+    "drinkPreferences": "Drink Preferences",
+    "favoritePizzerias": "Favorite Pizzerias",
+    "clickToRank": "(click to rank 1-3)",
+    "suggestPizzeria": "Suggest a Pizzeria",
+    "suggestPizzeriaPrompt": "Suggest a pizzeria",
+    "searchPizzeria": "Search for a pizzeria...",
+    "saveToProfile": "Save to profile",
+    "saveToProfileDesc": "Remember my preferences for future events",
+    "back": "Back",
+    "submit": "RSVP",
+    "editSubmit": "Edit RSVP",
+    "submitting": "Submitting...",
+    "saving": "Saving..."
+  },
+  "success": {
+    "seeYou": "See you at {{eventName}}!",
+    "alreadyRegistered": "You're already registered!",
+    "alreadyRegisteredDesc": "This email has already been used to RSVP to this event.",
+    "rsvpSubmitted": "RSVP Submitted!",
+    "pendingApproval": "Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.",
+    "rsvpUpdated": "RSVP Updated",
+    "preferenceSaved": "Your preferences have been saved.",
+    "waitlisted": "You're on the Waitlist!",
+    "waitlistedDesc": "This event is currently at capacity, but you're #{{position}} on the waitlist! We'll notify you if a spot opens up.",
+    "backToEvent": "Back to Event"
+  },
+  "password": {
+    "title": "Password Required",
+    "subtitle": "This event is password-protected",
+    "placeholder": "Event Password",
+    "continue": "Continue"
+  },
+  "donation": {
+    "donate": "Donate",
+    "defaultMessage": "Make a donation to help make this event possible",
+    "makeADonation": "Make a Donation",
+    "buyPizzaFor": "Buy Pizza for {{recipient}}",
+    "buyPizzaForEvent": "Buy Pizza for this event",
+    "buyPizzaForEventName": "Buy Pizza for {{eventName}}",
+    "thanksForSupport": "Thanks for your support!"
+  },
+  "nft": {
+    "minting": "Minting your NFT...",
+    "minted": "NFT Minted!",
+    "alreadyClaimed": "NFT Already Claimed!",
+    "viewOnOpenSea": "View on OpenSea",
+    "viewTransaction": "View Transaction",
+    "mintFailed": "NFT minting failed"
+  },
+  "share": {
+    "tellFriends": "Tell your friends about the party!",
+    "shareOnX": "Share on X",
+    "x": "X",
+    "download": "Download",
+    "save": "Save",
+    "copyLink": "Copy Link",
+    "link": "Link",
+    "copied": "Copied!"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "By checking the box, you consent to become a member of Stand with Crypto Alliance, Inc., a grassroots movement to empower crypto consumers, builders, and supporters to make themselves heard. By checking the box and agreeing to become a member, you understand that SWC and its vendors may collect and use your personal information. To learn more, visit",
+    "privacyPolicy": "SWC Privacy Policy",
+    "termsConditions": "Terms & Conditions"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Canada",
+    "description": "By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Canada. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit",
+    "privacyPolicy": "SWC Canada Privacy Policy",
+    "termsOfService": "Terms of Service"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Australia",
+    "description": "By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Australia. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit",
+    "privacyPolicy": "SWC Australia Privacy Policy",
+    "termsOfService": "Terms of Service"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto EU",
+    "description": "By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Europe. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit",
+    "privacyPolicy": "SWC EU Privacy Policy",
+    "termsOfService": "Terms of Service"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto UK",
+    "description": "By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in the UK. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit",
+    "privacyPolicy": "SWC UK Privacy Policy",
+    "termsOfService": "Terms of Service"
+  },
+  "roles": {
+    "Organizer": "Organizer",
+    "Builder": "Builder",
+    "Creative": "Creative",
+    "Connector": "Connector",
+    "Storyteller": "Storyteller",
+    "Counsel": "Counsel",
+    "Ground Support": "Ground Support"
+  },
+  "dietary": {
+    "Vegetarian": "Vegetarian",
+    "Vegan": "Vegan",
+    "Gluten-Free": "Gluten-Free",
+    "Dairy-Free": "Dairy-Free"
+  }
+}

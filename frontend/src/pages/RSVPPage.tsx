@@ -13,11 +13,14 @@ import { RSVPFormStep2 } from '../components/RSVPFormStep2';
 import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
 import { ShareRSVP } from '../components/ShareRSVP';
+import { useTranslation } from 'react-i18next';
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation('rsvp');
+  const { t: tCommon } = useTranslation('common');
 
   // Page-level loading state
   const [loading, setLoading] = useState(true);
@@ -96,7 +99,7 @@ export function RSVPPage() {
             setIsAuthenticated(true);
           }
         } else {
-          setLoadError('Party not found. The invite link may be invalid or expired.');
+          setLoadError(tCommon('errors.partyNotFoundDesc'));
         }
       }
       setLoading(false);
@@ -136,7 +139,7 @@ export function RSVPPage() {
       const authKey = `rsvpizza_auth_${inviteCode}`;
       sessionStorage.setItem(authKey, passwordInput);
     } else {
-      setPasswordError('Incorrect password. Please try again.');
+      setPasswordError(tCommon('errors.incorrectPassword'));
       setPasswordInput('');
     }
   };
@@ -163,7 +166,7 @@ export function RSVPPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{tCommon('errors.partyNotFound')}</h1>
           <p className="text-theme-text-secondary">{loadError}</p>
         </div>
       </div>
@@ -179,9 +182,9 @@ export function RSVPPage() {
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
-          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Password Required</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">{t('password.title')}</h1>
           <p className="text-theme-text-secondary mb-6 text-center">
-            This event is password-protected
+            {t('password.subtitle')}
           </p>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-3">
@@ -196,7 +199,7 @@ export function RSVPPage() {
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Event Password"
+                placeholder={t('password.placeholder')}
                 className="w-full"
                 required
                 autoFocus
@@ -204,7 +207,7 @@ export function RSVPPage() {
             </div>
 
             <button type="submit" className="w-full btn-primary">
-              Continue
+              {t('password.continue')}
             </button>
           </form>
         </div>
@@ -226,9 +229,9 @@ export function RSVPPage() {
               <Heart size={24} className="text-[#ff393a]" />
             </div>
             <div className="flex-1 text-left">
-              <p className="text-theme-text font-medium">Donate</p>
+              <p className="text-theme-text font-medium">{t('donation.donate')}</p>
               <p className="text-theme-text-muted text-sm">
-                {donationStats.message || 'Make a donation to help make this event possible'}
+                {donationStats.message || t('donation.defaultMessage')}
               </p>
             </div>
             <ChevronRight size={20} className="text-theme-text-muted" />
@@ -242,11 +245,11 @@ export function RSVPPage() {
               <Heart size={20} className="text-[#ff393a]" />
             </div>
             <div>
-              <h3 className="text-theme-text font-medium">Make a Donation</h3>
+              <h3 className="text-theme-text font-medium">{t('donation.makeADonation')}</h3>
               <p className="text-theme-text-muted text-sm">
                 {donationStats.recipient ? (
-                  <>Buy Pizza for {donationStats.recipientUrl ? <a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a> : donationStats.recipient}</>
-                ) : 'Buy Pizza for this event'}
+                  <>{t('donation.buyPizzaFor', { recipient: donationStats.recipient })}{donationStats.recipientUrl ? <> (<a href={donationStats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{donationStats.recipient}</a>)</> : null}</>
+                ) : t('donation.buyPizzaForEvent')}
               </p>
             </div>
           </div>
@@ -272,9 +275,9 @@ export function RSVPPage() {
     };
 
     const getSuccessTitle = () => {
-      if (form.alreadyRegistered) return "You're already registered!";
-      if (form.pendingApproval) return 'RSVP Submitted!';
-      return `See you at ${party?.name}!`;
+      if (form.alreadyRegistered) return t('success.alreadyRegistered');
+      if (form.pendingApproval) return t('success.rsvpSubmitted');
+      return t('success.seeYou', { eventName: party?.name });
     };
 
     return (
@@ -295,12 +298,12 @@ export function RSVPPage() {
           </h1>
           {form.alreadyRegistered && (
             <p className="text-theme-text-secondary mb-4">
-              This email has already been used to RSVP to this event.
+              {t('success.alreadyRegisteredDesc')}
             </p>
           )}
           {form.pendingApproval && !form.alreadyRegistered && (
             <p className="text-theme-text-secondary mb-4">
-              Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
+              {t('success.pendingApproval')}
             </p>
           )}
           {!form.alreadyRegistered && !form.pendingApproval && (() => {
@@ -324,7 +327,7 @@ export function RSVPPage() {
             onClick={handleClose}
             className="btn-secondary"
           >
-            Back to Event
+            {t('success.backToEvent')}
           </button>
         </div>
         {ConfettiOverlay}
@@ -346,8 +349,8 @@ export function RSVPPage() {
           </button>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text">RSVP to {party?.name}</h1>
-            <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
+            <h1 className="text-2xl font-bold text-theme-text">{t('step1.title', { eventName: party?.name })}</h1>
+            <p className="text-sm text-theme-text-secondary">{t('step1.stepIndicator')}</p>
           </div>
 
           <RSVPFormStep1
@@ -373,8 +376,8 @@ export function RSVPPage() {
         </button>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-theme-text">Pizza Requests</h1>
-          <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
+          <h1 className="text-2xl font-bold text-theme-text">{t('step2.title')}</h1>
+          <p className="text-sm text-theme-text-secondary">{t('step2.stepIndicator')}</p>
         </div>
 
         <RSVPFormStep2

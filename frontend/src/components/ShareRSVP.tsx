@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Link, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -41,6 +42,7 @@ function buildShareText(base: string, handles: string[], maxLen: number): string
 export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [] }: ShareRSVPProps) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const { t } = useTranslation('rsvp');
 
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
@@ -97,7 +99,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
 
   return (
     <div className="mt-6 pt-6 border-t border-theme-stroke">
-      <p className="text-theme-text font-medium text-center mb-3">Tell your friends about the party!</p>
+      <p className="text-theme-text font-medium text-center mb-3">{t('share.tellFriends')}</p>
       {eventImageUrl && (
         <div className="rounded-xl overflow-hidden mb-3">
           <img
@@ -114,8 +116,8 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
         >
           <XIcon size={14} />
-          <span className="hidden sm:inline">Share on X</span>
-          <span className="sm:hidden">X</span>
+          <span className="hidden sm:inline">{t('share.shareOnX')}</span>
+          <span className="sm:hidden">{t('share.x')}</span>
         </button>
 
         {eventImageUrl && (
@@ -125,8 +127,8 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
           >
             <Download size={14} />
-            <span className="hidden sm:inline">Download</span>
-            <span className="sm:hidden">Save</span>
+            <span className="hidden sm:inline">{t('share.download')}</span>
+            <span className="sm:hidden">{t('share.save')}</span>
           </button>
         )}
 
@@ -137,13 +139,13 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
           {copied ? (
             <>
               <Check size={14} className="text-[#39d98a]" />
-              <span className="text-[#39d98a]">Copied!</span>
+              <span className="text-[#39d98a]">{t('share.copied')}</span>
             </>
           ) : (
             <>
               <Link size={14} className="text-theme-text" />
-              <span className="text-theme-text hidden sm:inline">Copy Link</span>
-              <span className="text-theme-text sm:hidden">Link</span>
+              <span className="text-theme-text hidden sm:inline">{t('share.copyLink')}</span>
+              <span className="text-theme-text sm:hidden">{t('share.link')}</span>
             </>
           )}
         </button>

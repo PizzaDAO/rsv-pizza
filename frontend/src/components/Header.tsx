@@ -1,8 +1,9 @@
 import React, { ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, LogIn } from 'lucide-react';
+import { User, LogIn, Globe } from 'lucide-react';
 import { LoginModal } from './LoginModal';
+import { useTranslation } from 'react-i18next';
 
 interface HeaderProps {
   rightContent?: ReactNode;
@@ -17,10 +18,18 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, loading } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const { t, i18n } = useTranslation('common');
 
   const bgClass = variant === 'transparent'
     ? 'bg-theme-bg'
     : 'bg-theme-header';
+
+  const currentLang = i18n.language?.startsWith('es') ? 'es' : 'en';
+
+  const toggleLanguage = () => {
+    const newLang = currentLang === 'en' ? 'es' : 'en';
+    i18n.changeLanguage(newLang);
+  };
 
   return (
     <header className={`site-header border-b border-theme-stroke ${bgClass}`}>
@@ -42,6 +51,17 @@ export const Header: React.FC<HeaderProps> = ({
         </Link>
         <div className="flex items-center gap-3">
           {rightContent}
+          {/* Language Switcher */}
+          <button
+            onClick={toggleLanguage}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
+            title={currentLang === 'en' ? 'Cambiar a Espanol' : 'Switch to English'}
+          >
+            <Globe size={14} />
+            <span className={currentLang === 'en' ? 'font-bold text-theme-text' : ''}>EN</span>
+            <span className="text-theme-text-muted">/</span>
+            <span className={currentLang === 'es' ? 'font-bold text-theme-text' : ''}>ES</span>
+          </button>
           {!loading && (
             user ? (
               <Link
@@ -57,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex items-center gap-2 px-3 py-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover border border-theme-stroke-hover rounded-lg text-theme-text hover:text-theme-text text-sm transition-all"
               >
                 <LogIn size={16} />
-                <span>Log In / Sign Up</span>
+                <span>{t('header.logIn')}</span>
               </button>
             )
           )}
