@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, ChevronDown, Square, CheckSquare2, User, Mail, Wallet, Info, X } from 'lucide-react';
-import { TURTLES } from '../constants/options';
+import { ChevronRight, Square, CheckSquare2, User, Mail, Wallet, Info, X } from 'lucide-react';
 import { IconInput } from './IconInput';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
 
@@ -20,21 +19,6 @@ export function RSVPFormStep1({
   walletFieldSlot,
   showWallet,
 }: RSVPFormStep1Props) {
-  const [turtleDropdownOpen, setTurtleDropdownOpen] = useState(false);
-  const turtleRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (turtleRef.current && !turtleRef.current.contains(event.target as Node)) {
-        setTurtleDropdownOpen(false);
-      }
-    }
-    if (turtleDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [turtleDropdownOpen]);
-
   return (
     <form onSubmit={form.handleStep1Continue} className="space-y-3">
       {/* Name */}
@@ -89,61 +73,6 @@ export function RSVPFormStep1({
           </div>
         )
       )}
-
-      {/* Role selection - compact dropdown */}
-      <div className="relative" ref={turtleRef}>
-        <button
-          type="button"
-          onClick={() => setTurtleDropdownOpen(prev => !prev)}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-theme-stroke bg-theme-surface-hover hover:bg-theme-surface-hover/80 transition-colors"
-        >
-          <div className="flex items-center gap-1 flex-1">
-            {TURTLES.map((t) => (
-              <img
-                key={t.id}
-                src={t.image}
-                alt={t.label}
-                className={`w-5 h-5 object-contain transition-opacity ${
-                  form.roles.includes(t.id) ? 'opacity-100' : 'opacity-30'
-                }`}
-              />
-            ))}
-            {form.roles.length === 0 && (
-              <span className="text-sm text-theme-text-muted ml-1">Select your turtle(s)...</span>
-            )}
-          </div>
-          <ChevronDown size={16} className={`text-theme-text-muted transition-transform ${turtleDropdownOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {turtleDropdownOpen && (
-          <div className="absolute z-20 left-0 right-0 mt-1 card shadow-lg overflow-hidden !p-0">
-            {TURTLES.map((t) => {
-              const selected = form.roles.includes(t.id);
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => form.toggleRole(t.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                    selected
-                      ? 'bg-[#ff393a]/10 text-theme-text'
-                      : 'text-theme-text-secondary hover:bg-theme-surface-hover'
-                  }`}
-                >
-                  <img src={t.image} alt={t.label} className="w-8 h-8 object-contain flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm leading-tight">{t.label}</div>
-                    <div className="text-xs text-theme-text-muted leading-tight">{t.role}</div>
-                  </div>
-                  {selected && (
-                    <CheckSquare2 size={16} className="text-[#ff393a] flex-shrink-0" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Consolidated mailing list + partner opt-in */}
       <div className="flex items-center gap-2">
