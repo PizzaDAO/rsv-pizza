@@ -472,6 +472,7 @@ const gppEventSelect = {
   eventImageUrl: true,
   eventType: true,
   eventTags: true,
+  underbossApproved: true,
   rsvpClosedAt: true,
   createdAt: true,
   _count: {
@@ -512,6 +513,7 @@ function formatGppEvent(event: any) {
     createdAt: event.createdAt,
     hostName: 'PizzaDAO',
     guestCount: event._count?.guests ?? 0,
+    approved: event.underbossApproved ?? false,
     rsvpOpen: !event.rsvpClosedAt,
   };
 }
