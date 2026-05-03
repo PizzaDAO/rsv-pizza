@@ -779,7 +779,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
           {savingNotes ? (
             <Loader2 size={12} className="animate-spin flex-shrink-0" />
           ) : (
-            <span className="truncate">{notes || '{t('eventCard.privateNotes')}'}</span>
+            <span className="truncate">{notes || t('eventCard.privateNotes')}</span>
           )}
         </button>
       </div>{/* closes flex-1 wrapper */}
