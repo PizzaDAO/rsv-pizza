@@ -7,8 +7,10 @@ import { Topping, Beverage, PizzaStyle, PizzaSize } from '../types';
 
 // Dietary restriction options
 export const DIETARY_OPTIONS = [
+  'Meat',
   'Vegetarian',
   'Vegan',
+  'Plain',
   'Gluten-Free',
   'Dairy-Free',
 ] as const;

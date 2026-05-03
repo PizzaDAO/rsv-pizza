@@ -404,7 +404,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
       if (result) {
         // Save preferences to profile if checkbox is checked and email is provided
-        if (saveToProfile && email.trim() && !result.alreadyRegistered) {
+        if (email.trim() && !result.alreadyRegistered) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
             liked_toppings: likedToppings,
