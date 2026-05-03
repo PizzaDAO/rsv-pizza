@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza } from 'lucide-react';
-import { uploadEventImage } from '../lib/supabase';
+import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
 
 export const PartyHeader: React.FC = () => {
@@ -194,7 +194,7 @@ export const PartyHeader: React.FC = () => {
             <div className="w-48 h-48 flex-shrink-0 rounded-xl overflow-hidden">
               {party.eventImageUrl ? (
                 <img
-                  src={party.eventImageUrl}
+                  src={cdnUrl(party.eventImageUrl)}
                   alt={party.name}
                   className="w-full h-full object-cover"
                 />
@@ -612,7 +612,7 @@ export const PartyHeader: React.FC = () => {
                 {party.eventImageUrl ? (
                   <div className="sm:w-48 sm:h-48 w-full aspect-square flex-shrink-0 bg-black/30">
                     <img
-                      src={party.eventImageUrl}
+                      src={cdnUrl(party.eventImageUrl)}
                       alt={party.name}
                       className="w-full h-full object-cover"
                     />

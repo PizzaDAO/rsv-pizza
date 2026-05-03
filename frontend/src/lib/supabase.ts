@@ -20,6 +20,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const SUPABASE_STORAGE_PREFIX = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/';
+
+/**
+ * Rewrite a Supabase Storage public URL to go through the Vercel edge CDN.
+ * Non-matching URLs pass through unchanged.
+ */
+export function cdnUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith(SUPABASE_STORAGE_PREFIX)) {
+    return '/cdn/' + url.slice(SUPABASE_STORAGE_PREFIX.length);
+  }
+  return url;
+}
+
 // Helper to check if user is authenticated
 function isAuthenticated(): boolean {
   return !!localStorage.getItem('authToken');

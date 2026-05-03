@@ -11,6 +11,7 @@ import {
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
 } from 'lucide-react';
+import { cdnUrl } from '../lib/supabase';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 
@@ -632,7 +633,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
       {event.eventImageUrl && (
         <div className="md:w-44 flex-shrink-0 self-stretch bg-black/40 flex items-center justify-center">
           <img
-            src={event.eventImageUrl}
+            src={cdnUrl(event.eventImageUrl)}
             alt=""
             className="w-full h-32 md:h-full object-contain"
           />
@@ -758,7 +759,7 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-theme-surface text-xs text-theme-text-secondary"
                 >
                   {host.avatar_url && (
-                    <img src={host.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full" />
+                    <img src={cdnUrl(host.avatar_url)} alt="" className="w-3.5 h-3.5 rounded-full" />
                   )}
                   {host.name}
                 </span>
