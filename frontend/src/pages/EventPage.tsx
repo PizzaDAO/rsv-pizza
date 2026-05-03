@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
 import { IconInput } from '../components/IconInput';
@@ -38,6 +39,7 @@ export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation('event');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -296,10 +298,10 @@ export function EventPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Event Not Found</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('notFound.title')}</h1>
           <p className="text-theme-text-secondary mb-6">{error}</p>
           <Link to="/" className="btn-primary inline-block">
-            Go to Home
+            {t('notFound.goHome')}
           </Link>
         </div>
       </div>
@@ -314,7 +316,7 @@ export function EventPage() {
           <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
             <Lock className="w-8 h-8 text-[#ff393a]" />
           </div>
-          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Password Required</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">{t('password.title')}</h1>
           <form onSubmit={handlePasswordSubmit} className="space-y-3 mt-4">
             {passwordError && (
               <div className="bg-[#ff393a]/10 border border-[#ff393a]/30 text-[#ff393a] p-3 rounded-xl text-sm">
@@ -327,7 +329,7 @@ export function EventPage() {
               type="password"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Password"
+              placeholder={t('password.placeholder')}
               required
               autoFocus
               autoComplete="off"
@@ -342,9 +344,9 @@ export function EventPage() {
             >
               {verifyingPassword ? (
                 <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {t('password.verifying')}
                 </span>
-              ) : 'Continue'}
+              ) : t('password.continue')}
             </button>
           </form>
 
@@ -356,7 +358,7 @@ export function EventPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 bg-black hover:bg-black/80 text-theme-text rounded-xl border border-theme-stroke transition-colors"
               >
                 <LogIn className="w-4 h-4" />
-                Already RSVP'd? Log in
+                {t('password.alreadyRsvpd')}
               </button>
             </div>
           )}
@@ -366,7 +368,7 @@ export function EventPage() {
             <div className="mt-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1 h-px bg-theme-surface-hover" />
-                <span className="text-theme-text-muted text-sm">or</span>
+                <span className="text-theme-text-muted text-sm">{t('password.or')}</span>
                 <div className="flex-1 h-px bg-theme-surface-hover" />
               </div>
               {!showTweetInput ? (
@@ -385,12 +387,12 @@ export function EventPage() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
-                  Post to Get In
+                  {t('password.postToGetIn')}
                 </button>
               ) : (
                 <div className="space-y-3">
                   <p className="text-theme-text-secondary text-sm text-center">
-                    Paste your tweet URL to unlock the event
+                    {t('password.pasteTweetUrl')}
                   </p>
 
                   {tweetError && (
@@ -415,10 +417,10 @@ export function EventPage() {
                     {verifyingTweet ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Verifying...
+                        {t('password.verifying')}
                       </>
                     ) : (
-                      'Verify & Unlock'
+                      t('password.verifyUnlock')
                     )}
                   </button>
                 </div>
@@ -584,9 +586,9 @@ export function EventPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Lock className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">Host Password Required</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-2 text-center">{t('editPassword.title')}</h1>
             <p className="text-theme-text-secondary mb-6 text-center">
-              Enter the password you set when creating this event to edit it.
+              {t('editPassword.subtitle')}
             </p>
 
             <form onSubmit={handleEditPasswordSubmit} className="space-y-3">
@@ -598,13 +600,13 @@ export function EventPage() {
 
               <div>
                 <label className="block text-sm font-medium text-theme-text mb-2">
-                  Password
+                  {t('editPassword.label')}
                 </label>
                 <input
                   type="password"
                   value={editPasswordInput}
                   onChange={(e) => setEditPasswordInput(e.target.value)}
-                  placeholder="Enter password"
+                  placeholder={t('editPassword.placeholder')}
                   className="w-full"
                   required
                   autoFocus
@@ -621,13 +623,13 @@ export function EventPage() {
                   }}
                   className="btn-secondary flex-1"
                 >
-                  Cancel
+                  {t('editPassword.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary flex-1"
                 >
-                  Continue
+                  {t('editPassword.continue')}
                 </button>
               </div>
             </form>
@@ -683,7 +685,7 @@ export function EventPage() {
                     onClick={handleEditEvent}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
                   >
-                    Host Dashboard
+                    {t('hostDashboard')}
                     <Settings size={16} />
                   </button>
                 </div>
@@ -697,12 +699,12 @@ export function EventPage() {
                     className="btn-secondary w-full flex items-center justify-center gap-2"
                   >
                     <Heart size={16} />
-                    Donate
+                    {t('donate')}
                   </button>
                   <p className="text-theme-text-secondary text-sm text-center mt-1">
                     {event.donationRecipient ? (
-                      <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
-                    ) : `Buy Pizza for ${event.name}`}
+                      <>{ t('buyPizzaFor', { recipient: '' }) }{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
+                    ) : t('buyPizzaForEvent', { eventName: event.name })}
                   </p>
                 </div>
               )}
@@ -723,15 +725,15 @@ export function EventPage() {
                     <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                       <Users className="w-4 h-4" />
                       <span>
-                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {t('guest', { count: event.guestCount })}
                         {event.maxGuests && ` / ${event.maxGuests}`}
                       </span>
                       {event.maxGuests && event.guestCount >= event.maxGuests && (
-                        <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                        <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
                       )}
                       {event.maxGuests && event.guestCount < event.maxGuests && (
                         <span className="text-theme-text-muted text-xs">
-                          ({event.maxGuests - event.guestCount} spots left)
+                          {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
                         </span>
                       )}
                     </div>
@@ -776,7 +778,7 @@ export function EventPage() {
                       onClick={handleEditEvent}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
                     >
-                      Host Dashboard
+                      {t('hostDashboard')}
                       <Settings size={16} />
                     </button>
                   </div>
@@ -888,7 +890,7 @@ export function EventPage() {
                             }}
                             className="flex-1 btn-primary flex items-center justify-center gap-2 text-base py-3"
                           >
-                            {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                            {userHasRSVPd ? t('editRsvp') : t('rsvp')}
                           </button>
                           <CheckInButton
                             inviteCode={event.customUrl || event.inviteCode}
@@ -912,7 +914,7 @@ export function EventPage() {
                           }}
                           className="w-full btn-primary flex items-center justify-center gap-2 text-base py-3"
                         >
-                          {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                          {userHasRSVPd ? t('editRsvp') : t('rsvp')}
                         </button>
                       )}
                     </div>
@@ -998,7 +1000,7 @@ export function EventPage() {
                         }}
                         className="flex-1 btn-primary flex items-center justify-center gap-2 text-lg py-4"
                       >
-                        {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                        {userHasRSVPd ? t('editRsvp') : t('rsvp')}
                       </button>
                       <CheckInButton
                         inviteCode={event.customUrl || event.inviteCode}
@@ -1021,13 +1023,13 @@ export function EventPage() {
                       }}
                       className="w-[85%] mx-auto btn-primary flex items-center justify-center gap-2 text-lg py-4"
                     >
-                      {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                      {userHasRSVPd ? t('editRsvp') : t('rsvp')}
                     </button>
                   )}
                 </div>
                 {event.rsvpClosedAt && (
                   <p className="text-theme-text-muted text-sm">
-                    RSVPs are closed for this event
+                    {t('rsvpsClosed')}
                   </p>
                 )}
 
@@ -1037,15 +1039,15 @@ export function EventPage() {
                     <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                       <Users className="w-4 h-4" />
                       <span>
-                        {event.guestCount} {event.guestCount === 1 ? 'guest' : 'guests'}
+                        {t('guest', { count: event.guestCount })}
                         {event.maxGuests && ` / ${event.maxGuests}`}
                       </span>
                       {event.maxGuests && event.guestCount >= event.maxGuests && (
-                        <span className="text-[#ffc107] text-xs">(Waitlist open)</span>
+                        <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
                       )}
                       {event.maxGuests && event.guestCount < event.maxGuests && (
                         <span className="text-theme-text-muted text-xs">
-                          ({event.maxGuests - event.guestCount} spots left)
+                          {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
                         </span>
                       )}
                     </div>
@@ -1132,7 +1134,7 @@ export function EventPage() {
                               PizzaDAO
                             </a>
                           </strong>{' '}
-                          is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.
+                          {' '}{t('pizzadaoDescription')}
                         </p>
                         {event.sponsors && event.sponsors
                           .filter(s => s.brandDescription)
@@ -1193,8 +1195,8 @@ export function EventPage() {
                     </button>
                     <p className="text-theme-text-secondary text-sm text-center mt-1">
                       {event.donationRecipient ? (
-                        <>Supporting {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
-                      ) : `Supporting ${event.name}`}
+                        <>{t('supportingRecipient', { recipient: '' })}{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
+                      ) : t('supportingEvent', { eventName: event.name })}
                     </p>
                   </div>
                 )}
@@ -1252,8 +1254,8 @@ export function EventPage() {
                         <Camera className="w-5 h-5 text-[#ff393a]" />
                         <span className="text-theme-text font-medium">
                           {photoStats.totalPhotos > 0
-                            ? `View Photos (${photoStats.totalPhotos})`
-                            : 'Share Photos'}
+                            ? t('viewPhotos', { count: photoStats.totalPhotos })
+                            : t('sharePhotos')}
                         </span>
                       </button>
                     )}
@@ -1300,7 +1302,7 @@ export function EventPage() {
                 }}
                 className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
               >
-                {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+                {userHasRSVPd ? t('editRsvp') : t('rsvp')}
               </button>
               <CheckInButton
                 inviteCode={event!.customUrl || event!.inviteCode}
@@ -1322,7 +1324,7 @@ export function EventPage() {
               }}
               className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2.5"
             >
-              {userHasRSVPd ? "Edit RSVP" : "RSVP"}
+              {userHasRSVPd ? t('editRsvp') : t('rsvp')}
             </button>
           )}
         </div>

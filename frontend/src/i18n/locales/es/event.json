@@ -1,0 +1,43 @@
+{
+  "notFound": {
+    "title": "Evento No Encontrado",
+    "goHome": "Ir al Inicio"
+  },
+  "password": {
+    "title": "Contraseña Requerida",
+    "placeholder": "Contraseña",
+    "verifying": "Verificando...",
+    "continue": "Continuar",
+    "alreadyRsvpd": "¿Ya confirmaste? Inicia sesión",
+    "or": "o",
+    "postToGetIn": "Publica para Entrar",
+    "pasteTweetUrl": "Pega la URL de tu tweet para desbloquear el evento",
+    "verifyUnlock": "Verificar y Desbloquear"
+  },
+  "editPassword": {
+    "title": "Contraseña de Anfitrión Requerida",
+    "subtitle": "Ingresa la contraseña que configuraste al crear este evento para editarlo.",
+    "label": "Contraseña",
+    "placeholder": "Ingresa la contraseña",
+    "cancel": "Cancelar",
+    "continue": "Continuar"
+  },
+  "hostDashboard": "Panel del Anfitrión",
+  "donate": "Donar",
+  "buyPizzaFor": "Comprar Pizza para {{recipient}}",
+  "buyPizzaForEvent": "Comprar Pizza para {{eventName}}",
+  "supportingRecipient": "Apoyando a {{recipient}}",
+  "supportingEvent": "Apoyando a {{eventName}}",
+  "guest_one": "{{count}} invitado",
+  "guest_other": "{{count}} invitados",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "(Lista de espera abierta)",
+  "spotsLeft": "({{count}} lugares disponibles)",
+  "rsvp": "RSVP",
+  "editRsvp": "Editar RSVP",
+  "rsvpsClosed": "Las confirmaciones están cerradas para este evento",
+  "viewPhotos": "Ver Fotos ({{count}})",
+  "sharePhotos": "Compartir Fotos",
+  "pizzadaoDescription": "es una cooperativa internacional de pizza que está llevando la industria pizzera a la blockchain. Organizamos una fiesta global de pizza cada año, eventos en conferencias cada mes, y apoyamos a otros organizadores con pizza.",
+  "dateTbd": "Fecha por confirmar"
+}

@@ -4,8 +4,20 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import enCommon from './locales/en/common.json';
 import enRsvp from './locales/en/rsvp.json';
+import enEvent from './locales/en/event.json';
+import enAuth from './locales/en/auth.json';
+import enDonation from './locales/en/donation.json';
+import enGpp from './locales/en/gpp.json';
+import enAccount from './locales/en/account.json';
+import enCheckin from './locales/en/checkin.json';
 import esCommon from './locales/es/common.json';
 import esRsvp from './locales/es/rsvp.json';
+import esEvent from './locales/es/event.json';
+import esAuth from './locales/es/auth.json';
+import esDonation from './locales/es/donation.json';
+import esGpp from './locales/es/gpp.json';
+import esAccount from './locales/es/account.json';
+import esCheckin from './locales/es/checkin.json';
 
 i18n
   .use(LanguageDetector)
@@ -15,10 +27,22 @@ i18n
       en: {
         common: enCommon,
         rsvp: enRsvp,
+        event: enEvent,
+        auth: enAuth,
+        donation: enDonation,
+        gpp: enGpp,
+        account: enAccount,
+        checkin: enCheckin,
       },
       es: {
         common: esCommon,
         rsvp: esRsvp,
+        event: esEvent,
+        auth: esAuth,
+        donation: esDonation,
+        gpp: esGpp,
+        account: esAccount,
+        checkin: esCheckin,
       },
     },
     fallbackLng: 'en',

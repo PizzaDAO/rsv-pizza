@@ -1,0 +1,43 @@
+{
+  "home": {
+    "gppBanner": "¿Organizas una Global Pizza Party? Créala en rsv.pizza/gpp",
+    "yourEvents": "Tus Eventos",
+    "eventsSubtitle": "Eventos que organizas o a los que asistes",
+    "upcoming": "Próximos",
+    "past": "Pasados",
+    "createParty": "Crear Evento",
+    "noEvents": "No hay eventos {{filter}}",
+    "host": "Anfitrión",
+    "dateTbd": "Fecha por confirmar",
+    "guest_one": "{{count}} invitado",
+    "guest_other": "{{count}} invitados",
+    "alreadyCreated": "¿Ya creaste un evento?",
+    "viewAllTest": "Ver todos los eventos de prueba"
+  },
+  "profile": {
+    "title": "Tu Perfil",
+    "subtitle": "Elige cómo te ves como anfitrión o invitado.",
+    "namePlaceholder": "Tu nombre",
+    "emailPlaceholder": "Tu correo electrónico",
+    "bioPlaceholder": "Bio - Cuéntanos sobre ti...",
+    "pizzaPreferences": "Preferencias de Pizza",
+    "diet": "Dieta",
+    "toppings": "Ingredientes",
+    "drinkPreferences": "Preferencias de Bebida",
+    "sponsorships": "Tus Patrocinios",
+    "submitted": "Enviado el {{date}}",
+    "saving": "Guardando...",
+    "saved": "¡Guardado!",
+    "save": "Guardar",
+    "logOut": "Cerrar Sesión",
+    "deleteAccount": "Eliminar Cuenta",
+    "deleteConfirmTitle": "Eliminar Cuenta",
+    "deleteConfirmSubtitle": "Esta acción no se puede deshacer",
+    "deleteConfirmMessage": "¿Estás seguro de que deseas eliminar tu cuenta? Todos tus datos, incluyendo eventos organizados e historial de RSVP, se eliminarán permanentemente.",
+    "cancel": "Cancelar",
+    "deleting": "Eliminando...",
+    "uploadError": "Selecciona un archivo de imagen (JPEG, PNG, WebP o GIF)",
+    "uploadSizeError": "La imagen debe pesar menos de 2 MB",
+    "uploadFailed": "No se pudo subir la foto. Prueba con una imagen más pequeña (menos de 2 MB)."
+  }
+}

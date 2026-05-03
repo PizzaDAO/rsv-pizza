@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Mail, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from './IconInput';
 
@@ -13,6 +14,7 @@ interface LoginModalProps {
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       onClose();
       navigate('/auth/verify');
     } catch (err: any) {
-      setError(err.message || 'Failed to send login code');
+      setError(err.message || t('loginModal.failedToSend'));
       setLoading(false);
     }
   };
@@ -67,7 +69,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </button>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Log In or Sign Up</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('loginModal.title')}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -76,7 +78,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
+            placeholder={t('loginModal.emailPlaceholder')}
             required
             autoFocus
           />
@@ -95,10 +97,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Sending...
+                {t('loginModal.sending')}
               </>
             ) : (
-              'Continue'
+              t('loginModal.continue')
             )}
           </button>
         </form>

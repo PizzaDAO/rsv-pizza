@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { DollarSign, Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { createDonation } from '../lib/api';
 import { DonationPublicStats } from '../types';
@@ -54,6 +55,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
 }) => {
   const stripe = useStripe();
   const elements = useElements();
+  const { t } = useTranslation('donation');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
@@ -79,7 +81,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
       });
 
       if (confirmError) {
-        setError(confirmError.message || 'Payment failed');
+        setError(confirmError.message || t('form.paymentFailed'));
         setProcessing(false);
         return;
       }
@@ -102,7 +104,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
       }
     } catch (err) {
       console.error('Payment error:', err);
-      setError('An unexpected error occurred');
+      setError(t('form.unexpectedError'));
     }
 
     setProcessing(false);
@@ -114,8 +116,8 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
         <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
           <Check className="w-8 h-8 text-[#39d98a]" />
         </div>
-        <h3 className="text-xl font-bold text-theme-text mb-2">Thank You!</h3>
-        <p className="text-theme-text-secondary">Your donation of ${(amount / 100).toFixed(2)} has been received.</p>
+        <h3 className="text-xl font-bold text-theme-text mb-2">{t('form.thankYou')}</h3>
+        <p className="text-theme-text-secondary">{t('form.donationReceived', { amount: (amount / 100).toFixed(2) })}</p>
       </div>
     );
   }
@@ -147,12 +149,12 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
         {processing ? (
           <>
             <Loader2 size={18} className="animate-spin" />
-            Processing...
+            {t('form.processing')}
           </>
         ) : (
           <>
             <DollarSign size={18} />
-            Donate ${(amount / 100).toFixed(2)}
+            {t('form.donateAmount', { amount: (amount / 100).toFixed(2) })}
           </>
         )}
       </button>
@@ -163,7 +165,7 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
           onClick={onBack}
           className="w-full btn-secondary"
         >
-          Back
+          {t('form.back')}
         </button>
       )}
     </form>
@@ -183,6 +185,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
   guestName = '',
   guestEmail = '',
 }) => {
+  const { t } = useTranslation('donation');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
@@ -197,7 +200,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
 
   const createPaymentIntent = async () => {
     if (!finalAmount || finalAmount < 50) {
-      setError('Minimum donation is $0.50');
+      setError(t('form.minimumDonation'));
       return;
     }
 
@@ -224,11 +227,11 @@ export const DonationForm: React.FC<DonationFormProps> = ({
       if (data?.clientSecret) {
         setClientSecret(data.clientSecret);
       } else {
-        throw new Error('Failed to create payment intent');
+        throw new Error(t('form.failedToInitialize'));
       }
     } catch (err) {
       console.error('Error creating payment intent:', err);
-      setError('Failed to initialize payment. Please try again.');
+      setError(t('form.failedToInitialize'));
     }
 
     setLoading(false);
@@ -268,7 +271,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           onClick={() => setPaymentMethod(null)}
           className="text-theme-text-secondary hover:text-theme-text text-sm flex items-center gap-1 transition-colors"
         >
-          &larr; Back to payment options
+          &larr; {t('form.backToPaymentOptions')}
         </button>
         <CryptoDonationWidget
           partyId={partyId}
@@ -300,8 +303,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 <CreditCard size={24} className="text-[#635bff]" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-theme-text font-medium">Pay with Card or Wallet</p>
-                <p className="text-theme-text-muted text-sm">Credit/debit card, Apple Pay, Google Pay & more</p>
+                <p className="text-theme-text font-medium">{t('form.payWithCard')}</p>
+                <p className="text-theme-text-muted text-sm">{t('form.cardSubtitle')}</p>
               </div>
             </button>
 
@@ -318,8 +321,8 @@ export const DonationForm: React.FC<DonationFormProps> = ({
                 </svg>
               </div>
               <div className="flex-1 text-left">
-                <p className="text-theme-text font-medium">Crypto</p>
-                <p className="text-theme-text-muted text-sm">ETH, USDC, or other tokens</p>
+                <p className="text-theme-text font-medium">{t('form.crypto')}</p>
+                <p className="text-theme-text-muted text-sm">{t('form.cryptoSubtitle')}</p>
               </div>
             </button>
         </div>
@@ -330,7 +333,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
             onClick={onCancel}
             className="w-full btn-secondary"
           >
-            Cancel
+            {t('form.cancel')}
           </button>
         )}
       </div>
@@ -346,7 +349,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           onClick={() => setPaymentMethod(null)}
           className="text-theme-text-secondary hover:text-theme-text text-sm flex items-center gap-1 transition-colors"
         >
-          &larr; Back to payment options
+          &larr; {t('form.backToPaymentOptions')}
         </button>
 
         {/* Suggested Amounts */}
@@ -377,7 +380,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
           step={0.01}
           value={customAmount}
           onChange={(e) => handleCustomAmountChange(e.target.value)}
-          placeholder="Custom amount"
+          placeholder={t('form.customAmount')}
         />
 
         {error && (
@@ -395,7 +398,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
               onClick={onCancel}
               className="flex-1 btn-secondary"
             >
-              Cancel
+              {t('form.cancel')}
             </button>
           )}
           <button
@@ -407,11 +410,11 @@ export const DonationForm: React.FC<DonationFormProps> = ({
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Loading...
+                {t('form.loading')}
               </>
             ) : (
               <>
-                Donate
+                {t('form.donate')}
                 {finalAmount > 0 && ` $${(finalAmount / 100).toFixed(2)}`}
               </>
             )}

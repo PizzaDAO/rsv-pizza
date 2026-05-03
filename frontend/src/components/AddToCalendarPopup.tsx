@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { PublicEvent } from '../lib/api';
 import {
   buildCalendarEvent,
@@ -17,6 +18,7 @@ interface AddToCalendarPopupProps {
 }
 
 export function AddToCalendarPopup({ isOpen, onClose, event, anchorRef }: AddToCalendarPopupProps) {
+  const { t } = useTranslation('donation');
   const desktopRef = useRef<HTMLDivElement>(null);
 
   // Close on ESC
@@ -85,21 +87,21 @@ export function AddToCalendarPopup({ isOpen, onClose, event, anchorRef }: AddToC
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left"
         >
           <GoogleCalendarIcon />
-          <span className="text-sm font-medium text-theme-text">Google Calendar</span>
+          <span className="text-sm font-medium text-theme-text">{t('calendar.googleCalendar')}</span>
         </button>
         <button
           onClick={handleAppleCalendar}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left"
         >
           <AppleCalendarIcon />
-          <span className="text-sm font-medium text-theme-text">Apple Calendar</span>
+          <span className="text-sm font-medium text-theme-text">{t('calendar.appleCalendar')}</span>
         </button>
         <button
           onClick={handleOutlook}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left"
         >
           <OutlookIcon />
-          <span className="text-sm font-medium text-theme-text">Outlook</span>
+          <span className="text-sm font-medium text-theme-text">{t('calendar.outlook')}</span>
         </button>
       </div>
     </div>
@@ -114,28 +116,28 @@ export function AddToCalendarPopup({ isOpen, onClose, event, anchorRef }: AddToC
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4" />
-        <p className="text-xs text-theme-text-secondary uppercase tracking-wider font-semibold mb-3 px-1">Add to Calendar</p>
+        <p className="text-xs text-theme-text-secondary uppercase tracking-wider font-semibold mb-3 px-1">{t('calendar.addToCalendar')}</p>
         <div className="space-y-1">
           <button
             onClick={handleGoogleCalendar}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left"
           >
             <GoogleCalendarIcon />
-            <span className="text-base font-medium text-theme-text">Google Calendar</span>
+            <span className="text-base font-medium text-theme-text">{t('calendar.googleCalendar')}</span>
           </button>
           <button
             onClick={handleAppleCalendar}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left"
           >
             <AppleCalendarIcon />
-            <span className="text-base font-medium text-theme-text">Apple Calendar</span>
+            <span className="text-base font-medium text-theme-text">{t('calendar.appleCalendar')}</span>
           </button>
           <button
             onClick={handleOutlook}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left"
           >
             <OutlookIcon />
-            <span className="text-base font-medium text-theme-text">Outlook</span>
+            <span className="text-base font-medium text-theme-text">{t('calendar.outlook')}</span>
           </button>
         </div>
       </div>
