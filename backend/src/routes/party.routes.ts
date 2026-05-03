@@ -397,7 +397,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       hiddenGppPhotos, extraGppPhotos,
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
-      telegramGroup
+      telegramGroup,
+      turtleRolesEnabled
     } = req.body;
 
     // Verify ownership or super admin
@@ -531,6 +532,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
+        ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
       },
       include: {
         user: { select: { name: true } },

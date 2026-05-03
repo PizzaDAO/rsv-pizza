@@ -416,6 +416,7 @@ export interface PublicEvent {
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   telegramGroup?: string | null;
+  turtleRolesEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
 }
 

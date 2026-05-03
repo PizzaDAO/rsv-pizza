@@ -173,6 +173,9 @@ model Party {
   // Quiz settings
   quizEnabled Boolean @default(false) @map("quiz_enabled")
 
+  // Turtle role selection on RSVP form
+  turtleRolesEnabled Boolean @default(false) @map("turtle_roles_enabled")
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
