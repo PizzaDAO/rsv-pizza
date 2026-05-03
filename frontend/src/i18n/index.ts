@@ -4,8 +4,14 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import enCommon from './locales/en/common.json';
 import enRsvp from './locales/en/rsvp.json';
+import enHost from './locales/en/host.json';
+import enAdmin from './locales/en/admin.json';
+import enPartner from './locales/en/partner.json';
 import esCommon from './locales/es/common.json';
 import esRsvp from './locales/es/rsvp.json';
+import esHost from './locales/es/host.json';
+import esAdmin from './locales/es/admin.json';
+import esPartner from './locales/es/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -15,10 +21,16 @@ i18n
       en: {
         common: enCommon,
         rsvp: enRsvp,
+        host: enHost,
+        admin: enAdmin,
+        partner: enPartner,
       },
       es: {
         common: esCommon,
         rsvp: esRsvp,
+        host: esHost,
+        admin: esAdmin,
+        partner: esPartner,
       },
     },
     fallbackLng: 'en',

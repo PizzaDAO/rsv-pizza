@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
 import { UserRoundX, Users, Clock, Search, CheckCircle2, Download } from 'lucide-react';
@@ -6,6 +7,7 @@ import { IconInput } from './IconInput';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
+  const { t } = useTranslation('host');
   const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
@@ -90,9 +92,9 @@ export const GuestList: React.FC = () => {
     return (
       <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
         <UserRoundX size={48} className="text-theme-text-faint mb-4" />
-        <h3 className="text-xl font-medium text-theme-text">No Guests Yet</h3>
+        <h3 className="text-xl font-medium text-theme-text">{t('guests.noGuestsYet')}</h3>
         <p className="text-theme-text-muted mt-2">
-          Share your event link to start receiving RSVPs.
+          {t('guests.shareLink')}
         </p>
       </div>
     );
@@ -154,7 +156,7 @@ export const GuestList: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-theme-text-secondary" />
-            <h2 className="text-xl font-bold text-theme-text">Guests</h2>
+            <h2 className="text-xl font-bold text-theme-text">{t('guests.title')}</h2>
             <span className="bg-[#39d98a]/20 text-[#39d98a] text-sm font-medium px-3 py-1 rounded-full border border-[#39d98a]/30">
               {confirmedGuests.length}
               {party?.maxGuests && ` / ${party.maxGuests}`}
@@ -162,7 +164,7 @@ export const GuestList: React.FC = () => {
             {checkedInCount > 0 && (
               <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
                 <CheckCircle2 size={14} />
-                {checkedInCount} checked in
+                {t('guests.checkedIn', { count: checkedInCount })}
               </span>
             )}
           </div>
@@ -171,7 +173,7 @@ export const GuestList: React.FC = () => {
             className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <Download size={14} />
-            Export CSV
+            {t('guests.exportCsv')}
           </button>
         </div>
 
@@ -179,7 +181,7 @@ export const GuestList: React.FC = () => {
           <IconInput
             icon={Search}
             type="text"
-            placeholder="Search guests by name or email..."
+            placeholder={t('guests.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             data-testid="guest-search"
@@ -188,7 +190,7 @@ export const GuestList: React.FC = () => {
 
         {searchQuery.trim() && (
           <p className="text-sm text-theme-text-muted mb-3">
-            Showing {filteredGuests.length} of {guests.length} guests
+            {t('guests.showingOf', { filtered: filteredGuests.length, total: guests.length })}
           </p>
         )}
 
@@ -196,10 +198,10 @@ export const GuestList: React.FC = () => {
           searchQuery.trim() ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Search size={36} className="text-theme-text-faint mb-3" />
-              <p className="text-theme-text-muted">No guests match "{searchQuery}"</p>
+              <p className="text-theme-text-muted">{t('guests.noMatch', { query: searchQuery })}</p>
             </div>
           ) : (
-            <p className="text-theme-text-muted text-sm py-4">No confirmed guests yet.</p>
+            <p className="text-theme-text-muted text-sm py-4">{t('guests.noConfirmed')}</p>
           )
         ) : (
           <div className="divide-y divide-theme-stroke">
@@ -229,7 +231,7 @@ export const GuestList: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
               <Clock size={20} className="text-theme-text-secondary" />
-              <h2 className="text-xl font-bold text-theme-text">Waitlist</h2>
+              <h2 className="text-xl font-bold text-theme-text">{t('guests.waitlist')}</h2>
               <span className="bg-[#ffc107]/20 text-[#ffc107] text-sm font-medium px-3 py-1 rounded-full border border-[#ffc107]/30">
                 {waitlistedGuests.length}
               </span>
