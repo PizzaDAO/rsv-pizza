@@ -383,7 +383,7 @@ export function GPPLandingPage() {
             {/* Left: Flyer Image */}
             <div className="flex items-center justify-center">
               <img
-                src="/gpp-flyer-2026.png"
+                src="/gpp-flyer-2026-v2.png"
                 alt="2026 Global Pizza Party — May 22 — In a City Near You"
                 className="w-full max-w-md rounded-2xl shadow-lg"
               />
