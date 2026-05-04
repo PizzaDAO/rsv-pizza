@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Upload,
   FileText,
@@ -35,16 +36,16 @@ interface PreviewRow extends ParsedCsvRow {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ROWS = 500;
 
-function statusLabel(status: RowStatus): string {
+function statusLabel(status: RowStatus, t: (key: string) => string): string {
   switch (status) {
     case 'valid':
-      return 'Valid';
+      return t('promo.statusValid');
     case 'invalid-email':
-      return 'Invalid email';
+      return t('promo.statusInvalidEmail');
     case 'duplicate-db':
-      return 'Already invited';
+      return t('promo.statusAlreadyInvited');
     case 'duplicate-csv':
-      return 'Duplicate in file';
+      return t('promo.statusDuplicate');
   }
 }
 
@@ -61,6 +62,7 @@ function statusBadgeClass(status: RowStatus): string {
 }
 
 export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
+  const { t } = useTranslation('host');
   const { guests, loadParty } = usePizza();
 
   const [stage, setStage] = useState<Stage>('upload');
@@ -229,10 +231,10 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
         >
           <Upload size={32} className="mx-auto mb-3 text-theme-text-muted" />
           <p className="text-theme-text font-medium mb-1">
-            Drop a CSV or click to select
+            {t('promo.dropCsvOrClick')}
           </p>
           <p className="text-xs text-theme-text-muted">
-            CSV should have name and email columns. Max {MAX_ROWS} rows.
+            {t('promo.csvRequirements', { max: MAX_ROWS })}
           </p>
           <input
             ref={fileInputRef}
@@ -251,8 +253,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
         )}
 
         <p className="text-xs text-theme-text-faint">
-          Invited guests are added as pending RSVPs. They receive an email with
-          the event details and an RSVP link.
+          {t('promo.csvInfoNote')}
         </p>
       </div>
     );
@@ -266,10 +267,10 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
           <div className="flex items-center gap-2">
             <FileText size={14} className="text-theme-text-muted" />
             <span className="text-xs text-theme-text-muted">
-              Found {counts.total} row{counts.total !== 1 ? 's' : ''} ·{' '}
-              <span className="text-green-400">{counts.valid} valid</span> ·{' '}
-              <span className="text-theme-text-secondary">{counts.duplicates} duplicate</span> ·{' '}
-              <span className="text-yellow-500/90">{counts.invalid} invalid</span>
+              {t('promo.found', { total: counts.total, count: counts.total })} ·{' '}
+              <span className="text-green-400">{counts.valid} {t('promo.valid')}</span> ·{' '}
+              <span className="text-theme-text-secondary">{counts.duplicates} {t('promo.duplicate')}</span> ·{' '}
+              <span className="text-yellow-500/90">{counts.invalid} {t('promo.invalid')}</span>
             </span>
           </div>
           <button
@@ -278,7 +279,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
             className="text-xs text-theme-text-muted hover:text-theme-text-secondary flex items-center gap-1 transition-colors"
           >
             <RotateCcw size={12} />
-            Start over
+            {t('promo.startOver')}
           </button>
         </div>
 
@@ -288,9 +289,9 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
               <thead className="bg-theme-surface sticky top-0">
                 <tr>
                   <th className="w-10 p-2"></th>
-                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">Name</th>
-                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">Email</th>
-                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">Status</th>
+                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">{t('promo.name')}</th>
+                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">{t('promo.email')}</th>
+                  <th className="text-left p-2 text-xs font-medium text-theme-text-muted">{t('promo.status')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -319,7 +320,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
                       </td>
                       <td className="p-2">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs ${statusBadgeClass(row.status)}`}>
-                          {statusLabel(row.status)}
+                          {statusLabel(row.status, t)}
                         </span>
                       </td>
                     </tr>
@@ -336,7 +337,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
           rows={3}
           value={customMessage}
           onChange={(e) => setCustomMessage(e.target.value)}
-          placeholder="Optional custom message (shown in invite email)"
+          placeholder={t('promo.customMessagePlaceholder')}
         />
 
         {sendError && (
@@ -353,7 +354,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
             className="flex-1 flex items-center justify-center gap-2 bg-theme-surface hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm border border-theme-stroke"
           >
             <RotateCcw size={16} />
-            Start over
+            {t('promo.startOver')}
           </button>
           <button
             type="button"
@@ -362,7 +363,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
             className="flex-1 flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
           >
             <Send size={16} />
-            Send {counts.checked} invite{counts.checked !== 1 ? 's' : ''}
+            {t('promo.sendInvite', { count: counts.checked })}
           </button>
         </div>
       </div>
@@ -374,9 +375,9 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <Loader2 size={32} className="text-[#ff393a] animate-spin" />
-        <p className="text-theme-text font-medium">Sending invites...</p>
+        <p className="text-theme-text font-medium">{t('promo.sendingInvites')}</p>
         <p className="text-xs text-theme-text-muted">
-          This may take a moment for large batches.
+          {t('promo.sendingMayTakeMoment')}
         </p>
       </div>
     );
@@ -406,16 +407,16 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
           <div className="flex-1">
             <p className={`font-medium ${success ? 'text-green-400' : 'text-yellow-500'}`}>
               {success
-                ? `Sent ${sentCount} invite${sentCount !== 1 ? 's' : ''}`
-                : 'Failed to send any invites'}
+                ? t('promo.sentInvite', { count: sentCount })
+                : t('promo.failedToSend')}
             </p>
             <div className="flex flex-wrap gap-3 mt-1 text-xs text-theme-text-muted">
               <span className="flex items-center gap-1">
                 <Users size={12} />
-                {sentCount} sent
+                {t('promo.sent', { count: sentCount })}
               </span>
-              {skippedCount > 0 && <span>{skippedCount} skipped</span>}
-              {failedCount > 0 && <span className="text-red-300">{failedCount} failed</span>}
+              {skippedCount > 0 && <span>{t('promo.skipped', { count: skippedCount })}</span>}
+              {failedCount > 0 && <span className="text-red-300">{t('promo.failed', { count: failedCount })}</span>}
             </div>
           </div>
         </div>
@@ -428,7 +429,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
               className="w-full flex items-center justify-between p-3 text-left hover:bg-theme-surface transition-colors"
             >
               <span className="text-sm text-theme-text">
-                {skippedCount} skipped
+                {t('promo.skipped', { count: skippedCount })}
               </span>
               {showSkipped ? (
                 <ChevronUp size={16} className="text-theme-text-muted" />
@@ -460,7 +461,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
               className="w-full flex items-center justify-between p-3 text-left hover:bg-red-500/5 transition-colors"
             >
               <span className="text-sm text-red-300">
-                {failedCount} failed
+                {t('promo.failed', { count: failedCount })}
               </span>
               {showFailed ? (
                 <ChevronUp size={16} className="text-red-300" />
@@ -490,7 +491,7 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
           className="w-full flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           <Upload size={16} />
-          Invite more
+          {t('promo.inviteMore')}
         </button>
       </div>
     );

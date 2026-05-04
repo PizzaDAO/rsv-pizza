@@ -39,5 +39,34 @@
   "viewPhotos": "Ver Fotos ({{count}})",
   "sharePhotos": "Compartir Fotos",
   "pizzadaoDescription": "es una cooperativa internacional de pizza que está llevando la industria pizzera a la blockchain. Organizamos una fiesta global de pizza cada año, eventos en conferencias cada mes, y apoyamos a otros organizadores con pizza.",
-  "dateTbd": "Fecha por confirmar"
+  "dateTbd": "Fecha por confirmar",
+  "partiesList": {
+    "title": "Todas las Fiestas",
+    "newParty": "+ Nueva Fiesta",
+    "noParties": "No se encontraron fiestas.",
+    "createFirst": "Crea tu primera fiesta",
+    "host": "Anfitrión: {{name}}",
+    "closed": "Cerrado",
+    "created": "Creado:",
+    "guests": "{{count}} invitados",
+    "loading": "Cargando fiestas..."
+  },
+  "report": {
+    "notFound": "Reporte No Encontrado",
+    "notFoundDesc": "Este reporte puede haber sido despublicado o el enlace es inválido.",
+    "passwordProtected": "Protegido con Contraseña",
+    "enterPassword": "Ingresa la contraseña para ver este reporte.",
+    "enterPasswordPlaceholder": "Ingresa la contraseña",
+    "incorrectPassword": "Contraseña incorrecta",
+    "viewReport": "Ver Reporte"
+  },
+  "venueReport": {
+    "notFound": "Reporte de Venue No Encontrado",
+    "notFoundDesc": "Este reporte de venue puede haber sido despublicado o el enlace es inválido.",
+    "passwordProtected": "Protegido con Contraseña",
+    "enterPassword": "Ingresa la contraseña para ver este reporte de venue.",
+    "enterPasswordPlaceholder": "Ingresa la contraseña",
+    "incorrectPassword": "Contraseña incorrecta",
+    "viewReport": "Ver Reporte"
+  }
 }

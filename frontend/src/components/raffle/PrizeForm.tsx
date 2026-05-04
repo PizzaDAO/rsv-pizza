@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, Gift, AlignLeft, Link, Hash } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { RafflePrize } from '../../types';
@@ -11,6 +12,7 @@ interface PrizeFormProps {
 }
 
 export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProps) {
+  const { t } = useTranslation('host');
   const [name, setName] = useState(prize?.name || '');
   const [description, setDescription] = useState(prize?.description || '');
   const [imageUrl, setImageUrl] = useState(prize?.imageUrl || '');
@@ -33,7 +35,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <h2 className="text-lg font-semibold text-theme-text">
-            {prize ? 'Edit Prize' : 'Add Prize'}
+            {prize ? t('raffle.editPrize') : t('raffle.addPrize')}
           </h2>
           <button
             onClick={onClose}
@@ -49,7 +51,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Prize name (e.g., Pizza for a Year)"
+            placeholder={t('raffle.prizeNamePlaceholder')}
             required
             autoFocus
           />
@@ -60,7 +62,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Prize description"
+            placeholder={t('raffle.prizeDescPlaceholder')}
           />
 
           <div className="flex gap-2">
@@ -70,7 +72,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="Image URL (https://...)"
+                placeholder={t('raffle.imageUrlPlaceholder')}
               />
             </div>
             {imageUrl && (
@@ -94,9 +96,9 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
             max={100}
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            placeholder="Quantity"
+            placeholder={t('raffle.quantityPlaceholder')}
           />
-          <p className="text-xs text-theme-text-muted -mt-2 pl-1">Number of this prize to give away</p>
+          <p className="text-xs text-theme-text-muted -mt-2 pl-1">{t('raffle.quantityHelp')}</p>
 
           <div className="flex gap-3 pt-1">
             <button
@@ -105,7 +107,7 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
               className="btn-secondary flex-1"
               disabled={isLoading}
             >
-              Cancel
+              {t('raffle.cancel')}
             </button>
             <button
               type="submit"
@@ -115,10 +117,10 @@ export function PrizeForm({ prize, onSubmit, onClose, isLoading }: PrizeFormProp
               {isLoading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Saving...
+                  {t('raffle.saving')}
                 </>
               ) : (
-                prize ? 'Update Prize' : 'Add Prize'
+                prize ? t('raffle.updatePrize') : t('raffle.addPrize')
               )}
             </button>
           </div>

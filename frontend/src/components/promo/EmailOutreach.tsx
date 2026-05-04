@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Mail, Copy, Check, Users, AlertCircle, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -49,6 +50,7 @@ function getTemplates(party: Party): Record<EmailTemplate, TemplateConfig> {
 }
 
 export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) => {
+  const { t } = useTranslation('host');
   const templates = useMemo(() => getTemplates(party), [party]);
 
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all');
@@ -132,13 +134,13 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Users size={14} className="text-theme-text-muted" />
-          <span className="text-xs text-theme-text-muted">Recipients</span>
+          <span className="text-xs text-theme-text-muted">{t('promo.recipients')}</span>
         </div>
         <div className="flex gap-2">
           {([
-            { value: 'all' as RecipientFilter, label: 'All Guests' },
-            { value: 'approved' as RecipientFilter, label: 'Approved' },
-            { value: 'pending' as RecipientFilter, label: 'Pending' },
+            { value: 'all' as RecipientFilter, label: t('promo.allGuests') },
+            { value: 'approved' as RecipientFilter, label: t('promo.approvedGuests') },
+            { value: 'pending' as RecipientFilter, label: t('promo.pendingGuests') },
           ]).map(({ value, label }) => (
             <button
               key={value}
@@ -156,7 +158,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         </div>
         <div className="flex items-center justify-between mt-2">
           <p className="text-xs text-theme-text-muted">
-            {filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''} with email
+            {t('promo.guestsWithEmail', { count: filteredGuests.length })}
           </p>
           {filteredGuests.length > 0 && (
             <button
@@ -165,7 +167,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
               className="text-xs text-theme-text-muted hover:text-theme-text-secondary flex items-center gap-1 transition-colors"
             >
               {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-              Copy emails
+              {t('promo.copyEmails')}
             </button>
           )}
         </div>
@@ -173,7 +175,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
 
       {/* Template Selector */}
       <div>
-        <span className="text-xs text-theme-text-muted mb-2 block">Template</span>
+        <span className="text-xs text-theme-text-muted mb-2 block">{t('promo.template')}</span>
         <div className="flex gap-2 flex-wrap">
           {(Object.entries(templates) as [EmailTemplate, TemplateConfig][]).map(([key, config]) => (
             <button
@@ -198,7 +200,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         type="text"
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
-        placeholder="Email subject"
+        placeholder={t('promo.emailSubjectPlaceholder')}
       />
 
       {/* Body */}
@@ -208,20 +210,20 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         rows={8}
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Email body..."
+        placeholder={t('promo.emailBodyPlaceholder')}
       />
 
       {/* Include Event Details Toggle */}
       <Checkbox
         checked={includeEventDetails}
         onChange={() => setIncludeEventDetails(!includeEventDetails)}
-        label="Include event details footer"
+        label={t('promo.includeEventDetails')}
       />
 
       {/* Preview */}
       {includeEventDetails && (
         <div className="bg-theme-surface border border-theme-stroke rounded-lg p-3">
-          <span className="text-xs text-theme-text-muted block mb-1">Event details footer preview:</span>
+          <span className="text-xs text-theme-text-muted block mb-1">{t('promo.footerPreview')}</span>
           <div className="text-xs text-theme-text-secondary whitespace-pre-wrap">
             ---{'\n'}
             {party.name}{'\n'}
@@ -237,7 +239,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
         <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
           <AlertCircle size={16} className="text-yellow-500 flex-shrink-0" />
           <span className="text-xs text-yellow-500/80">
-            No guests with email addresses in this filter. Guests must provide an email when RSVPing.
+            {t('promo.noGuestsWarning')}
           </span>
         </div>
       )}
@@ -250,7 +252,7 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
           className="flex-1 flex items-center justify-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           <Copy size={16} />
-          Copy Email
+          {t('promo.copyEmail')}
         </button>
 
         <button
@@ -260,13 +262,13 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
           className="flex-1 flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           <Mail size={16} />
-          Open in Email App
+          {t('promo.openInEmailApp')}
         </button>
       </div>
 
       <p className="text-xs text-theme-text-faint text-center">
-        Opens your default email client with the message pre-filled.
-        {filteredGuests.length > 50 && ' Only the first 50 recipients will be included in the mailto link.'}
+        {t('promo.emailAppNote')}
+        {filteredGuests.length > 50 && t('promo.emailAppNoteLimit')}
       </p>
     </div>
   );

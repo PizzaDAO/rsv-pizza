@@ -39,5 +39,34 @@
   "viewPhotos": "View Photos ({{count}})",
   "sharePhotos": "Share Photos",
   "pizzadaoDescription": "is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.",
-  "dateTbd": "Date TBD"
+  "dateTbd": "Date TBD",
+  "partiesList": {
+    "title": "All Parties",
+    "newParty": "+ New Party",
+    "noParties": "No parties found.",
+    "createFirst": "Create your first party",
+    "host": "Host: {{name}}",
+    "closed": "Closed",
+    "created": "Created:",
+    "guests": "{{count}} guests",
+    "loading": "Loading parties..."
+  },
+  "report": {
+    "notFound": "Report Not Found",
+    "notFoundDesc": "This report may have been unpublished or the link is invalid.",
+    "passwordProtected": "Password Protected",
+    "enterPassword": "Enter the password to view this report.",
+    "enterPasswordPlaceholder": "Enter password",
+    "incorrectPassword": "Incorrect password",
+    "viewReport": "View Report"
+  },
+  "venueReport": {
+    "notFound": "Venue Report Not Found",
+    "notFoundDesc": "This venue report may have been unpublished or the link is invalid.",
+    "passwordProtected": "Password Protected",
+    "enterPassword": "Enter the password to view this venue report.",
+    "enterPasswordPlaceholder": "Enter password",
+    "incorrectPassword": "Incorrect password",
+    "viewReport": "View Report"
+  }
 }

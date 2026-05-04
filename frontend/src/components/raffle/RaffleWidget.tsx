@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Gift, Loader2, Trash2, Edit2, Play, Trophy, CheckCircle, X } from 'lucide-react';
 import { Raffle, RafflePrize } from '../../types';
 import {
@@ -23,6 +24,7 @@ interface RaffleWidgetProps {
 }
 
 export function RaffleWidget({ partyId }: RaffleWidgetProps) {
+  const { t } = useTranslation('host');
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
       await loadRaffles();
       setShowRaffleForm(false);
     } else {
-      setError('Failed to create raffle. Please try again.');
+      setError(t('raffle.failedToCreate'));
     }
     setActionLoading(null);
   };
@@ -77,7 +79,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
   };
 
   const handleDeleteRaffle = async (raffleId: string) => {
-    if (!confirm('Are you sure you want to delete this raffle?')) return;
+    if (!confirm(t('raffle.deleteConfirm'))) return;
     setActionLoading(raffleId);
     const success = await deleteRaffle(partyId, raffleId);
     if (success) {
@@ -109,7 +111,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
   };
 
   const handleDeletePrize = async (raffleId: string, prizeId: string) => {
-    if (!confirm('Are you sure you want to delete this prize?')) return;
+    if (!confirm(t('raffle.deletePrizeConfirm'))) return;
     setActionLoading(prizeId);
     const success = await deleteRafflePrize(partyId, raffleId, prizeId);
     if (success) {
@@ -119,7 +121,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
   };
 
   const handleDrawWinners = async (raffleId: string) => {
-    if (!confirm('Are you sure you want to draw winners? This action cannot be undone.')) return;
+    if (!confirm(t('raffle.drawConfirm'))) return;
     setActionLoading(raffleId);
     try {
       const result = await drawRaffleWinners(partyId, raffleId);
@@ -172,8 +174,8 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
               <Gift className="w-5 h-5 text-[#ff393a]" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-theme-text">Raffles</h2>
-              <p className="text-sm text-theme-text-secondary">Create raffles and draw winners</p>
+              <h2 className="text-lg font-semibold text-theme-text">{t('raffle.raffles')}</h2>
+              <p className="text-sm text-theme-text-secondary">{t('raffle.rafflesDesc')}</p>
             </div>
           </div>
           <button
@@ -181,7 +183,7 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
             className="btn-primary flex items-center gap-2"
           >
             <Plus size={18} />
-            New Raffle
+            {t('raffle.newRaffle')}
           </button>
         </div>
 
@@ -194,8 +196,8 @@ export function RaffleWidget({ partyId }: RaffleWidgetProps) {
         {raffles.length === 0 ? (
           <div className="text-center py-8 text-theme-text-muted">
             <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>No raffles yet</p>
-            <p className="text-sm mt-1">Create a raffle to give away prizes to your guests</p>
+            <p>{t('raffle.noRafflesYet')}</p>
+            <p className="text-sm mt-1">{t('raffle.noRafflesDesc')}</p>
           </div>
         ) : (
           <div className="space-y-4">

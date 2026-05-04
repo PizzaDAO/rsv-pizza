@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trophy, Shuffle, Users, UserCheck, RotateCcw, Sparkles, Crown } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { Guest } from '../../types';
@@ -11,6 +12,7 @@ interface Winner {
 }
 
 export function WinnerPicker() {
+  const { t } = useTranslation('host');
   const { party } = usePizza();
   const [filter, setFilter] = useState<EligibilityFilter>('rsvp');
   const [isAnimating, setIsAnimating] = useState(false);
@@ -100,14 +102,14 @@ export function WinnerPicker() {
             <Trophy className="w-5 h-5 text-[#ff393a]" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-theme-text">Pick a Winner</h3>
-            <p className="text-sm text-theme-text-secondary">Randomly select a guest</p>
+            <h3 className="text-lg font-semibold text-theme-text">{t('raffle.pickAWinner')}</h3>
+            <p className="text-sm text-theme-text-secondary">{t('raffle.randomlySelectGuest')}</p>
           </div>
         </div>
         <div className="text-center py-8 text-theme-text-muted">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>No guests yet</p>
-          <p className="text-sm mt-1">Guests need to RSVP before you can pick a winner</p>
+          <p>{t('raffle.noGuestsYet')}</p>
+          <p className="text-sm mt-1">{t('raffle.noGuestsDesc')}</p>
         </div>
       </div>
     );
@@ -123,18 +125,18 @@ export function WinnerPicker() {
               <Trophy className="w-5 h-5 text-[#ff393a]" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-theme-text">Pick a Winner</h3>
-              <p className="text-sm text-theme-text-secondary">Randomly select a lucky guest</p>
+              <h3 className="text-lg font-semibold text-theme-text">{t('raffle.pickAWinner')}</h3>
+              <p className="text-sm text-theme-text-secondary">{t('raffle.randomlySelectLucky')}</p>
             </div>
           </div>
           {winnerHistory.length > 0 && (
             <button
               onClick={resetHistory}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
-              title="Reset all winners"
+              title={t('raffle.reset')}
             >
               <RotateCcw size={14} />
-              Reset
+              {t('raffle.reset')}
             </button>
           )}
         </div>
@@ -150,7 +152,7 @@ export function WinnerPicker() {
             }`}
           >
             <Users size={16} />
-            RSVP'd ({guests.length})
+            {t('raffle.rsvpd', { count: guests.length })}
           </button>
           <button
             onClick={() => setFilter('checkedIn')}
@@ -161,7 +163,7 @@ export function WinnerPicker() {
             }`}
           >
             <UserCheck size={16} />
-            Checked In ({checkedInCount})
+            {t('raffle.checkedIn', { count: checkedInCount })}
           </button>
         </div>
       </div>
@@ -189,7 +191,7 @@ export function WinnerPicker() {
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Crown className="w-6 h-6 text-yellow-500" />
                     <span className="text-sm font-medium text-yellow-500 uppercase tracking-wider">
-                      Winner!
+                      {t('raffle.winner')}
                     </span>
                     <Crown className="w-6 h-6 text-yellow-500" />
                   </div>
@@ -213,8 +215,8 @@ export function WinnerPicker() {
               <Shuffle className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
                 {availableGuests.length === 0
-                  ? 'All eligible guests have been picked!'
-                  : 'Click below to pick a random winner'}
+                  ? t('raffle.allPicked')
+                  : t('raffle.clickToPick')}
               </p>
             </div>
           )}
@@ -237,19 +239,19 @@ export function WinnerPicker() {
           {isAnimating ? (
             <>
               <Shuffle size={20} className="animate-spin" />
-              Picking...
+              {t('raffle.picking')}
             </>
           ) : winner ? (
             <>
               <Shuffle size={20} />
-              Pick Again
-              <span className="text-sm opacity-70">({availableGuests.length} remaining)</span>
+              {t('raffle.pickAgain')}
+              <span className="text-sm opacity-70">({t('raffle.remaining', { count: availableGuests.length })})</span>
             </>
           ) : (
             <>
               <Sparkles size={20} />
-              Pick a Winner
-              <span className="text-sm opacity-70">({availableGuests.length} eligible)</span>
+              {t('raffle.pickAWinnerBtn')}
+              <span className="text-sm opacity-70">({t('raffle.eligible', { count: availableGuests.length })})</span>
             </>
           )}
         </button>
@@ -260,7 +262,7 @@ export function WinnerPicker() {
         <div className="border-t border-theme-stroke p-4">
           <h4 className="text-sm font-medium text-theme-text-secondary mb-3 flex items-center gap-2">
             <Trophy size={14} className="text-yellow-500" />
-            Winners This Session ({winnerHistory.length})
+            {t('raffle.winnersThisSession', { count: winnerHistory.length })}
           </h4>
           <div className="space-y-2">
             {winnerHistory.map((w, index) => (

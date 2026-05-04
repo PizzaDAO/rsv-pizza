@@ -122,5 +122,25 @@
     "noEventsMatch": "Ningun evento coincide con tus filtros.",
     "newPartners": "Nuevos socios",
     "viewEvent": "Ver evento"
+  },
+  "postComposer": {
+    "title": "Compositor de Posts",
+    "accessDenied": "Acceso Denegado",
+    "accessDeniedDesc": "No tienes acceso de administrador. Inicia sesión con una cuenta de admin.",
+    "searchEvents": "Buscar eventos...",
+    "copyToClipboard": "Copiar al Portapapeles",
+    "copied": "¡Copiado!"
+  },
+  "shipping": {
+    "title": "Panel de Envíos",
+    "loginPrompt": "Inicia sesión para acceder al panel de envíos.",
+    "logIn": "Iniciar Sesión",
+    "loading": "Cargando panel de envíos...",
+    "accessDenied": "Acceso Denegado",
+    "allRegions": "Todas las Regiones",
+    "subtitle": "Global Pizza Party · Panel de Envíos",
+    "signedInAdmin": "Conectado como Admin ({{email}})",
+    "signedInAs": "Conectado como {{name}}",
+    "kitRequests": "Solicitudes de Kit ({{count}})"
   }
 }

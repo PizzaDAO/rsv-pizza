@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Copy, ExternalLink, Check, MessageSquare, Download, Image } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Party } from '../../types';
@@ -63,6 +64,7 @@ function getPlatformIcon(platform: SocialPlatform, size = 16) {
 }
 
 export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
+  const { t } = useTranslation('host');
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>('twitter');
   const [postText, setPostText] = useState('');
   const [threadPosts, setThreadPosts] = useState<string[]>(['', '', '']);
@@ -199,12 +201,12 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
               className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 hover:bg-black/90 text-theme-text text-xs font-medium px-3 py-1.5 rounded-lg transition-colors backdrop-blur-sm"
             >
               <Download size={14} />
-              Download Image
+              {t('promo.downloadImage')}
             </button>
           </div>
           <div className="px-3 py-2 flex items-center gap-2 text-theme-text-muted text-xs">
             <Image size={12} />
-            Attach this image to your post for best engagement
+            {t('promo.attachImage')}
           </div>
         </div>
       )}
@@ -264,7 +266,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
               onClick={regeneratePost}
               className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
             >
-              Regenerate
+              {t('promo.regenerate')}
             </button>
             <span className={`text-xs ${isOverLimit ? 'text-red-400' : 'text-theme-text-muted'}`}>
               {charCount} / {config.charLimit}
@@ -281,7 +283,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             onClick={regeneratePost}
             className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors"
           >
-            Regenerate thread
+            {t('promo.regenerateThread')}
           </button>
         </div>
       )}
@@ -296,12 +298,12 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
           {copied ? (
             <>
               <Check size={16} className="text-green-400" />
-              Copied!
+              {t('promo.copied')}
             </>
           ) : (
             <>
               <Copy size={16} />
-              {isTwitter ? 'Copy All' : 'Copy Text'}
+              {isTwitter ? t('promo.copyAll') : t('promo.copyText')}
             </>
           )}
         </button>
@@ -313,7 +315,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             className="flex-1 flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
           >
             <Copy size={16} />
-            Copy for Instagram
+            {t('promo.copyForInstagram')}
           </button>
         ) : (
           <button
@@ -323,7 +325,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             className="flex-1 flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
           >
             <ExternalLink size={16} />
-            Share on {SOCIAL_PLATFORMS[activePlatform].name}
+            {t('promo.shareOn', { platform: SOCIAL_PLATFORMS[activePlatform].name })}
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, Building2, Lock } from 'lucide-react';
 import { VenueReport } from '../types';
@@ -8,6 +9,7 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 
 export function PublicVenueReportPage() {
+  const { t } = useTranslation('event');
   const { slug } = useParams<{ slug: string }>();
   const [report, setReport] = useState<VenueReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,8 +98,8 @@ export function PublicVenueReportPage() {
             {error === 'Venue report not found' ? (
               <>
                 <Building2 className="w-16 h-16 text-theme-text-faint mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-theme-text mb-2">Venue Report Not Found</h2>
-                <p className="text-theme-text-secondary">This venue report may have been unpublished or the link is invalid.</p>
+                <h2 className="text-xl font-semibold text-theme-text mb-2">{t('venueReport.notFound')}</h2>
+                <p className="text-theme-text-secondary">{t('venueReport.notFoundDesc')}</p>
               </>
             ) : (
               <div className="flex items-center justify-center gap-3 text-red-400">
@@ -117,16 +119,16 @@ export function PublicVenueReportPage() {
         <div className="max-w-5xl mx-auto py-12 px-4">
           <div className="card p-8 max-w-md mx-auto text-center">
             <Lock className="w-12 h-12 text-theme-text-faint mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-theme-text mb-2">Password Protected</h2>
+            <h2 className="text-xl font-semibold text-theme-text mb-2">{t('venueReport.passwordProtected')}</h2>
             {(reportTitle || eventName) && (
               <p className="text-theme-text-secondary mb-4">{reportTitle || eventName}</p>
             )}
-            <p className="text-theme-text-muted text-sm mb-6">Enter the password to view this venue report.</p>
+            <p className="text-theme-text-muted text-sm mb-6">{t('venueReport.enterPassword')}</p>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <IconInput
                 icon={Lock}
                 type="password"
-                placeholder="Enter password"
+                placeholder={t('venueReport.enterPasswordPlaceholder')}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -134,7 +136,7 @@ export function PublicVenueReportPage() {
                 }}
               />
               {passwordError && (
-                <p className="text-red-400 text-sm">Incorrect password</p>
+                <p className="text-red-400 text-sm">{t('venueReport.incorrectPassword')}</p>
               )}
               <button
                 type="submit"
@@ -144,7 +146,7 @@ export function PublicVenueReportPage() {
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                 ) : (
-                  'View Report'
+                  t('venueReport.viewReport')
                 )}
               </button>
             </form>

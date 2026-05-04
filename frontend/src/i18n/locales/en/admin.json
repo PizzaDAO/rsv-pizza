@@ -122,5 +122,25 @@
     "noEventsMatch": "No events match your filters.",
     "newPartners": "New partners",
     "viewEvent": "View event"
+  },
+  "postComposer": {
+    "title": "Post Composer",
+    "accessDenied": "Access Denied",
+    "accessDeniedDesc": "You do not have admin access. Please log in with an admin account.",
+    "searchEvents": "Search events...",
+    "copyToClipboard": "Copy to Clipboard",
+    "copied": "Copied!"
+  },
+  "shipping": {
+    "title": "Shipping Dashboard",
+    "loginPrompt": "Please log in to access the shipping dashboard.",
+    "logIn": "Log In",
+    "loading": "Loading shipping dashboard...",
+    "accessDenied": "Access Denied",
+    "allRegions": "All Regions",
+    "subtitle": "Global Pizza Party · Shipping Dashboard",
+    "signedInAdmin": "Signed in as Admin ({{email}})",
+    "signedInAs": "Signed in as {{name}}",
+    "kitRequests": "Kit Requests ({{count}})"
   }
 }

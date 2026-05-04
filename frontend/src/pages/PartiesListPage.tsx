@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { getAllParties, DbParty } from '../lib/supabase';
 import { Calendar, Users, MapPin, ChevronRight, PartyPopper } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 export const PartiesListPage: React.FC = () => {
+  const { t } = useTranslation('event');
   const [parties, setParties] = useState<DbParty[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,7 +42,7 @@ export const PartiesListPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center py-16">
-          <div className="text-theme-text-secondary">Loading parties...</div>
+          <div className="text-theme-text-secondary">{t('partiesList.loading')}</div>
         </div>
       </Layout>
     );
@@ -53,21 +55,21 @@ export const PartiesListPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-theme-text flex items-center gap-2">
               <PartyPopper className="text-[#ff393a]" />
-              All Parties
+              {t('partiesList.title')}
             </h1>
             <Link
               to="/"
               className="px-4 py-2 bg-[#ff393a] text-white rounded-lg text-sm font-medium hover:bg-[#ff393a]/90 transition-colors"
             >
-              + New Party
+              {t('partiesList.newParty')}
             </Link>
           </div>
 
           {parties.length === 0 ? (
             <div className="card p-8 text-center">
-              <p className="text-theme-text-secondary">No parties found.</p>
+              <p className="text-theme-text-secondary">{t('partiesList.noParties')}</p>
               <Link to="/" className="text-[#ff393a] hover:underline mt-2 inline-block">
-                Create your first party
+                {t('partiesList.createFirst')}
               </Link>
             </div>
           ) : (
@@ -86,13 +88,13 @@ export const PartiesListPage: React.FC = () => {
                         </h2>
                         {party.rsvp_closed_at && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-300 rounded">
-                            Closed
+                            {t('partiesList.closed')}
                           </span>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-theme-text-secondary">
                         {party.host_name && (
-                          <span>Host: {party.host_name}</span>
+                          <span>{t('partiesList.host', { name: party.host_name })}</span>
                         )}
                         {party.date && (
                           <span className="flex items-center gap-1">
@@ -103,7 +105,7 @@ export const PartiesListPage: React.FC = () => {
                         {party.max_guests && (
                           <span className="flex items-center gap-1">
                             <Users size={12} />
-                            {party.max_guests} guests
+                            {t('partiesList.guests', { count: party.max_guests })}
                           </span>
                         )}
                         {party.address && (
@@ -114,7 +116,7 @@ export const PartiesListPage: React.FC = () => {
                         )}
                       </div>
                       <div className="text-xs text-theme-text-muted mt-1">
-                        Created: {formatCreatedAt(party.created_at)} | Code: {party.invite_code}
+                        {t('partiesList.created')} {formatCreatedAt(party.created_at)} | Code: {party.invite_code}
                       </div>
                     </div>
                     <ChevronRight

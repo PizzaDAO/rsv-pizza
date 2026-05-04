@@ -134,5 +134,15 @@
     "completionRates": "Completion Rates",
     "venue": "Venue",
     "budget": "Budget"
+  },
+  "intake": {
+    "linkNotFound": "Link Not Found",
+    "linkNotFoundDesc": "This partner intake link is invalid, has expired, or has been revoked. Please contact the event host for a new link.",
+    "thankYou": "Thank You!",
+    "submittedSuccess": "Your partner information for <1>{{eventName}}</1> has been submitted successfully.",
+    "revisitLink": "You can revisit this link anytime to update your information.",
+    "headerTitle": "Thanks for partnering with {{eventName}}!",
+    "headerDescNew": "Please fill out the form below so we can feature your brand at the event.",
+    "headerDescUpdate": "Update your partner information below."
   }
 }

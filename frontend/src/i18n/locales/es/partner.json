@@ -134,5 +134,15 @@
     "completionRates": "Tasas de Progreso",
     "venue": "Lugar",
     "budget": "Presupuesto"
+  },
+  "intake": {
+    "linkNotFound": "Enlace No Encontrado",
+    "linkNotFoundDesc": "Este enlace de registro de partner es inválido, ha expirado o ha sido revocado. Contacta al anfitrión del evento para obtener un nuevo enlace.",
+    "thankYou": "¡Gracias!",
+    "submittedSuccess": "Tu información de partner para <1>{{eventName}}</1> ha sido enviada exitosamente.",
+    "revisitLink": "Puedes volver a visitar este enlace en cualquier momento para actualizar tu información.",
+    "headerTitle": "¡Gracias por asociarte con {{eventName}}!",
+    "headerDescNew": "Por favor completa el formulario a continuación para que podamos destacar tu marca en el evento.",
+    "headerDescUpdate": "Actualiza tu información de partner a continuación."
   }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Copy, ExternalLink, Check, MessageSquare, Link, Tag, X, Plus, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Party } from '../../types';
@@ -63,6 +64,7 @@ function getPlatformLogo(platform: EventPlatform) {
 }
 
 export const PlatformPublisher: React.FC = () => {
+  const { t } = useTranslation('host');
   const { party, loadParty } = usePizza();
   const [expandedPlatform, setExpandedPlatform] = useState<EventPlatform | null>(null);
   const [description, setDescription] = useState('');
@@ -227,7 +229,7 @@ export const PlatformPublisher: React.FC = () => {
                 {getPlatformLogo(platform)}
                 <div className="text-left">
                   <p className="text-theme-text font-medium text-sm">{config.name}</p>
-                  <p className="text-theme-text-muted text-xs">Create event listing</p>
+                  <p className="text-theme-text-muted text-xs">{t('promo.createEventListing')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -251,7 +253,7 @@ export const PlatformPublisher: React.FC = () => {
                 {/* URL Input */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-theme-text-muted">{config.name} Event URL</span>
+                    <span className="text-xs text-theme-text-muted">{t('promo.eventUrl', { platform: config.name })}</span>
                     {renderSaveIndicator(PLATFORM_URL_FIELD[platform])}
                   </div>
                   <IconInput
@@ -260,7 +262,7 @@ export const PlatformPublisher: React.FC = () => {
                     value={platformUrls[platform]}
                     onChange={(e) => setPlatformUrls(prev => ({ ...prev, [platform]: e.target.value }))}
                     onBlur={() => savePlatformUrl(platform)}
-                    placeholder={`Paste your ${config.name} event URL`}
+                    placeholder={t('promo.pasteEventUrl', { platform: config.name })}
                   />
                 </div>
 
@@ -268,7 +270,7 @@ export const PlatformPublisher: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs text-theme-text-muted">Event Name</span>
+                      <span className="text-xs text-theme-text-muted">{t('promo.eventName')}</span>
                       <p className="text-theme-text text-sm truncate">{party.name}</p>
                     </div>
                     <button
@@ -283,7 +285,7 @@ export const PlatformPublisher: React.FC = () => {
                   {party.date && (
                     <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs text-theme-text-muted">Date & Time</span>
+                        <span className="text-xs text-theme-text-muted">{t('promo.dateAndTime')}</span>
                         <p className="text-theme-text text-sm truncate">{formatEventDateLong(party)}</p>
                       </div>
                       <button
@@ -299,7 +301,7 @@ export const PlatformPublisher: React.FC = () => {
                   {(party.venueName || party.address) && (
                     <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs text-theme-text-muted">Location</span>
+                        <span className="text-xs text-theme-text-muted">{t('promo.location')}</span>
                         <p className="text-theme-text text-sm truncate">{getLocationString(party)}</p>
                       </div>
                       <button
@@ -314,7 +316,7 @@ export const PlatformPublisher: React.FC = () => {
 
                   <div className="flex items-center justify-between bg-theme-surface rounded-lg px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs text-theme-text-muted">RSVP Link</span>
+                      <span className="text-xs text-theme-text-muted">{t('promo.rsvpLink')}</span>
                       <p className="text-theme-text text-sm truncate">{rsvpUrl}</p>
                     </div>
                     <button
@@ -330,7 +332,7 @@ export const PlatformPublisher: React.FC = () => {
                 {/* Description Editor */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-theme-text-muted">Description (editable)</span>
+                    <span className="text-xs text-theme-text-muted">{t('promo.descriptionEditable')}</span>
                     <button
                       type="button"
                       onClick={() => handleCopy(description, `${platform}-desc`)}
@@ -339,12 +341,12 @@ export const PlatformPublisher: React.FC = () => {
                       {copied === `${platform}-desc` ? (
                         <>
                           <Check size={12} className="text-green-400" />
-                          Copied!
+                          {t('promo.copied')}
                         </>
                       ) : (
                         <>
                           <Copy size={12} />
-                          Copy
+                          {t('promo.copy')}
                         </>
                       )}
                     </button>
@@ -355,7 +357,7 @@ export const PlatformPublisher: React.FC = () => {
                     rows={6}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Event description..."
+                    placeholder={t('promo.eventDescPlaceholder')}
                   />
                 </div>
 
@@ -366,11 +368,11 @@ export const PlatformPublisher: React.FC = () => {
                   className="w-full flex items-center justify-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
                 >
                   <ExternalLink size={16} />
-                  Create on {config.name}
+                  {t('promo.createOn', { platform: config.name })}
                 </button>
 
                 <p className="text-xs text-theme-text-faint text-center">
-                  Copy the details above, then paste them into {config.name}
+                  {t('promo.copyDetailsThen', { platform: config.name })}
                 </p>
               </div>
             )}
@@ -384,7 +386,7 @@ export const PlatformPublisher: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Link size={16} className="text-theme-text-muted" />
-              <span className="text-theme-text font-medium text-sm">Custom Links</span>
+              <span className="text-theme-text font-medium text-sm">{t('promo.customLinks')}</span>
             </div>
             <div className="flex items-center gap-2">
               {renderSaveIndicator('external_links')}
@@ -394,7 +396,7 @@ export const PlatformPublisher: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-theme-text-muted mb-3">
-            Add links to other platforms where your event is listed
+            {t('promo.customLinksDesc')}
           </p>
 
           {customLinks.length > 0 && (
@@ -407,7 +409,7 @@ export const PlatformPublisher: React.FC = () => {
                       value={link.label}
                       onChange={(e) => updateCustomLink(index, 'label', e.target.value)}
                       onBlur={handleCustomLinkBlur}
-                      placeholder="Label (e.g. Facebook)"
+                      placeholder={t('promo.labelPlaceholder')}
                     />
                   </div>
                   <div className="flex-[2] min-w-0">
@@ -417,7 +419,7 @@ export const PlatformPublisher: React.FC = () => {
                       value={link.url}
                       onChange={(e) => updateCustomLink(index, 'url', e.target.value)}
                       onBlur={handleCustomLinkBlur}
-                      placeholder="https://..."
+                      placeholder={t('promo.urlPlaceholder')}
                     />
                   </div>
                   <button
@@ -439,7 +441,7 @@ export const PlatformPublisher: React.FC = () => {
               className="flex items-center gap-1.5 text-sm text-theme-text-muted hover:text-theme-text transition-colors"
             >
               <Plus size={14} />
-              Add link
+              {t('promo.addLink')}
             </button>
           )}
         </div>
