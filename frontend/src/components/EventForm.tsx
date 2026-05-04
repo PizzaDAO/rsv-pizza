@@ -10,8 +10,10 @@ import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, Che
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
 import { parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
 
 export function EventForm() {
+  const { t } = useTranslation('account');
   const navigate = useNavigate();
   const { user } = useAuth();
   const startDateInputRef = useRef<HTMLInputElement>(null);
@@ -138,12 +140,12 @@ export function EventForm() {
     setImageError(null);
 
     if (!file.type.startsWith('image/')) {
-      setImageError('Please select an image file');
+      setImageError(t('eventForm.imageSelectError'));
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image must be less than 5MB');
+      setImageError(t('eventForm.imageSizeError'));
       return;
     }
 
@@ -154,7 +156,7 @@ export function EventForm() {
       const aspectRatio = img.width / img.height;
 
       if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError('Image must be square (1:1 aspect ratio)');
+        setImageError(t('eventForm.imageAspectError'));
         setEventImageFile(null);
         setImagePreview(null);
         URL.revokeObjectURL(objectUrl);
@@ -166,7 +168,7 @@ export function EventForm() {
     };
 
     img.onerror = () => {
-      setImageError('Failed to load image');
+      setImageError(t('eventForm.imageLoadError'));
       URL.revokeObjectURL(objectUrl);
     };
 
@@ -233,7 +235,7 @@ export function EventForm() {
         if (uploadedUrl) {
           imageUrl = uploadedUrl;
         } else {
-          setImageError('Failed to upload image. Please try again.');
+          setImageError(t('eventForm.imageUploadFailed'));
           setCreating(false);
           return;
         }
@@ -262,7 +264,7 @@ export function EventForm() {
       if (party?.invite_code) {
         navigate(`/host/${party.invite_code}`);
       } else {
-        setImageError('Failed to create party. Please try again.');
+        setImageError(t('eventForm.createFailed'));
       }
     } catch (error) {
       console.error('Error creating party:', error);
@@ -279,7 +281,7 @@ export function EventForm() {
             type="text"
             value={partyName}
             onChange={(e) => setPartyName(e.target.value)}
-            placeholder="Party Name"
+            placeholder={t('eventForm.partyName')}
             className="w-full pl-3"
             autoFocus
             data-testid="event-form-name"
@@ -290,7 +292,7 @@ export function EventForm() {
           value={partyAddress}
           onChange={setPartyAddress}
           onTimezoneChange={setTimezone}
-          placeholder="Event Location"
+          placeholder={t('eventForm.eventLocation')}
         />
 
         {/* Mobile: Date/Time Button */}
@@ -312,8 +314,8 @@ export function EventForm() {
               </div>
             ) : (
               <div>
-                <span className="text-theme-text-secondary">Thursday, January 15</span>
-                <div className="text-theme-text-muted text-sm mt-1">2:00 PM – 3:00 PM EST</div>
+                <span className="text-theme-text-secondary">{t('eventForm.datePlaceholder')}</span>
+                <div className="text-theme-text-muted text-sm mt-1">{t('eventForm.timePlaceholder')}</div>
               </div>
             )}
           </div>
@@ -387,7 +389,7 @@ export function EventForm() {
           <textarea
             value={eventDescription}
             onChange={(e) => setEventDescription(e.target.value)}
-            placeholder="Description"
+            placeholder={t('eventForm.description')}
             className="w-full !pl-11 text-left"
             rows={3}
           />
@@ -429,15 +431,15 @@ export function EventForm() {
                 }`}
               >
                 <Upload className="w-8 h-8 text-theme-text-muted mb-2" />
-                <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
-                <span className="text-xs text-theme-text-muted mt-1">Max 5MB - 1:1 aspect ratio</span>
+                <span className="text-sm text-theme-text-secondary">{t('eventForm.uploadImage')}</span>
+                <span className="text-xs text-theme-text-muted mt-1">{t('eventForm.uploadImageHint')}</span>
               </label>
             </div>
           )}
 
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 h-px bg-theme-surface-hover"></div>
-            <span className="text-xs text-theme-text-muted">OR</span>
+            <span className="text-xs text-theme-text-muted">{t('eventForm.or')}</span>
             <div className="flex-1 h-px bg-theme-surface-hover"></div>
           </div>
 
@@ -454,7 +456,7 @@ export function EventForm() {
                   setImageError(null);
                 }
               }}
-              placeholder="Square Image URL"
+              placeholder={t('eventForm.imageUrl')}
               className="w-full !pl-11"
             />
           </div>
@@ -471,7 +473,7 @@ export function EventForm() {
           className="w-full flex items-center justify-between p-4 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors"
         >
           <span className="text-sm font-medium text-theme-text">
-            Options
+            {t('eventForm.options')}
           </span>
           {showOptionalFields ? (
             <ChevronUp size={18} className="text-theme-text-secondary" />
@@ -494,7 +496,7 @@ export function EventForm() {
                 ) : (
                   <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-theme-text">Require Approval</span>
+                <span className="text-sm font-medium text-theme-text">{t('eventForm.requireApproval')}</span>
               </button>
             </div>
 
@@ -509,7 +511,7 @@ export function EventForm() {
                 ) : (
                   <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-theme-text">Limit Guests</span>
+                <span className="text-sm font-medium text-theme-text">{t('eventForm.limitGuests')}</span>
               </button>
             </div>
 
@@ -524,7 +526,7 @@ export function EventForm() {
                 ) : (
                   <SquareIcon size={18} className="text-theme-text-muted flex-shrink-0" />
                 )}
-                <span className="text-sm font-medium text-theme-text">Hide Guests</span>
+                <span className="text-sm font-medium text-theme-text">{t('eventForm.hideGuests')}</span>
               </button>
             </div>
 
@@ -536,7 +538,7 @@ export function EventForm() {
                   min="1"
                   value={expectedGuests}
                   onChange={(e) => setExpectedGuests(e.target.value)}
-                  placeholder="Capacity"
+                  placeholder={t('eventForm.capacity')}
                   className="w-full !pl-14"
                 />
               </div>
@@ -548,7 +550,7 @@ export function EventForm() {
                 type="password"
                 value={partyPassword}
                 onChange={(e) => setPartyPassword(e.target.value)}
-                placeholder="Event Password"
+                placeholder={t('eventForm.eventPassword')}
                 className="w-full !pl-14"
               />
             </div>
@@ -573,10 +575,10 @@ export function EventForm() {
           {creating ? (
             <>
               <Loader2 size={20} className="animate-spin" />
-              Creating...
+              {t('eventForm.creating')}
             </>
           ) : (
-            'Create Party'
+            t('eventForm.createParty')
           )}
         </button>
       </form>
@@ -585,14 +587,14 @@ export function EventForm() {
       {showDateTimeModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
+            <h2 className="text-lg font-semibold text-theme-text mb-4">{t('eventForm.eventTime')}</h2>
 
             <div className="space-y-3">
               {/* Start Date */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <Play size={14} className="text-theme-text-muted" />
-                  <span className="text-xs text-theme-text-muted">Start Date</span>
+                  <span className="text-xs text-theme-text-muted">{t('eventForm.startDate')}</span>
                 </div>
                 <input
                   type="date"
@@ -609,7 +611,7 @@ export function EventForm() {
 
               {/* Start Time */}
               <div>
-                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">Start Time</span>
+                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">{t('eventForm.startTime')}</span>
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
@@ -622,7 +624,7 @@ export function EventForm() {
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <SquareIcon size={12} className="text-theme-text-muted" />
-                  <span className="text-xs text-theme-text-muted">End Date</span>
+                  <span className="text-xs text-theme-text-muted">{t('eventForm.endDate')}</span>
                 </div>
                 <input
                   type="date"
@@ -636,7 +638,7 @@ export function EventForm() {
 
               {/* End Time */}
               <div>
-                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">End Time</span>
+                <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">{t('eventForm.endTime')}</span>
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
@@ -658,7 +660,7 @@ export function EventForm() {
               onClick={() => setShowDateTimeModal(false)}
               className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Done
+              {t('eventForm.done')}
             </button>
           </div>
         </div>,
