@@ -397,6 +397,15 @@ export function PartnerDashboardPage() {
           const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
           const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
           const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
+          // Aggregate click breakdown by type across all events
+          const clicksByTypeAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
+          for (const e of allEvents) {
+            for (const t of e.clickStats?.byType || []) {
+              if (!clicksByTypeAgg[t.linkType]) clicksByTypeAgg[t.linkType] = { clicks: 0, uniqueClickers: 0 };
+              clicksByTypeAgg[t.linkType].clicks += t.clicks;
+              clicksByTypeAgg[t.linkType].uniqueClickers += t.uniqueClickers;
+            }
+          }
           const isSwc = dashboardData?.tag === 'swc';
           const withVenue = allEvents.filter(e => e.progress?.hasVenue).length;
           const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
@@ -435,6 +444,20 @@ export function PartnerDashboardPage() {
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
+                  {Object.keys(clicksByTypeAgg).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {Object.entries(clicksByTypeAgg).map(([type, data]) => (
+                        <span
+                          key={type}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-[10px] text-green-300"
+                          title={`${data.uniqueClickers} unique`}
+                        >
+                          {type === 'sponsor' ? 'Website/Social' : type === 'host_social' ? 'Host Links' : type}
+                          <span className="font-semibold">{data.clicks}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {isSwc && (
                   <>
@@ -737,11 +760,25 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
               </div>
             )}
             {event.clickStats && event.clickStats.totalClicks > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted">
+              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted flex-wrap">
                 <MousePointerClick size={12} />
                 <span>{event.clickStats.totalClicks} clicks</span>
                 {event.clickStats.uniqueClickers > 0 && (
                   <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+                )}
+                {event.clickStats.byType && event.clickStats.byType.length > 1 && (
+                  <span className="flex items-center gap-1">
+                    {event.clickStats.byType.map(t => (
+                      <span
+                        key={t.linkType}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0 rounded-full bg-green-500/10 text-[10px] text-green-300"
+                        title={`${t.uniqueClickers} unique`}
+                      >
+                        {t.linkType === 'sponsor' ? 'Web' : t.linkType === 'host_social' ? 'Host' : t.linkType}
+                        <span className="font-semibold">{t.clicks}</span>
+                      </span>
+                    ))}
+                  </span>
                 )}
               </div>
             )}

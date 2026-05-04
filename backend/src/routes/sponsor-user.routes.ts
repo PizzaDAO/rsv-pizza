@@ -564,6 +564,43 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       : [];
     const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
 
+    // Per-type click breakdown (grouped by partyId + linkType)
+    const clickStatsByType = await prisma.linkClick.groupBy({
+      by: ['partyId', 'linkType'],
+      where: {
+        partyId: { in: eventIds },
+        linkType: { in: ['sponsor', 'host_social'] },
+      },
+      _count: true,
+    });
+
+    const uniqueClicksByType = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; link_type: string; unique_count: bigint }[]>`
+        SELECT party_id::text, link_type, COUNT(DISTINCT visitor_hash) as unique_count
+        FROM link_clicks
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+        AND link_type IN ('sponsor', 'host_social')
+        GROUP BY party_id, link_type
+      `
+      : [];
+
+    // Build map: partyId -> [{ linkType, clicks, uniqueClickers }]
+    const byTypeMap = new Map<string, { linkType: string; clicks: number; uniqueClickers: number }[]>();
+    for (const row of clickStatsByType) {
+      const list = byTypeMap.get(row.partyId) || [];
+      list.push({ linkType: row.linkType!, clicks: row._count, uniqueClickers: 0 });
+      byTypeMap.set(row.partyId, list);
+    }
+    for (const row of uniqueClicksByType) {
+      const list = byTypeMap.get(row.party_id);
+      if (list) {
+        const entry = list.find(e => e.linkType === row.link_type);
+        if (entry) {
+          entry.uniqueClickers = Number(row.unique_count);
+        }
+      }
+    }
+
     // Get page view (impression) counts per party
     const viewStats = await prisma.pageView.groupBy({
       by: ['partyId'],
@@ -679,6 +716,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         clickStats: {
           totalClicks: clickCountMap.get(event.id) || 0,
           uniqueClickers: uniqueClickMap.get(event.id) || 0,
+          byType: byTypeMap.get(event.id) || [],
         },
         impressions: {
           totalViews: viewCountMap.get(event.id) || 0,
