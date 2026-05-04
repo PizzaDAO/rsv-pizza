@@ -16,6 +16,7 @@ import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { Party } from '../../types';
 import { usePizza } from '../../contexts/PizzaContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { parseCsv, ParsedCsvRow } from '../../lib/csvParser';
 import { bulkInviteGuests, BulkInviteResult } from '../../lib/api';
 
@@ -62,8 +63,11 @@ function statusBadgeClass(status: RowStatus): string {
 
 export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
   const { guests, loadParty } = usePizza();
+  const { user } = useAuth();
 
   const [stage, setStage] = useState<Stage>('upload');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<'sent' | 'error' | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [customMessage, setCustomMessage] = useState('');
@@ -209,6 +213,21 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
     }
   };
 
+  const handleTestEmail = async () => {
+    if (!user?.email) return;
+    setTestSending(true);
+    setTestResult(null);
+    try {
+      await bulkInviteGuests(party.id, [{ name: user.username || user.email.split('@')[0], email: user.email }], customMessage.trim() || undefined);
+      setTestResult('sent');
+      setTimeout(() => setTestResult(null), 3000);
+    } catch {
+      setTestResult('error');
+    } finally {
+      setTestSending(false);
+    }
+  };
+
   // ---------------- Upload stage ----------------
   if (stage === 'upload') {
     return (
@@ -248,6 +267,25 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
             <span className="text-xs text-yellow-500/80">{parseError}</span>
           </div>
+        )}
+
+        {user?.email && (
+          <button
+            type="button"
+            onClick={handleTestEmail}
+            disabled={testSending}
+            className="w-full flex items-center justify-center gap-2 bg-theme-surface hover:bg-theme-surface-hover text-theme-text-secondary font-medium py-2 rounded-lg transition-colors text-sm border border-theme-stroke"
+          >
+            {testSending ? (
+              <><Loader2 size={14} className="animate-spin" /> Sending...</>
+            ) : testResult === 'sent' ? (
+              <><CheckCircle size={14} className="text-green-400" /> Test sent to {user.email}</>
+            ) : testResult === 'error' ? (
+              <><AlertTriangle size={14} className="text-red-400" /> Failed to send test</>
+            ) : (
+              <><Send size={14} /> Send test invite to {user.email}</>
+            )}
+          </button>
         )}
 
         <p className="text-xs text-theme-text-faint">
