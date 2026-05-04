@@ -37,6 +37,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [confirmedMode, setConfirmedMode] = useState(false);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
   const [expandedVenue, setExpandedVenue] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -65,6 +66,12 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       if (venue) {
         setVenues(prev => [venue, ...prev]);
         setShowForm(false);
+
+        // In confirmed mode, auto-select the venue
+        if (confirmedMode) {
+          setConfirmedMode(false);
+          await handleSelect(venue.id);
+        }
       }
     } catch (error) {
       throw error;
@@ -166,7 +173,7 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
         </div>
         <button
           type="button"
-          onClick={() => setShowForm(true)}
+          onClick={() => { setConfirmedMode(false); setShowForm(true); }}
           className="flex items-center gap-1.5 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-3 py-1.5 rounded-lg transition-colors text-sm"
         >
           <Plus size={16} />
@@ -178,15 +185,25 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
       {venues.length === 0 ? (
         <div className="card p-8 text-center">
           <MapPin size={32} className="mx-auto mb-3 text-theme-text-faint" />
-          <p className="text-theme-text-secondary mb-4">No venue options yet</p>
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={18} />
-            Add Your First Venue
-          </button>
+          <p className="text-theme-text-secondary mb-4">Where's the party?</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => { setConfirmedMode(true); setShowForm(true); }}
+              className="inline-flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
+            >
+              <Check size={18} />
+              I Have My Venue
+            </button>
+            <button
+              type="button"
+              onClick={() => { setConfirmedMode(false); setShowForm(true); }}
+              className="inline-flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface text-theme-text-secondary font-medium px-5 py-2.5 rounded-lg transition-colors"
+            >
+              <Plus size={18} />
+              Still Exploring
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -440,7 +457,9 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
           onClose={() => {
             setShowForm(false);
             setEditingVenue(null);
+            setConfirmedMode(false);
           }}
+          initialStatus={confirmedMode ? 'confirmed' : undefined}
         />
       )}
     </div>
