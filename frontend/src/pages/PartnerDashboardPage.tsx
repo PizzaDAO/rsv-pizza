@@ -10,6 +10,7 @@ import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
+  Instagram, Youtube, Linkedin, Globe, Facebook,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
@@ -35,16 +36,39 @@ function detectPlatform(url: string): string {
   }
 }
 
-const PLATFORM_COLORS: Record<string, string> = {
-  Instagram: 'bg-pink-500/15 text-pink-300',
-  X: 'bg-gray-500/15 text-gray-300',
-  YouTube: 'bg-red-500/15 text-red-300',
-  TikTok: 'bg-cyan-500/15 text-cyan-300',
-  LinkedIn: 'bg-blue-500/15 text-blue-300',
-  Facebook: 'bg-indigo-500/15 text-indigo-300',
-  Farcaster: 'bg-purple-500/15 text-purple-300',
-  Website: 'bg-green-500/15 text-green-300',
-};
+// X (Twitter) icon
+const XIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+// TikTok icon
+const TikTokIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+  </svg>
+);
+
+// Farcaster icon
+const FarcasterIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M5.315 3.401h13.37v17.198h-1.689V7.68H6.998v12.919H5.315V3.401zm3.371 7.674h6.628v1.414h-6.628v-1.414z" />
+  </svg>
+);
+
+function PlatformIcon({ platform, size = 12 }: { platform: string; size?: number }) {
+  switch (platform) {
+    case 'Instagram': return <Instagram size={size} />;
+    case 'X': return <XIcon size={size} />;
+    case 'YouTube': return <Youtube size={size} />;
+    case 'TikTok': return <TikTokIcon size={size} />;
+    case 'LinkedIn': return <Linkedin size={size} />;
+    case 'Facebook': return <Facebook size={size} />;
+    case 'Farcaster': return <FarcasterIcon size={size} />;
+    default: return <Globe size={size} />;
+  }
+}
 
 // ============================================
 // Progress filter constants & FilterPill
@@ -474,17 +498,17 @@ export function PartnerDashboardPage() {
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
                   {Object.keys(clicksByPlatformAgg).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {Object.entries(clicksByPlatformAgg)
                         .sort((a, b) => b[1].clicks - a[1].clicks)
                         .map(([platform, data]) => (
                         <span
                           key={platform}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${PLATFORM_COLORS[platform] || PLATFORM_COLORS.Website}`}
-                          title={`${data.uniqueClickers} unique`}
+                          className="inline-flex items-center gap-1 text-xs text-theme-text-muted"
+                          title={`${platform}: ${data.clicks} clicks (${data.uniqueClickers} unique)`}
                         >
-                          {platform}
-                          <span className="font-semibold">{data.clicks}</span>
+                          <PlatformIcon platform={platform} size={14} />
+                          <span className="font-semibold text-theme-text">{data.clicks}</span>
                         </span>
                       ))}
                     </div>
@@ -798,9 +822,8 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                   <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
                 )}
                 {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
-                  <span className="flex items-center gap-1 flex-wrap">
+                  <span className="flex items-center gap-1.5 flex-wrap">
                     {(() => {
-                      // Group by platform for compact display
                       const platformCounts: Record<string, number> = {};
                       for (const link of event.clickStats.byLink!) {
                         const p = detectPlatform(link.url);
@@ -811,10 +834,11 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                         .map(([platform, clicks]) => (
                           <span
                             key={platform}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0 rounded-full text-[10px] ${PLATFORM_COLORS[platform] || PLATFORM_COLORS.Website}`}
+                            className="inline-flex items-center gap-0.5 text-theme-text-muted"
+                            title={`${platform}: ${clicks}`}
                           >
-                            {platform}
-                            <span className="font-semibold">{clicks}</span>
+                            <PlatformIcon platform={platform} size={11} />
+                            <span className="font-semibold text-[10px]">{clicks}</span>
                           </span>
                         ));
                     })()}
