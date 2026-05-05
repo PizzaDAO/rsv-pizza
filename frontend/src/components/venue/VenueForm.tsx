@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
@@ -58,6 +58,7 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
   const [searchValue, setSearchValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const handlePlaceSelected = useCallback(async (address: string, venueName: string | null) => {
     if (saving) return;
@@ -102,6 +103,9 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
       // Non-critical — we'll create the venue without extra details
     }
 
+    // Capture coordinates from the pending ref
+    const coords = pendingCoordsRef.current;
+
     try {
       await onSave({
         name: name.trim(),
@@ -109,6 +113,7 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
         website,
         contactPhone,
         ...(initialStatus ? { status: initialStatus } : {}),
+        ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
       });
       onClose();
     } catch (err) {
@@ -154,6 +159,9 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
                 value={searchValue}
                 onChange={setSearchValue}
                 onPlaceSelected={handlePlaceSelected}
+                onLocationSelected={(loc) => {
+                  pendingCoordsRef.current = loc;
+                }}
                 types={['establishment']}
                 fields={['formatted_address', 'name', 'place_id', 'geometry', 'website']}
                 placeholder="Search for a venue..."

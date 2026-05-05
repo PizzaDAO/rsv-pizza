@@ -160,6 +160,8 @@ export interface Venue {
   capacity: number | null;
   cost: number | null;
   organization: string | null;
+  latitude: number | null;
+  longitude: number | null;
   pointPerson: string | null;
   contactName: string | null;
   contactEmail: string | null;
