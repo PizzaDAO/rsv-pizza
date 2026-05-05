@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
+import posthog from 'posthog-js';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
@@ -53,6 +54,12 @@ export function RSVPPage() {
         const foundParty = await getPartyByInviteCodeOrCustomUrl(inviteCode);
         if (foundParty) {
           setParty(foundParty);
+
+          // Track RSVP page view for funnel analysis
+          posthog.capture('rsvp_page_viewed', {
+            eventName: foundParty.name,
+            inviteCode: foundParty.invite_code,
+          });
 
           // Check if donations are enabled
           const stats = await getDonationStats(foundParty.id);
@@ -124,6 +131,24 @@ export function RSVPPage() {
       if (isGPP) fireFromCenter();
     },
   });
+
+  // Track RSVP step 2 reached
+  useEffect(() => {
+    if (form.step === 2 && party) {
+      posthog.capture('rsvp_step2_reached', { eventName: party.name });
+    }
+  }, [form.step, party]);
+
+  // Track RSVP submission success
+  useEffect(() => {
+    if (form.submitted && party) {
+      posthog.capture('rsvp_submitted', {
+        eventName: party.name,
+        alreadyRegistered: form.alreadyRegistered,
+        pendingApproval: form.pendingApproval,
+      });
+    }
+  }, [form.submitted, party, form.alreadyRegistered, form.pendingApproval]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
