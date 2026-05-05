@@ -13,6 +13,7 @@ import {
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
   CITY_BOX, VENUE_BOX, TIME_BOX, DEFAULT_SPONSOR_BOX,
 } from './renderFlyer';
+import { cancelFlyerRegen } from './autoRegenFlyer';
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -572,6 +573,9 @@ export function FlyerGenerator() {
         flyer_generated_at: new Date().toISOString(),
       });
       if (!success) throw new Error('Failed to update party');
+
+      // Cancel any pending auto-regen so it doesn't overwrite the manual flyer
+      cancelFlyerRegen(party.id);
 
       if (party.inviteCode) {
         await loadParty(party.inviteCode);

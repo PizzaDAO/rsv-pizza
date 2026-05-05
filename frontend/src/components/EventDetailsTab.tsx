@@ -14,9 +14,10 @@ import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, form
 import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
 import { DescriptionEditor } from './DescriptionEditor';
+import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
 
 export const EventDetailsTab: React.FC = () => {
-  const { party } = usePizza();
+  const { party, loadParty } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -451,6 +452,7 @@ export const EventDetailsTab: React.FC = () => {
     const success = await saveField('name', { name: name.trim() });
     if (success) {
       setOriginalValues((prev: any) => ({ ...prev, name: name.trim() }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
@@ -486,6 +488,7 @@ export const EventDetailsTab: React.FC = () => {
         endTime,
         timezone,
       }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
@@ -516,6 +519,7 @@ export const EventDetailsTab: React.FC = () => {
         address: newAddress.trim(),
         venueName: newVenueName,
       }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
