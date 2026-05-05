@@ -541,24 +541,34 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
     }
 
-    // Get link click stats per party — filtered to THIS partner's links only
+    // Get link click stats per party — filtered to the relevant partner's links
     const eventIds = events.map(e => e.id);
 
-    // Determine partner's name(s) for filtering link_label
-    // Sponsor records use: coHostName || sponsorUser.name || email
-    const sponsorUser = req.sponsorUser;
-    const partnerName = sponsorUser
-      ? (await prisma.sponsorUser.findUnique({
-          where: { id: sponsorUser.id },
-          select: { coHostName: true, name: true, email: true },
-        }))
-      : null;
-    const partnerDisplayName = partnerName?.coHostName || partnerName?.name || partnerName?.email || '';
+    // Determine which partner name(s) to filter clicks by:
+    // - Non-admin partner: filter to their own name
+    // - Admin viewing a specific tag: filter to ALL partner names for that tag
+    // - Admin with no tag filter: show all clicks (no filter)
+    let partnerNames: string[] = [];
 
-    // For sponsor clicks: link_label = partner name exactly
-    // For host_social clicks: link_label = "PartnerName_platform" (starts with name)
-    // If admin viewing without a specific partner, show all clicks (no filter)
-    const filterByPartner = !req.isAdminViewing && partnerDisplayName;
+    if (!req.isAdminViewing && req.sponsorUser) {
+      // Regular partner: filter to their own name
+      const partnerRecord = await prisma.sponsorUser.findUnique({
+        where: { id: req.sponsorUser.id },
+        select: { coHostName: true, name: true, email: true },
+      });
+      const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
+      if (displayName) partnerNames = [displayName];
+    } else if (req.isAdminViewing && tag) {
+      // Admin viewing a specific tag: filter to all partners with that tag
+      const tagPartners = await prisma.sponsorUser.findMany({
+        where: { tag, isActive: true },
+        select: { coHostName: true, name: true, email: true },
+      });
+      partnerNames = tagPartners
+        .map(p => p.coHostName || p.name || p.email)
+        .filter(Boolean) as string[];
+    }
+    // else: admin with no tag = show all clicks (partnerNames stays empty)
 
     const clicksByLink = eventIds.length > 0
       ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
@@ -572,7 +582,13 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         FROM link_clicks
         WHERE party_id::text IN (${Prisma.join(eventIds)})
         AND link_type IN ('sponsor', 'host_social')
-        ${filterByPartner ? Prisma.sql`AND (link_label = ${partnerDisplayName} OR link_label LIKE ${partnerDisplayName + '_%'})` : Prisma.empty}
+        ${partnerNames.length === 1
+          ? Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`
+          : partnerNames.length > 1
+          ? Prisma.sql`AND (link_label IN (${Prisma.join(partnerNames)}) OR ${Prisma.raw(
+              partnerNames.map(n => `link_label LIKE '${n.replace(/'/g, "''")}_%'`).join(' OR ')
+            )})`
+          : Prisma.empty}
         GROUP BY party_id, url, link_type
         ORDER BY total_clicks DESC
       `
