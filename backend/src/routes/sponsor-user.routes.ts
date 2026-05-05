@@ -541,28 +541,76 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
     }
 
-    // Get link click stats per party (sponsor + host_social clicks)
+    // Get link click stats per party — filtered to the relevant partner's links
     const eventIds = events.map(e => e.id);
-    const clickStats = await prisma.linkClick.groupBy({
-      by: ['partyId'],
-      where: {
-        partyId: { in: eventIds },
-        linkType: { in: ['sponsor', 'host_social'] },
-      },
-      _count: true,
-    });
-    const clickCountMap = new Map(clickStats.map(r => [r.partyId, r._count]));
 
-    const uniqueClickStats = eventIds.length > 0
-      ? await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
-        SELECT party_id::text, COUNT(DISTINCT visitor_hash) as unique_count
+    // Determine which partner name(s) to filter clicks by:
+    // - Non-admin partner: filter to their own name
+    // - Admin viewing a specific tag: filter to ALL partner names for that tag
+    // - Admin with no tag filter: show all clicks (no filter)
+    let partnerNames: string[] = [];
+
+    if (!req.isAdminViewing && req.sponsorUser) {
+      // Regular partner: filter to their own name
+      const partnerRecord = await prisma.sponsorUser.findUnique({
+        where: { id: req.sponsorUser.id },
+        select: { coHostName: true, name: true, email: true },
+      });
+      const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
+      if (displayName) partnerNames = [displayName];
+    } else if (req.isAdminViewing && tag) {
+      // Admin viewing a specific tag: filter to all partners with that tag
+      const tagPartners = await prisma.sponsorUser.findMany({
+        where: { tag, isActive: true },
+        select: { coHostName: true, name: true, email: true },
+      });
+      partnerNames = tagPartners
+        .map(p => p.coHostName || p.name || p.email)
+        .filter(Boolean) as string[];
+    }
+    // else: admin with no tag = show all clicks (partnerNames stays empty)
+
+    const clicksByLink = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
+        SELECT
+          party_id::text,
+          url,
+          link_type,
+          MAX(link_label) as link_label,
+          COUNT(*) as total_clicks,
+          COUNT(DISTINCT visitor_hash) as unique_clicks
         FROM link_clicks
         WHERE party_id::text IN (${Prisma.join(eventIds)})
         AND link_type IN ('sponsor', 'host_social')
-        GROUP BY party_id
+        ${partnerNames.length === 1
+          ? Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`
+          : partnerNames.length > 1
+          ? Prisma.sql`AND (link_label IN (${Prisma.join(partnerNames)}) OR ${Prisma.raw(
+              partnerNames.map(n => `link_label LIKE '${n.replace(/'/g, "''")}_%'`).join(' OR ')
+            )})`
+          : Prisma.empty}
+        GROUP BY party_id, url, link_type
+        ORDER BY total_clicks DESC
       `
       : [];
-    const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
+
+    // Build map: partyId -> [{ url, linkType, linkLabel, clicks, uniqueClickers }]
+    const byLinkMap = new Map<string, { url: string; linkType: string; linkLabel: string | null; clicks: number; uniqueClickers: number }[]>();
+    const clickCountMap = new Map<string, number>();
+    const uniqueClickMap = new Map<string, number>();
+    for (const row of clicksByLink) {
+      const list = byLinkMap.get(row.party_id) || [];
+      list.push({
+        url: row.url,
+        linkType: row.link_type,
+        linkLabel: row.link_label,
+        clicks: Number(row.total_clicks),
+        uniqueClickers: Number(row.unique_clicks),
+      });
+      byLinkMap.set(row.party_id, list);
+      clickCountMap.set(row.party_id, (clickCountMap.get(row.party_id) || 0) + Number(row.total_clicks));
+      uniqueClickMap.set(row.party_id, (uniqueClickMap.get(row.party_id) || 0) + Number(row.unique_clicks));
+    }
 
     // Get page view (impression) counts per party
     const viewStats = await prisma.pageView.groupBy({
@@ -679,6 +727,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         clickStats: {
           totalClicks: clickCountMap.get(event.id) || 0,
           uniqueClickers: uniqueClickMap.get(event.id) || 0,
+          byLink: byLinkMap.get(event.id) || [],
         },
         impressions: {
           totalViews: viewCountMap.get(event.id) || 0,

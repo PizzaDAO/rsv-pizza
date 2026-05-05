@@ -10,6 +10,7 @@ import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
+  Instagram, Youtube, Linkedin, Globe, Facebook,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
@@ -17,6 +18,57 @@ import { GPP_REGIONS } from '../types';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+// Detect platform from URL domain
+function detectPlatform(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace('www.', '');
+    if (host.includes('instagram.com')) return 'Instagram';
+    if (host.includes('twitter.com') || host.includes('x.com')) return 'X';
+    if (host.includes('youtube.com') || host.includes('youtu.be')) return 'YouTube';
+    if (host.includes('tiktok.com')) return 'TikTok';
+    if (host.includes('linkedin.com')) return 'LinkedIn';
+    if (host.includes('facebook.com') || host.includes('fb.com')) return 'Facebook';
+    if (host.includes('farcaster') || host.includes('warpcast.com')) return 'Farcaster';
+    return 'Website';
+  } catch {
+    return 'Website';
+  }
+}
+
+// X (Twitter) icon
+const XIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+// TikTok icon
+const TikTokIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+  </svg>
+);
+
+// Farcaster icon
+const FarcasterIcon: React.FC<{ size: number }> = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M5.315 3.401h13.37v17.198h-1.689V7.68H6.998v12.919H5.315V3.401zm3.371 7.674h6.628v1.414h-6.628v-1.414z" />
+  </svg>
+);
+
+function PlatformIcon({ platform, size = 12 }: { platform: string; size?: number }) {
+  switch (platform) {
+    case 'Instagram': return <Instagram size={size} />;
+    case 'X': return <XIcon size={size} />;
+    case 'YouTube': return <Youtube size={size} />;
+    case 'TikTok': return <TikTokIcon size={size} />;
+    case 'LinkedIn': return <Linkedin size={size} />;
+    case 'Facebook': return <Facebook size={size} />;
+    case 'Farcaster': return <FarcasterIcon size={size} />;
+    default: return <Globe size={size} />;
+  }
+}
 
 // ============================================
 // Progress filter constants & FilterPill
@@ -397,6 +449,16 @@ export function PartnerDashboardPage() {
           const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
           const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
           const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
+          // Aggregate click breakdown by platform across all events
+          const clicksByPlatformAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
+          for (const e of allEvents) {
+            for (const link of e.clickStats?.byLink || []) {
+              const platform = detectPlatform(link.url);
+              if (!clicksByPlatformAgg[platform]) clicksByPlatformAgg[platform] = { clicks: 0, uniqueClickers: 0 };
+              clicksByPlatformAgg[platform].clicks += link.clicks;
+              clicksByPlatformAgg[platform].uniqueClickers += link.uniqueClickers;
+            }
+          }
           const isSwc = dashboardData?.tag === 'swc';
           const withVenue = allEvents.filter(e => e.progress?.hasVenue).length;
           const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
@@ -435,6 +497,22 @@ export function PartnerDashboardPage() {
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
+                  {Object.keys(clicksByPlatformAgg).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(clicksByPlatformAgg)
+                        .sort((a, b) => b[1].clicks - a[1].clicks)
+                        .map(([platform, data]) => (
+                        <span
+                          key={platform}
+                          className="inline-flex items-center gap-1 text-xs text-theme-text-muted"
+                          title={`${platform}: ${data.clicks} clicks (${data.uniqueClickers} unique)`}
+                        >
+                          <PlatformIcon platform={platform} size={14} />
+                          <span className="font-semibold text-theme-text">{data.clicks}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {isSwc && (
                   <>
@@ -737,11 +815,34 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
               </div>
             )}
             {event.clickStats && event.clickStats.totalClicks > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted">
+              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted flex-wrap">
                 <MousePointerClick size={12} />
                 <span>{event.clickStats.totalClicks} clicks</span>
                 {event.clickStats.uniqueClickers > 0 && (
                   <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+                )}
+                {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
+                  <span className="flex items-center gap-1.5 flex-wrap">
+                    {(() => {
+                      const platformCounts: Record<string, number> = {};
+                      for (const link of event.clickStats.byLink!) {
+                        const p = detectPlatform(link.url);
+                        platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
+                      }
+                      return Object.entries(platformCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([platform, clicks]) => (
+                          <span
+                            key={platform}
+                            className="inline-flex items-center gap-0.5 text-theme-text-muted"
+                            title={`${platform}: ${clicks}`}
+                          >
+                            <PlatformIcon platform={platform} size={11} />
+                            <span className="font-semibold text-[10px]">{clicks}</span>
+                          </span>
+                        ));
+                    })()}
+                  </span>
                 )}
               </div>
             )}

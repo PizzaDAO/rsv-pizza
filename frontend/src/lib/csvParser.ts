@@ -92,6 +92,10 @@ export function parseCsv(text: string): ParsedCsvRow[] {
     nameIdx = firstCells.findIndex(isNameHeader);
     emailIdx = firstCells.findIndex(isEmailHeader);
     dataStart = 1;
+  } else if (firstCells.length === 1 && firstCells[0].includes('@')) {
+    // Single-column file with emails only — treat column 0 as email
+    emailIdx = 0;
+    nameIdx = -1; // no name column
   }
 
   const rows: ParsedCsvRow[] = [];

@@ -791,6 +791,8 @@ model Venue {
   capacity     Int?
   cost         Decimal?  @db.Decimal(10, 2)
   organization String?
+  latitude     Float?
+  longitude    Float?
 
   // Contact
   pointPerson   String?  @map("point_person")

@@ -160,6 +160,8 @@ export interface Venue {
   capacity: number | null;
   cost: number | null;
   organization: string | null;
+  latitude: number | null;
+  longitude: number | null;
   pointPerson: string | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -1218,6 +1220,13 @@ export interface SponsorDashboardEvent {
   clickStats?: {
     totalClicks: number;
     uniqueClickers: number;
+    byLink?: {
+      url: string;
+      linkType: string;
+      linkLabel: string | null;
+      clicks: number;
+      uniqueClickers: number;
+    }[];
   };
   impressions?: {
     totalViews: number;

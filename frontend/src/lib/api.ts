@@ -1159,6 +1159,8 @@ export interface VenueCreateData {
   notes?: string;
   pros?: string;
   cons?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface VenueUpdateData extends Partial<VenueCreateData> {}
