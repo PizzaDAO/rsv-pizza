@@ -54,6 +54,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hiddenGppPhotos: true,
         extraGppPhotos: true,
         telegramGroup: true,
+        turtleRolesEnabled: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -120,6 +121,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           hiddenGppPhotos: true,
           extraGppPhotos: true,
           telegramGroup: true,
+          turtleRolesEnabled: true,
           password: true,
           userId: true,
           user: {
@@ -270,6 +272,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hiddenGppPhotos: party.hiddenGppPhotos || [],
         extraGppPhotos: party.extraGppPhotos || [],
         telegramGroup: party.telegramGroup || null,
+        turtleRolesEnabled: party.turtleRolesEnabled || false,
         hasPassword: !!party.password,
         hostName: party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         hostProfile,

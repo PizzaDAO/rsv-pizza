@@ -547,6 +547,8 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Turtle role selection toggle
+  turtle_roles_enabled?: boolean;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -607,7 +609,8 @@ export const SAFE_PARTY_COLUMNS = `
   flyer_generated_at,
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
-  telegram_group
+  telegram_group,
+  turtle_roles_enabled
 `;
 
 /**
@@ -1523,6 +1526,7 @@ export async function updateParty(
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
     telegram_group?: string | null;
+    turtle_roles_enabled?: boolean;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1587,6 +1591,7 @@ export async function updateParty(
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
         telegramGroup: updates.telegram_group,
+        turtleRolesEnabled: updates.turtle_roles_enabled,
       });
       return true;
     } catch (error) {

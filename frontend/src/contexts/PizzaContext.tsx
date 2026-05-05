@@ -134,6 +134,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventbriteUrl: dbParty.eventbrite_url || null,
     externalLinks: dbParty.external_links || [],
     telegramGroup: dbParty.telegram_group || null,
+    turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
     guests,
   };
 }

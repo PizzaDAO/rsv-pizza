@@ -14,9 +14,10 @@ import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, form
 import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
 import { DescriptionEditor } from './DescriptionEditor';
+import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
 
 export const EventDetailsTab: React.FC = () => {
-  const { party } = usePizza();
+  const { party, loadParty } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -45,6 +46,7 @@ export const EventDetailsTab: React.FC = () => {
   const [nftEnabled, setNftEnabled] = useState(false);
   const [nftChain, setNftChain] = useState<string>('base');
   const [telegramGroup, setTelegramGroup] = useState('');
+  const [turtleRolesEnabled, setTurtleRolesEnabled] = useState(false);
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
@@ -129,6 +131,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyNftEnabled = party.nftEnabled || false;
       const partyNftChain = party.nftChain || 'base';
       const partyTelegramGroup = party.telegramGroup || '';
+      const partyTurtleRolesEnabled = party.turtleRolesEnabled || false;
 
       // Set form values
       setName(partyName);
@@ -154,6 +157,7 @@ export const EventDetailsTab: React.FC = () => {
       setNftEnabled(partyNftEnabled);
       setNftChain(partyNftChain);
       setTelegramGroup(partyTelegramGroup);
+      setTurtleRolesEnabled(partyTurtleRolesEnabled);
 
       // Store original values
       setOriginalValues({
@@ -448,6 +452,7 @@ export const EventDetailsTab: React.FC = () => {
     const success = await saveField('name', { name: name.trim() });
     if (success) {
       setOriginalValues((prev: any) => ({ ...prev, name: name.trim() }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
@@ -483,6 +488,7 @@ export const EventDetailsTab: React.FC = () => {
         endTime,
         timezone,
       }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
@@ -513,6 +519,7 @@ export const EventDetailsTab: React.FC = () => {
         address: newAddress.trim(),
         venueName: newVenueName,
       }));
+      if (party) triggerFlyerRegen(party, loadParty);
     }
   };
 
@@ -857,6 +864,16 @@ export const EventDetailsTab: React.FC = () => {
                   saveOptions({ telegram_group: telegramGroup.trim() || null });
                 }}
                 placeholder="Telegram group link (e.g. https://t.me/+abc123)"
+              />
+
+              <Checkbox
+                checked={turtleRolesEnabled}
+                onChange={() => {
+                  const newValue = !turtleRolesEnabled;
+                  setTurtleRolesEnabled(newValue);
+                  saveOptions({ turtle_roles_enabled: newValue });
+                }}
+                label="Ask RSVP Role (Turtle)"
               />
 
               {/* NFT Settings — hidden for GPP events (managed from /admin) */}

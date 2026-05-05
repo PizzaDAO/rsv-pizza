@@ -280,6 +280,7 @@ export interface Party {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   telegramGroup?: string | null;
+  turtleRolesEnabled?: boolean;
 }
 
 export interface Donation {

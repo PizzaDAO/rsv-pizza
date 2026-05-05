@@ -1,6 +1,6 @@
 import React from 'react';
-import { ThumbsUp, ThumbsDown, Loader2, ChevronLeft, X, Square, CheckSquare2, Star, MapPin, Plus } from 'lucide-react';
-import { DIETARY_OPTIONS, TOPPINGS, DRINKS } from '../constants/options';
+import { ThumbsUp, ThumbsDown, Loader2, ChevronLeft, X, Star, MapPin, Plus } from 'lucide-react';
+import { DIETARY_OPTIONS, DRINKS } from '../constants/options';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
@@ -42,102 +42,6 @@ export function RSVPFormStep2({
               {option}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Toppings */}
-      <div>
-        <label className="block text-sm font-medium text-theme-text mb-3">
-          Toppings
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {TOPPINGS.filter(t => form.availableToppings.length === 0 || form.availableToppings.includes(t.id)).map((topping) => {
-            const isLiked = form.likedToppings.includes(topping.id);
-            const isDisliked = form.dislikedToppings.includes(topping.id);
-            const isExcluded = form.excludedToppings.has(topping.id);
-
-            return (
-              <div
-                key={topping.id}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                  isExcluded
-                    ? 'opacity-40 cursor-not-allowed bg-theme-surface border-theme-stroke'
-                    : isLiked
-                      ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                      : isDisliked
-                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                        : 'bg-theme-surface border-theme-stroke'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => !isExcluded && form.handleToppingLike(topping.id)}
-                  disabled={isExcluded}
-                  className={`flex items-center gap-1.5 flex-1 py-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
-                >
-                  <ThumbsUp
-                    size={12}
-                    className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
-                  />
-                  <span className={`text-xs ${isExcluded ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{topping.name}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !isExcluded && form.handleToppingDislike(topping.id)}
-                  disabled={isExcluded}
-                  className={`p-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
-                >
-                  <ThumbsDown
-                    size={12}
-                    className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
-                  />
-                </button>
-              </div>
-            );
-          })}
-          {/* Custom toppings (host-added, stored as custom:Name) */}
-          {form.availableToppings
-            .filter(id => id.startsWith('custom:'))
-            .map(id => {
-              const name = id.slice('custom:'.length);
-              const isLiked = form.likedToppings.includes(id);
-              const isDisliked = form.dislikedToppings.includes(id);
-
-              return (
-                <div
-                  key={id}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                    isLiked
-                      ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-                      : isDisliked
-                        ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
-                        : 'bg-theme-surface border-theme-stroke'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => form.handleToppingLike(id)}
-                    className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
-                  >
-                    <ThumbsUp
-                      size={12}
-                      className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
-                    />
-                    <span className="text-xs text-theme-text">{name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => form.handleToppingDislike(id)}
-                    className="p-0.5 hover:opacity-70 transition-opacity"
-                  >
-                    <ThumbsDown
-                      size={12}
-                      className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
-                    />
-                  </button>
-                </div>
-              );
-            })}
         </div>
       </div>
 
@@ -337,25 +241,6 @@ export function RSVPFormStep2({
 
       {/* Donation slot */}
       {donationSlot}
-
-      {/* Save to Profile Checkbox */}
-      {form.email.trim() && (
-        <button
-          type="button"
-          onClick={() => form.setSaveToProfile(!form.saveToProfile)}
-          className="flex items-center gap-3 w-full p-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors"
-        >
-          {form.saveToProfile ? (
-            <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-          ) : (
-            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-          )}
-          <div className="text-left">
-            <span className="text-sm font-medium text-theme-text">Save to profile</span>
-            <p className="text-xs text-theme-text-muted">Remember my preferences for future events</p>
-          </div>
-        </button>
-      )}
 
       {/* Navigation buttons */}
       <div className="flex gap-3">

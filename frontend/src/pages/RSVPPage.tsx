@@ -354,6 +354,7 @@ export function RSVPPage() {
             form={form}
             eventName={party?.name || ''}
             showWallet={!!(party?.nft_enabled || party?.event_type === 'gpp')}
+            showTurtleRoles={!!party?.turtle_roles_enabled}
           />
         </div>
       </div>
