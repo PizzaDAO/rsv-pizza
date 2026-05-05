@@ -8,9 +8,10 @@ import type { PartnerFormData } from '../sponsors/PartnerForm';
 
 interface PartnerManagerProps {
   onSyncComplete?: () => void;
+  onFlyerRegenNeeded?: (tag: string) => void;
 }
 
-export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
+export function PartnerManager({ onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
   const [partners, setPartners] = useState<SponsorUser[]>([]);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -104,6 +105,8 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
 
       if (newSyncMessage) {
         setSyncMessage(newSyncMessage);
+        // Trigger flyer regen for events with this partner's tag
+        onFlyerRegenNeeded?.(data.tag);
       }
 
       await loadPartners();
