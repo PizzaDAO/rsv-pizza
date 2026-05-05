@@ -17,6 +17,7 @@ export interface Guest {
   name: string;
   email?: string;
   ethereumAddress?: string;
+  walletSource?: 'manual' | 'connectkit' | 'privy-embedded' | null;
   roles?: string[];
   mailingListOptIn?: boolean;
   dietaryRestrictions: string[];

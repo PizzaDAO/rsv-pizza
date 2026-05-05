@@ -23,7 +23,12 @@ export const GuestBasicCard: React.FC<GuestBasicCardProps> = ({ guest }) => {
           )}
 
           {guest.ethereumAddress && (
-            <p className="text-xs text-theme-text-muted truncate font-mono">{guest.ethereumAddress}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-theme-text-muted truncate font-mono">{guest.ethereumAddress}</p>
+              {guest.walletSource === 'privy-embedded' && (
+                <span className="shrink-0 px-1 py-0.5 bg-blue-500/20 text-blue-300 text-[9px] rounded font-medium">Auto</span>
+              )}
+            </div>
           )}
 
           {guest.roles && guest.roles.length > 0 && (

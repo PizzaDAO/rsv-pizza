@@ -242,6 +242,10 @@ model Guest {
   waitlistPosition  Int?     @map("waitlist_position")
   promotedAt        DateTime? @map("promoted_at") @db.Timestamptz
 
+  // Privy embedded wallet fields
+  privyUserId       String?   @map("privy_user_id") @db.VarChar
+  walletSource      String?   @map("wallet_source") @db.VarChar
+
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy String?   @map("checked_in_by")
