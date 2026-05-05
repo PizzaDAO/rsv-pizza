@@ -400,7 +400,7 @@ export function FlyerGenerator() {
   const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
 
   // Compute sponsor logo sizing to fit within bounding box
-  const sponsorCount = Math.min(sponsors.length, 8);
+  const sponsorCount = sponsors.length;
   const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
   const sponsorRows = sponsorCount <= 4 ? 1 : 2;
   const maxLogoWidth = sponsorCols > 0 ? (sponsorBoxSize.width - (sponsorCols - 1) * 16) / sponsorCols : 0;
@@ -464,8 +464,8 @@ export function FlyerGenerator() {
       const boxH = sponsorBoxSize.height;
 
       // Separate group logos from popped-out logos
-      const groupSponsors = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
-      const poppedSponsors = sponsors.slice(0, 8).filter(s => poppedLogos[s.id]);
+      const groupSponsors = sponsors.filter(s => !poppedLogos[s.id]);
+      const poppedSponsors = sponsors.filter(s => poppedLogos[s.id]);
 
       // Draw group logos in flex layout
       if (groupSponsors.length > 0) {
@@ -877,7 +877,7 @@ export function FlyerGenerator() {
         {/* Sponsor logos - left-aligned in bounding box (skip popped-out logos) */}
         {sponsors.length > 0 && (() => {
           const dragProps = getDragProps('sponsors');
-          const groupLogos = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
+          const groupLogos = sponsors.filter(s => !poppedLogos[s.id]);
           return groupLogos.length > 0 ? (
             <div
               onMouseDown={dragProps.onMouseDown}
@@ -1273,7 +1273,7 @@ export function FlyerGenerator() {
         })()}
 
         {/* Popped-out logos — freely positioned anywhere on the canvas */}
-        {sponsors.slice(0, 8).filter(s => poppedLogos[s.id]).map(s => {
+        {sponsors.filter(s => poppedLogos[s.id]).map(s => {
           const pos = poppedLogos[s.id];
           const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
           const isDragging = draggingLogo === s.id;

@@ -157,7 +157,7 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
     const boxH = DEFAULT_SPONSOR_BOX.height;
 
     // Compute auto logo size
-    const sponsorCount = Math.min(sponsors.length, 8);
+    const sponsorCount = sponsors.length;
     const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
     const sponsorRows = sponsorCount <= 4 ? 1 : 2;
     const maxLogoWidth = sponsorCols > 0 ? (boxW - (sponsorCols - 1) * 16) / sponsorCols : 0;
@@ -166,7 +166,7 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
 
     type LogoItem = { img: HTMLImageElement; w: number; h: number };
     const items: LogoItem[] = [];
-    for (const s of sponsors.slice(0, 8)) {
+    for (const s of sponsors) {
       try {
         const logoImg = await loadImg(s.logoUrl);
         const maxW = autoLogoSize * 2.5;
