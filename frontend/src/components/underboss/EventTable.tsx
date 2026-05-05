@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
 import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
+import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
 
 interface EventTableProps {
   events: UnderbossEvent[];
@@ -219,6 +220,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     [events]
   );
 
+  const sponsorshipSuggestion = useMemo(() => {
+    if (tagFilter === 'all' || filteredEvents.length === 0) return null;
+    return calculateTagSponsorshipTotal(filteredEvents);
+  }, [tagFilter, filteredEvents]);
+
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
       setSelectedIds(new Set());
@@ -336,6 +342,18 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           </button>
         )}
       </div>
+
+      {/* Sponsorship pricing suggestion banner */}
+      {sponsorshipSuggestion && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+          <DollarSign size={14} className="text-green-400" />
+          <span className="text-sm text-green-400">
+            Suggested sponsorship for "<span className="font-medium">{tagFilter}</span>"
+            ({sponsorshipSuggestion.eventCount} events):
+            <span className="font-bold ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+          </span>
+        </div>
+      )}
 
       {/* Bulk action bar — always visible */}
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
