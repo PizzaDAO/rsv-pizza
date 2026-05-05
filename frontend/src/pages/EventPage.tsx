@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
+import posthog from 'posthog-js';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
 import { IconInput } from '../components/IconInput';
@@ -114,6 +115,13 @@ export function EventPage() {
         const foundEvent = result;
         if (foundEvent) {
           setEvent(foundEvent);
+
+          // Track event page view for funnel analysis
+          posthog.capture('event_page_viewed', {
+            eventName: foundEvent.name,
+            inviteCode: foundEvent.inviteCode,
+          });
+
           setCanEditAsCoHost(false);
 
           // Check if logged-in user has already RSVP'd and fetch their data
