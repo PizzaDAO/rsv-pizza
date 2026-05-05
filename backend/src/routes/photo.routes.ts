@@ -244,6 +244,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       caption,
       tags,
       photoYear,
+      duration,
     } = req.body;
 
     // Validate required fields
@@ -265,15 +266,34 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Photos are not enabled for this party', 403, 'PHOTOS_DISABLED');
     }
 
-    // Validate MIME type
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    // Validate MIME type (images + videos)
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    const allowedMimeTypes = [...allowedImageTypes, ...allowedVideoTypes];
     if (!allowedMimeTypes.includes(mimeType)) {
-      throw new AppError('Invalid file type. Allowed: jpeg, png, webp, gif', 400, 'INVALID_FILE_TYPE');
+      throw new AppError('Invalid file type. Allowed: jpeg, png, webp, gif, mp4, webm, mov', 400, 'INVALID_FILE_TYPE');
     }
 
-    // Validate file size (10MB max)
-    if (fileSize > 10 * 1024 * 1024) {
-      throw new AppError('File too large. Maximum size is 10MB', 400, 'FILE_TOO_LARGE');
+    const isVideo = allowedVideoTypes.includes(mimeType);
+
+    // Validate file size: 10MB for images, 50MB for videos
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (fileSize > maxSize) {
+      throw new AppError(
+        isVideo ? 'File too large. Maximum video size is 50MB' : 'File too large. Maximum size is 10MB',
+        400,
+        'FILE_TOO_LARGE'
+      );
+    }
+
+    // Validate video duration (5 minutes max)
+    if (isVideo && duration !== undefined && duration !== null) {
+      if (typeof duration !== 'number' || duration <= 0) {
+        throw new AppError('Invalid duration', 400, 'VALIDATION_ERROR');
+      }
+      if (duration > 300) {
+        throw new AppError('Video too long. Maximum duration is 5 minutes', 400, 'VIDEO_TOO_LONG');
+      }
     }
 
     // If guestId provided, verify it belongs to this party
@@ -296,7 +316,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
-    // All photos require approval
+    // All photos/videos require approval
     const initialStatus = 'pending';
 
     const photo = await prisma.photo.create({
@@ -315,6 +335,7 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
         caption: caption || null,
         tags: tags || [],
         photoYear: photoYear ? parseInt(photoYear, 10) : null,
+        duration: isVideo && duration ? duration : null,
         status: initialStatus,
       },
       include: {

@@ -418,6 +418,7 @@ export interface Photo {
   status: 'approved' | 'pending' | 'rejected';
   reviewedAt: string | null;
   reviewedBy: string | null;
+  duration: number | null; // Video duration in seconds (null for images)
   createdAt: string;
   updatedAt: string;
   guest?: {
