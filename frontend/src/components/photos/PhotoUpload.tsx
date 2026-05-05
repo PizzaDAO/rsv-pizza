@@ -81,7 +81,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
       // Client-side size validation
       if (isImage && file.size > 10 * 1024 * 1024) continue;
-      if (isVideo && file.size > 100 * 1024 * 1024) continue;
+      if (isVideo && file.size > 50 * 1024 * 1024) continue;
 
       // Client-side duration validation for videos
       if (isVideo) {
@@ -276,7 +276,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <Upload className="w-10 h-10 text-theme-text-muted mx-auto mb-3" />
         <p className="text-theme-text-secondary mb-1">Drag and drop photos or videos here</p>
         <p className="text-theme-text-muted text-sm">or click to select files</p>
-        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo, 100MB per video (5 min). JPEG, PNG, WebP, GIF, MP4, WebM, MOV</p>
+        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo, 50MB per video (5 min). JPEG, PNG, WebP, GIF, MP4, WebM, MOV</p>
       </div>
 
       {/* Caption Input */}

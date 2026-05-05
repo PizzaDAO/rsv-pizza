@@ -276,11 +276,11 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
 
     const isVideo = allowedVideoTypes.includes(mimeType);
 
-    // Validate file size: 10MB for images, 100MB for videos
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Validate file size: 10MB for images, 50MB for videos
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
     if (fileSize > maxSize) {
       throw new AppError(
-        isVideo ? 'File too large. Maximum video size is 100MB' : 'File too large. Maximum size is 10MB',
+        isVideo ? 'File too large. Maximum video size is 50MB' : 'File too large. Maximum size is 10MB',
         400,
         'FILE_TOO_LARGE'
       );

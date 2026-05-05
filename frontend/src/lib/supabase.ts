@@ -474,8 +474,8 @@ export async function uploadEventVideo(
       return null;
     }
 
-    // Validate file size (100MB max for videos)
-    if (file.size > 100 * 1024 * 1024) {
+    // Validate file size (50MB max for videos)
+    if (file.size > 50 * 1024 * 1024) {
       console.error('Video file too large:', file.size);
       return null;
     }
