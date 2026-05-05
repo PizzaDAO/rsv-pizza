@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, Loader2, Image as ImageIcon, Check, Tag } from 'lucide-react';
-import { uploadEventPhoto } from '../../lib/supabase';
+import { Upload, X, Loader2, Image as ImageIcon, Check, Tag, Play } from 'lucide-react';
+import { uploadEventPhoto, uploadEventVideo } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi, PhotoUploadData } from '../../lib/api';
 import { Photo } from '../../types';
 
@@ -18,11 +18,16 @@ interface PhotoUploadProps {
 interface UploadingFile {
   file: File;
   preview: string;
+  isVideo: boolean;
   progress: number;
   status: 'pending' | 'uploading' | 'complete' | 'error';
   error?: string;
   photo?: Photo;
 }
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const MAX_VIDEO_DURATION = 300; // 5 minutes in seconds
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   partyId,
@@ -44,17 +49,73 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
 
-  const handleFiles = useCallback((selectedFiles: FileList | File[]) => {
-    const newFiles: UploadingFile[] = Array.from(selectedFiles)
-      .filter(file => file.type.startsWith('image/'))
-      .map(file => ({
+  // Client-side duration check for videos before adding to queue
+  const checkVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      const objectUrl = URL.createObjectURL(file);
+
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(video.duration);
+      };
+
+      video.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Failed to read video'));
+      };
+
+      video.src = objectUrl;
+    });
+  };
+
+  const handleFiles = useCallback(async (selectedFiles: FileList | File[]) => {
+    const validFiles: UploadingFile[] = [];
+
+    for (const file of Array.from(selectedFiles)) {
+      const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+      const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
+      if (!isImage && !isVideo) continue;
+
+      // Client-side size validation
+      if (isImage && file.size > 10 * 1024 * 1024) continue;
+      if (isVideo && file.size > 100 * 1024 * 1024) continue;
+
+      // Client-side duration validation for videos
+      if (isVideo) {
+        try {
+          const duration = await checkVideoDuration(file);
+          if (duration > MAX_VIDEO_DURATION) {
+            // Skip videos longer than 5 minutes - add as error
+            validFiles.push({
+              file,
+              preview: URL.createObjectURL(file),
+              isVideo: true,
+              progress: 0,
+              status: 'error',
+              error: 'Video exceeds 5-minute limit',
+            });
+            continue;
+          }
+        } catch {
+          // Allow upload anyway - server will validate
+        }
+      }
+
+      validFiles.push({
         file,
         preview: URL.createObjectURL(file),
+        isVideo,
         progress: 0,
-        status: 'pending' as const,
-      }));
+        status: 'pending',
+      });
+    }
 
-    setFiles(prev => [...prev, ...newFiles]);
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles]);
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -89,6 +150,9 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       const fileIndex = files.findIndex(f => f.file === pendingFiles[i].file);
       if (fileIndex === -1) continue;
 
+      const currentFile = pendingFiles[i];
+      const isVideo = currentFile.isVideo;
+
       // Update status to uploading
       setFiles(prev => {
         const newFiles = [...prev];
@@ -97,11 +161,16 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       });
 
       try {
-        // Upload to Supabase Storage
-        const uploadResult = await uploadEventPhoto(pendingFiles[i].file, partyId);
+        // Upload to Supabase Storage - branch by file type
+        let uploadResult;
+        if (isVideo) {
+          uploadResult = await uploadEventVideo(currentFile.file, partyId);
+        } else {
+          uploadResult = await uploadEventPhoto(currentFile.file, partyId);
+        }
 
         if (!uploadResult) {
-          throw new Error('Failed to upload to storage');
+          throw new Error(isVideo ? 'Failed to upload video to storage' : 'Failed to upload to storage');
         }
 
         setFiles(prev => {
@@ -124,6 +193,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           caption: caption || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
           photoYear: photoYear || undefined,
+          duration: isVideo && 'duration' in uploadResult ? uploadResult.duration : undefined,
         };
 
         const result = await uploadPhotoApi(partyId, photoData);
@@ -163,11 +233,16 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
   const completeCount = files.filter(f => f.status === 'complete').length;
 
+  // Count media types for label text
+  const hasVideos = files.some(f => f.isVideo);
+  const hasImages = files.some(f => !f.isVideo);
+  const mediaLabel = hasVideos && hasImages ? 'files' : hasVideos ? 'videos' : 'photos';
+
   return (
     <div className="bg-theme-header border border-theme-stroke rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-theme-text">Upload Photos</h2>
+        <h2 className="text-lg font-semibold text-theme-text">Upload Photos & Videos</h2>
         {onClose && (
           <button
             onClick={onClose}
@@ -193,15 +268,15 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
           multiple
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
           className="hidden"
         />
         <Upload className="w-10 h-10 text-theme-text-muted mx-auto mb-3" />
-        <p className="text-theme-text-secondary mb-1">Drag and drop photos here</p>
+        <p className="text-theme-text-secondary mb-1">Drag and drop photos or videos here</p>
         <p className="text-theme-text-muted text-sm">or click to select files</p>
-        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo. JPEG, PNG, WebP, GIF</p>
+        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo, 100MB per video (5 min). JPEG, PNG, WebP, GIF, MP4, WebM, MOV</p>
       </div>
 
       {/* Caption Input */}
@@ -240,7 +315,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <div className="mt-3">
           <p className="text-theme-text-muted text-xs mb-2 flex items-center gap-1">
             <Tag size={12} />
-            Tag your photos
+            Tag your uploads
           </p>
           <div className="flex flex-wrap gap-2">
             {availableTags.map((tag) => {
@@ -276,11 +351,30 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
               key={index}
               className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface"
             >
-              <img
-                src={file.preview}
-                alt={`Preview ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {file.isVideo ? (
+                <div className="relative w-full h-full">
+                  <video
+                    src={file.preview}
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                    muted
+                  />
+                  {/* Play icon overlay for video previews */}
+                  {file.status === 'pending' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/50 rounded-full p-3">
+                        <Play size={24} className="text-white fill-white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <img
+                  src={file.preview}
+                  alt={`Preview ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
 
               {/* Status Overlay */}
               {file.status === 'uploading' && (
@@ -303,8 +397,8 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
                 </div>
               )}
 
-              {/* Remove Button (only for pending files) */}
-              {file.status === 'pending' && (
+              {/* Remove Button (only for pending or error files) */}
+              {(file.status === 'pending' || file.status === 'error') && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -330,12 +424,12 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           {uploadingCount > 0 ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              Uploading {uploadingCount} photo{uploadingCount !== 1 ? 's' : ''}...
+              Uploading...
             </>
           ) : (
             <>
               <Upload size={18} />
-              Upload {pendingCount} photo{pendingCount !== 1 ? 's' : ''}
+              Upload {pendingCount} {pendingCount !== 1 ? mediaLabel : mediaLabel.replace(/s$/, '')}
             </>
           )}
         </button>
@@ -346,11 +440,11 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <div className="mt-4 text-center">
           <p className="text-green-400 flex items-center justify-center gap-2">
             <Check size={18} />
-            {completeCount} photo{completeCount !== 1 ? 's' : ''} uploaded successfully
+            {completeCount} {completeCount !== 1 ? 'files' : 'file'} uploaded successfully
           </p>
           {photoModeration && (
             <p className="text-amber-400/80 text-sm mt-2">
-              Photos will appear after the host approves them.
+              Uploads will appear after the host approves them.
             </p>
           )}
         </div>
@@ -359,7 +453,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       {/* Moderation Notice */}
       {photoModeration && files.length === 0 && (
         <p className="mt-3 text-amber-400/70 text-xs text-center">
-          Photos are reviewed by the host before appearing in the gallery.
+          Uploads are reviewed by the host before appearing in the gallery.
         </p>
       )}
     </div>

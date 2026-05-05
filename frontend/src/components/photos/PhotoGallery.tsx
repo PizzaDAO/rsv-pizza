@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag } from 'lucide-react';
+import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag, Video } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
 import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
 import { PhotoCard } from './PhotoCard';
@@ -17,6 +17,7 @@ interface PhotoGalleryProps {
 }
 
 type FilterOption = 'all' | 'starred' | 'pending';
+type MediaTab = 'photos' | 'videos';
 
 export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   partyId,
@@ -33,11 +34,18 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [filter, setFilter] = useState<FilterOption>('all');
+  const [mediaTab, setMediaTab] = useState<MediaTab>('photos');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
+
+  // Split photos into images and videos for tab filtering
+  const imagePhotos = useMemo(() => photos.filter(p => !p.mimeType?.startsWith('video/')), [photos]);
+  const videoPhotos = useMemo(() => photos.filter(p => p.mimeType?.startsWith('video/')), [photos]);
+  const displayedPhotos = mediaTab === 'videos' ? videoPhotos : imagePhotos;
+  const videoCount = videoPhotos.length;
 
   const loadPhotos = useCallback(async (reset = false) => {
     if (reset) {
@@ -257,7 +265,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
             <Camera size={20} className="text-[#ff393a]" />
-            Photos
+            Gallery
             {stats && stats.totalPhotos > 0 && (
               <span className="text-theme-text-muted font-normal text-sm">
                 ({stats.totalPhotos})
@@ -324,6 +332,34 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Photos / Videos Tab Toggle */}
+      {photos.length > 0 && (
+        <div className="flex items-center bg-theme-surface rounded-lg p-1 w-fit">
+          <button
+            onClick={() => setMediaTab('photos')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              mediaTab === 'photos'
+                ? 'bg-[#ff393a] text-white'
+                : 'text-theme-text-secondary hover:text-theme-text'
+            }`}
+          >
+            <Camera size={14} />
+            Photos ({imagePhotos.length})
+          </button>
+          <button
+            onClick={() => setMediaTab('videos')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              mediaTab === 'videos'
+                ? 'bg-[#ff393a] text-white'
+                : 'text-theme-text-secondary hover:text-theme-text'
+            }`}
+          >
+            <Video size={14} />
+            Videos ({videoCount})
+          </button>
+        </div>
+      )}
 
       {/* Approve All Banner (for pending filter) */}
       {isHost && filter === 'pending' && photos.length > 0 && (
@@ -403,12 +439,22 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         document.body
       )}
 
-      {/* Photo Grid */}
-      {photos.length === 0 ? (
+      {/* Photo/Video Grid */}
+      {displayedPhotos.length === 0 ? (
         <div className="text-center py-12 bg-theme-surface rounded-xl">
-          <Camera className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+          {mediaTab === 'videos' ? (
+            <Video className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+          ) : (
+            <Camera className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
+          )}
           <p className="text-theme-text-secondary mb-4">
-            {filter === 'starred' ? 'No starred photos yet' : filter === 'pending' ? 'No pending photos' : 'No photos yet'}
+            {filter === 'starred'
+              ? 'No starred items yet'
+              : filter === 'pending'
+              ? 'No pending items'
+              : mediaTab === 'videos'
+              ? 'No videos yet'
+              : 'No photos yet'}
           </p>
           {filter === 'all' && (
             <button
@@ -416,14 +462,14 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               className="inline-flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <Upload size={16} />
-              Upload First Photo
+              {mediaTab === 'videos' ? 'Upload First Video' : 'Upload First Photo'}
             </button>
           )}
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {photos.map((photo) => (
+            {displayedPhotos.map((photo) => (
               <PhotoCard
                 key={photo.id}
                 photo={photo}
@@ -451,7 +497,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                     Loading...
                   </>
                 ) : (
-                  'Load More Photos'
+                  'Load More'
                 )}
               </button>
             </div>
@@ -459,11 +505,11 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         </>
       )}
 
-      {/* Photo Modal */}
+      {/* Photo/Video Modal */}
       {selectedPhoto && (
         <PhotoModal
           photo={selectedPhoto}
-          photos={photos}
+          photos={displayedPhotos}
           isHost={isHost}
           availableTags={availableTags}
           onClose={() => setSelectedPhoto(null)}

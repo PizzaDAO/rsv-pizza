@@ -137,6 +137,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   };
 
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
+  const isVideo = photo.mimeType?.startsWith('video/');
 
   return createPortal(
     <div
@@ -181,13 +182,23 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
         className="flex flex-col md:flex-row max-w-6xl w-full max-h-[90vh] mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Photo */}
+        {/* Photo/Video */}
         <div className="flex-1 flex items-center justify-center min-h-0">
-          <img
-            src={photo.url}
-            alt={photo.caption || 'Event photo'}
-            className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
-          />
+          {isVideo ? (
+            <video
+              key={photo.id}
+              src={photo.url}
+              controls
+              autoPlay
+              className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
+            />
+          ) : (
+            <img
+              src={photo.url}
+              alt={photo.caption || 'Event photo'}
+              className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
+            />
+          )}
         </div>
 
         {/* Info Panel */}
@@ -485,7 +496,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                   }`}
                 >
                   <Star size={18} className={photo.starred ? 'fill-current' : ''} />
-                  {photo.starred ? 'Starred' : 'Star Photo'}
+                  {photo.starred ? 'Starred' : isVideo ? 'Star Video' : 'Star Photo'}
                 </button>
 
                 <button
@@ -493,7 +504,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                   className="w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
                 >
                   <Trash2 size={18} />
-                  Delete Photo
+                  {isVideo ? 'Delete Video' : 'Delete Photo'}
                 </button>
               </>
             )}
@@ -513,9 +524,9 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             className="bg-theme-header border border-theme-stroke rounded-2xl p-6 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-theme-text mb-3">Delete Photo?</h3>
+            <h3 className="text-lg font-semibold text-theme-text mb-3">{isVideo ? 'Delete Video?' : 'Delete Photo?'}</h3>
             <p className="text-theme-text-secondary mb-6">
-              This action cannot be undone. The photo will be permanently removed.
+              This action cannot be undone. The {isVideo ? 'video' : 'photo'} will be permanently removed.
             </p>
             <div className="flex gap-3">
               <button

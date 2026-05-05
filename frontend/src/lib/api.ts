@@ -557,6 +557,7 @@ export interface PhotoUploadData {
   caption?: string;
   tags?: string[];
   photoYear?: number;
+  duration?: number; // Video duration in seconds
 }
 
 export interface PhotosListResponse {

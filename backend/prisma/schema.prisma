@@ -530,6 +530,9 @@ model Photo {
   reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
   reviewedBy String?   @map("reviewed_by")
 
+  // Video metadata
+  duration  Float?    // Video duration in seconds (null for images)
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz

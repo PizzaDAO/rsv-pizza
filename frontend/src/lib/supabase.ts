@@ -449,6 +449,124 @@ export async function uploadVenuePhoto(
 }
 
 /**
+ * Upload a video to Supabase Storage (event-videos bucket) and return public URL + metadata
+ * @param file The video file to upload
+ * @param partyId The party ID for organizing uploads
+ * @returns Object with URL, metadata, and duration, or null if upload failed
+ */
+export async function uploadEventVideo(
+  file: File,
+  partyId: string
+): Promise<{
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+} | null> {
+  try {
+    // Validate video MIME types
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!allowedVideoTypes.includes(file.type)) {
+      console.error('Invalid video file type:', file.type);
+      return null;
+    }
+
+    // Validate file size (100MB max for videos)
+    if (file.size > 100 * 1024 * 1024) {
+      console.error('Video file too large:', file.size);
+      return null;
+    }
+
+    // Get video duration and dimensions
+    let duration: number | undefined;
+    let width: number | undefined;
+    let height: number | undefined;
+
+    try {
+      const metadata = await getVideoMetadata(file);
+      duration = metadata.duration;
+      width = metadata.width;
+      height = metadata.height;
+    } catch (e) {
+      console.warn('Could not get video metadata:', e);
+    }
+
+    // Validate duration (5 minutes max)
+    if (duration && duration > 300) {
+      console.error('Video too long:', duration, 'seconds');
+      return null;
+    }
+
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop() || 'mp4';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const fileName = `${partyId}/${timestamp}-${random}.${fileExt}`;
+
+    // Upload to Supabase Storage (event-videos bucket)
+    const { error } = await supabase.storage
+      .from('event-videos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading video:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-videos')
+      .getPublicUrl(fileName);
+
+    return {
+      url: urlData.publicUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      width,
+      height,
+      duration,
+    };
+  } catch (error) {
+    console.error('Error uploading video:', error);
+    return null;
+  }
+}
+
+/**
+ * Get video metadata (duration, width, height) from a File object using HTML5 Video element
+ */
+function getVideoMetadata(file: File): Promise<{ duration: number; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const objectUrl = URL.createObjectURL(file);
+
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load video metadata'));
+    };
+
+    video.src = objectUrl;
+  });
+}
+
+/**
  * Get image dimensions from a File object
  */
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
