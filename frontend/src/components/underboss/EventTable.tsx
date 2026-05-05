@@ -5,6 +5,7 @@ import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
 import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
+import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
 
@@ -462,6 +463,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                     }
                                   }
                                 }
+                                // Trigger flyer regen for affected events
+                                const affected = events.filter(e => selectedIds.has(e.id));
+                                triggerFlyerRegenForEvents(affected);
                                 onBulkAction?.();
                               } catch (err) { console.error('Add tag failed', err); }
                               setBulkLoading(false);
@@ -494,6 +498,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                       }
                                     }
                                   }
+                                  // Trigger flyer regen for affected events
+                                  const affected = events.filter(e2 => selectedIds.has(e2.id));
+                                  triggerFlyerRegenForEvents(affected);
                                   onBulkAction?.();
                                 } catch (err) { console.error('Add custom tag failed', err); }
                                 setBulkLoading(false);
@@ -541,6 +548,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                       onEventUpdate?.(id, { eventTags: (evt.eventTags || []).filter(t => t !== tag) });
                                     }
                                   }
+                                  // Trigger flyer regen for affected events (partner logo may have been removed)
+                                  const affected = events.filter(e => selectedIds.has(e.id));
+                                  triggerFlyerRegenForEvents(affected);
                                   onBulkAction?.();
                                 } catch (err) { console.error('Remove tag failed', err); }
                                 setBulkLoading(false);

@@ -2,8 +2,9 @@
  * Auto-regenerate GPP event flyers when partner status or event details change.
  *
  * Exports:
- *   triggerFlyerRegen(party, loadParty?)  — debounced entry point (3 s per party)
- *   cancelFlyerRegen(partyId)             — cancel a pending regen
+ *   triggerFlyerRegen(party, loadParty?)        — debounced entry point (3 s per party)
+ *   triggerFlyerRegenForEvents(events)           — batch entry point for underboss context
+ *   cancelFlyerRegen(partyId)                    — cancel a pending regen
  */
 
 import { renderFlyer, uses12Hour, formatFlyerTime } from './renderFlyer';
@@ -11,6 +12,23 @@ import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../../lib/supabase';
 import { getSponsors } from '../../lib/api';
 import type { Party } from '../../types';
+
+/**
+ * Minimal data needed for flyer regeneration.
+ * Both `Party` (host dashboard) and `UnderbossEvent` data satisfy this shape.
+ */
+export interface FlyerRegenData {
+  id: string;
+  name: string;
+  venueName: string | null;
+  address: string | null;
+  date: string | null;
+  timezone: string | null;
+  duration: number | null;
+  customUrl: string | null;
+  inviteCode?: string | null;
+  eventType?: string | null;
+}
 
 // ---- Debounce map (partyId → timer handle) ----
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -63,8 +81,6 @@ export function triggerFlyerRegen(
   pendingTimers.set(party.id, timer);
 }
 
-// ---- Internal helpers ----
-
 /** Extract city name from the party name (strip "Global Pizza Party" prefix). */
 function parseCityFromName(name: string): string {
   return name.replace(/^Global Pizza Party\s*/i, '').trim() || name;
@@ -89,45 +105,90 @@ async function ensureFonts(): Promise<void> {
   }
 }
 
+/**
+ * Trigger flyer regen from underboss context where we have UnderbossEvent data
+ * instead of a full Party object. Accepts multiple events for batch operations.
+ * Regens sequentially with a small delay between each to avoid overwhelming the browser.
+ */
+export function triggerFlyerRegenForEvents(
+  events: FlyerRegenData[],
+): void {
+  // Filter out events with custom flyer positions (host-customized layouts)
+  const eligible = events.filter((e) => {
+    try {
+      if (localStorage.getItem(`flyer-${e.id}`)) return false;
+    } catch {
+      // localStorage unavailable — include the event
+    }
+    return true;
+  });
+
+  if (eligible.length === 0) return;
+
+  // Process sequentially with ~500ms delay between each
+  let idx = 0;
+  function processNext() {
+    if (idx >= eligible.length) return;
+    const event = eligible[idx];
+    idx++;
+
+    // Cancel any existing pending regen for this event
+    cancelFlyerRegen(event.id);
+
+    doRegen(event).catch((err) => {
+      console.error(`[autoRegenFlyer] batch regen failed for ${event.id}:`, err);
+    }).finally(() => {
+      if (idx < eligible.length) {
+        setTimeout(processNext, 500);
+      }
+    });
+  }
+
+  // Kick off after a short initial delay (like the debounce for single events)
+  setTimeout(processNext, 1000);
+}
+
+// ---- Internal helpers ----
+
 /** The actual render → upload → update pipeline. */
 async function doRegen(
-  party: Party,
+  data: FlyerRegenData,
   loadParty?: (inviteCode: string) => Promise<boolean>,
 ): Promise<void> {
   // 1. Load fonts
   await ensureFonts();
 
   // 2. Fetch sponsors with logo + yes/paid status
-  const sponsorResult = await getSponsors(party.id);
+  const sponsorResult = await getSponsors(data.id);
   const sponsors = (sponsorResult?.sponsors ?? []).filter(
     (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
   );
 
   // 3. Derive flyer text fields from party data
-  const city = parseCityFromName(party.name);
-  const venueName = party.venueName || 'LOCATION TBA';
-  const streetAddress = party.address ? party.address.split(',')[0].trim() : '';
+  const city = parseCityFromName(data.name);
+  const venueName = data.venueName || 'LOCATION TBA';
+  const streetAddress = data.address ? data.address.split(',')[0].trim() : '';
 
   let dateDisplay = '';
   let timeDisplay = '';
-  const is12h = party.timezone ? uses12Hour(party.timezone) : false;
+  const is12h = data.timezone ? uses12Hour(data.timezone) : false;
 
-  if (party.date) {
-    const tz = party.timezone || 'UTC';
-    const start = getDateTimeInTimezone(party.date, tz);
+  if (data.date) {
+    const tz = data.timezone || 'UTC';
+    const start = getDateTimeInTimezone(data.date, tz);
     const startFormatted = formatFlyerTime(start.timeStr, is12h);
     timeDisplay = startFormatted;
 
-    if (party.duration) {
+    if (data.duration) {
       const endDate = new Date(
-        new Date(party.date).getTime() + party.duration * 3600000,
+        new Date(data.date).getTime() + data.duration * 3600000,
       );
       const end = getDateTimeInTimezone(endDate, tz);
       const endFormatted = formatFlyerTime(end.timeStr, is12h);
       timeDisplay = `${startFormatted} - ${endFormatted}`;
     }
 
-    const eventDate = new Date(party.date);
+    const eventDate = new Date(data.date);
     const monthFormatter = new Intl.DateTimeFormat('en-US', {
       timeZone: tz,
       month: 'short',
@@ -162,7 +223,7 @@ async function doRegen(
   // 6. Upload
   const file = new File(
     [blob],
-    `gpp-flyer-${party.customUrl || party.inviteCode || party.id}.png`,
+    `gpp-flyer-${data.customUrl || data.inviteCode || data.id}.png`,
     { type: 'image/png' },
   );
   const uploadedUrl = await uploadEventImage(file);
@@ -172,7 +233,7 @@ async function doRegen(
   }
 
   // 7. Update party with new image URL + timestamp
-  const success = await updateParty(party.id, {
+  const success = await updateParty(data.id, {
     event_image_url: uploadedUrl,
     flyer_generated_at: new Date().toISOString(),
   });
@@ -182,7 +243,7 @@ async function doRegen(
   }
 
   // 8. Optionally refresh UI
-  if (loadParty && party.inviteCode) {
-    await loadParty(party.inviteCode);
+  if (loadParty && data.inviteCode) {
+    await loadParty(data.inviteCode);
   }
 }

@@ -4,6 +4,7 @@ import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshak
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
+import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
@@ -141,11 +142,13 @@ function HostStatusBadge({
 function HostTagsPills({
   tags,
   eventId,
+  event,
   onUpdate,
   partnerTags = [],
 }: {
   tags: string[];
   eventId: string;
+  event: UnderbossEvent;
   onUpdate: (tags: string[]) => void;
   partnerTags?: string[];
 }) {
@@ -163,6 +166,7 @@ function HostTagsPills({
     setIsAdding(false);
     try {
       await bulkUpdateEventTags([eventId], [cleaned], 'add');
+      triggerFlyerRegenForEvents([event]);
     } catch {
       onUpdate(tags);
     }
@@ -173,6 +177,7 @@ function HostTagsPills({
     onUpdate(newTags);
     try {
       await bulkUpdateEventTags([eventId], [tag], 'remove');
+      triggerFlyerRegenForEvents([event]);
     } catch {
       onUpdate(tags);
     }
@@ -584,6 +589,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
           <HostTagsPills
             tags={eventTags}
             eventId={event.id}
+            event={event}
             partnerTags={partnerTags}
             onUpdate={(tags) => {
               setEventTags(tags);
