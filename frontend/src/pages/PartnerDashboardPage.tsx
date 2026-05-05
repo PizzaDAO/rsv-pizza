@@ -18,6 +18,34 @@ import { GPP_REGIONS } from '../types';
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
 
+// Detect platform from URL domain
+function detectPlatform(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace('www.', '');
+    if (host.includes('instagram.com')) return 'Instagram';
+    if (host.includes('twitter.com') || host.includes('x.com')) return 'X';
+    if (host.includes('youtube.com') || host.includes('youtu.be')) return 'YouTube';
+    if (host.includes('tiktok.com')) return 'TikTok';
+    if (host.includes('linkedin.com')) return 'LinkedIn';
+    if (host.includes('facebook.com') || host.includes('fb.com')) return 'Facebook';
+    if (host.includes('farcaster') || host.includes('warpcast.com')) return 'Farcaster';
+    return 'Website';
+  } catch {
+    return 'Website';
+  }
+}
+
+const PLATFORM_COLORS: Record<string, string> = {
+  Instagram: 'bg-pink-500/15 text-pink-300',
+  X: 'bg-gray-500/15 text-gray-300',
+  YouTube: 'bg-red-500/15 text-red-300',
+  TikTok: 'bg-cyan-500/15 text-cyan-300',
+  LinkedIn: 'bg-blue-500/15 text-blue-300',
+  Facebook: 'bg-indigo-500/15 text-indigo-300',
+  Farcaster: 'bg-purple-500/15 text-purple-300',
+  Website: 'bg-green-500/15 text-green-300',
+};
+
 // ============================================
 // Progress filter constants & FilterPill
 // ============================================
@@ -397,13 +425,14 @@ export function PartnerDashboardPage() {
           const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
           const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
           const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
-          // Aggregate click breakdown by type across all events
-          const clicksByTypeAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
+          // Aggregate click breakdown by platform across all events
+          const clicksByPlatformAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
           for (const e of allEvents) {
-            for (const t of e.clickStats?.byType || []) {
-              if (!clicksByTypeAgg[t.linkType]) clicksByTypeAgg[t.linkType] = { clicks: 0, uniqueClickers: 0 };
-              clicksByTypeAgg[t.linkType].clicks += t.clicks;
-              clicksByTypeAgg[t.linkType].uniqueClickers += t.uniqueClickers;
+            for (const link of e.clickStats?.byLink || []) {
+              const platform = detectPlatform(link.url);
+              if (!clicksByPlatformAgg[platform]) clicksByPlatformAgg[platform] = { clicks: 0, uniqueClickers: 0 };
+              clicksByPlatformAgg[platform].clicks += link.clicks;
+              clicksByPlatformAgg[platform].uniqueClickers += link.uniqueClickers;
             }
           }
           const isSwc = dashboardData?.tag === 'swc';
@@ -444,15 +473,17 @@ export function PartnerDashboardPage() {
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
-                  {Object.keys(clicksByTypeAgg).length > 0 && (
+                  {Object.keys(clicksByPlatformAgg).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {Object.entries(clicksByTypeAgg).map(([type, data]) => (
+                      {Object.entries(clicksByPlatformAgg)
+                        .sort((a, b) => b[1].clicks - a[1].clicks)
+                        .map(([platform, data]) => (
                         <span
-                          key={type}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-[10px] text-green-300"
+                          key={platform}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${PLATFORM_COLORS[platform] || PLATFORM_COLORS.Website}`}
                           title={`${data.uniqueClickers} unique`}
                         >
-                          {type === 'sponsor' ? 'Website/Social' : type === 'host_social' ? 'Host Links' : type}
+                          {platform}
                           <span className="font-semibold">{data.clicks}</span>
                         </span>
                       ))}
@@ -766,18 +797,27 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
                 {event.clickStats.uniqueClickers > 0 && (
                   <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
                 )}
-                {event.clickStats.byType && event.clickStats.byType.length > 1 && (
-                  <span className="flex items-center gap-1">
-                    {event.clickStats.byType.map(t => (
-                      <span
-                        key={t.linkType}
-                        className="inline-flex items-center gap-0.5 px-1.5 py-0 rounded-full bg-green-500/10 text-[10px] text-green-300"
-                        title={`${t.uniqueClickers} unique`}
-                      >
-                        {t.linkType === 'sponsor' ? 'Web' : t.linkType === 'host_social' ? 'Host' : t.linkType}
-                        <span className="font-semibold">{t.clicks}</span>
-                      </span>
-                    ))}
+                {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
+                  <span className="flex items-center gap-1 flex-wrap">
+                    {(() => {
+                      // Group by platform for compact display
+                      const platformCounts: Record<string, number> = {};
+                      for (const link of event.clickStats.byLink!) {
+                        const p = detectPlatform(link.url);
+                        platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
+                      }
+                      return Object.entries(platformCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([platform, clicks]) => (
+                          <span
+                            key={platform}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0 rounded-full text-[10px] ${PLATFORM_COLORS[platform] || PLATFORM_COLORS.Website}`}
+                          >
+                            {platform}
+                            <span className="font-semibold">{clicks}</span>
+                          </span>
+                        ));
+                    })()}
                   </span>
                 )}
               </div>

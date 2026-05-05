@@ -1217,8 +1217,10 @@ export interface SponsorDashboardEvent {
   clickStats?: {
     totalClicks: number;
     uniqueClickers: number;
-    byType?: {
+    byLink?: {
+      url: string;
       linkType: string;
+      linkLabel: string | null;
       clicks: number;
       uniqueClickers: number;
     }[];
