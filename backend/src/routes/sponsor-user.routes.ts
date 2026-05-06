@@ -52,7 +52,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
     if (uniqueTags.length > 0) {
       for (const tag of uniqueTags) {
         const count = await prisma.party.count({
-          where: { eventTags: { has: tag } },
+          where: tag === 'pizzadao' ? {} : { eventTags: { has: tag } },
         });
         tagCounts[tag] = count;
       }
@@ -480,8 +480,10 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
 
     // Build where clause — admins without a tag filter see all events that have any eventTags
     const where: any = {};
-    if (tag) {
+    if (tag && tag !== 'pizzadao') {
       where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      // PizzaDAO is a co-host on all events — no eventTags filter needed
     } else if (req.isAdminViewing) {
       // Admin with no tag filter — show events that have at least one eventTag
       where.NOT = { eventTags: { equals: [] } };
