@@ -215,6 +215,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     eventTags: party.eventTags || [],
     underbossNotes: party.underbossNotes || null,
     expectedGuests: party.expectedGuests || null,
+    telegramGroup: party.telegramGroup || null,
     createdAt: party.createdAt,
     flyerGeneratedAt,
     latestSponsorAt: latestSponsorAtStr,
