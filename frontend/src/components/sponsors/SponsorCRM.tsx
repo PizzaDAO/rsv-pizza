@@ -21,9 +21,10 @@ import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
 
 interface SponsorCRMProps {
   partyId: string;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
 }
 
-export function SponsorCRM({ partyId }: SponsorCRMProps) {
+export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const { party, loadParty } = usePizza();
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
@@ -392,6 +393,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
           onSubmit={handleFormSubmit}
           onClose={handleCloseForm}
           isLoading={isSubmitting}
+          onAddAsCoHost={onAddAsCoHost}
         />
       )}
     </div>

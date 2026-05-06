@@ -12,6 +12,17 @@ export function uuid(): string {
 }
 
 /**
+ * Normalise a URL by prepending `https://` if no protocol is present.
+ * Applied on blur so it doesn't interfere with typing.
+ */
+export function normalizeUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+/**
  * Strips markdown formatting from a string, returning plain text.
  * Useful for meta descriptions and other contexts where markdown syntax
  * should not be visible.

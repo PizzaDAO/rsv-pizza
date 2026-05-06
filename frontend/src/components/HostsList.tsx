@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
+import { normalizeUrl } from '../lib/utils';
 
 interface CoHost {
   id: string;
@@ -109,7 +110,7 @@ export const HostsList: React.FC<HostsListProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 {hostProfile.website && (
                   <a
-                    href={hostProfile.website}
+                    href={normalizeUrl(hostProfile.website)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
@@ -197,7 +198,7 @@ export const HostsList: React.FC<HostsListProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 {coHost.website && (
                   <a
-                    href={coHost.website}
+                    href={normalizeUrl(coHost.website)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"

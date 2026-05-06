@@ -15,7 +15,10 @@ import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
-import { updateParty } from '../lib/supabase';
+import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
+import { uuid } from '../lib/utils';
+import { getXAvatarUrl } from '../utils/avatarUtils';
+import { CoHost } from '../types';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
@@ -396,7 +399,35 @@ function HostPageContent() {
               )}
 
               {activeTab === 'partners' && party && (
-                <SponsorCRM partyId={party.id} />
+                <SponsorCRM
+                  partyId={party.id}
+                  onAddAsCoHost={async (data) => {
+                    // Build avatar from X handle or Instagram
+                    let avatarUrl: string | undefined;
+                    const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                    if (xAvatar) {
+                      avatarUrl = await proxyAvatarToStorage(xAvatar);
+                    } else if (data.instagram) {
+                      const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+                      avatarUrl = await proxyAvatarToStorage(igAvatar);
+                    }
+
+                    const newCoHost: CoHost = {
+                      id: uuid(),
+                      name: data.name,
+                      website: data.website || undefined,
+                      twitter: data.twitter || undefined,
+                      instagram: data.instagram || undefined,
+                      avatar_url: avatarUrl,
+                      showOnEvent: true,
+                    };
+
+                    const existing = party.coHosts || [];
+                    const updated = [...existing, newCoHost];
+                    await updateParty(party.id, { co_hosts: updated });
+                    if (party.inviteCode) await loadParty(party.inviteCode);
+                  }}
+                />
               )}
 
               {activeTab === 'staff' && party && (

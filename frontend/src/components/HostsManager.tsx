@@ -5,7 +5,7 @@ import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { updateParty, addGuestByHost, proxyAvatarToStorage } from '../lib/supabase';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
-import { uuid } from '../lib/utils';
+import { uuid, normalizeUrl } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 
 interface HostsManagerProps {
@@ -311,7 +311,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 )}
                 <div className="flex items-center gap-2 mt-1">
                   {coHost.website && (
-                    <a href={coHost.website} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                    <a href={normalizeUrl(coHost.website)} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                       <Globe size={14} />
                     </a>
                   )}
@@ -460,6 +460,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   type="url"
                   value={editHostWebsite}
                   onChange={(e) => setEditHostWebsite(e.target.value)}
+                  onBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
                   placeholder="Website"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -560,6 +561,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   type="url"
                   value={newCoHostWebsite}
                   onChange={(e) => setNewCoHostWebsite(e.target.value)}
+                  onBlur={() => setNewCoHostWebsite(normalizeUrl(newCoHostWebsite))}
                   placeholder="Website"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
