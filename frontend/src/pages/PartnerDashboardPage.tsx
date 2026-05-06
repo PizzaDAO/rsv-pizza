@@ -514,7 +514,7 @@ export function PartnerDashboardPage() {
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/20 text-green-400"><MousePointerClick size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Clicks</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Partner Link Clicks</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>

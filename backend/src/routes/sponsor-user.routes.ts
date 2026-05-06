@@ -561,17 +561,16 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       });
       const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
       if (displayName) partnerNames = [displayName];
-    } else if (req.isAdminViewing && tag) {
-      // Admin viewing a specific tag: filter to all partners with that tag
+    } else if (req.isAdminViewing) {
+      // Admin: filter to partners for the specific tag, or ALL partners for "all tags"
       const tagPartners = await prisma.sponsorUser.findMany({
-        where: { tag, isActive: true },
+        where: { ...(tag ? { tag } : {}), isActive: true },
         select: { coHostName: true, name: true, email: true },
       });
       partnerNames = tagPartners
         .map(p => p.coHostName || p.name || p.email)
         .filter(Boolean) as string[];
     }
-    // else: admin with no tag = show all clicks (partnerNames stays empty)
 
     // Build parameterized label filter: exact match OR prefix match (for "Name_twitter" etc.)
     let labelFilter = Prisma.empty;
