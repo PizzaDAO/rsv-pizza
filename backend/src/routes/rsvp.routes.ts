@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
+import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 
 const router = Router();
 
@@ -217,6 +218,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         name: true,
         email: true,
         ethereumAddress: true,
+        walletSource: true,
         roles: true,
         mailingListOptIn: true,
         dietaryRestrictions: true,
@@ -392,6 +394,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           data: {
             name: name.trim(),
             ethereumAddress: ethereumAddress?.trim() || null,
+            ...(ethereumAddress?.trim() ? { walletSource: 'manual' } : {}),
             roles: roles || [],
             mailingListOptIn: mailingListOptIn || false,
             swcOptIn: swcOptIn || false,
@@ -452,6 +455,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         name: name.trim(),
         email: email?.trim().toLowerCase() || null,
         ethereumAddress: ethereumAddress?.trim() || null,
+        walletSource: ethereumAddress?.trim() ? 'manual' : null,
         roles: roles || [],
         mailingListOptIn: mailingListOptIn || false,
         swcOptIn: swcOptIn || false,
@@ -473,6 +477,27 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         waitlistPosition: waitlistPosition,
       },
     });
+
+    // Auto-provision Privy embedded wallet if no wallet address was provided and email exists
+    if (!ethereumAddress?.trim() && email?.trim()) {
+      try {
+        const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
+        if (walletResult) {
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: {
+              ethereumAddress: walletResult.walletAddress,
+              privyUserId: walletResult.privyUserId,
+              walletSource: 'privy-embedded',
+            },
+          });
+          console.log(`Privy embedded wallet provisioned for guest ${guest.id}: ${walletResult.walletAddress}`);
+        }
+      } catch (privyError) {
+        // Non-fatal: RSVP succeeds even if Privy provisioning fails
+        console.error('Privy wallet provisioning failed (non-fatal):', privyError);
+      }
+    }
 
     // Trigger webhook for guest registration or waitlist (using party owner's webhooks)
     if (isAtCapacity) {
