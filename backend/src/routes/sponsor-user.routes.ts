@@ -483,7 +483,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     if (tag && tag !== 'pizzadao') {
       where.eventTags = { has: tag };
     } else if (tag === 'pizzadao') {
-      // PizzaDAO is a co-host on all events — no eventTags filter needed
+      // PizzaDAO: show all GPP events (created via /gpp flow)
+      where.eventType = 'gpp';
     } else if (req.isAdminViewing) {
       // Admin with no tag filter — show events that have at least one eventTag
       where.NOT = { eventTags: { equals: [] } };
