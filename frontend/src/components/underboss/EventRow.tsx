@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
@@ -521,6 +521,17 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 >
                   <StickyNote size={12} />
                 </button>
+                {event.telegramGroup && (
+                  <a
+                    href={event.telegramGroup}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#29B6F6] hover:text-[#4FC3F7] transition-colors shrink-0"
+                    title="Telegram group"
+                  >
+                    <MessageCircle size={12} />
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5" title={fullDate}>
                 <Calendar size={10} className="text-theme-text-faint" />

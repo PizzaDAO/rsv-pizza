@@ -1026,6 +1026,7 @@ export interface UnderbossEvent {
   eventTags: string[];
   underbossNotes: string | null;
   expectedGuests: number | null;
+  telegramGroup?: string | null;
   createdAt: string;
   flyerGeneratedAt: string | null;
   latestSponsorAt: string | null;
