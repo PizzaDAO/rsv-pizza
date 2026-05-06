@@ -86,13 +86,11 @@ function parseCityFromName(name: string): string {
   return name.replace(/^Global Pizza Party\s*/i, '').trim() || name;
 }
 
+let _fontsLoaded = false;
+
 /** Ensure the Hub 191 fonts are loaded (idempotent). */
 async function ensureFonts(): Promise<void> {
-  // Check if fonts are already loaded
-  const alreadyLoaded =
-    document.fonts.check('16px "Hub 191"') &&
-    document.fonts.check('16px "Hub 191 Display"');
-  if (alreadyLoaded) return;
+  if (_fontsLoaded) return;
 
   try {
     const regular = new FontFace('Hub 191', 'url(/fonts/Hub-191-Regular.otf)');
@@ -100,6 +98,7 @@ async function ensureFonts(): Promise<void> {
     const [reg, disp] = await Promise.all([regular.load(), display.load()]);
     document.fonts.add(reg);
     document.fonts.add(disp);
+    _fontsLoaded = true;
   } catch (err) {
     console.warn('[autoRegenFlyer] font load failed, using fallbacks:', err);
   }
