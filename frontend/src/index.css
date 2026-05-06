@@ -213,7 +213,7 @@ textarea {
   right: 16px;
   display: flex;
   gap: 8px;
-  z-index: 50;
+  z-index: 40;
 }
 
 .corner-link {
