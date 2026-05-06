@@ -572,6 +572,18 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     }
     // else: admin with no tag = show all clicks (partnerNames stays empty)
 
+    // Build parameterized label filter: exact match OR prefix match (for "Name_twitter" etc.)
+    let labelFilter = Prisma.empty;
+    if (partnerNames.length === 1) {
+      labelFilter = Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`;
+    } else if (partnerNames.length > 1) {
+      // Build OR chain: (link_label = 'A' OR link_label LIKE 'A_%' OR link_label = 'B' OR link_label LIKE 'B_%')
+      const conditions = partnerNames.map(n =>
+        Prisma.sql`link_label = ${n} OR link_label LIKE ${n + '_%'}`
+      );
+      labelFilter = Prisma.sql`AND (${Prisma.join(conditions, ' OR ')})`;
+    }
+
     const clicksByLink = eventIds.length > 0
       ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
         SELECT
@@ -584,13 +596,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         FROM link_clicks
         WHERE party_id::text IN (${Prisma.join(eventIds)})
         AND link_type IN ('sponsor', 'host_social')
-        ${partnerNames.length === 1
-          ? Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`
-          : partnerNames.length > 1
-          ? Prisma.sql`AND (link_label IN (${Prisma.join(partnerNames)}) OR ${Prisma.raw(
-              partnerNames.map(n => `link_label LIKE '${n.replace(/'/g, "''")}_%'`).join(' OR ')
-            )})`
-          : Prisma.empty}
+        ${labelFilter}
         GROUP BY party_id, url, link_type
         ORDER BY total_clicks DESC
       `
