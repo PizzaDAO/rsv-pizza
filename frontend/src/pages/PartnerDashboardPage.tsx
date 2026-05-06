@@ -13,6 +13,8 @@ import {
   Instagram, Youtube, Linkedin, Globe, Facebook,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
+import { fetchSheetCities } from '../lib/cities';
+import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 
@@ -128,6 +130,12 @@ function FilterPill({
   );
 }
 
+function resolveCityChat(eventName: string, chats: Map<string, string>): string | undefined {
+  // Event names are like "Global Pizza Party City Name" — strip the prefix
+  const city = eventName.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
+  return chats.get(city);
+}
+
 export function PartnerDashboardPage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -154,6 +162,19 @@ export function PartnerDashboardPage() {
 
   // Region filter (simple dropdown like underboss)
   const [regionFilter, setRegionFilter] = useState<string>('all');
+
+  // City chat Telegram links from the master Google Sheet
+  const [cityChats, setCityChats] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    fetchSheetCities().then(cities => {
+      const map = new Map<string, string>();
+      for (const c of cities) {
+        if (c.chatUrl) map.set(c.city.toLowerCase().trim(), c.chatUrl);
+      }
+      setCityChats(map);
+    }).catch(() => {/* silent — Telegram buttons just won't show */});
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -632,6 +653,7 @@ export function PartnerDashboardPage() {
                 key={event.id}
                 event={event}
                 onToggleChecklist={(itemId) => handleToggleChecklist(event.id, itemId)}
+                cityChats={cityChats}
               />
             ))}
           </div>
@@ -651,9 +673,10 @@ export function PartnerDashboardPage() {
 interface EventCardProps {
   event: SponsorDashboardEvent;
   onToggleChecklist: (itemId: string) => void;
+  cityChats: Map<string, string>;
 }
 
-function EventCard({ event, onToggleChecklist }: EventCardProps) {
+function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
@@ -739,18 +762,21 @@ function EventCard({ event, onToggleChecklist }: EventCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {event.telegramGroup && (
-              <a
-                href={event.telegramGroup}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#29B6F6] hover:text-[#4FC3F7] border border-[#29B6F6]/30 hover:border-[#29B6F6]/50 rounded-md transition-colors"
-                title="Join city Telegram group"
-              >
-                <MessageCircle size={12} />
-                Telegram
-              </a>
-            )}
+            {(() => {
+              const telegramLink = event.telegramGroup || resolveCityChat(event.name, cityChats);
+              return telegramLink ? (
+                <a
+                  href={telegramLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#29B6F6] hover:text-[#4FC3F7] border border-[#29B6F6]/30 hover:border-[#29B6F6]/50 rounded-md transition-colors"
+                  title="Join city Telegram group"
+                >
+                  <MessageCircle size={12} />
+                  Telegram
+                </a>
+              ) : null;
+            })()}
             {event.reportPublicSlug ? (
               <a
                 href={`/report/${event.reportPublicSlug}`}
