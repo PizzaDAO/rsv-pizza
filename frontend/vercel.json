@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/santacruzdelasierra",
+      "destination": "/santacruz",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/cdn/:path*",
