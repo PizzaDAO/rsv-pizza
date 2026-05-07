@@ -6,6 +6,7 @@ import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
+import { calculateEventPrice } from '../../utils/sponsorshipPricing';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface DisplayPhoto {
@@ -469,6 +470,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
 
+  const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+  const priceGuests = event.expectedGuests ?? event.guestCount ?? 30;
+  const price = calculateEventPrice(priceGuests, cityName);
+
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
   const displayedPhotos = showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12);
@@ -538,6 +543,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {relTime.text}
                 </span>
+                <span className="text-xs text-green-400/60 ml-1">&middot; ${price.toLocaleString()}</span>
               </div>
               {/* Inline notes editor */}
               {notesOpen && (
