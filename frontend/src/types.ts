@@ -223,6 +223,7 @@ export interface Party {
   pizzaStyle: string;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   maxGuests: number | null;
   expectedGuests?: number | null;
   hideGuests: boolean;

@@ -20,6 +20,16 @@ export function RSVPFormStep2({
 }: RSVPFormStep2Props) {
   const label = submitLabel ?? (isEditing ? 'Edit RSVP' : 'RSVP');
 
+  // Use host-configured dietary options if non-empty, else fall back to all defaults
+  const dietaryOptionsToShow: string[] = form.availableDietaryOptions.length > 0
+    ? [
+        ...DIETARY_OPTIONS.filter(o => form.availableDietaryOptions.includes(o)),
+        ...form.availableDietaryOptions
+          .filter(id => id.startsWith('custom:'))
+          .map(id => id.slice('custom:'.length)),
+      ]
+    : [...DIETARY_OPTIONS];
+
   return (
     <form onSubmit={form.handleSubmit} className="space-y-3">
       {/* Dietary Restrictions */}
@@ -28,7 +38,7 @@ export function RSVPFormStep2({
           Diet
         </label>
         <div className="flex flex-wrap gap-2">
-          {DIETARY_OPTIONS.map((option) => (
+          {dietaryOptionsToShow.map((option) => (
             <button
               key={option}
               type="button"

@@ -3,7 +3,7 @@ import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
 import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User, X } from 'lucide-react';
 import { IconInput } from './IconInput';
-import { getExcludedToppingIds } from '../constants/options';
+import { getExcludedToppingIds, DIETARY_OPTIONS } from '../constants/options';
 
 interface AddGuestFormProps {
   onClose?: () => void;
@@ -131,7 +131,16 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
               Dietary Restrictions
             </h3>
             <div className="flex flex-wrap gap-2">
-              {dietaryOptions.map(option => (
+              {(party?.availableDietaryOptions && party.availableDietaryOptions.length > 0
+                ? [
+                    ...DIETARY_OPTIONS.filter(o => party.availableDietaryOptions!.includes(o)),
+                    ...party.availableDietaryOptions
+                      .filter(id => id.startsWith('custom:'))
+                      .map(id => id.slice('custom:'.length)),
+                    'None',
+                  ]
+                : dietaryOptions
+              ).map(option => (
                 <button
                   type="button"
                   key={option}

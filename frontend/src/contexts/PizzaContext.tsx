@@ -17,6 +17,7 @@ interface PizzaContextType {
   getHostLink: () => string;
   updatePartyBeverages: (beverages: string[]) => Promise<void>;
   updatePartyToppings: (toppings: string[]) => Promise<void>;
+  updatePartyDietaryOptions: (dietaryOptions: string[]) => Promise<void>;
   // Guest management
   guests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
@@ -91,6 +92,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
+    availableDietaryOptions: dbParty.available_dietary_options || [],
     maxGuests: dbParty.max_guests,
     expectedGuests: dbParty.expected_guests || null,
     hideGuests: dbParty.hide_guests || false,
@@ -356,6 +358,19 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updatePartyDietaryOptions = async (dietaryOptions: string[]) => {
+    if (!party) return;
+
+    const dbParty = await db.updatePartyDietaryOptions(party.id, dietaryOptions);
+    if (dbParty) {
+      const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
+      setParty(updatedParty);
+    }
+  };
+
   const generateRecommendations = () => {
     if (!party) return;
 
@@ -416,6 +431,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       getHostLink,
       updatePartyBeverages,
       updatePartyToppings,
+      updatePartyDietaryOptions,
       guests,
       addGuest,
       removeGuest,
