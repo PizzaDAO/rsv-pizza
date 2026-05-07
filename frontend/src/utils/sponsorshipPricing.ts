@@ -11,6 +11,7 @@ const TIER_2_CITIES = [
   'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
   'toronto', 'mexico city', 'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan',
   'melbourne', 'bangkok', 'mumbai', 'sao paulo', 'buenos aires',
+  'vienna', 'prague', 'warsaw', 'budapest', 'dublin', 'copenhagen', 'stockholm', 'oslo', 'zurich', 'brussels',
 ];
 
 const TIER_CONFIG: Record<1 | 2 | 3, { floor: number; ceiling: number; max: number }> = {
