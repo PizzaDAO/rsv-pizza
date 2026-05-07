@@ -90,7 +90,7 @@ export function extractSponsorData(data: PartnerFormData): CreateSponsorData {
 const STATUS_OPTIONS: { value: SponsorStatus; label: string; color: string }[] = [
   { value: 'todo', label: 'To Do', color: 'bg-gray-500' },
   { value: 'asked', label: 'Asked', color: 'bg-orange-500' },
-  { value: 'yes', label: 'Yes', color: 'bg-green-500' },
+  { value: 'yes', label: 'Confirmed', color: 'bg-green-500' },
   { value: 'billed', label: 'Billed', color: 'bg-yellow-500' },
   { value: 'paid', label: 'Paid', color: 'bg-blue-500' },
   { value: 'stuck', label: 'Stuck', color: 'bg-red-500' },

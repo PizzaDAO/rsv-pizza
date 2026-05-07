@@ -11,7 +11,7 @@ interface SponsorPipelineProps {
 const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgColor: string }> = {
   todo: { label: 'To Do', color: 'text-gray-400', bgColor: 'bg-gray-500' },
   asked: { label: 'Asked', color: 'text-orange-400', bgColor: 'bg-orange-500' },
-  yes: { label: 'Yes', color: 'text-green-400', bgColor: 'bg-green-500' },
+  yes: { label: 'Confirmed', color: 'text-green-400', bgColor: 'bg-green-500' },
   billed: { label: 'Billed', color: 'text-yellow-400', bgColor: 'bg-yellow-500' },
   paid: { label: 'Paid', color: 'text-blue-400', bgColor: 'bg-blue-500' },
   stuck: { label: 'Stuck', color: 'text-red-400', bgColor: 'bg-red-500' },
