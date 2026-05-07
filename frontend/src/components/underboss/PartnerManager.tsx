@@ -7,11 +7,12 @@ import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 
 interface PartnerManagerProps {
+  isAdmin?: boolean;
   onSyncComplete?: () => void;
   onFlyerRegenNeeded?: (tag: string) => void;
 }
 
-export function PartnerManager({ onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
+export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
   const [partners, setPartners] = useState<SponsorUser[]>([]);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -208,21 +209,23 @@ export function PartnerManager({ onSyncComplete, onFlyerRegenNeeded }: PartnerMa
           {partners.map((partner, index) => (
             <div
               key={partner.id}
-              draggable
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
-              className={`p-3 rounded-xl border transition-colors cursor-move ${
+              draggable={!!isAdmin}
+              onDragStart={isAdmin ? () => handleDragStart(index) : undefined}
+              onDragOver={isAdmin ? (e) => handleDragOver(e, index) : undefined}
+              onDragEnd={isAdmin ? handleDragEnd : undefined}
+              className={`p-3 rounded-xl border transition-colors ${isAdmin ? 'cursor-move' : ''} ${
                 partner.isActive
                   ? 'bg-theme-surface border-theme-stroke'
                   : 'bg-theme-surface/50 border-theme-stroke/50 opacity-60'
               } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
             >
               <div className="flex items-start gap-3">
-                {/* Drag handle */}
-                <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
-                  <GripVertical size={16} />
-                </div>
+                {/* Drag handle (admin only) */}
+                {isAdmin && (
+                  <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
+                    <GripVertical size={16} />
+                  </div>
+                )}
 
                 {/* Avatar */}
                 {partner.coHostAvatarUrl ? (

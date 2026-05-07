@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin, isUnderboss } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
@@ -10,14 +10,23 @@ import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromA
 
 export const sponsorUserAdminRouter = Router();
 
-// GET /api/sponsor-users/list - List all sponsor users (admin only)
+// GET /api/sponsor-users/list - List sponsor users (admin: all, underboss: own)
 sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
+    }
+
+    const whereClause: any = {};
+    if (!adminUser) {
+      // Underboss: only see partners they created
+      whereClause.createdBy = req.userEmail;
     }
 
     const sponsorUsers = await prisma.sponsorUser.findMany({
+      where: whereClause,
       orderBy: [{ descriptionSortOrder: 'asc' }, { createdAt: 'desc' }],
       select: {
         id: true,
@@ -64,11 +73,13 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
-// POST /api/sponsor-users - Create a sponsor user (super admin only)
+// POST /api/sponsor-users - Create a sponsor user (admin or underboss)
 sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const {
@@ -94,13 +105,16 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('A sponsor user with this email already exists', 409, 'CONFLICT');
     }
 
+    // Underboss: always set createdBy to their email (prevent spoofing)
+    const createdBy = underbossUser ? req.userEmail : (req.userEmail || null);
+
     const sponsorUser = await prisma.sponsorUser.create({
       data: {
         email: email.toLowerCase(),
         tag: tag.trim().toLowerCase(),
         name: name?.trim() || null,
         notes: notes?.trim() || null,
-        createdBy: req.userEmail || null,
+        createdBy,
         coHostName: coHostName?.trim() || null,
         coHostWebsite: coHostWebsite?.trim() || null,
         coHostTwitter: coHostTwitter?.trim() || null,
@@ -134,18 +148,30 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
-// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin only)
+// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin or underboss)
 // NOTE: Must be registered before /:id to avoid Express matching 'reorder' as an id
 sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { sponsorUserIds } = req.body;
 
     if (!Array.isArray(sponsorUserIds) || sponsorUserIds.length === 0) {
       throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    // Underboss: verify all IDs belong to them
+    if (!adminUser) {
+      const ownedCount = await prisma.sponsorUser.count({
+        where: { id: { in: sponsorUserIds }, createdBy: req.userEmail },
+      });
+      if (ownedCount !== sponsorUserIds.length) {
+        throw new AppError('You can only reorder your own partners', 403, 'FORBIDDEN');
+      }
     }
 
     // Capture old global order BEFORE updating
@@ -246,11 +272,13 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
   }
 });
 
-// PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
+// PATCH /api/sponsor-users/:id - Update a sponsor user (admin or underboss)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -270,6 +298,11 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     });
     if (!oldSponsorUser) {
       throw new AppError('Sponsor user not found', 404, 'NOT_FOUND');
+    }
+
+    // Underboss: verify ownership
+    if (!adminUser && oldSponsorUser.createdBy !== req.userEmail) {
+      throw new AppError('You can only edit your own partners', 403, 'FORBIDDEN');
     }
 
     const updateData: any = {};
@@ -371,11 +404,13 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
   }
 });
 
-// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (super admin only)
+// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (admin or underboss)
 sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -384,6 +419,11 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
     const sponsorUser = await prisma.sponsorUser.findUnique({
       where: { id },
     });
+
+    // Underboss: verify ownership
+    if (!adminUser && sponsorUser?.createdBy !== req.userEmail) {
+      throw new AppError('You can only deactivate your own partners', 403, 'FORBIDDEN');
+    }
 
     await prisma.sponsorUser.update({
       where: { id },

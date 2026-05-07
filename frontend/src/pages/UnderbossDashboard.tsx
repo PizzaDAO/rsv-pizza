@@ -416,21 +416,19 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('partners')}
-                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
-                  activeTab === 'partners'
-                    ? 'text-theme-text'
-                    : 'text-theme-text-muted hover:text-theme-text-secondary'
-                }`}
-              >
-                Partners
-                {activeTab === 'partners' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
-                )}
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('partners')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'partners'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Partners
+              {activeTab === 'partners' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -441,8 +439,8 @@ export function UnderbossDashboard() {
             <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
           )}
 
-          {activeTab === 'partners' && isAdmin && (
-            <PartnerManager onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+          {activeTab === 'partners' && (
+            <PartnerManager isAdmin={isAdmin} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
         </section>
         </div>

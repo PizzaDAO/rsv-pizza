@@ -22,6 +22,16 @@ export async function isSuperAdmin(email?: string): Promise<boolean> {
   return admin?.role === 'super_admin';
 }
 
+// Check if the user is an active underboss (DB-backed)
+export async function isUnderboss(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const ub = await prisma.underboss.findFirst({
+    where: { email: email.toLowerCase(), isActive: true },
+    select: { id: true },
+  });
+  return !!ub;
+}
+
 // Optional auth: tries to parse the JWT but doesn't error if missing/invalid
 export const optionalAuth = (
   req: AuthRequest,
