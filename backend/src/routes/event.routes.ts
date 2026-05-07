@@ -159,12 +159,15 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
-    // Fetch confirmed sponsors with descriptions for public display
+    // Fetch confirmed sponsors with descriptions or logos for public display
     const sponsors = await prisma.sponsor.findMany({
       where: {
         partyId: party.id,
         status: { in: ['yes', 'billed', 'paid'] },
-        brandDescription: { not: null },
+        OR: [
+          { brandDescription: { not: null } },
+          { logoUrl: { not: null } },
+        ],
       },
       select: {
         id: true,
@@ -176,6 +179,20 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
+
+    // Page view stats for one-sheet
+    const [totalViews, uniqueVisitorsResult] = await Promise.all([
+      prisma.pageView.count({ where: { partyId: party.id } }),
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT visitor_hash) as count
+        FROM page_views
+        WHERE party_id = ${party.id}::uuid AND visitor_hash IS NOT NULL
+      `,
+    ]);
+    const pageViewStats = {
+      totalViews,
+      uniqueVisitors: Number(uniqueVisitorsResult[0]?.count ?? 0),
+    };
 
     // Enrich coHosts with user profile data (avatar, socials) then strip emails
     const rawCoHosts = (party.coHosts as any[] || []);
@@ -279,6 +296,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         guestCount: party._count.guests,
         userId: party.userId,
         sponsors,
+        pageViewStats,
       },
     });
   } catch (error) {

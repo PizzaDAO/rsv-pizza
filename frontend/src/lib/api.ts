@@ -418,6 +418,7 @@ export interface PublicEvent {
   telegramGroup?: string | null;
   turtleRolesEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
+  pageViewStats?: { totalViews: number; uniqueVisitors: number };
 }
 
 // Public Event API (no auth required)
@@ -444,6 +445,31 @@ export async function getEventBySlug(slug: string): Promise<PublicEvent | { redi
     console.error('Error fetching event:', error);
     return null;
   }
+}
+
+// One Sheet interest form
+export interface OneSheetInterestData {
+  name: string;
+  email: string;
+  company: string;
+  message?: string;
+}
+
+export async function submitOneSheetInterest(slug: string, data: OneSheetInterestData): Promise<{ success: boolean; id: string }> {
+  const response = await fetch(`${API_URL}/api/events/${slug}/interest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    const err = new Error(error.message || error.error || `API error: ${response.status}`);
+    (err as any).status = response.status;
+    throw err;
+  }
+
+  return response.json();
 }
 
 // Donation API functions

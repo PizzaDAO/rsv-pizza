@@ -10,7 +10,7 @@ import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
-  Instagram, Youtube, Linkedin, Globe, Facebook,
+  Instagram, Youtube, Linkedin, Globe, Facebook, Link2,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { fetchSheetCities } from '../lib/cities';
@@ -680,6 +680,9 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
+  // One Sheet copy state
+  const [copied, setCopied] = useState(false);
+
   // Notes state with debounced auto-save
   const [notes, setNotes] = useState(event.partnerNotes || '');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -797,6 +800,18 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 Report
               </span>
             )}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://rsv.pizza/onesheet/${event.slug}`);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
+              title="Copy One Sheet link"
+            >
+              <Link2 size={12} />
+              {copied ? 'Copied!' : 'One Sheet'}
+            </button>
           </div>
         </div>
 
