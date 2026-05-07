@@ -43,7 +43,7 @@ function buildPartnerCoHost(sponsorUser: SponsorUserLike): Record<string, any> {
     website: sponsorUser.coHostWebsite || undefined,
     twitter: sponsorUser.coHostTwitter || undefined,
     instagram: sponsorUser.coHostInstagram || undefined,
-    avatar_url: sponsorUser.coHostAvatarUrl || undefined,
+    avatar_url: sponsorUser.coHostAvatarUrl || sponsorUser.coHostLogoUrl || undefined,
     showOnEvent: sponsorUser.coHostShowOnEvent !== false,
     canEdit: !!sponsorUser.coHostCanEdit,
     isPartner: true,
