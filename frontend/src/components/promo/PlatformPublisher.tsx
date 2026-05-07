@@ -372,6 +372,12 @@ export const PlatformPublisher: React.FC = () => {
                 <p className="text-xs text-theme-text-faint text-center">
                   Copy the details above, then paste them into {config.name}
                 </p>
+
+                {platform === 'luma' && (
+                  <p className="text-xs text-theme-text-muted text-center mt-1">
+                    Add <span className="font-medium text-theme-text-secondary">hello@rarepizzas.com</span> as a host on your Luma event
+                  </p>
+                )}
               </div>
             )}
           </div>
