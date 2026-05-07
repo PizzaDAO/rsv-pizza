@@ -12,7 +12,7 @@ import {
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
-  Camera, ChevronLeft, ChevronRight, X,
+  Camera, ChevronLeft, ChevronRight, X, Link2,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
@@ -766,6 +766,9 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
+  // One Sheet copy state
+  const [oneSheetCopied, setOneSheetCopied] = useState(false);
+
   // Photo state
   const [photosExpanded, setPhotosExpanded] = useState(false);
   const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
@@ -942,6 +945,18 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 Report
               </span>
             )}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://rsv.pizza/onesheet/${event.slug}`);
+                setOneSheetCopied(true);
+                setTimeout(() => setOneSheetCopied(false), 2000);
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
+              title="Copy One Sheet link"
+            >
+              <Link2 size={12} />
+              {oneSheetCopied ? 'Copied!' : 'One Sheet'}
+            </button>
           </div>
         </div>
 
@@ -974,10 +989,11 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
             {(event.photoCount + gppCount > 0) && (
               <button
                 onClick={togglePhotos}
-                className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-theme-stroke hover:border-theme-stroke-hover text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
               >
-                <Camera size={12} />
-                <span className="text-xs">{event.photoCount + gppCount}</span>
+                <Camera size={14} />
+                <span className="text-sm font-medium">{event.photoCount + gppCount}</span>
+                <span className="text-xs">Photos</span>
               </button>
             )}
             {event.expectedGuests != null && (
