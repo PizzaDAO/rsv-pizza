@@ -425,18 +425,13 @@ export function PartnerDashboardPage() {
         <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[#E52828]/20 flex items-center justify-center">
-              <Tag size={20} className="text-[#E52828]" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-theme-text">
-                {dashboardData?.isAdmin ? 'Partner Dashboard' : `${sponsor?.name || 'Partner'} Dashboard`}
-              </h1>
-              <p className="text-sm text-theme-text-muted">
-                Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
-              </p>
-            </div>
+          <div className="mb-2">
+            <h1 className="text-2xl font-bold text-theme-text">
+              {dashboardData?.isAdmin ? 'Partner Dashboard' : `${sponsor?.name || 'Partner'} Dashboard`}
+            </h1>
+            <p className="text-sm text-theme-text-muted">
+              Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
+            </p>
           </div>
 
           {/* Admin tag filter */}
@@ -502,14 +497,14 @@ export function PartnerDashboardPage() {
               <div className={`grid grid-cols-2 gap-3 ${isSwc ? 'md:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20 text-blue-400"><BarChart3 size={16} /></div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><BarChart3 size={16} /></div>
                     <span className="text-xs text-theme-text-muted uppercase tracking-wider">Events</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{allEvents.length}</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/20 text-purple-400"><Users size={16} /></div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Users size={16} /></div>
                     <span className="text-xs text-theme-text-muted uppercase tracking-wider">Total RSVPs</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalRsvps}</div>
@@ -517,7 +512,7 @@ export function PartnerDashboardPage() {
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-cyan-500/20 text-cyan-400"><Eye size={16} /></div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Eye size={16} /></div>
                     <span className="text-xs text-theme-text-muted uppercase tracking-wider">Impressions</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalImpressions.toLocaleString()}</div>
@@ -525,7 +520,7 @@ export function PartnerDashboardPage() {
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/20 text-green-400"><MousePointerClick size={16} /></div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><MousePointerClick size={16} /></div>
                     <span className="text-xs text-theme-text-muted uppercase tracking-wider">Partner Link Clicks</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
@@ -563,14 +558,14 @@ export function PartnerDashboardPage() {
                   <>
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-orange-500/20 text-orange-400"><MapPin size={16} /></div>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><MapPin size={16} /></div>
                         <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Venue</span>
                       </div>
                       <div className="text-2xl font-bold text-theme-text">{withVenue}</div>
                     </div>
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-yellow-500/20 text-yellow-400"><Wallet size={16} /></div>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Wallet size={16} /></div>
                         <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Budget</span>
                       </div>
                       <div className="text-2xl font-bold text-theme-text">{withBudget}</div>
