@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote, getPartyPhotos } from '../lib/api';
 import {
   Loader2, Shield, Tag, Users,
-  Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
+  Search, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
   Camera, ChevronLeft, ChevronRight, X, Link2,
@@ -158,64 +158,6 @@ function PlatformIcon({ platform, size = 12 }: { platform: string; size?: number
   }
 }
 
-// ============================================
-// Progress filter constants & FilterPill
-// ============================================
-
-const PROGRESS_FILTER_KEYS: { key: string; label: string }[] = [
-  { key: 'hasPartyKit', label: 'Kit' },
-  { key: 'hasCoHosts', label: 'Team' },
-  { key: 'hasVenue', label: 'Venue' },
-  { key: 'hasBudget', label: 'Budget' },
-  { key: 'hasSponsors', label: 'Partners' },
-  { key: 'hasSocialPosts', label: 'Social' },
-  { key: 'hasThrown', label: 'Thrown' },
-];
-
-function FilterPill({
-  label,
-  state,
-  onToggle,
-}: {
-  label: string;
-  state: 'neutral' | 'include' | 'exclude';
-  onToggle: (newState: 'neutral' | 'include' | 'exclude') => void;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-        state === 'include'
-          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
-          : state === 'exclude'
-            ? 'bg-[#E52828]/20 border-[#E52828]/30'
-            : 'bg-theme-surface border-theme-stroke'
-      }`}
-    >
-      <button
-        onClick={() => onToggle(state === 'include' ? 'neutral' : 'include')}
-        className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
-        title={`Must have ${label}`}
-      >
-        <ThumbsUp
-          size={12}
-          className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
-        />
-        <span className="text-theme-text text-xs">{label}</span>
-      </button>
-      <button
-        onClick={() => onToggle(state === 'exclude' ? 'neutral' : 'exclude')}
-        className="p-0.5 hover:opacity-70 transition-opacity"
-        title={`Must NOT have ${label}`}
-      >
-        <ThumbsDown
-          size={12}
-          className={`transition-all ${state === 'exclude' ? 'text-[#E52828]' : 'text-theme-text-faint'}`}
-        />
-      </button>
-    </div>
-  );
-}
-
 function resolveCityChat(eventName: string, chats: Map<string, string>): string | undefined {
   // Event names are like "Global Pizza Party City Name" — strip the prefix
   const city = eventName.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
@@ -242,9 +184,8 @@ export function PartnerDashboardPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Three-state progress filters
-  const [progressIncludes, setProgressIncludes] = useState<string[]>([]);
-  const [progressExcludes, setProgressExcludes] = useState<string[]>([]);
+  // Sort
+  const [sortBy, setSortBy] = useState<string>('date-desc');
 
   // Region filter (simple dropdown like underboss)
   const [regionFilter, setRegionFilter] = useState<string>('all');
@@ -348,22 +289,6 @@ export function PartnerDashboardPage() {
   const sponsor = dashboardData?.sponsor;
   const allEvents = dashboardData?.events || [];
 
-  function getFilterState(key: string): 'neutral' | 'include' | 'exclude' {
-    if (progressIncludes.includes(key)) return 'include';
-    if (progressExcludes.includes(key)) return 'exclude';
-    return 'neutral';
-  }
-
-  function setFilterState(key: string, newState: 'neutral' | 'include' | 'exclude') {
-    setProgressIncludes((prev) => prev.filter((k) => k !== key));
-    setProgressExcludes((prev) => prev.filter((k) => k !== key));
-    if (newState === 'include') {
-      setProgressIncludes((prev) => [...prev, key]);
-    } else if (newState === 'exclude') {
-      setProgressExcludes((prev) => [...prev, key]);
-    }
-  }
-
   const events = useMemo(() => {
     let filtered = allEvents;
 
@@ -378,48 +303,44 @@ export function PartnerDashboardPage() {
       );
     }
 
-    // Progress includes (AND: event must have ALL included progress items)
-    if (progressIncludes.length > 0) {
-      filtered = filtered.filter(e => {
-        if (!e.progress) return false;
-        return progressIncludes.every(key => e.progress![key as keyof typeof e.progress]);
-      });
-    }
-
-    // Progress excludes (AND: event must NOT have ANY excluded progress items)
-    if (progressExcludes.length > 0) {
-      filtered = filtered.filter(e => {
-        if (!e.progress) return true; // if no progress data, don't exclude
-        return progressExcludes.every(key => !e.progress![key as keyof typeof e.progress]);
-      });
-    }
-
     // Region filter
     if (regionFilter !== 'all') {
       filtered = filtered.filter(e => e.region === regionFilter);
     }
 
-    // Sort by date descending (default, no user-selectable sort)
+    // Sort
     const sorted = [...filtered].sort((a, b) => {
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
+      switch (sortBy) {
+        case 'date-asc':
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case 'rsvps':
+          return (b.rsvpCount || 0) - (a.rsvpCount || 0);
+        case 'clicks':
+          return (b.clickStats?.totalClicks || 0) - (a.clickStats?.totalClicks || 0);
+        case 'name':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'date-desc':
+        default:
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
     });
 
     return sorted;
-  }, [allEvents, searchQuery, progressIncludes, progressExcludes, regionFilter]);
+  }, [allEvents, searchQuery, sortBy, regionFilter]);
 
   const uniqueRegions = useMemo(() => {
     const regions = new Set(allEvents.map(e => e.region).filter(Boolean));
     return regions;
   }, [allEvents]);
 
-  const hasActiveFilters = searchQuery.trim() !== '' || progressIncludes.length > 0 || progressExcludes.length > 0 || (uniqueRegions.size > 1 && regionFilter !== 'all');
+  const hasActiveFilters = searchQuery.trim() !== '' || (uniqueRegions.size > 1 && regionFilter !== 'all');
 
   function clearAllFilters() {
     setSearchQuery('');
-    setProgressIncludes([]);
-    setProgressExcludes([]);
     setRegionFilter('all');
   }
 
@@ -702,16 +623,19 @@ export function PartnerDashboardPage() {
               />
             </div>
 
-            {/* Progress filter pills + Region dropdown */}
+            {/* Sort & Region dropdowns */}
             <div className="flex flex-wrap items-center gap-2">
-              {PROGRESS_FILTER_KEYS.map(({ key, label }) => (
-                <FilterPill
-                  key={key}
-                  label={label}
-                  state={getFilterState(key)}
-                  onToggle={(newState) => setFilterState(key, newState)}
-                />
-              ))}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
+              >
+                <option value="date-desc">Newest first</option>
+                <option value="date-asc">Oldest first</option>
+                <option value="rsvps">Most RSVPs</option>
+                <option value="clicks">Most clicks</option>
+                <option value="name">Name A–Z</option>
+              </select>
 
               {/* Region filter dropdown — hidden when all events share one region */}
               {uniqueRegions.size > 1 && (
