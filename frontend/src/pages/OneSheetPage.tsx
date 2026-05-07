@@ -11,6 +11,9 @@ import { IconInput } from '../components/IconInput';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
+const themeClass = 'gpp-theme';
+const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
 export function OneSheetPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -93,7 +96,7 @@ export function OneSheetPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className={`min-h-screen ${themeClass} flex items-center justify-center`} style={backgroundStyle}>
         <Loader2 className="w-8 h-8 animate-spin text-white/40" />
       </div>
     );
@@ -101,7 +104,7 @@ export function OneSheetPage() {
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <h1 className="text-2xl font-bold text-white mb-2">Event Not Found</h1>
@@ -124,7 +127,7 @@ export function OneSheetPage() {
   ].filter(Boolean).join(' | ');
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
       <Helmet>
         <title>{event.name} - Partner One Sheet</title>
         <meta property="og:title" content={`${event.name} - Partner One Sheet`} />
@@ -276,7 +279,7 @@ export function OneSheetPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3 rounded-lg bg-white text-black font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-lg bg-[#E52828] text-white font-semibold hover:bg-[#CC2020] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>
