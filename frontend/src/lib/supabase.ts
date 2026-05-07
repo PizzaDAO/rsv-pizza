@@ -615,6 +615,7 @@ export interface DbParty {
   pizza_style: string;
   available_beverages: string[];
   available_toppings: string[];
+  available_dietary_options: string[];
   max_guests: number | null;
   expected_guests?: number | null;
   hide_guests: boolean;
@@ -706,7 +707,7 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, max_guests, expected_guests, hide_guests,
+  pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, latitude, longitude, country, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
@@ -796,6 +797,7 @@ export async function createParty(
         pizza_style: party.pizzaStyle,
         available_beverages: party.availableBeverages || [],
         available_toppings: party.availableToppings || [],
+        available_dietary_options: party.availableDietaryOptions || [],
         max_guests: party.maxGuests,
         hide_guests: party.hideGuests || false,
         event_image_url: party.eventImageUrl,
@@ -1185,6 +1187,22 @@ export async function updatePartyBeverages(partyId: string, availableBeverages: 
 export async function updatePartyToppings(partyId: string, availableToppings: string[]): Promise<DbParty | null> {
   // Use the updateParty function which handles API routing
   const success = await updateParty(partyId, { available_toppings: availableToppings });
+  if (!success) return null;
+
+  // Fetch the updated party
+  const { data } = await supabase
+    .from('parties')
+    .select(SAFE_PARTY_COLUMNS)
+    .eq('id', partyId)
+    .single();
+
+  if (data) normalizePartyCoHosts(data);
+  return data;
+}
+
+export async function updatePartyDietaryOptions(partyId: string, availableDietaryOptions: string[]): Promise<DbParty | null> {
+  // Use the updateParty function which handles API routing
+  const success = await updateParty(partyId, { available_dietary_options: availableDietaryOptions });
   if (!success) return null;
 
   // Fetch the updated party
@@ -1677,6 +1695,7 @@ export async function updateParty(
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
+        availableDietaryOptions: updates.available_dietary_options,
         selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,

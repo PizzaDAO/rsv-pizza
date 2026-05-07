@@ -97,6 +97,7 @@ export interface CreatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   password?: string;
   eventImageUrl?: string;
   description?: string;
@@ -130,6 +131,7 @@ export interface UpdatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
@@ -181,6 +183,7 @@ export async function createPartyApi(data: CreatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      availableDietaryOptions: data.availableDietaryOptions,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
       description: data.description,
@@ -221,6 +224,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      availableDietaryOptions: data.availableDietaryOptions,
       selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
@@ -383,6 +387,7 @@ export interface PublicEvent {
   pizzaStyle: string;
   availableBeverages: string[];
   availableToppings: string[];
+  availableDietaryOptions: string[];
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;

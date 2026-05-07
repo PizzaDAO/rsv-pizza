@@ -49,6 +49,7 @@ model Party {
   pizzaStyle         String    @default("new-york") @map("pizza_style")
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
+  availableDietaryOptions String[] @map("available_dietary_options")
   address            String?
   latitude           Float?
   longitude          Float?

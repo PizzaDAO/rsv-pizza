@@ -209,7 +209,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
   try {
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
-      availableBeverages, availableToppings, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress
@@ -255,6 +255,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         pizzaStyle: pizzaStyle || 'new-york',
         availableBeverages: availableBeverages || [],
         availableToppings: availableToppings || [],
+        availableDietaryOptions: availableDietaryOptions || [],
         address: address || null,
         venueName: venueName || null,
         maxGuests: maxGuests || null,
@@ -383,7 +384,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const { id } = req.params;
     const {
       name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
-      availableBeverages, availableToppings, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -498,6 +499,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
+        ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),

@@ -9,6 +9,7 @@ import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
+import { DietarySettings } from '../components/DietarySettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
@@ -348,6 +349,7 @@ function HostPageContent() {
                   <AiCallHistory partyId={party.id} />
                   <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                   <BeverageSettings />
+                  <DietarySettings />
                 </>
               )}
 
