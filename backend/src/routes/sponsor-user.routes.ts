@@ -515,7 +515,9 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
   try {
     // Admins can pass ?tag= to filter, or see all tagged events
     const queryTag = req.query.tag as string | undefined;
-    const tag = queryTag?.trim().toLowerCase() || req.sponsorUser?.tag;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
     const sponsorUserId = req.sponsorUser?.id;
 
     // Build where clause — admins without a tag filter see all events that have any eventTags
