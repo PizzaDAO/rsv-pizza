@@ -180,17 +180,17 @@ export function OneSheetPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
+          <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Users size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{rsvpCount.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">RSVPs</div>
           </div>
-          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
+          <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Eye size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{totalViews.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">Page Views</div>
           </div>
-          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
+          <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Handshake size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{partnerCount.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">Partners</div>
@@ -240,7 +240,7 @@ export function OneSheetPage() {
         )}
 
         {/* Interest Form */}
-        <div className="bg-black/5 border border-black/10 rounded-xl p-6 space-y-5">
+        <div className="bg-white/80 border border-black/10 rounded-xl p-6 space-y-5">
           {submitted ? (
             <div className="flex flex-col items-center py-8 text-center space-y-3">
               <CheckCircle size={48} className="text-green-400" />
