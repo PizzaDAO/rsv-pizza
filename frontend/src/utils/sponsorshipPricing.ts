@@ -1,40 +1,48 @@
 import type { UnderbossEvent } from '../types';
 
+/** Tier 1 — top global cities (max $1,000) */
 const TIER_1_CITIES = [
-  'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami', 'toronto', 'mexico city',
-  'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
-  'london', 'paris', 'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan',
-  'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'melbourne', 'bangkok', 'dubai', 'mumbai',
-  'sao paulo', 'buenos aires',
+  'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami',
+  'london', 'paris', 'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'dubai',
 ];
 
-/**
- * Check if a city name matches a tier-1 city.
- * Normalizes by lowercasing and stripping hyphens/spaces, then checks
- * if any tier-1 city string is contained in the normalized name.
- */
-export function isTier1City(cityName: string): boolean {
+/** Tier 2 — major cities (max $500) */
+const TIER_2_CITIES = [
+  'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
+  'toronto', 'mexico city', 'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan',
+  'melbourne', 'bangkok', 'mumbai', 'sao paulo', 'buenos aires',
+];
+
+const TIER_CONFIG: Record<1 | 2 | 3, { floor: number; ceiling: number; max: number }> = {
+  1: { floor: 25, ceiling: 150, max: 1000 },
+  2: { floor: 25, ceiling: 100, max: 500 },
+  3: { floor: 35, ceiling: 100, max: 300 },
+};
+
+function matchesList(cityName: string, list: string[]): boolean {
   const normalized = cityName.toLowerCase().replace(/[-\s]/g, '');
-  return TIER_1_CITIES.some((tier1) => {
-    const normalizedTier1 = tier1.replace(/[-\s]/g, '');
-    return normalized.includes(normalizedTier1);
-  });
+  return list.some((c) => normalized.includes(c.replace(/[-\s]/g, '')));
+}
+
+export function getCityTier(cityName: string): 1 | 2 | 3 {
+  if (matchesList(cityName, TIER_1_CITIES)) return 1;
+  if (matchesList(cityName, TIER_2_CITIES)) return 2;
+  return 3;
 }
 
 /**
  * Calculate the sponsorship price for a single event.
- * $200 floor: non-tier-1 at ≤35 guests, tier-1 at ≤25 guests.
- * Scales linearly up to $500 (non-tier-1) or $1,000 (tier-1) at 105 guests.
+ * Tier 1: $200 (≤25 guests) → $1,000 (150+ guests)
+ * Tier 2: $200 (≤25 guests) → $500 (100+ guests)
+ * Tier 3: $200 (≤35 guests) → $300 (100+ guests)
+ * Rounded to nearest $50.
  */
 export function calculateEventPrice(guests: number, cityName: string): number {
-  const tier1 = isTier1City(cityName);
-  const floor = tier1 ? 25 : 35;
-  const ceiling = 105;
+  const tier = getCityTier(cityName);
+  const { floor, ceiling, max } = TIER_CONFIG[tier];
   const clamped = Math.max(floor, Math.min(ceiling, guests));
-  const min = 200;
-  const max = tier1 ? 1000 : 500;
-  const price = min + ((clamped - floor) / (ceiling - floor)) * (max - min);
-  return Math.round(price);
+  const price = 200 + ((clamped - floor) / (ceiling - floor)) * (max - 200);
+  return Math.round(price / 50) * 50;
 }
 
 /**
