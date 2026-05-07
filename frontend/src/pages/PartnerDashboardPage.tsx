@@ -556,25 +556,19 @@ export function PartnerDashboardPage() {
           const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
           const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
           const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
-          // Aggregate click breakdown by platform across all events
-          const clicksByPlatformAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
+          // Aggregate clicks: per-partner with per-platform breakdown
+          const clicksByPartnerPlatformAgg: Record<string, { total: number; uniqueTotal: number; platforms: Record<string, { clicks: number; uniqueClickers: number }> }> = {};
           for (const e of allEvents) {
             for (const link of e.clickStats?.byLink || []) {
-              const platform = detectPlatform(link.url);
-              if (!clicksByPlatformAgg[platform]) clicksByPlatformAgg[platform] = { clicks: 0, uniqueClickers: 0 };
-              clicksByPlatformAgg[platform].clicks += link.clicks;
-              clicksByPlatformAgg[platform].uniqueClickers += link.uniqueClickers;
-            }
-          }
-          // Aggregate clicks by partner name (for All Tags view)
-          const clicksByPartnerAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
-          for (const e of allEvents) {
-            for (const link of e.clickStats?.byLink || []) {
-              // Extract base partner name: "PizzaDAO_twitter" -> "PizzaDAO"
               const baseName = (link.linkLabel || 'Unknown').replace(/_[^_]+$/, '');
-              if (!clicksByPartnerAgg[baseName]) clicksByPartnerAgg[baseName] = { clicks: 0, uniqueClickers: 0 };
-              clicksByPartnerAgg[baseName].clicks += link.clicks;
-              clicksByPartnerAgg[baseName].uniqueClickers += link.uniqueClickers;
+              const platform = detectPlatform(link.url);
+              // Per-partner-per-platform
+              if (!clicksByPartnerPlatformAgg[baseName]) clicksByPartnerPlatformAgg[baseName] = { total: 0, uniqueTotal: 0, platforms: {} };
+              clicksByPartnerPlatformAgg[baseName].total += link.clicks;
+              clicksByPartnerPlatformAgg[baseName].uniqueTotal += link.uniqueClickers;
+              if (!clicksByPartnerPlatformAgg[baseName].platforms[platform]) clicksByPartnerPlatformAgg[baseName].platforms[platform] = { clicks: 0, uniqueClickers: 0 };
+              clicksByPartnerPlatformAgg[baseName].platforms[platform].clicks += link.clicks;
+              clicksByPartnerPlatformAgg[baseName].platforms[platform].uniqueClickers += link.uniqueClickers;
             }
           }
           const isSwc = dashboardData?.tag === 'swc';
@@ -584,29 +578,24 @@ export function PartnerDashboardPage() {
           const budgetRate = allEvents.length > 0 ? Math.round((withBudget / allEvents.length) * 100) : 0;
           return (
             <div className="mb-6 space-y-3">
-              <div className={`grid grid-cols-2 gap-3 ${isSwc ? 'md:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
-                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
+              <div className={`grid grid-cols-1 gap-3 ${isSwc ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'}`}>
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20 text-blue-400"><BarChart3 size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Events</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Overview</span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{allEvents.length}</div>
-                </div>
-                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/20 text-purple-400"><Users size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Total RSVPs</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-theme-text-muted">Events</span>
+                    <span className="text-sm font-bold text-theme-text">{allEvents.length}</span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{totalRsvps}</div>
-                  <div className="text-xs text-theme-text-muted mt-1">~{avgRsvps} per event</div>
-                </div>
-                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-cyan-500/20 text-cyan-400"><Eye size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Impressions</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-theme-text-muted">Total RSVPs</span>
+                    <span className="text-sm font-bold text-theme-text">{totalRsvps} <span className="text-xs font-normal text-theme-text-muted">(~{avgRsvps}/event)</span></span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{totalImpressions.toLocaleString()}</div>
-                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueVisitors.toLocaleString()} unique</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-theme-text-muted">Impressions</span>
+                    <span className="text-sm font-bold text-theme-text">{totalImpressions.toLocaleString()} <span className="text-xs font-normal text-theme-text-muted">({totalUniqueVisitors.toLocaleString()} unique)</span></span>
+                  </div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -615,36 +604,33 @@ export function PartnerDashboardPage() {
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
-                  {!selectedTag && dashboardData?.isAdmin ? (
-                    Object.keys(clicksByPartnerAgg).length > 0 && (
-                      <div className="flex flex-col gap-1 mt-2">
-                        {Object.entries(clicksByPartnerAgg)
-                          .sort((a, b) => b[1].clicks - a[1].clicks)
-                          .map(([partner, data]) => (
-                            <div key={partner} className="flex items-center justify-between text-xs">
-                              <span className="text-theme-text-secondary">{partner}</span>
-                              <span className="text-theme-text font-semibold">{data.clicks} <span className="text-theme-text-muted font-normal">({data.uniqueClickers} unique)</span></span>
+                  {Object.keys(clicksByPartnerPlatformAgg).length > 0 && (
+                    <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-theme-stroke/50">
+                      {Object.entries(clicksByPartnerPlatformAgg)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .map(([partner, data]) => (
+                          <div key={partner}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-theme-text-secondary font-medium">{partner}</span>
+                              <span className="text-theme-text font-semibold">{data.total} <span className="text-theme-text-muted font-normal">({data.uniqueTotal} unique)</span></span>
                             </div>
-                          ))}
-                      </div>
-                    )
-                  ) : (
-                    Object.keys(clicksByPlatformAgg).length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {Object.entries(clicksByPlatformAgg)
-                          .sort((a, b) => b[1].clicks - a[1].clicks)
-                          .map(([platform, data]) => (
-                          <span
-                            key={platform}
-                            className="inline-flex items-center gap-1 text-xs text-theme-text-muted"
-                            title={`${platform}: ${data.clicks} clicks (${data.uniqueClickers} unique)`}
-                          >
-                            <PlatformIcon platform={platform} size={14} />
-                            <span className="font-semibold text-theme-text">{data.clicks}</span>
-                          </span>
+                            <div className="flex flex-wrap gap-2 ml-1">
+                              {Object.entries(data.platforms)
+                                .sort((a, b) => b[1].clicks - a[1].clicks)
+                                .map(([platform, pData]) => (
+                                  <span
+                                    key={platform}
+                                    className="inline-flex items-center gap-1 text-[11px] text-theme-text-muted"
+                                    title={`${platform}: ${pData.clicks} clicks (${pData.uniqueClickers} unique)`}
+                                  >
+                                    <PlatformIcon platform={platform} size={12} />
+                                    <span className="font-semibold text-theme-text">{pData.clicks}</span>
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
                         ))}
-                      </div>
-                    )
+                    </div>
                   )}
                 </div>
                 {isSwc && (
