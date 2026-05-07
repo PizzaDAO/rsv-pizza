@@ -41,17 +41,19 @@ export function calculateEventPrice(guests: number, cityName: string): number {
  */
 export function calculateTagSponsorshipTotal(
   events: UnderbossEvent[]
-): { total: number; eventCount: number } {
+): { total: number; eventCount: number; missingExpectedGuests: number } {
   const prefix = 'Global Pizza Party ';
   let total = 0;
+  let missingExpectedGuests = 0;
 
   for (const event of events) {
     const cityName = event.name.startsWith(prefix)
       ? event.name.slice(prefix.length)
       : event.name;
+    if (event.expectedGuests == null) missingExpectedGuests++;
     const guests = event.expectedGuests ?? event.guestCount ?? 30;
     total += calculateEventPrice(guests, cityName);
   }
 
-  return { total, eventCount: events.length };
+  return { total, eventCount: events.length, missingExpectedGuests };
 }

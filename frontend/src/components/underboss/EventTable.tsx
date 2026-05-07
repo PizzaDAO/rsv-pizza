@@ -373,6 +373,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             />
             <span className="text-xs text-green-400/60">% off</span>
           </div>
+          {sponsorshipSuggestion.missingExpectedGuests > 0 && (
+            <span className="text-xs text-amber-400/70 ml-2">
+              ({sponsorshipSuggestion.missingExpectedGuests} without expected guests)
+            </span>
+          )}
         </div>
       )}
 
