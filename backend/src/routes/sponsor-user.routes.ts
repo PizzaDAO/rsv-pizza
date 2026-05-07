@@ -751,7 +751,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         id: event.id,
         name: event.name,
         slug: event.customUrl || event.inviteCode,
-        reportPublicSlug: event.reportPublicSlug || event.customUrl || event.inviteCode,
+        reportPublicSlug: event.reportPublished ? (event.reportPublicSlug || event.customUrl || event.inviteCode) : null,
         date: event.date,
         timezone: event.timezone,
         address: event.address,
