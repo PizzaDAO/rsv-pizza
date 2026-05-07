@@ -543,7 +543,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {relTime.text}
                 </span>
-                <span className="text-xs text-green-400/60 ml-1">&middot; ${price.toLocaleString()}</span>
+                <span className="text-xs font-medium text-green-400 ml-1">&middot; ${price.toLocaleString()}</span>
               </div>
               {/* Inline notes editor */}
               {notesOpen && (

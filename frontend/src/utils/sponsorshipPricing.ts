@@ -2,16 +2,44 @@ import type { UnderbossEvent } from '../types';
 
 /** Tier 1 — top global cities (max $1,000) */
 const TIER_1_CITIES = [
+  // Americas
   'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami',
-  'london', 'paris', 'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'dubai',
+  // Europe
+  'london', 'paris',
+  // Asia-Pacific
+  'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'dubai',
+  'shanghai', 'beijing', 'shenzhen',
+  // Local name variants
+  'istanbul', 'İstanbul',
+  // India mega-cities
+  'delhi', 'new delhi', 'mumbai',
 ];
 
 /** Tier 2 — major cities (max $500) */
 const TIER_2_CITIES = [
+  // US
   'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
-  'toronto', 'mexico city', 'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan',
-  'melbourne', 'bangkok', 'mumbai', 'sao paulo', 'buenos aires',
-  'vienna', 'prague', 'warsaw', 'budapest', 'dublin', 'copenhagen', 'stockholm', 'oslo', 'zurich', 'brussels',
+  'san diego', 'las vegas', 'phoenix', 'nashville', 'minneapolis', 'detroit', 'portland',
+  'kansas city', 'st. louis', 'salt lake city', 'pittsburgh', 'san juan', 'honolulu',
+  'raleigh', 'cleveland', 'cincinnati', 'milwaukee', 'memphis', 'jacksonville', 'omaha',
+  // Canada
+  'toronto', 'vancouver', 'calgary', 'edmonton', 'ottawa', 'montreal', 'winnipeg',
+  // Latin America
+  'mexico city', 'monterrey', 'sao paulo', 'rio de janeiro', 'buenos aires', 'bogota', 'bogotá',
+  'lima', 'santiago', 'medellin', 'medellín', 'caracas', 'quito',
+  // Europe
+  'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan', 'munich', 'hamburg', 'rome', 'roma',
+  'vienna', 'wien', 'prague', 'warsaw', 'warszawa', 'budapest', 'dublin', 'copenhagen',
+  'stockholm', 'oslo', 'zurich', 'brussels', 'athens', 'helsinki', 'bucharest',
+  'zagreb', 'ljubljana', 'gothenburg', 'tallinn', 'naples', 'moscow',
+  // Asia
+  'melbourne', 'bangkok', 'kuala lumpur', 'ho chi minh', 'hanoi', 'doha', 'beirut',
+  'chennai', 'kolkata', 'hyderabad', 'bangalore', 'pune', 'colombo', 'kathmandu',
+  // Africa
+  'lagos', 'nairobi', 'johannesburg', 'kampala', 'dar es salaam', 'accra', 'addis ababa',
+  'kigali', 'cape town',
+  // Oceania
+  'perth', 'gold coast', 'auckland', 'wellington',
 ];
 
 const TIER_CONFIG: Record<1 | 2 | 3, { floor: number; ceiling: number; max: number }> = {
