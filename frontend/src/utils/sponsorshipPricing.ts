@@ -45,7 +45,7 @@ const TIER_2_CITIES = [
 const TIER_CONFIG: Record<1 | 2 | 3, { floor: number; ceiling: number; max: number }> = {
   1: { floor: 25, ceiling: 150, max: 1000 },
   2: { floor: 25, ceiling: 100, max: 500 },
-  3: { floor: 35, ceiling: 100, max: 300 },
+  3: { floor: 35, ceiling: 150, max: 400 },
 };
 
 function matchesList(cityName: string, list: string[]): boolean {
