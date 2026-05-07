@@ -1,22 +1,108 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote } from '../lib/api';
+import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote, getPartyPhotos } from '../lib/api';
 import {
   Loader2, Shield, Tag, Users,
   Search, ThumbsUp, ThumbsDown, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
-  Instagram, Youtube, Linkedin, Globe, Facebook, Link2,
+  Instagram, Youtube, Linkedin, Globe, Facebook,
+  Camera, ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
+import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
 import { fetchSheetCities } from '../lib/cities';
 import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
+
+interface DisplayPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  source: 'uploaded' | 'gpp';
+  year?: number;
+}
+
+function PhotoLightbox({
+  photos,
+  currentIndex,
+  onClose,
+  onNavigate,
+}: {
+  photos: DisplayPhoto[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const photo = photos[currentIndex];
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+    };
+    window.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [currentIndex, photos.length, onClose, onNavigate]);
+
+  if (!photo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+      >
+        <X size={24} />
+      </button>
+
+      {currentIndex > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {currentIndex < photos.length - 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
+
+      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={photo.url}
+          alt={photo.caption || ''}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {photo.caption && (
+          <p className="text-white/70 text-sm text-center max-w-lg">{photo.caption}</p>
+        )}
+      </div>
+
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+        {currentIndex + 1} of {photos.length}
+      </p>
+    </div>
+  );
+}
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -680,8 +766,64 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
-  // One Sheet copy state
-  const [copied, setCopied] = useState(false);
+  // Photo state
+  const [photosExpanded, setPhotosExpanded] = useState(false);
+  const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [gppCount, setGppCount] = useState(0);
+
+  useEffect(() => {
+    const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+    if (!cityName) return;
+    getGppPhotoCounts().then(counts => {
+      const key = cityName.toLowerCase().replace(/\s+/g, '');
+      setGppCount(counts[key] || 0);
+    });
+  }, [event.name]);
+
+  const loadPhotos = useCallback(async () => {
+    if (displayPhotos.length > 0 || !event.id) return;
+    setPhotosLoading(true);
+    try {
+      const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+
+      const [uploadedResult, gppPhotos] = await Promise.all([
+        getPartyPhotos(event.id),
+        cityName ? getGppPhotosForCity(cityName) : Promise.resolve([]),
+      ]);
+
+      const uploaded: DisplayPhoto[] = (uploadedResult?.photos || []).map((p: any) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        source: 'uploaded' as const,
+      }));
+
+      const gpp: DisplayPhoto[] = gppPhotos.map((p: any, i: number) => ({
+        id: `gpp-${i}`,
+        url: p.url,
+        thumbnailUrl: null,
+        caption: `GPP ${p.year}`,
+        source: 'gpp' as const,
+        year: p.year,
+      }));
+
+      setDisplayPhotos([...uploaded, ...gpp]);
+    } catch (err) {
+      console.error('Failed to load photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [event.id, event.name, displayPhotos.length]);
+
+  const togglePhotos = useCallback(() => {
+    const next = !photosExpanded;
+    setPhotosExpanded(next);
+    if (next) loadPhotos();
+  }, [photosExpanded, loadPhotos]);
 
   // Notes state with debounced auto-save
   const [notes, setNotes] = useState(event.partnerNotes || '');
@@ -800,18 +942,6 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 Report
               </span>
             )}
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`https://rsv.pizza/onesheet/${event.slug}`);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
-              title="Copy One Sheet link"
-            >
-              <Link2 size={12} />
-              {copied ? 'Copied!' : 'One Sheet'}
-            </button>
           </div>
         </div>
 
@@ -841,6 +971,15 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
               <span className="text-xs text-theme-text-muted">RSVPs</span>
             </div>
+            {(event.photoCount + gppCount > 0) && (
+              <button
+                onClick={togglePhotos}
+                className="flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
+              >
+                <Camera size={12} />
+                <span className="text-xs">{event.photoCount + gppCount}</span>
+              </button>
+            )}
             {event.expectedGuests != null && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-theme-text-faint">/</span>
@@ -923,6 +1062,63 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
             <span className="truncate">{notes || 'Private notes for this event...'}</span>
           )}
         </button>
+
+        {/* Expandable photo grid */}
+        {photosExpanded && (
+          <div className="mt-3 pt-3 border-t border-theme-stroke/50">
+            {photosLoading ? (
+              <div className="flex items-center gap-2 py-3">
+                <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
+                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+              </div>
+            ) : displayPhotos.length === 0 ? (
+              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12)).map((photo, idx) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => setLightboxIndex(idx)}
+                      className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500/50 transition-all relative group"
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.caption || ''}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {photo.source === 'gpp' && photo.year && (
+                        <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/60 text-white/80 px-1 rounded">
+                          {photo.year}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {!showAllPhotos && displayPhotos.length > 12 && (
+                  <button
+                    onClick={() => setShowAllPhotos(true)}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Show all {displayPhotos.length} photos
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Photo lightbox */}
+        {lightboxIndex !== null && (showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12))[lightboxIndex] && createPortal(
+          <PhotoLightbox
+            photos={showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12)}
+            currentIndex={lightboxIndex}
+            onClose={() => setLightboxIndex(null)}
+            onNavigate={setLightboxIndex}
+          />,
+          document.body
+        )}
       </div>{/* closes flex-1 wrapper */}
 
       {/* Notes modal */}
