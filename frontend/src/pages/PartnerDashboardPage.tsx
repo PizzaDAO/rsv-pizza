@@ -499,24 +499,29 @@ export function PartnerDashboardPage() {
           const budgetRate = allEvents.length > 0 ? Math.round((withBudget / allEvents.length) * 100) : 0;
           return (
             <div className="mb-6 space-y-3">
-              <div className={`grid grid-cols-1 gap-3 ${isSwc ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'}`}>
-                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-2 mb-1">
+              <div className={`grid grid-cols-2 gap-3 ${isSwc ? 'md:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20 text-blue-400"><BarChart3 size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Overview</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Events</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-theme-text-muted">Events</span>
-                    <span className="text-sm font-bold text-theme-text">{allEvents.length}</span>
+                  <div className="text-2xl font-bold text-theme-text">{allEvents.length}</div>
+                </div>
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/20 text-purple-400"><Users size={16} /></div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Total RSVPs</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-theme-text-muted">Total RSVPs</span>
-                    <span className="text-sm font-bold text-theme-text">{totalRsvps} <span className="text-xs font-normal text-theme-text-muted">(~{avgRsvps}/event)</span></span>
+                  <div className="text-2xl font-bold text-theme-text">{totalRsvps}</div>
+                  <div className="text-xs text-theme-text-muted mt-1">~{avgRsvps} per event</div>
+                </div>
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-cyan-500/20 text-cyan-400"><Eye size={16} /></div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Impressions</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-theme-text-muted">Impressions</span>
-                    <span className="text-sm font-bold text-theme-text">{totalImpressions.toLocaleString()} <span className="text-xs font-normal text-theme-text-muted">({totalUniqueVisitors.toLocaleString()} unique)</span></span>
-                  </div>
+                  <div className="text-2xl font-bold text-theme-text">{totalImpressions.toLocaleString()}</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueVisitors.toLocaleString()} unique</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
