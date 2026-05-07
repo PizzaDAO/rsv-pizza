@@ -566,6 +566,17 @@ export function PartnerDashboardPage() {
               clicksByPlatformAgg[platform].uniqueClickers += link.uniqueClickers;
             }
           }
+          // Aggregate clicks by partner name (for All Tags view)
+          const clicksByPartnerAgg: Record<string, { clicks: number; uniqueClickers: number }> = {};
+          for (const e of allEvents) {
+            for (const link of e.clickStats?.byLink || []) {
+              // Extract base partner name: "PizzaDAO_twitter" -> "PizzaDAO"
+              const baseName = (link.linkLabel || 'Unknown').replace(/_[^_]+$/, '');
+              if (!clicksByPartnerAgg[baseName]) clicksByPartnerAgg[baseName] = { clicks: 0, uniqueClickers: 0 };
+              clicksByPartnerAgg[baseName].clicks += link.clicks;
+              clicksByPartnerAgg[baseName].uniqueClickers += link.uniqueClickers;
+            }
+          }
           const isSwc = dashboardData?.tag === 'swc';
           const withVenue = allEvents.filter(e => e.progress?.hasVenue).length;
           const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
@@ -604,21 +615,36 @@ export function PartnerDashboardPage() {
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
                   <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
-                  {Object.keys(clicksByPlatformAgg).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.entries(clicksByPlatformAgg)
-                        .sort((a, b) => b[1].clicks - a[1].clicks)
-                        .map(([platform, data]) => (
-                        <span
-                          key={platform}
-                          className="inline-flex items-center gap-1 text-xs text-theme-text-muted"
-                          title={`${platform}: ${data.clicks} clicks (${data.uniqueClickers} unique)`}
-                        >
-                          <PlatformIcon platform={platform} size={14} />
-                          <span className="font-semibold text-theme-text">{data.clicks}</span>
-                        </span>
-                      ))}
-                    </div>
+                  {!selectedTag && dashboardData?.isAdmin ? (
+                    Object.keys(clicksByPartnerAgg).length > 0 && (
+                      <div className="flex flex-col gap-1 mt-2">
+                        {Object.entries(clicksByPartnerAgg)
+                          .sort((a, b) => b[1].clicks - a[1].clicks)
+                          .map(([partner, data]) => (
+                            <div key={partner} className="flex items-center justify-between text-xs">
+                              <span className="text-theme-text-secondary">{partner}</span>
+                              <span className="text-theme-text font-semibold">{data.clicks} <span className="text-theme-text-muted font-normal">({data.uniqueClickers} unique)</span></span>
+                            </div>
+                          ))}
+                      </div>
+                    )
+                  ) : (
+                    Object.keys(clicksByPlatformAgg).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {Object.entries(clicksByPlatformAgg)
+                          .sort((a, b) => b[1].clicks - a[1].clicks)
+                          .map(([platform, data]) => (
+                          <span
+                            key={platform}
+                            className="inline-flex items-center gap-1 text-xs text-theme-text-muted"
+                            title={`${platform}: ${data.clicks} clicks (${data.uniqueClickers} unique)`}
+                          >
+                            <PlatformIcon platform={platform} size={14} />
+                            <span className="font-semibold text-theme-text">{data.clicks}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )
                   )}
                 </div>
                 {isSwc && (
