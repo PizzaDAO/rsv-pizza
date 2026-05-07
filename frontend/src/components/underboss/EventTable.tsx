@@ -101,6 +101,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [customTag, setCustomTag] = useState('');
   const [showCopyCitiesModal, setShowCopyCitiesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [discount, setDiscount] = useState(0);
 
   // Alphabetized city names from the currently-selected events.
   // Reuses the same extraction logic as the Send Telegram action: strip
@@ -351,8 +352,27 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           <span className="text-sm text-green-400">
             Suggested sponsorship for "<span className="font-medium">{tagFilter}</span>"
             ({sponsorshipSuggestion.eventCount} events):
-            <span className="font-bold ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+            {discount > 0 ? (
+              <>
+                <span className="line-through opacity-50 ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+                <span className="font-bold ml-1">${Math.round(sponsorshipSuggestion.total * (1 - discount / 100)).toLocaleString()}</span>
+              </>
+            ) : (
+              <span className="font-bold ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+            )}
           </span>
+          <div className="flex items-center gap-1 ml-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={discount || ''}
+              onChange={(e) => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+              placeholder="0"
+              className="w-12 px-1.5 py-0.5 text-xs text-center rounded bg-black/30 border border-green-500/20 text-green-400 placeholder:text-green-400/30 focus:outline-none focus:border-green-500/40"
+            />
+            <span className="text-xs text-green-400/60">% off</span>
+          </div>
         </div>
       )}
 

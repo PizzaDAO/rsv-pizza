@@ -22,16 +22,16 @@ export function isTier1City(cityName: string): boolean {
 
 /**
  * Calculate the sponsorship price for a single event.
- * Base price scales linearly from $2 (30 guests) to $500 (250 guests).
- * Tier-1 cities get a 2x multiplier.
+ * $200 minimum, linear interpolation up to $500 (non-tier-1) or $1,000 (tier-1).
  * Guest count is clamped to [30, 250].
  */
 export function calculateEventPrice(guests: number, cityName: string): number {
   const clamped = Math.max(30, Math.min(250, guests));
-  // Linear interpolation: $2 at 30 guests, $500 at 250 guests
-  const base = 2 + ((clamped - 30) / (250 - 30)) * (500 - 2);
-  const multiplier = isTier1City(cityName) ? 2 : 1;
-  return Math.round(base * multiplier);
+  const tier1 = isTier1City(cityName);
+  const min = 200;
+  const max = tier1 ? 1000 : 500;
+  const price = min + ((clamped - 30) / (250 - 30)) * (max - min);
+  return Math.round(price);
 }
 
 /**
