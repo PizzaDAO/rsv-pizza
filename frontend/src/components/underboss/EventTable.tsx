@@ -347,18 +347,18 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
       {/* Sponsorship pricing suggestion banner */}
       {sponsorshipSuggestion && (
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-          <DollarSign size={14} className="text-green-400" />
-          <span className="text-sm text-green-400">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+          <DollarSign size={14} className="text-theme-text-secondary" />
+          <span className="text-sm text-theme-text">
             Suggested sponsorship for "<span className="font-medium">{tagFilter}</span>"
             ({sponsorshipSuggestion.eventCount} events):
             {discount > 0 ? (
               <>
-                <span className="line-through opacity-50 ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
-                <span className="font-bold ml-1">${Math.round(sponsorshipSuggestion.total * (1 - discount / 100)).toLocaleString()}</span>
+                <span className="line-through text-theme-text-muted ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+                <span className="font-bold text-white ml-1">${Math.round(sponsorshipSuggestion.total * (1 - discount / 100)).toLocaleString()}</span>
               </>
             ) : (
-              <span className="font-bold ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+              <span className="font-bold text-white ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
             )}
           </span>
           <div className="flex items-center gap-1 ml-2">
@@ -369,12 +369,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               value={discount || ''}
               onChange={(e) => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
               placeholder="0"
-              className="w-12 px-1.5 py-0.5 text-xs text-center rounded bg-black/30 border border-green-500/20 text-green-400 placeholder:text-green-400/30 focus:outline-none focus:border-green-500/40"
+              className="w-12 px-1.5 py-0.5 text-xs text-center rounded bg-black/30 border border-theme-stroke text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
             />
-            <span className="text-xs text-green-400/60">% off</span>
+            <span className="text-xs text-theme-text-muted">% off</span>
           </div>
           {sponsorshipSuggestion.missingExpectedGuests > 0 && (
-            <span className="text-xs text-amber-400/70 ml-2">
+            <span className="text-xs text-amber-400 ml-2">
               ({sponsorshipSuggestion.missingExpectedGuests} without expected guests)
             </span>
           )}
