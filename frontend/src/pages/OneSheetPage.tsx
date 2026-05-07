@@ -10,6 +10,8 @@ import { cdnUrl } from '../lib/supabase';
 import { IconInput } from '../components/IconInput';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { GPPClouds } from '../components/GPPClouds';
+import { LastYearPhotos } from '../components/LastYearPhotos';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -127,7 +129,8 @@ export function OneSheetPage() {
   ].filter(Boolean).join(' | ');
 
   return (
-    <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+    <div className={`min-h-screen ${themeClass} relative`} style={backgroundStyle}>
+      <GPPClouds />
       <Helmet>
         <title>{event.name} - Partner One Sheet</title>
         <meta property="og:title" content={`${event.name} - Partner One Sheet`} />
@@ -140,7 +143,7 @@ export function OneSheetPage() {
 
       <Header />
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8 relative z-10">
         {/* Flyer Image */}
         {event.eventImageUrl && (
           <div className="rounded-xl overflow-hidden">
@@ -177,17 +180,17 @@ export function OneSheetPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
             <Users size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{rsvpCount.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">RSVPs</div>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
             <Eye size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{totalViews.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">Page Views</div>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+          <div className="bg-black/5 border border-black/10 rounded-xl p-4 text-center">
             <Handshake size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{partnerCount.toLocaleString()}</div>
             <div className="text-xs text-white/40 mt-0.5">Partners</div>
@@ -227,8 +230,17 @@ export function OneSheetPage() {
           </div>
         )}
 
+        {/* Last Year's Photos */}
+        {event.eventType === 'gpp' && event.customUrl && (
+          <LastYearPhotos
+            customUrl={event.customUrl}
+            hiddenGppPhotos={event.hiddenGppPhotos}
+            extraGppPhotos={event.extraGppPhotos}
+          />
+        )}
+
         {/* Interest Form */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-5">
+        <div className="bg-black/5 border border-black/10 rounded-xl p-6 space-y-5">
           {submitted ? (
             <div className="flex flex-col items-center py-8 text-center space-y-3">
               <CheckCircle size={48} className="text-green-400" />
@@ -243,6 +255,7 @@ export function OneSheetPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <IconInput
                   icon={User}
+                  type="text"
                   placeholder="Your name"
                   required
                   value={name}
@@ -258,7 +271,8 @@ export function OneSheetPage() {
                 />
                 <IconInput
                   icon={Building2}
-                  placeholder="Company / brand"
+                  type="text"
+                  placeholder="Organization"
                   required
                   value={company}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCompany(e.target.value)}
