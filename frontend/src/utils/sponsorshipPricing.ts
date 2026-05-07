@@ -2,6 +2,7 @@ import type { UnderbossEvent } from '../types';
 
 const TIER_1_CITIES = [
   'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami', 'toronto', 'mexico city',
+  'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
   'london', 'paris', 'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan',
   'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'melbourne', 'bangkok', 'dubai', 'mumbai',
   'sao paulo', 'buenos aires',
@@ -22,15 +23,17 @@ export function isTier1City(cityName: string): boolean {
 
 /**
  * Calculate the sponsorship price for a single event.
- * $200 minimum, linear interpolation up to $500 (non-tier-1) or $1,000 (tier-1).
- * Guest count is clamped to [30, 250].
+ * $200 floor: non-tier-1 at ≤35 guests, tier-1 at ≤25 guests.
+ * Scales linearly up to $500 (non-tier-1) or $1,000 (tier-1) at 105 guests.
  */
 export function calculateEventPrice(guests: number, cityName: string): number {
-  const clamped = Math.max(30, Math.min(250, guests));
   const tier1 = isTier1City(cityName);
+  const floor = tier1 ? 25 : 35;
+  const ceiling = 105;
+  const clamped = Math.max(floor, Math.min(ceiling, guests));
   const min = 200;
   const max = tier1 ? 1000 : 500;
-  const price = min + ((clamped - 30) / (250 - 30)) * (max - min);
+  const price = min + ((clamped - floor) / (ceiling - floor)) * (max - min);
   return Math.round(price);
 }
 
