@@ -308,7 +308,7 @@ export function RSVPFormStep1({
           className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
         >
           {form.ethconfOptIn ? (
-            <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
           ) : (
             <Square size={20} className="text-theme-text-muted flex-shrink-0" />
           )}
