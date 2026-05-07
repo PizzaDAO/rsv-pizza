@@ -522,7 +522,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           select: { notes: true },
           take: 1,
         },
-        _count: { select: { guests: true } },
+        _count: { select: { guests: true, photos: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -744,6 +744,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         sponsorStatuses,
         sponsorCount,
         partnerNotes: event.partnerEventNotes.length > 0 ? event.partnerEventNotes[0].notes : null,
+        photoCount: event._count.photos,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,

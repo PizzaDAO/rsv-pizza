@@ -1236,6 +1236,7 @@ export interface SponsorDashboardEvent {
     uniqueVisitors: number;
   };
   partnerNotes: string | null;
+  photoCount: number;
   checklist: SponsorChecklistItem[];
 }
 
