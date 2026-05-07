@@ -149,32 +149,39 @@ export function RSVPFormStep1({
         </div>
       )}
 
-      {/* Consolidated mailing list + partner opt-in */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            const newVal = !form.mailingListOptIn;
-            form.setMailingListOptIn(newVal);
-            // Also set the relevant SWC opt-in for this event's region
-            if (form.isSwcEvent) form.setSwcOptIn(newVal);
-            if (form.isSwcCaEvent) form.setSwcCaOptIn(newVal);
-            if (form.isSwcAuEvent) form.setSwcAuOptIn(newVal);
-            if (form.isSwcEuEvent) form.setSwcEuOptIn(newVal);
-            if (form.isSwcUkEvent) form.setSwcUkOptIn(newVal);
-          }}
-          className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-        >
-          {form.mailingListOptIn ? (
-            <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-          ) : (
-            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-          )}
-          <span className="text-sm text-theme-text">
-            Hear from PizzaDAO + our partners
-          </span>
-        </button>
-        {(form.isSwcEvent || form.isSwcCaEvent || form.isSwcAuEvent || form.isSwcEuEvent || form.isSwcUkEvent) && (
+      {/* PizzaDAO Newsletter opt-in */}
+      <button
+        type="button"
+        onClick={() => form.setMailingListOptIn(!form.mailingListOptIn)}
+        className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
+      >
+        {form.mailingListOptIn ? (
+          <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+        ) : (
+          <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+        )}
+        <span className="text-sm text-theme-text">
+          Join PizzaDAO's mailing list
+        </span>
+      </button>
+
+      {/* SWC opt-in (US) */}
+      {form.isSwcEvent && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => form.setSwcOptIn(!form.swcOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+          >
+            {form.swcOptIn ? (
+              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              Join Stand with Crypto
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => form.setShowSwcInfoModal(true)}
@@ -182,8 +189,134 @@ export function RSVPFormStep1({
           >
             <Info size={18} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* SWC opt-in (Canada) */}
+      {form.isSwcCaEvent && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => form.setSwcCaOptIn(!form.swcCaOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+          >
+            {form.swcCaOptIn ? (
+              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              Join Stand with Crypto Canada
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => form.setShowSwcInfoModal(true)}
+            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+          >
+            <Info size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* SWC opt-in (Australia) */}
+      {form.isSwcAuEvent && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => form.setSwcAuOptIn(!form.swcAuOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+          >
+            {form.swcAuOptIn ? (
+              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              Join Stand with Crypto Australia
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => form.setShowSwcInfoModal(true)}
+            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+          >
+            <Info size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* SWC opt-in (EU) */}
+      {form.isSwcEuEvent && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => form.setSwcEuOptIn(!form.swcEuOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+          >
+            {form.swcEuOptIn ? (
+              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              Join Stand with Crypto EU
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => form.setShowSwcInfoModal(true)}
+            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+          >
+            <Info size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* SWC opt-in (UK) */}
+      {form.isSwcUkEvent && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => form.setSwcUkOptIn(!form.swcUkOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+          >
+            {form.swcUkOptIn ? (
+              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              Join Stand with Crypto UK
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => form.setShowSwcInfoModal(true)}
+            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+          >
+            <Info size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* ETHConf opt-in */}
+      {form.isEthconfEvent && (
+        <button
+          type="button"
+          onClick={() => form.setEthconfOptIn(!form.ethconfOptIn)}
+          className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
+        >
+          {form.ethconfOptIn ? (
+            <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+          ) : (
+            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+          )}
+          <span className="text-sm text-theme-text">
+            Send me an ETHConf Discount
+          </span>
+        </button>
+      )}
 
       {/* Partner info modal (SWC) */}
       {form.showSwcInfoModal && createPortal(
