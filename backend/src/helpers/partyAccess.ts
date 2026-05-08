@@ -2,6 +2,15 @@ import { prisma } from '../config/database.js';
 import { isSuperAdmin } from '../middleware/auth.js';
 
 /**
+ * Emails that automatically get editor access to ALL GPP events.
+ * These users don't appear in the co_hosts array, so they're invisible
+ * in host settings and on the public event page.
+ */
+export const GPP_GLOBAL_EDITORS = [
+  'hunter@rarepizzas.com',
+];
+
+/**
  * Valid tab IDs that can appear in a co-host's allowedTabs array.
  * Used for validation when saving co-host permissions.
  */
@@ -59,6 +68,13 @@ export async function canUserEditParty(
     return true;
   }
 
+  // Check if user is a GPP global editor
+  if (userEmail && (party as any).eventType === 'gpp') {
+    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+      return true;
+    }
+  }
+
   // Check if user is a co-host with edit permissions
   if (userEmail) {
     const coHosts = party.coHosts as Array<{ email?: string; canEdit?: boolean }> | null;
@@ -101,7 +117,7 @@ export async function canUserAccessTab(
   // Fetch the party to check ownership and co-host permissions
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    select: { userId: true, coHosts: true },
+    select: { userId: true, coHosts: true, eventType: true },
   });
 
   if (!party) {
@@ -111,6 +127,13 @@ export async function canUserAccessTab(
   // Party owner can access all tabs
   if (party.userId === userId) {
     return true;
+  }
+
+  // GPP global editors can access all tabs
+  if (userEmail && party.eventType === 'gpp') {
+    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+      return true;
+    }
   }
 
   // Check co-host tab permissions

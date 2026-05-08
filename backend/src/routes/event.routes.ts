@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 
 const router = Router();
 
@@ -320,12 +321,12 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
     // Find party by invite code or custom URL
     let party = await prisma.party.findUnique({
       where: { inviteCode: slug },
-      select: { coHosts: true, userId: true },
+      select: { coHosts: true, userId: true, eventType: true },
     });
     if (!party) {
       party = await prisma.party.findUnique({
         where: { customUrl: slug },
-        select: { coHosts: true, userId: true },
+        select: { coHosts: true, userId: true, eventType: true },
       });
     }
     // Alias fallback: silently resolve old slugs
@@ -337,7 +338,7 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
       if (alias) {
         party = await prisma.party.findUnique({
           where: { id: alias.partyId },
-          select: { coHosts: true, userId: true },
+          select: { coHosts: true, userId: true, eventType: true },
         });
       }
     }
@@ -350,7 +351,18 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
       (h: any) => h.email?.toLowerCase() === email.toLowerCase()
     );
 
-    res.json({ isHost: !!matchedHost, canEdit: !!matchedHost?.canEdit });
+    // Check GPP global editor access
+    let isHost = !!matchedHost;
+    let canEdit = !!matchedHost?.canEdit;
+    if (!canEdit && (party as any).eventType === 'gpp' && email) {
+      const isGppEditor = GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === email.toLowerCase());
+      if (isGppEditor) {
+        isHost = true;
+        canEdit = true;
+      }
+    }
+
+    res.json({ isHost, canEdit });
   } catch (error) {
     next(error);
   }
