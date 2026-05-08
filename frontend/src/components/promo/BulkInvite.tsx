@@ -229,7 +229,8 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
       const res = await bulkInviteGuests(
         party.id,
         [{ name, email }],
-        testMessage.trim() || undefined
+        testMessage.trim() || undefined,
+        true // testOnly — skip duplicate check, don't create guest row
       );
       if (res.sent.length > 0) {
         setTestResult('sent');

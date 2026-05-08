@@ -316,13 +316,14 @@ export interface BulkInviteResult {
 export async function bulkInviteGuests(
   partyId: string,
   guests: Array<{ name: string; email: string }>,
-  customMessage?: string
+  customMessage?: string,
+  testOnly?: boolean
 ): Promise<BulkInviteResult> {
   return apiRequest<BulkInviteResult>(
     `/api/v1/parties/${partyId}/guests/bulk-invite`,
     {
       method: 'POST',
-      body: { guests, customMessage },
+      body: { guests, customMessage, ...(testOnly && { testOnly: true }) },
     }
   );
 }
