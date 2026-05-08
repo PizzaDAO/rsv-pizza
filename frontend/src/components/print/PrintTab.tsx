@@ -1,5 +1,6 @@
 import React from 'react';
 import { Download, Tag } from 'lucide-react';
+import { usePizza } from '../../contexts/PizzaContext';
 
 type StickerShape = 'square' | 'round' | 'wide' | 'banner';
 
@@ -8,6 +9,10 @@ interface Sticker {
   name: string;
   shape: StickerShape;
   pngOnly?: boolean;
+  /** If set, only show this sticker when the event has this tag */
+  requireTag?: string;
+  /** If true, the image is an SVG (not PNG) */
+  svg?: boolean;
 }
 
 interface PrintAsset {
@@ -21,6 +26,7 @@ interface NameTag {
   id: string;
   name: string;
   description: string;
+  preview?: string;
   pdf: string;
 }
 
@@ -37,7 +43,10 @@ const STICKERS: Sticker[] = [
   { id: 'sticker-10', name: 'Bitcoin Pizza Day 2026', shape: 'round' },
   { id: 'sticker-gpp2026-round', name: 'Global Pizza Party 2026', shape: 'round' },
   { id: 'sticker-gpp2026-square', name: 'Global Pizza Party 2026', shape: 'square' },
-  { id: 'swc-canada', name: 'Stand With Crypto Canada', shape: 'wide', pngOnly: true },
+  { id: 'swc-canada', name: 'Stand With Crypto Canada', shape: 'wide', pngOnly: true, requireTag: 'swccanada' },
+  { id: 'swc-au', name: 'Stand With Crypto Australia', shape: 'wide', svg: true, requireTag: 'swcau' },
+  { id: 'swc-europe', name: 'Stand With Crypto Europe', shape: 'wide', svg: true, requireTag: 'swceu' },
+  { id: 'swc-br', name: 'Stand With Crypto Brazil', shape: 'wide', svg: true, requireTag: 'swcbr' },
 ];
 
 const FLYERS: PrintAsset[] = [
@@ -69,6 +78,7 @@ const NAME_TAGS: NameTag[] = [
     id: 'tmnt-nametags',
     name: 'TMNT Name Tags',
     description: 'Ninja Turtle themed name tags (without sponsor logos)',
+    preview: '/print-assets/name-tags/tmnt-nametags-preview.png',
     pdf: '/print-assets/name-tags/tmnt-nametags.pdf',
   },
 ];
@@ -81,6 +91,13 @@ const shapeLabel: Record<StickerShape, string> = {
 };
 
 export function PrintTab() {
+  const { party } = usePizza();
+  const eventTags = party?.eventTags || [];
+
+  const visibleStickers = STICKERS.filter(
+    (s) => !s.requireTag || eventTags.includes(s.requireTag)
+  );
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -95,18 +112,22 @@ export function PrintTab() {
       <section>
         <h3 className="text-lg font-semibold text-theme-text mb-3">Stickers</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {STICKERS.map((sticker) => {
-            const imgSrc = sticker.pngOnly
-              ? `/stickers/${sticker.id}.png`
-              : `/stickers/${sticker.id}@2x.png`;
-            const downloadHref = sticker.pngOnly
-              ? `/stickers/${sticker.id}.png`
-              : `/stickers/${sticker.id}.pdf`;
-            const downloadLabel = sticker.pngOnly ? 'Download PNG' : 'Download PDF';
+          {visibleStickers.map((sticker) => {
+            const imgSrc = sticker.svg
+              ? `/stickers/${sticker.id}.svg`
+              : sticker.pngOnly
+                ? `/stickers/${sticker.id}.png`
+                : `/stickers/${sticker.id}@2x.png`;
+            const downloadHref = sticker.svg
+              ? `/stickers/${sticker.id}.svg`
+              : sticker.pngOnly
+                ? `/stickers/${sticker.id}.png`
+                : `/stickers/${sticker.id}.pdf`;
+            const downloadLabel = sticker.svg ? 'Download SVG' : sticker.pngOnly ? 'Download PNG' : 'Download PDF';
 
             return (
               <div key={sticker.id} className="card p-4 flex flex-col items-center gap-3">
-                <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface p-3">
                   <img
                     src={imgSrc}
                     alt={sticker.name}
@@ -199,7 +220,16 @@ export function PrintTab() {
           {NAME_TAGS.map((tag) => (
             <div key={tag.id} className="card p-4 flex flex-col items-center gap-3">
               <div className="w-full aspect-video flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
-                <Tag size={48} className="text-theme-text-muted" />
+                {tag.preview ? (
+                  <img
+                    src={tag.preview}
+                    alt={tag.name}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                ) : (
+                  <Tag size={48} className="text-theme-text-muted" />
+                )}
               </div>
               <div className="text-center w-full">
                 <p className="text-sm font-medium text-theme-text leading-tight">{tag.name}</p>
