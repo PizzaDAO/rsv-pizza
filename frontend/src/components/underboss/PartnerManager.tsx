@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, Copy } from 'lucide-react';
 import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
 import { proxyAvatarToStorage } from '../../lib/supabase';
 import type { SponsorUser } from '../../types';
@@ -22,6 +22,7 @@ export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: 
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -255,7 +256,21 @@ export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: 
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-theme-text-faint truncate">{partner.email}</div>
+                  <div className="flex items-center gap-1">
+                    <div className="text-xs text-theme-text-faint truncate">{partner.email}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(partner.email);
+                        setCopiedEmail(partner.id);
+                        setTimeout(() => setCopiedEmail(null), 1500);
+                      }}
+                      className="shrink-0 opacity-40 hover:opacity-100 transition-opacity text-theme-text-faint"
+                      title="Copy email"
+                    >
+                      {copiedEmail === partner.id ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
                   <div className="flex items-center gap-3 mt-1">
                     {partner.autoCoHost && (
                       <span className="text-[10px] text-green-400 flex items-center gap-1">
