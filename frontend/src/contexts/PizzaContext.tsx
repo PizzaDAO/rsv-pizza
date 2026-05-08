@@ -376,7 +376,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     // Generate wave-based recommendations (handles both single and multi-wave)
     // Pass orderExpectedGuests as override if set
-    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party, availableBeverages, orderExpectedGuests);
+    const activeGuests = guests.filter(g => g.status !== 'INVITED');
+    const waves = generateWaveRecommendations(activeGuests, pizzaSettings.style, party, availableBeverages, orderExpectedGuests);
     setWaveRecommendations(waves);
 
     // Also update single recommendations for backward compatibility

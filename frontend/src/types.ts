@@ -10,7 +10,7 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
-export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED' | 'INVITED';
 
 export interface Guest {
   id?: string;

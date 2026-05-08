@@ -388,6 +388,22 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       });
 
       if (existingGuest) {
+        // Determine new status for INVITED guests completing RSVP
+        let newStatus = existingGuest.status;
+        let newWaitlistPosition: number | null = null;
+        if (existingGuest.status === 'INVITED') {
+          if (isAtCapacity) {
+            newStatus = 'WAITLISTED';
+            const maxPos = await prisma.guest.aggregate({
+              where: { partyId: party.id, status: 'WAITLISTED' },
+              _max: { waitlistPosition: true },
+            });
+            newWaitlistPosition = (maxPos._max.waitlistPosition || 0) + 1;
+          } else {
+            newStatus = party.requireApproval ? 'PENDING' : 'CONFIRMED';
+          }
+        }
+
         // Update the existing guest record
         const updatedGuest = await prisma.guest.update({
           where: { id: existingGuest.id },
@@ -410,6 +426,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             dislikedBeverages: dislikedBeverages || [],
             pizzeriaRankings: pizzeriaRankings || [],
             suggestedPizzerias: suggestedPizzerias || [],
+            status: newStatus,
+            ...(newWaitlistPosition !== null ? { waitlistPosition: newWaitlistPosition } : {}),
+            submittedVia: existingGuest.status === 'INVITED' ? 'rsvp' : existingGuest.submittedVia,
           },
         });
 

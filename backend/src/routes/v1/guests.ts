@@ -255,7 +255,7 @@ router.post('/', requireApiKey(SCOPES.GUESTS_WRITE), async (req: ApiKeyRequest, 
 
     // Check max guests
     if (party.maxGuests) {
-      const guestCount = await prisma.guest.count({ where: { partyId } });
+      const guestCount = await prisma.guest.count({ where: { partyId, status: { not: 'INVITED' } } });
       if (guestCount >= party.maxGuests) {
         throw new AppError('Party has reached maximum guests', 400, 'MAX_GUESTS_REACHED');
       }
@@ -704,7 +704,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   partyId,
                   name,
                   email: normalizedEmail,
-                  status: 'PENDING',
+                  status: 'INVITED',
                   submittedVia: 'invite',
                   approved: null,
                   roles: [],

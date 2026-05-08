@@ -156,9 +156,17 @@ export const GPPDashboardTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-theme-text">{guests.length}</div>
+          <div className="text-2xl font-bold text-theme-text">
+            {guests.filter(g => g.status === 'INVITED').length}
+          </div>
+          <div className="text-xs text-theme-text-muted">Invited</div>
+        </div>
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-theme-text">
+            {guests.filter(g => g.status !== 'INVITED').length}
+          </div>
           <div className="text-xs text-theme-text-muted">RSVPs</div>
         </div>
         <div className="card p-4 text-center">
