@@ -1133,7 +1133,7 @@ model Admin {
 
 model SponsorUser {
   id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique
+  email     String
   name      String?
   tag       String
   isActive  Boolean  @default(true) @map("is_active")
@@ -1166,6 +1166,8 @@ model SponsorUser {
   quizQuestionTemplates QuizQuestionTemplate[]
   partnerEventNotes     PartnerEventNote[]
 
+  @@unique([email, tag])
+  @@index([email])
   @@index([tag])
   @@map("sponsor_users")
 }

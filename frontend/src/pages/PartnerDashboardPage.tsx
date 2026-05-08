@@ -221,8 +221,13 @@ export function PartnerDashboardPage() {
           return;
         }
 
-        // If admin, load all events first to get available tags
-        const tag = me.isAdmin ? selectedTag : me.sponsor?.tag;
+        // Determine which tag to fetch events for
+        const isMultiTag = !me.isAdmin && me.sponsors && me.sponsors.length > 1;
+        const tag = me.isAdmin
+          ? selectedTag
+          : isMultiTag
+            ? (selectedTag || me.sponsors![0].tag)
+            : me.sponsor?.tag;
         const data = await fetchSponsorEvents(tag);
         setDashboardData(data);
 
@@ -240,6 +245,14 @@ export function PartnerDashboardPage() {
             result.sponsorUsers.forEach(su => tags.add(su.tag));
           } catch { /* admin-only, ok to fail */ }
           setAvailableTags(Array.from(tags).sort());
+        }
+
+        // For multi-tag partners (non-admin), set available tags from their sponsors
+        if (isMultiTag && availableTags.length === 0) {
+          setAvailableTags(me.sponsors!.map(s => s.tag).sort());
+          if (!selectedTag) {
+            setSelectedTag(me.sponsors![0].tag);
+          }
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load partner dashboard');
@@ -435,18 +448,20 @@ export function PartnerDashboardPage() {
           </div>
 
           {/* Admin tag filter */}
-          {dashboardData?.isAdmin && availableTags.length > 0 && (
+          {(dashboardData?.isAdmin || (meData?.sponsors && meData.sponsors.length > 1)) && availableTags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedTag(undefined)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                  !selectedTag
-                    ? 'border-[#E52828] text-theme-text bg-[#E52828]/20'
-                    : 'border-theme-stroke text-theme-text-muted hover:text-theme-text-secondary'
-                }`}
-              >
-                All tags
-              </button>
+              {dashboardData?.isAdmin && (
+                <button
+                  onClick={() => setSelectedTag(undefined)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                    !selectedTag
+                      ? 'border-[#E52828] text-theme-text bg-[#E52828]/20'
+                      : 'border-theme-stroke text-theme-text-muted hover:text-theme-text-secondary'
+                  }`}
+                >
+                  All tags
+                </button>
+              )}
               {availableTags.map(tag => (
                 <button
                   key={tag}
