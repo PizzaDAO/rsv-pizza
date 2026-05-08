@@ -1263,6 +1263,78 @@ export interface SponsorDashboardData {
   events: SponsorDashboardEvent[];
 }
 
+// ============================================
+// Invoice types
+// ============================================
+
+export type InvoiceStatus = 'draft' | 'issued' | 'viewed' | 'paid' | 'cancelled';
+
+export interface InvoiceLineItem {
+  partyId?: string;
+  description: string;
+  amount: number; // in cents
+}
+
+export interface Invoice {
+  id: string;
+  partyId: string | null;
+  sponsorId: string | null;
+  tag: string | null;
+  sponsorUserId: string | null;
+  invoiceNumber: string;
+  viewToken: string;
+  billToCompany: string | null;
+  billToContact: string | null;
+  billToAddress: string | null;
+  billToEmail: string;
+  ccEmails: string[];
+  lineItems: InvoiceLineItem[];
+  total: number;
+  currency: string;
+  paymentTerms: string | null;
+  paymentInstructions: string | null;
+  dueDate: string | null;
+  memo: string | null;
+  status: InvoiceStatus;
+  paidAt: string | null;
+  paidAmount: number | null;
+  paymentMethod: string | null;
+  paymentRef: string | null;
+  sentAt: string | null;
+  viewedAt: string | null;
+  attachments: any[];
+  createdAt: string;
+  updatedAt: string;
+  sponsorUser?: {
+    id: string;
+    coHostName: string | null;
+    email?: string;
+    tag: string;
+  } | null;
+}
+
+export interface TagInvoiceEvent {
+  id: string;
+  name: string;
+  city: string;
+  expectedGuests: number | null;
+  guestCount: number;
+  suggestedPrice: number;
+}
+
+export interface TagInvoiceEventsResponse {
+  tag: string;
+  sponsorUser: {
+    id: string;
+    coHostName: string | null;
+    email: string;
+    name: string | null;
+    coHostWebsite: string | null;
+  } | null;
+  events: TagInvoiceEvent[];
+  suggestedTotal: number;
+}
+
 // Unified partner (merges event-level Sponsor with underboss SponsorUser)
 export interface UnifiedPartner {
   id: string;

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, Invoice, TagInvoiceEventsResponse, InvoiceLineItem } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -3132,6 +3132,99 @@ export async function vouchForGuest(inviteCode: string, targetGuestId: string): 
   return apiRequest<VouchResponse>(`/api/checkin/${inviteCode}/vouch`, {
     method: 'POST',
     body: { targetGuestId },
+  });
+}
+
+// ============================================
+// Tag Invoice API
+// ============================================
+
+/** Fetch events for a tag with suggested pricing */
+export async function fetchTagInvoiceEvents(tag: string): Promise<TagInvoiceEventsResponse> {
+  return apiRequest<TagInvoiceEventsResponse>(`/api/tag-invoices/events?tag=${encodeURIComponent(tag)}`);
+}
+
+/** List all tag invoices */
+export async function fetchTagInvoices(filters?: {
+  status?: string;
+  tag?: string;
+  search?: string;
+}): Promise<{ invoices: Invoice[] }> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.tag) params.set('tag', filters.tag);
+  if (filters?.search) params.set('search', filters.search);
+  const qs = params.toString();
+  return apiRequest<{ invoices: Invoice[] }>(`/api/tag-invoices${qs ? `?${qs}` : ''}`);
+}
+
+/** Get a single tag invoice */
+export async function fetchTagInvoice(id: string): Promise<{ invoice: Invoice }> {
+  return apiRequest<{ invoice: Invoice }>(`/api/tag-invoices/${id}`);
+}
+
+/** Create a tag-based invoice */
+export async function createTagInvoice(data: {
+  tag: string;
+  lineItems: InvoiceLineItem[];
+  paymentTerms?: string;
+  paymentInstructions?: string;
+  memo?: string;
+  dueDate?: string;
+  billToCompany?: string;
+  billToContact?: string;
+  billToEmail?: string;
+  billToAddress?: string;
+  ccEmails?: string[];
+}): Promise<{ invoice: Invoice }> {
+  return apiRequest<{ invoice: Invoice }>('/api/tag-invoices', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+/** Update a draft tag invoice */
+export async function updateTagInvoice(id: string, data: Partial<{
+  lineItems: InvoiceLineItem[];
+  paymentTerms: string;
+  paymentInstructions: string;
+  memo: string;
+  dueDate: string;
+  billToCompany: string;
+  billToContact: string;
+  billToEmail: string;
+  billToAddress: string;
+  ccEmails: string[];
+}>): Promise<{ invoice: Invoice }> {
+  return apiRequest<{ invoice: Invoice }>(`/api/tag-invoices/${id}`, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+/** Delete a draft tag invoice */
+export async function deleteTagInvoice(id: string): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/tag-invoices/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Send (issue) a tag invoice */
+export async function sendTagInvoice(id: string): Promise<{ invoice: Invoice; message: string }> {
+  return apiRequest<{ invoice: Invoice; message: string }>(`/api/tag-invoices/${id}/send`, {
+    method: 'POST',
+  });
+}
+
+/** Mark a tag invoice as paid */
+export async function markTagInvoicePaid(id: string, data?: {
+  paymentMethod?: string;
+  paymentRef?: string;
+  paidAmount?: number;
+}): Promise<{ invoice: Invoice }> {
+  return apiRequest<{ invoice: Invoice }>(`/api/tag-invoices/${id}/mark-paid`, {
+    method: 'POST',
+    body: data || {},
   });
 }
 

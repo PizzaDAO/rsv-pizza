@@ -25,6 +25,7 @@ import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
+import { InvoicesPage } from './pages/InvoicesPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -66,6 +67,7 @@ function App() {
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
+            <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/post" element={<PostComposerPage />} />
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />
