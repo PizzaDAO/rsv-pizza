@@ -232,13 +232,23 @@ export const PartyHeader: React.FC = () => {
                 )}
                 <p className="text-sm text-theme-text-muted">
                   {party.hostName && `Hosted by ${party.hostName} • `}
-                  {party.maxGuests ? (
-                    <span>
-                      {party.guests.length} of {party.maxGuests} guests responded
-                    </span>
-                  ) : (
-                    <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
-                  )}
+                  {(() => {
+                    const invited = party.guests.filter(g => g.status === 'INVITED').length;
+                    const rsvpd = party.guests.filter(g => g.status !== 'INVITED').length;
+                    const checkedIn = party.guests.filter(g => g.checkedInAt).length;
+                    if (invited > 0) {
+                      return (
+                        <span>
+                          {invited} invited · {rsvpd} RSVP'd{party.maxGuests ? ` / ${party.maxGuests}` : ''} · {checkedIn} checked in
+                        </span>
+                      );
+                    }
+                    return party.maxGuests ? (
+                      <span>{rsvpd} of {party.maxGuests} guests responded</span>
+                    ) : (
+                      <span>{rsvpd} guest{rsvpd !== 1 ? 's' : ''}{checkedIn > 0 ? ` · ${checkedIn} checked in` : ''}</span>
+                    );
+                  })()}
                 </p>
               </div>
 

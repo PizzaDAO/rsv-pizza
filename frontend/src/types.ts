@@ -10,7 +10,7 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
-export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED' | 'INVITED';
 
 export interface Guest {
   id?: string;
@@ -1200,6 +1200,7 @@ export interface SponsorDashboardEvent {
   } | null;
   coHosts: CoHost[];
   rsvpCount: number;
+  invitedCount: number;
   approvedCount: number;
   maxGuests: number | null;
   expectedGuests?: number | null;

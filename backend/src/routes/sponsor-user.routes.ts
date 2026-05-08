@@ -544,7 +544,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       include: {
         user: { select: { name: true, email: true, profilePictureUrl: true, website: true, twitter: true, instagram: true } },
         guests: {
-          select: { id: true, approved: true, checkedInAt: true },
+          select: { id: true, approved: true, checkedInAt: true, status: true },
         },
         budgetItems: {
           select: { id: true, cost: true, status: true },
@@ -687,8 +687,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     const uniqueViewMap = new Map(uniqueViewStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     const formattedEvents = events.map(event => {
-      const guestCount = event._count.guests;
-      const approvedCount = event.guests.filter(g => g.approved !== false).length;
+      const guestCount = event.guests.filter(g => g.status !== 'INVITED').length;
+      const approvedCount = event.guests.filter(g => g.approved !== false && g.status !== 'INVITED').length;
 
       // Budget summary
       let budget = null;
@@ -775,6 +775,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         } : null,
         coHosts,
         rsvpCount: guestCount,
+        invitedCount: event.guests.filter(g => g.status === 'INVITED').length,
         approvedCount,
         maxGuests: event.maxGuests,
         expectedGuests: event.expectedGuests || null,

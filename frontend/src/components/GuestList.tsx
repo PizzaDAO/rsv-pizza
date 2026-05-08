@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX, Users, Clock, Search, CheckCircle2, Download } from 'lucide-react';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
@@ -101,10 +101,11 @@ export const GuestList: React.FC = () => {
   const requireApproval = party?.requireApproval || false;
 
   const exportCSV = () => {
-    const headers = ['Name', 'Email', 'RSVP Date', 'Dietary Restrictions', 'Liked Toppings', 'Disliked Toppings', 'Wallet Address'];
+    const headers = ['Name', 'Email', 'Status', 'RSVP Date', 'Dietary Restrictions', 'Liked Toppings', 'Disliked Toppings', 'Wallet Address'];
     const rows = guests.map(g => [
       g.name,
       g.email || '',
+      g.status || 'CONFIRMED',
       g.submittedAt ? new Date(g.submittedAt).toLocaleDateString() : '',
       g.dietaryRestrictions.join('; '),
       g.toppings.join('; '),
@@ -143,7 +144,8 @@ export const GuestList: React.FC = () => {
   };
 
   // Separate guests by status
-  const confirmedGuests = filteredGuests.filter(g => g.status !== 'WAITLISTED');
+  const invitedGuests = filteredGuests.filter(g => g.status === 'INVITED');
+  const confirmedGuests = filteredGuests.filter(g => g.status !== 'WAITLISTED' && g.status !== 'INVITED');
   const waitlistedGuests = filteredGuests.filter(g => g.status === 'WAITLISTED')
     .sort((a, b) => (a.waitlistPosition || 0) - (b.waitlistPosition || 0));
 
@@ -159,6 +161,12 @@ export const GuestList: React.FC = () => {
               {confirmedGuests.length}
               {party?.maxGuests && ` / ${party.maxGuests}`}
             </span>
+            {invitedGuests.length > 0 && (
+              <span className="bg-blue-500/20 text-blue-400 text-sm font-medium px-3 py-1 rounded-full border border-blue-500/30 flex items-center gap-1">
+                <Mail size={14} />
+                {invitedGuests.length} invited
+              </span>
+            )}
             {checkedInCount > 0 && (
               <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
                 <CheckCircle2 size={14} />
@@ -222,6 +230,31 @@ export const GuestList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Invited Section */}
+      {invitedGuests.length > 0 && (
+        <div className="card p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-3">
+              <Mail size={20} className="text-theme-text-secondary" />
+              <h2 className="text-xl font-bold text-theme-text">Invited</h2>
+              <span className="bg-blue-500/20 text-blue-400 text-sm font-medium px-3 py-1 rounded-full border border-blue-500/30">
+                {invitedGuests.length}
+              </span>
+            </div>
+          </div>
+          <div className="divide-y divide-theme-stroke">
+            {invitedGuests.map(guest => (
+              <TableRow
+                key={guest.id}
+                guest={guest}
+                variant="basic"
+                onRemove={removeGuest}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Waitlist Section */}
       {waitlistedGuests.length > 0 && (
