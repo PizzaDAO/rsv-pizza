@@ -46,6 +46,7 @@ const STICKERS: Sticker[] = [
 ];
 
 const SWC_ASSETS: Sticker[] = [
+  { id: 'swc', name: 'Stand With Crypto', shape: 'wide', svg: true, requireTag: 'swc' },
   { id: 'swc-canada', name: 'Stand With Crypto Canada', shape: 'wide', pngOnly: true, requireTag: 'swccanada' },
   { id: 'swc-au', name: 'Stand With Crypto Australia', shape: 'wide', svg: true, requireTag: 'swcau' },
   { id: 'swc-europe', name: 'Stand With Crypto Europe', shape: 'wide', svg: true, requireTag: 'swceu' },
