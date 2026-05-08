@@ -155,7 +155,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           e.host.name?.toLowerCase().includes(q) ||
           e.host.email?.toLowerCase().includes(q) ||
           e.address?.toLowerCase().includes(q) ||
-          e.venueName?.toLowerCase().includes(q)
+          e.venueName?.toLowerCase().includes(q) ||
+          e.country?.toLowerCase().includes(q) ||
+          e.region?.toLowerCase().includes(q)
       );
     }
 
