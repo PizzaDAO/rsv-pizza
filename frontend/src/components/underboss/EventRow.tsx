@@ -637,6 +637,9 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             <Users size={12} className="text-theme-text-faint" />
             <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
           </div>
+          {event.invitedCount > 0 && (
+            <div className="text-xs text-blue-400/60">{event.invitedCount} invited</div>
+          )}
           {event.checkedInCount > 0 && (
             <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
           )}

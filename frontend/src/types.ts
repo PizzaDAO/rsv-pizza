@@ -1015,6 +1015,7 @@ export interface UnderbossEvent {
   coHosts: any[];
   progress: UnderbossEventProgress;
   guestCount: number;
+  invitedCount: number;
   approvedCount: number;
   checkedInCount: number;
   photoCount: number;
@@ -1037,6 +1038,7 @@ export interface UnderbossEvent {
 export interface UnderbossStats {
   totalEvents: number;
   totalRsvps: number;
+  totalInvited: number;
   totalApproved: number;
   eventsWithVenue: number;
   eventsWithBudget: number;

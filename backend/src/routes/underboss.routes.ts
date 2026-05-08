@@ -132,10 +132,14 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
   let eventsWithBudget = 0;
   let eventsWithKit = 0;
 
-  for (const event of events) {
-    const guestCount = event._count?.guests || 0;
-    const approvedCount = event.guests?.filter((g: any) => g.approved !== false).length || 0;
+  let totalInvited = 0;
 
+  for (const event of events) {
+    const invited = event.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
+    const guestCount = (event._count?.guests || 0) - invited;
+    const approvedCount = event.guests?.filter((g: any) => g.approved !== false && g.status !== 'INVITED').length || 0;
+
+    totalInvited += invited;
     totalRsvps += guestCount;
     totalApproved += approvedCount;
 
@@ -148,6 +152,7 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
   return {
     totalEvents,
     totalRsvps,
+    totalInvited,
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
@@ -163,8 +168,9 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
 
 // Helper: format event for response
 function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMap?: Map<string, Date>) {
-  const guestCount = party._count?.guests || 0;
-  const approvedCount = party.guests?.filter((g: any) => g.approved !== false).length || 0;
+  const invitedCount = party.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
+  const guestCount = (party._count?.guests || 0) - invitedCount;
+  const approvedCount = party.guests?.filter((g: any) => g.approved !== false && g.status !== 'INVITED').length || 0;
   const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
   const photoCount = party._count?.photos || 0;
 
@@ -203,6 +209,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     coHosts: party.coHosts || [],
     progress: computeProgress(party, underbossEmails),
     guestCount,
+    invitedCount,
     approvedCount,
     checkedInCount,
     photoCount,
@@ -373,7 +380,7 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       include: {
         user: { select: { name: true, email: true } },
         guests: {
-          select: { id: true, approved: true, checkedInAt: true },
+          select: { id: true, approved: true, checkedInAt: true, status: true },
         },
         partyKit: { select: { status: true } },
         sponsors: { select: { status: true, amount: true } },
@@ -440,7 +447,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
         include: {
           user: { select: { name: true, email: true } },
           guests: {
-            select: { id: true, approved: true, checkedInAt: true },
+            select: { id: true, approved: true, checkedInAt: true, status: true },
           },
           partyKit: { select: { status: true } },
           sponsors: { select: { status: true, amount: true } },
@@ -565,7 +572,7 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
         include: {
           user: { select: { name: true, email: true } },
           guests: {
-            select: { id: true, approved: true, checkedInAt: true },
+            select: { id: true, approved: true, checkedInAt: true, status: true },
           },
           partyKit: { select: { status: true } },
           _count: { select: { guests: true, photos: true } },
