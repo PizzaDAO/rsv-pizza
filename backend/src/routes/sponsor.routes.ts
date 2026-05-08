@@ -205,11 +205,15 @@ router.post('/:partyId/sponsors/ensure-from-underboss', requireAuth, async (req:
         continue; // Skip unknown IDs
       }
 
-      // Check if a Sponsor record already exists for this party + email
+      // Check if a Sponsor record already exists for this party + email or name
+      const sponsorName = sponsorUser.coHostName || sponsorUser.name || sponsorUser.email;
       const existingSponsor = await prisma.sponsor.findFirst({
         where: {
           partyId,
-          contactEmail: sponsorUser.email,
+          OR: [
+            { contactEmail: sponsorUser.email },
+            { name: sponsorName, notes: `Auto-created from partner tag "${sponsorUser.tag}"` },
+          ],
         },
       });
 

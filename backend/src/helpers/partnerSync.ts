@@ -56,6 +56,29 @@ function buildPartnerCoHost(sponsorUser: SponsorUserLike): Record<string, any> {
 }
 
 /**
+ * Find an existing sponsor record for a party, matching by contactEmail first,
+ * then falling back to matching by name + auto-created notes pattern.
+ * This prevents duplicates when a partner's email changes between syncs.
+ */
+async function findExistingSponsor(partyId: string, sponsorUser: SponsorUserLike) {
+  // Primary match: contactEmail
+  const byEmail = await prisma.sponsor.findFirst({
+    where: { partyId, contactEmail: sponsorUser.email },
+  });
+  if (byEmail) return byEmail;
+
+  // Fallback: match by name + auto-created note pattern for this tag
+  const sponsorName = sponsorUser.coHostName || sponsorUser.name || sponsorUser.email;
+  return prisma.sponsor.findFirst({
+    where: {
+      partyId,
+      name: sponsorName,
+      notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+    },
+  });
+}
+
+/**
  * Add or update a partner as co-host (and optionally sponsor) on a single party.
  * Idempotent: upserts co-host entry and sponsor row keyed by stable identifiers
  * so repeated calls don't create duplicates when partner details change.
@@ -99,18 +122,13 @@ export async function addPartnerToParty(
       sortOrder: sponsorUser.descriptionSortOrder,
     };
 
-    const existingSponsor = await prisma.sponsor.findFirst({
-      where: {
-        partyId: party.id,
-        contactEmail: sponsorUser.email,
-      },
-    });
+    const existingSponsor = await findExistingSponsor(party.id, sponsorUser);
 
     let sponsorId: string;
     if (existingSponsor) {
       await prisma.sponsor.update({
         where: { id: existingSponsor.id },
-        data: sponsorData,
+        data: { ...sponsorData, contactEmail: sponsorUser.email },
       });
       sponsorId = existingSponsor.id;
     } else {
@@ -265,15 +283,13 @@ export async function syncAutoSponsorsToAllEvents(
 
   let synced = 0;
   for (const event of events) {
-    const existingSponsor = await prisma.sponsor.findFirst({
-      where: { partyId: event.id, contactEmail: sponsorUser.email },
-    });
+    const existingSponsor = await findExistingSponsor(event.id, sponsorUser);
 
     let sponsorId: string;
     if (existingSponsor) {
       await prisma.sponsor.update({
         where: { id: existingSponsor.id },
-        data: sponsorData,
+        data: { ...sponsorData, contactEmail: sponsorUser.email },
       });
       sponsorId = existingSponsor.id;
     } else {
