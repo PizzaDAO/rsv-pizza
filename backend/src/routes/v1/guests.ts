@@ -5,6 +5,7 @@ import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
+import { canUserAccessTab } from '../../helpers/partyAccess.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -619,10 +620,12 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
       throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    // Verify party ownership (user must own the party to bulk-invite)
-    const party = await prisma.party.findFirst({
-      where: { id: partyId, userId },
-    });
+    // Verify the user can access the promo tab (owner, co-host, or super admin)
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, userId, 'promo');
+    if (!canAccess) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const party = await prisma.party.findUnique({ where: { id: partyId } });
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
