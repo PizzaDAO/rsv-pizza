@@ -39,6 +39,7 @@ import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
+import tagInvoiceRoutes from './routes/tag-invoice.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -101,6 +102,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
+app.use('/api/tag-invoices', tagInvoiceRoutes); // Tag-based invoice management (admin)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
 app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)

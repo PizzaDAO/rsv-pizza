@@ -202,6 +202,7 @@ model Party {
   partnerEventNotes     PartnerEventNote[]
   quizQuestions         QuizQuestion[]
   slugAliases           SlugAlias[]
+  invoices              Invoice[]
 
   @@map("parties")
 }
@@ -903,6 +904,7 @@ model Sponsor {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   quizQuestions QuizQuestion[]
+  invoices      Invoice[]
 
   @@index([partyId, status])
   @@index([partyId, createdAt])
@@ -1165,6 +1167,7 @@ model SponsorUser {
   checklistItems        SponsorChecklistItem[]
   quizQuestionTemplates QuizQuestionTemplate[]
   partnerEventNotes     PartnerEventNote[]
+  invoices              Invoice[]
 
   @@index([tag])
   @@map("sponsor_users")
@@ -1288,6 +1291,75 @@ model QuizAnswer {
   @@index([questionId])
   @@index([guestId])
   @@map("quiz_answers")
+}
+
+// ============================================
+// Invoice Models
+// ============================================
+
+model Invoice {
+  id             String    @id @default(uuid()) @db.Uuid
+  partyId        String?   @map("party_id") @db.Uuid
+  party          Party?    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  sponsorId      String?   @map("sponsor_id") @db.Uuid
+  sponsor        Sponsor?  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  // Tag-based invoice fields
+  tag            String?
+  sponsorUserId  String?   @map("sponsor_user_id") @db.Uuid
+  sponsorUser    SponsorUser? @relation(fields: [sponsorUserId], references: [id])
+
+  // Invoice identification
+  invoiceNumber  String    @map("invoice_number")
+  viewToken      String    @unique @map("view_token")
+
+  // Bill-to (snapshot at invoice time)
+  billToCompany  String?   @map("bill_to_company")
+  billToContact  String?   @map("bill_to_contact")
+  billToAddress  String?   @map("bill_to_address")
+  billToEmail    String    @map("bill_to_email")
+  ccEmails       String[]  @map("cc_emails")
+
+  // Line items (JSONB array)
+  // Each: { partyId?: string, description: string, amount: number (cents) }
+  lineItems      Json      @default("[]") @map("line_items")
+
+  // Totals (all in cents)
+  total          Int       @default(0)
+  currency       String    @default("usd")
+
+  // Payment info
+  paymentTerms        String?  @map("payment_terms")
+  paymentInstructions String?  @map("payment_instructions")
+  dueDate             DateTime? @map("due_date") @db.Date
+  memo                String?
+
+  // Status: draft, issued, viewed, paid, cancelled
+  status         String    @default("draft")
+
+  // Payment tracking
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz
+  paidAmount     Int?      @map("paid_amount")
+  paymentMethod  String?   @map("payment_method")
+  paymentRef     String?   @map("payment_ref")
+
+  // Email tracking
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz
+  viewedAt       DateTime? @map("viewed_at") @db.Timestamptz
+
+  // Extra document attachments (URLs)
+  attachments    Json      @default("[]")
+
+  // Metadata
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([sponsorId])
+  @@index([tag])
+  @@index([sponsorUserId])
+  @@index([status])
+  @@map("invoices")
 }
 
 model SlugAlias {

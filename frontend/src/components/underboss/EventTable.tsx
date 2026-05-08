@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign, FileText } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
+import { TagInvoiceCreator } from './TagInvoiceCreator';
 import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
@@ -102,6 +103,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [showCopyCitiesModal, setShowCopyCitiesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [discount, setDiscount] = useState(0);
+  const [showInvoiceCreator, setShowInvoiceCreator] = useState(false);
 
   // Alphabetized city names from the currently-selected events.
   // Reuses the same extraction logic as the Send Telegram action: strip
@@ -378,6 +380,13 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               ({sponsorshipSuggestion.missingExpectedGuests} without expected guests)
             </span>
           )}
+          <button
+            onClick={() => setShowInvoiceCreator(true)}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#ff393a] hover:bg-[#e02020] text-white rounded-lg transition-colors"
+          >
+            <FileText size={12} />
+            Create Invoice
+          </button>
         </div>
       )}
 
@@ -785,6 +794,14 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         </table>
       </div>
 
+      {/* Tag Invoice Creator Modal */}
+      {showInvoiceCreator && tagFilter !== 'all' && (
+        <TagInvoiceCreator
+          tag={tagFilter}
+          onClose={() => setShowInvoiceCreator(false)}
+          onCreated={() => setShowInvoiceCreator(false)}
+        />
+      )}
     </div>
   );
 }
