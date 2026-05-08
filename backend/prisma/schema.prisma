@@ -163,7 +163,7 @@ model Party {
 
   // Underboss dashboard fields
   hostStatus        String?  @map("host_status")
-  underbossApproved Boolean  @default(false) @map("underboss_approved")
+  underbossStatus   String   @default("pending") @map("underboss_status")
   hostTags          Json     @default("[]") @map("host_tags")
   underbossNotes    String?  @map("underboss_notes")
 

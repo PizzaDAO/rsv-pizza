@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
@@ -184,6 +184,24 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
           <div className="text-xs text-theme-text-muted">Pending Approval</div>
         </div>
+        {party.underbossStatus === 'approved' && (
+          <div className="card p-4 text-center border border-green-500/30">
+            <div className="flex items-center justify-center gap-1.5 text-green-400">
+              <Check size={20} />
+              <span className="text-sm font-medium">Approved</span>
+            </div>
+            <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
+          </div>
+        )}
+        {party.underbossStatus === 'rejected' && (
+          <div className="card p-4 text-center border border-red-500/30">
+            <div className="flex items-center justify-center gap-1.5 text-red-400">
+              <X size={20} />
+              <span className="text-sm font-medium">Not Approved</span>
+            </div>
+            <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
+          </div>
+        )}
       </div>
 
       {/* Checklist progress */}

@@ -217,7 +217,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     fundraisingGoal: party.fundraisingGoal ? Number(party.fundraisingGoal) : null,
     totalSponsored,
     hostStatus: party.hostStatus || null,
-    underbossApproved: party.underbossApproved || false,
+    underbossStatus: party.underbossStatus || 'pending',
     hostTags: party.hostTags || [],
     eventTags: party.eventTags || [],
     underbossNotes: party.underbossNotes || null,
@@ -597,21 +597,22 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
 // Bulk action routes (underboss auth)
 // ============================================
 
-// PATCH /api/underboss/events/bulk-approve - Bulk approve/unapprove events
-router.patch('/events/bulk-approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+// PATCH /api/underboss/events/bulk-status - Bulk update underboss status
+router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { partyIds, approved } = req.body;
+    const { partyIds, status } = req.body;
 
     if (!Array.isArray(partyIds) || partyIds.length === 0) {
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
     const result = await prisma.party.updateMany({
       where: { id: { in: partyIds } },
-      data: { underbossApproved: approved },
+      data: { underbossStatus: status },
     });
 
     res.json({ updated: result.count });
@@ -774,20 +775,21 @@ router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, a
   }
 });
 
-// PATCH /api/underboss/event/:partyId/approve - Toggle underboss approval
-router.patch('/event/:partyId/approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+// PATCH /api/underboss/event/:partyId/status - Update underboss status
+router.patch('/event/:partyId/status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { approved } = req.body;
+    const { status } = req.body;
 
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
     const party = await prisma.party.update({
       where: { id: partyId },
-      data: { underbossApproved: approved },
-      select: { id: true, underbossApproved: true },
+      data: { underbossStatus: status },
+      select: { id: true, underbossStatus: true },
     });
 
     res.json({ party });

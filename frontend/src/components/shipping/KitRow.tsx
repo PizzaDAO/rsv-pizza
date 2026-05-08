@@ -83,8 +83,8 @@ export function KitRow({
       <td className="px-3 py-3">
         <div className="flex items-center gap-1.5">
           <span
-            className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${kit.underbossApproved ? 'bg-green-500' : 'bg-yellow-500'}`}
-            title={kit.underbossApproved ? 'Event Approved' : 'Pending Approval'}
+            className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${kit.underbossStatus === 'approved' ? 'bg-green-500' : kit.underbossStatus === 'rejected' ? 'bg-red-500' : 'bg-yellow-500'}`}
+            title={kit.underbossStatus === 'approved' ? 'Event Approved' : kit.underbossStatus === 'rejected' ? 'Event Rejected' : 'Pending Approval'}
           />
           <span className="text-sm font-medium text-theme-text truncate max-w-[168px]" title={kit.partyName}>
             {kit.partyName}

@@ -666,6 +666,8 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Underboss status
+  underboss_status?: string | null;
   // Turtle role selection toggle
   turtle_roles_enabled?: boolean;
 }
@@ -729,7 +731,8 @@ export const SAFE_PARTY_COLUMNS = `
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
   telegram_group,
-  turtle_roles_enabled
+  turtle_roles_enabled,
+  underboss_status
 `;
 
 /**
