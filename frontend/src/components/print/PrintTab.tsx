@@ -95,13 +95,24 @@ const shapeLabel: Record<StickerShape, string> = {
   banner: 'Banner',
 };
 
+/**
+ * PrintMaterials renders all print assets with no party context.
+ * Shows everything including all SWC assets. Used on /shipping.
+ */
+export function PrintMaterials() {
+  return <PrintContent showAllSwc />;
+}
+
 export function PrintTab() {
   const { party } = usePizza();
   const eventTags = party?.eventTags || [];
+  return <PrintContent eventTags={eventTags} />;
+}
 
-  const visibleSwcAssets = SWC_ASSETS.filter(
-    (s) => eventTags.includes(s.requireTag!)
-  );
+function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: string[]; showAllSwc?: boolean }) {
+  const visibleSwcAssets = showAllSwc
+    ? SWC_ASSETS
+    : SWC_ASSETS.filter((s) => eventTags.includes(s.requireTag!));
 
   return (
     <div className="space-y-8">

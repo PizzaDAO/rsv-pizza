@@ -1,1 +1,1 @@
-export { PrintTab } from './PrintTab';
+export { PrintTab, PrintMaterials } from './PrintTab';
