@@ -1200,6 +1200,7 @@ export interface SponsorDashboardEvent {
   } | null;
   coHosts: CoHost[];
   rsvpCount: number;
+  invitedCount: number;
   approvedCount: number;
   maxGuests: number | null;
   expectedGuests?: number | null;

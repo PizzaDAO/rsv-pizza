@@ -937,6 +937,12 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
               <span className="text-xs text-theme-text-muted">RSVPs</span>
             </div>
+            {event.invitedCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg font-bold text-blue-400">{event.invitedCount}</span>
+                <span className="text-xs text-theme-text-muted">Invited</span>
+              </div>
+            )}
             {(event.photoCount + gppCount > 0) && (
               <button
                 onClick={togglePhotos}
