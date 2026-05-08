@@ -96,13 +96,13 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('Email and tag are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Check for existing sponsor with same email
-    const existing = await prisma.sponsorUser.findUnique({
-      where: { email: email.toLowerCase() },
+    // Check for existing sponsor with same email+tag combo
+    const existing = await prisma.sponsorUser.findFirst({
+      where: { email: email.toLowerCase(), tag: tag.trim().toLowerCase() },
     });
 
     if (existing) {
-      throw new AppError('A sponsor user with this email already exists', 409, 'CONFLICT');
+      throw new AppError('This email is already registered for this tag', 409, 'CONFLICT');
     }
 
     // Underboss: always set createdBy to their email (prevent spoofing)
@@ -467,7 +467,7 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
 
     const adminUser = await isAdmin(email);
 
-    const sponsorUser = await prisma.sponsorUser.findFirst({
+    const sponsorUsers = await prisma.sponsorUser.findMany({
       where: { email: email.toLowerCase(), isActive: true },
       select: {
         id: true,
@@ -478,16 +478,22 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
       },
     });
 
-    if (sponsorUser) {
+    if (sponsorUsers.length > 0) {
       return res.json({
         isSponsor: true,
         isAdmin: adminUser,
         sponsor: {
-          id: sponsorUser.id,
-          email: sponsorUser.email,
-          name: sponsorUser.name,
-          tag: sponsorUser.tag,
+          id: sponsorUsers[0].id,
+          email: sponsorUsers[0].email,
+          name: sponsorUsers[0].name,
+          tag: sponsorUsers[0].tag,
         },
+        sponsors: sponsorUsers.map(s => ({
+          id: s.id,
+          email: s.email,
+          name: s.name,
+          tag: s.tag,
+        })),
       });
     }
 

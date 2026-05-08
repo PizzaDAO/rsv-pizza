@@ -1250,6 +1250,12 @@ export interface SponsorMeResponse {
     name: string | null;
     tag: string;
   } | null;
+  sponsors?: {
+    id: string;
+    email: string;
+    name: string | null;
+    tag: string;
+  }[];
 }
 
 export interface SponsorDashboardData {
