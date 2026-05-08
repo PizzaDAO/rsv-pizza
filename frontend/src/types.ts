@@ -10,6 +10,8 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
+export type UnderbossStatus = 'pending' | 'approved' | 'rejected';
+
 export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED' | 'INVITED';
 
 export interface Guest {
@@ -282,6 +284,7 @@ export interface Party {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   telegramGroup?: string | null;
+  underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
 }
 
@@ -1023,7 +1026,7 @@ export interface UnderbossEvent {
   fundraisingGoal: number | null;
   totalSponsored: number;
   hostStatus: HostStatus | null;
-  underbossApproved: boolean;
+  underbossStatus: UnderbossStatus;
   hostTags: string[];
   eventTags: string[];
   underbossNotes: string | null;
@@ -1092,7 +1095,7 @@ export interface ShippingKit {
   hostEmail: string | null;
   eventAddress: string | null;
   eventVenue: string | null;
-  underbossApproved: boolean;
+  underbossStatus: UnderbossStatus;
   requestedTier: KitTier;
   allocatedTier: KitTier | null;
   recipientName: string;

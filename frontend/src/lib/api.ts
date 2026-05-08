@@ -2498,14 +2498,14 @@ export async function updateHostStatus(
   });
 }
 
-// Toggle underboss approval on an event (underboss auth)
-export async function updateUnderbossApproval(
+// Update underboss status on an event (underboss auth)
+export async function updateUnderbossStatus(
   partyId: string,
-  approved: boolean
+  status: 'pending' | 'approved' | 'rejected'
 ): Promise<void> {
-  await apiRequest(`/api/underboss/event/${partyId}/approve`, {
+  await apiRequest(`/api/underboss/event/${partyId}/status`, {
     method: 'PATCH',
-    body: { approved },
+    body: { status },
   });
 }
 
@@ -2542,11 +2542,11 @@ export async function updateExpectedGuests(
   });
 }
 
-// Bulk approve events (underboss auth)
-export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
-  await apiRequest('/api/underboss/events/bulk-approve', {
+// Bulk update underboss status (underboss auth)
+export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pending' | 'approved' | 'rejected'): Promise<void> {
+  await apiRequest('/api/underboss/events/bulk-status', {
     method: 'PATCH',
-    body: { partyIds, approved },
+    body: { partyIds, status },
   });
 }
 

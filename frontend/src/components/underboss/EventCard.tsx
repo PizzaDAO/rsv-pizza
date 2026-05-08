@@ -406,8 +406,11 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {event.underbossApproved && (
+            {event.underbossStatus === 'approved' && (
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+            )}
+            {event.underbossStatus === 'rejected' && (
+              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title="Rejected" />
             )}
             <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
             {eventUrl && (

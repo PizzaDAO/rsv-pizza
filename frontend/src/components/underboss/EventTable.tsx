@@ -4,7 +4,7 @@ import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, Dolla
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
-import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
+import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
@@ -165,7 +165,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     if (progressIncludes.length > 0) {
       result = result.filter((e) =>
         progressIncludes.every((key) => {
-          if (key === 'approved') return e.underbossApproved;
+          if (key === 'approved') return e.underbossStatus === 'approved';
+          if (key === 'rejected') return e.underbossStatus === 'rejected';
           return e.progress[key as keyof typeof e.progress];
         })
       );
@@ -175,7 +176,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     if (progressExcludes.length > 0) {
       result = result.filter((e) =>
         progressExcludes.every((key) => {
-          if (key === 'approved') return !e.underbossApproved;
+          if (key === 'approved') return e.underbossStatus !== 'approved';
+          if (key === 'rejected') return e.underbossStatus !== 'rejected';
           return !e.progress[key as keyof typeof e.progress];
         })
       );
@@ -303,6 +305,13 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           onToggle={(newState) => setFilterState('approved', newState)}
         />
 
+        {/* Rejected filter */}
+        <FilterPill
+          label="Rejected"
+          state={getFilterState('rejected')}
+          onToggle={(newState) => setFilterState('rejected', newState)}
+        />
+
         {/* Country filter -- only when showRegion */}
         {showRegion && (
           <select
@@ -409,7 +418,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       setShowActionDropdown(false);
                       setBulkLoading(true);
                       try {
-                        await bulkApproveEvents(Array.from(selectedIds), true);
+                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'approved');
                         setSelectedIds(new Set());
                         onBulkAction?.();
                       } catch (err) { console.error('Bulk approve failed', err); }
@@ -418,6 +427,21 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
                     Approve
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowActionDropdown(false);
+                      setBulkLoading(true);
+                      try {
+                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'rejected');
+                        setSelectedIds(new Set());
+                        onBulkAction?.();
+                      } catch (err) { console.error('Bulk reject failed', err); }
+                      setBulkLoading(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                  >
+                    Reject
                   </button>
                   <button
                     onClick={() => {
