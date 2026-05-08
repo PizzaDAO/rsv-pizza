@@ -146,7 +146,7 @@ export const GPPDashboardTab: React.FC = () => {
   // Days until event
   const daysUntil = useMemo(() => {
     if (!party?.date) return null;
-    const eventDate = new Date(party.date + 'T00:00:00');
+    const eventDate = new Date(party.date.slice(0, 10) + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const diff = eventDate.getTime() - today.getTime();
