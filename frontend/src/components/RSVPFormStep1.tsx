@@ -165,142 +165,352 @@ export function RSVPFormStep1({
         </span>
       </button>
 
-      {/* SWC opt-in (US) */}
+      {/* SWC checkbox + info modal (US) */}
       {form.isSwcEvent && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => form.setSwcOptIn(!form.swcOptIn)}
-            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-          >
-            {form.swcOptIn ? (
-              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-            )}
-            <span className="text-sm text-theme-text">
-              Join Stand with Crypto
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => form.setShowSwcInfoModal(true)}
-            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-          >
-            <Info size={18} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcOptIn(!form.swcOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Join Stand with Crypto
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to become a member of Stand with Crypto Alliance, Inc., a grassroots movement to empower crypto consumers, builders, and supporters to make themselves heard. By checking the box and agreeing to become a member, you understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms &amp; Conditions
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
 
-      {/* SWC opt-in (Canada) */}
+      {/* SWC Canada checkbox + info modal */}
       {form.isSwcCaEvent && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => form.setSwcCaOptIn(!form.swcCaOptIn)}
-            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-          >
-            {form.swcCaOptIn ? (
-              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-            )}
-            <span className="text-sm text-theme-text">
-              Join Stand with Crypto Canada
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => form.setShowSwcInfoModal(true)}
-            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-          >
-            <Info size={18} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcCaOptIn(!form.swcCaOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcCaOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcCaInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcCaInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcCaInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcCaInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto Canada</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Canada. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/ca/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC Canada Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/ca/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
 
-      {/* SWC opt-in (Australia) */}
+      {/* SWC Australia checkbox + info modal */}
       {form.isSwcAuEvent && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => form.setSwcAuOptIn(!form.swcAuOptIn)}
-            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-          >
-            {form.swcAuOptIn ? (
-              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-            )}
-            <span className="text-sm text-theme-text">
-              Join Stand with Crypto Australia
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => form.setShowSwcInfoModal(true)}
-            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-          >
-            <Info size={18} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcAuOptIn(!form.swcAuOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcAuOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcAuInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcAuInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcAuInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcAuInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto Australia</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Australia. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/au/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC Australia Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/au/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
 
-      {/* SWC opt-in (EU) */}
+      {/* SWC EU checkbox + info modal */}
       {form.isSwcEuEvent && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => form.setSwcEuOptIn(!form.swcEuOptIn)}
-            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-          >
-            {form.swcEuOptIn ? (
-              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-            )}
-            <span className="text-sm text-theme-text">
-              Join Stand with Crypto EU
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => form.setShowSwcInfoModal(true)}
-            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-          >
-            <Info size={18} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcEuOptIn(!form.swcEuOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcEuOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcEuInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcEuInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcEuInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcEuInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto EU</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in Europe. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/eu/en/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC EU Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/eu/en/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
 
-      {/* SWC opt-in (UK) */}
+      {/* SWC UK checkbox + info modal */}
       {form.isSwcUkEvent && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => form.setSwcUkOptIn(!form.swcUkOptIn)}
-            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-          >
-            {form.swcUkOptIn ? (
-              <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-            ) : (
-              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-            )}
-            <span className="text-sm text-theme-text">
-              Join Stand with Crypto UK
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => form.setShowSwcInfoModal(true)}
-            className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-          >
-            <Info size={18} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcUkOptIn(!form.swcUkOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcUkOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                Notify me about future Stand With Crypto events.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcUkInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcUkInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcUkInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcUkInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">Stand with Crypto UK</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  By checking the box, you consent to receive communications from Stand with Crypto about future events and advocacy efforts in the UK. You understand that SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/gb/en/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    SWC UK Privacy Policy
+                  </a> and{' '}
+                  <a
+                    href="https://www.standwithcrypto.org/gb/en/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    Terms of Service
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
 
-      {/* ETHConf opt-in */}
+      {/* ETHConf discount opt-in */}
       {form.isEthconfEvent && (
         <button
           type="button"
@@ -316,47 +526,6 @@ export function RSVPFormStep1({
             Send me an ETHConf Discount
           </span>
         </button>
-      )}
-
-      {/* Partner info modal (SWC) */}
-      {form.showSwcInfoModal && createPortal(
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => form.setShowSwcInfoModal(false)}
-        >
-          <div
-            className="card p-6 max-w-md w-full relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => form.setShowSwcInfoModal(false)}
-              className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-            >
-              <X size={20} />
-            </button>
-            <h3 className="text-lg font-bold text-theme-text mb-3">Our Partners</h3>
-            <p className="text-sm text-theme-text-secondary leading-relaxed">
-              By opting in, you consent to receive communications from PizzaDAO and our partners, including Stand with Crypto Alliance, Inc. — a grassroots movement empowering crypto consumers, builders, and supporters. SWC and its vendors may collect and use your personal information. To learn more, visit{' '}
-              <a
-                href="https://www.standwithcrypto.org/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 underline"
-              >
-                SWC Privacy Policy
-              </a> and{' '}
-              <a
-                href="https://www.standwithcrypto.org/terms-of-service"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 underline"
-              >
-                Terms &amp; Conditions
-              </a>.
-            </p>
-          </div>
-        </div>,
-        document.body
       )}
 
       {/* Error display */}
