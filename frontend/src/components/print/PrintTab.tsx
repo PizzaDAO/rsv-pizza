@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download } from 'lucide-react';
+import { Download, Tag } from 'lucide-react';
 
 type StickerShape = 'square' | 'round' | 'wide' | 'banner';
 
@@ -7,6 +7,21 @@ interface Sticker {
   id: string;
   name: string;
   shape: StickerShape;
+  pngOnly?: boolean;
+}
+
+interface PrintAsset {
+  id: string;
+  name: string;
+  preview: string;
+  pdf: string;
+}
+
+interface NameTag {
+  id: string;
+  name: string;
+  description: string;
+  pdf: string;
 }
 
 const STICKERS: Sticker[] = [
@@ -22,6 +37,40 @@ const STICKERS: Sticker[] = [
   { id: 'sticker-10', name: 'Bitcoin Pizza Day 2026', shape: 'round' },
   { id: 'sticker-gpp2026-round', name: 'Global Pizza Party 2026', shape: 'round' },
   { id: 'sticker-gpp2026-square', name: 'Global Pizza Party 2026', shape: 'square' },
+  { id: 'swc-canada', name: 'Stand With Crypto Canada', shape: 'wide', pngOnly: true },
+];
+
+const FLYERS: PrintAsset[] = [
+  {
+    id: 'join-the-mafia-8.5x11',
+    name: 'Join The Pizza Mafia (8.5" x 11")',
+    preview: '/print-assets/flyers/join-the-mafia-8.5x11.png',
+    pdf: '/print-assets/flyers/join-the-mafia-8.5x11.pdf',
+  },
+  {
+    id: 'join-the-mafia-a4',
+    name: 'Join The Pizza Mafia (A4)',
+    preview: '/print-assets/flyers/join-the-mafia-a4.jpg',
+    pdf: '/print-assets/flyers/join-the-mafia-a4.pdf',
+  },
+];
+
+const TABLE_TENTS: PrintAsset[] = [
+  {
+    id: 'pizzaday-table-tent',
+    name: 'PizzaDAO Table Tent',
+    preview: '/print-assets/table-tents/pizzaday-table-tent.jpg',
+    pdf: '/print-assets/table-tents/pizzaday-table-tent.pdf',
+  },
+];
+
+const NAME_TAGS: NameTag[] = [
+  {
+    id: 'tmnt-nametags',
+    name: 'TMNT Name Tags',
+    description: 'Ninja Turtle themed name tags (without sponsor logos)',
+    pdf: '/print-assets/name-tags/tmnt-nametags.pdf',
+  },
 ];
 
 const shapeLabel: Record<StickerShape, string> = {
@@ -33,40 +82,141 @@ const shapeLabel: Record<StickerShape, string> = {
 
 export function PrintTab() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="text-center">
-        <h2 className="text-xl font-bold text-theme-text">Sticker Pack</h2>
+        <h2 className="text-xl font-bold text-theme-text">Print Materials</h2>
         <p className="text-sm text-theme-text-secondary mt-1">
-          Download print-ready sticker PDFs for your event
+          Download print-ready materials for your event
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {STICKERS.map((sticker) => (
-          <div key={sticker.id} className="card p-4 flex flex-col items-center gap-3">
-            <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
-              <img
-                src={`/stickers/${sticker.id}@2x.png`}
-                alt={sticker.name}
-                className="max-w-full max-h-full object-contain"
-                loading="lazy"
-              />
+      {/* Stickers Section */}
+      <section>
+        <h3 className="text-lg font-semibold text-theme-text mb-3">Stickers</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {STICKERS.map((sticker) => {
+            const imgSrc = sticker.pngOnly
+              ? `/stickers/${sticker.id}.png`
+              : `/stickers/${sticker.id}@2x.png`;
+            const downloadHref = sticker.pngOnly
+              ? `/stickers/${sticker.id}.png`
+              : `/stickers/${sticker.id}.pdf`;
+            const downloadLabel = sticker.pngOnly ? 'Download PNG' : 'Download PDF';
+
+            return (
+              <div key={sticker.id} className="card p-4 flex flex-col items-center gap-3">
+                <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                  <img
+                    src={imgSrc}
+                    alt={sticker.name}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="text-center w-full">
+                  <p className="text-sm font-medium text-theme-text leading-tight">{sticker.name}</p>
+                  <p className="text-xs text-theme-text-muted mt-0.5">{shapeLabel[sticker.shape]}</p>
+                </div>
+                <a
+                  href={downloadHref}
+                  download
+                  className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+                >
+                  <Download size={14} />
+                  {downloadLabel}
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Flyers Section */}
+      <section>
+        <h3 className="text-lg font-semibold text-theme-text mb-3">Flyers</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {FLYERS.map((flyer) => (
+            <div key={flyer.id} className="card p-4 flex flex-col items-center gap-3">
+              <div className="w-full aspect-[8.5/11] flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                <img
+                  src={flyer.preview}
+                  alt={flyer.name}
+                  className="max-w-full max-h-full object-contain"
+                  loading="lazy"
+                />
+              </div>
+              <div className="text-center w-full">
+                <p className="text-sm font-medium text-theme-text leading-tight">{flyer.name}</p>
+              </div>
+              <a
+                href={flyer.pdf}
+                download
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+              >
+                <Download size={14} />
+                Download PDF
+              </a>
             </div>
-            <div className="text-center w-full">
-              <p className="text-sm font-medium text-theme-text leading-tight">{sticker.name}</p>
-              <p className="text-xs text-theme-text-muted mt-0.5">{shapeLabel[sticker.shape]}</p>
+          ))}
+        </div>
+      </section>
+
+      {/* Table Tents Section */}
+      <section>
+        <h3 className="text-lg font-semibold text-theme-text mb-3">Table Tents</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {TABLE_TENTS.map((tent) => (
+            <div key={tent.id} className="card p-4 flex flex-col items-center gap-3">
+              <div className="w-full aspect-video flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                <img
+                  src={tent.preview}
+                  alt={tent.name}
+                  className="max-w-full max-h-full object-contain"
+                  loading="lazy"
+                />
+              </div>
+              <div className="text-center w-full">
+                <p className="text-sm font-medium text-theme-text leading-tight">{tent.name}</p>
+              </div>
+              <a
+                href={tent.pdf}
+                download
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+              >
+                <Download size={14} />
+                Download PDF
+              </a>
             </div>
-            <a
-              href={`/stickers/${sticker.id}.pdf`}
-              download
-              className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
-            >
-              <Download size={14} />
-              Download PDF
-            </a>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Name Tags Section */}
+      <section>
+        <h3 className="text-lg font-semibold text-theme-text mb-3">Name Tags</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {NAME_TAGS.map((tag) => (
+            <div key={tag.id} className="card p-4 flex flex-col items-center gap-3">
+              <div className="w-full aspect-video flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                <Tag size={48} className="text-theme-text-muted" />
+              </div>
+              <div className="text-center w-full">
+                <p className="text-sm font-medium text-theme-text leading-tight">{tag.name}</p>
+                <p className="text-xs text-theme-text-muted mt-0.5">{tag.description}</p>
+              </div>
+              <a
+                href={tag.pdf}
+                download
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+              >
+                <Download size={14} />
+                Download PDF
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
