@@ -11,6 +11,7 @@ import {
   Package,
   Megaphone,
   FileImage,
+  Printer,
 } from 'lucide-react';
 
 /**
@@ -38,4 +39,5 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'party-kit', name: 'Party Kit', tab: 'gpp', icon: Package },
   { id: 'marketing-promo', name: 'Promo', tab: 'promo', icon: Megaphone },
   { id: 'flyer', name: 'Flyer', tab: 'flyer', icon: FileImage },
+  { id: 'print-nametags', name: 'Print', tab: 'print', icon: Printer },
 ];
