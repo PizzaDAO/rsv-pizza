@@ -17,12 +17,14 @@ import type { UnderbossDashboardData, UnderbossStats, UnderbossEvent } from '../
 function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
   const totalEvents = events.length;
   let totalRsvps = 0;
+  let totalInvited = 0;
   let totalApproved = 0;
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
 
   for (const e of events) {
     totalRsvps += e.guestCount;
+    totalInvited += e.invitedCount || 0;
     totalApproved += e.approvedCount;
     if (e.progress.hasVenue) eventsWithVenue++;
     if (e.progress.hasBudget) eventsWithBudget++;
@@ -31,6 +33,7 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
   return {
     totalEvents,
     totalRsvps,
+    totalInvited,
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
