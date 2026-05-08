@@ -20,6 +20,7 @@ import {
 import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser } from '../types';
+import { fetchSheetCities } from '../lib/cities';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -182,15 +183,27 @@ export function AdminPage() {
   async function handleExportEventsCsv() {
     setExportingCsv(true);
     try {
-      const data = await fetchUnderbossDashboard('all');
-      const headers = ['City Name', 'Address', 'Event Link', 'Telegram Chat', 'Country'];
-      const rows = data.events.map(e => [
-        e.name,
-        e.address || '',
-        e.customUrl ? `https://rsv.pizza/${e.customUrl}` : '',
-        e.telegramGroup || '',
-        e.country || '',
+      const [data, sheetCities] = await Promise.all([
+        fetchUnderbossDashboard('all'),
+        fetchSheetCities(),
       ]);
+      // Build city→chatUrl map (same pattern as PartnerDashboardPage)
+      const cityChats = new Map<string, string>();
+      for (const c of sheetCities) {
+        if (c.chatUrl) cityChats.set(c.city.toLowerCase().trim(), c.chatUrl);
+      }
+      const headers = ['City Name', 'Address', 'Event Link', 'Telegram Chat', 'Country'];
+      const rows = data.events.map(e => {
+        const city = e.name.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
+        const telegramLink = e.telegramGroup || cityChats.get(city) || '';
+        return [
+          e.name,
+          e.address || '',
+          e.customUrl ? `https://rsv.pizza/${e.customUrl}` : '',
+          telegramLink,
+          e.country || '',
+        ];
+      });
       const csvContent = [headers, ...rows]
         .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
         .join('\n');
