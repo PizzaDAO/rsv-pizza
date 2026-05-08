@@ -51,6 +51,7 @@ const SWC_ASSETS: Sticker[] = [
   { id: 'swc-au', name: 'Stand With Crypto Australia', shape: 'wide', svg: true, requireTag: 'swcau' },
   { id: 'swc-europe', name: 'Stand With Crypto Europe', shape: 'wide', svg: true, requireTag: 'swceu' },
   { id: 'swc-br', name: 'Stand With Crypto Brazil', shape: 'wide', svg: true, requireTag: 'swcbr' },
+  { id: 'swc-uk', name: 'Stand With Crypto UK', shape: 'wide', svg: true, requireTag: 'swcuk' },
 ];
 
 const FLYERS: PrintAsset[] = [
