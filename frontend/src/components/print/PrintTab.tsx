@@ -43,6 +43,9 @@ const STICKERS: Sticker[] = [
   { id: 'sticker-10', name: 'Bitcoin Pizza Day 2026', shape: 'round' },
   { id: 'sticker-gpp2026-round', name: 'Global Pizza Party 2026', shape: 'round' },
   { id: 'sticker-gpp2026-square', name: 'Global Pizza Party 2026', shape: 'square' },
+];
+
+const SWC_ASSETS: Sticker[] = [
   { id: 'swc-canada', name: 'Stand With Crypto Canada', shape: 'wide', pngOnly: true, requireTag: 'swccanada' },
   { id: 'swc-au', name: 'Stand With Crypto Australia', shape: 'wide', svg: true, requireTag: 'swcau' },
   { id: 'swc-europe', name: 'Stand With Crypto Europe', shape: 'wide', svg: true, requireTag: 'swceu' },
@@ -94,8 +97,8 @@ export function PrintTab() {
   const { party } = usePizza();
   const eventTags = party?.eventTags || [];
 
-  const visibleStickers = STICKERS.filter(
-    (s) => !s.requireTag || eventTags.includes(s.requireTag)
+  const visibleSwcAssets = SWC_ASSETS.filter(
+    (s) => eventTags.includes(s.requireTag!)
   );
 
   return (
@@ -112,7 +115,7 @@ export function PrintTab() {
       <section>
         <h3 className="text-lg font-semibold text-theme-text mb-3">Stickers</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {visibleStickers.map((sticker) => {
+          {STICKERS.map((sticker) => {
             const imgSrc = sticker.svg
               ? `/stickers/${sticker.id}.svg`
               : sticker.pngOnly
@@ -152,6 +155,46 @@ export function PrintTab() {
           })}
         </div>
       </section>
+
+      {/* Stand With Crypto Section — only visible for SWC-tagged events */}
+      {visibleSwcAssets.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-theme-text mb-3">Stand With Crypto</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {visibleSwcAssets.map((asset) => {
+              const imgSrc = asset.svg
+                ? `/stickers/${asset.id}.svg`
+                : `/stickers/${asset.id}.png`;
+              const downloadHref = imgSrc;
+              const downloadLabel = asset.svg ? 'Download SVG' : 'Download PNG';
+
+              return (
+                <div key={asset.id} className="card p-4 flex flex-col items-center gap-3">
+                  <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface p-3">
+                    <img
+                      src={imgSrc}
+                      alt={asset.name}
+                      className="max-w-full max-h-full object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="text-sm font-medium text-theme-text leading-tight">{asset.name}</p>
+                  </div>
+                  <a
+                    href={downloadHref}
+                    download
+                    className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-[#6100FF]/15 text-[#6100FF] hover:bg-[#6100FF]/25 transition-colors text-sm font-medium"
+                  >
+                    <Download size={14} />
+                    {downloadLabel}
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Flyers Section */}
       <section>
