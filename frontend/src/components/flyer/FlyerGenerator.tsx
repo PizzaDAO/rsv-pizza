@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getSponsors, createSponsor, reorderSponsors } from '../../lib/api';
+import { getSponsors, createSponsor, updateSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
 import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check, Pencil } from 'lucide-react';
@@ -54,6 +54,7 @@ export function FlyerGenerator() {
   const [logoSizes, setLogoSizes] = useState<Record<string, number>>(savedState?.logoSizes || {});
   const defaultLogoSize = 80;
   const [showAddSponsor, setShowAddSponsor] = useState(false);
+  const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
@@ -310,6 +311,22 @@ export function FlyerGenerator() {
       await createSponsor(party.id, data);
       loadSponsors();
       setShowAddSponsor(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditSponsor = async (formData: PartnerFormData) => {
+    if (!party?.id || !editingSponsor) return;
+    const data = extractSponsorData(formData);
+    setIsSubmitting(true);
+    try {
+      await updateSponsor(party.id, editingSponsor.id, data);
+      const result = await getSponsors(party.id);
+      if (result?.sponsors) {
+        setSponsors(result.sponsors.filter(s => s.logoUrl && (s.status === 'yes' || s.status === 'paid')));
+      }
+      setEditingSponsor(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -1253,6 +1270,23 @@ export function FlyerGenerator() {
                         </button>
                       </div>
                     )}
+                    {hoveredLogoId === s.id && (
+                      <button
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); setEditingSponsor(s); }}
+                        style={{
+                          position: 'absolute', top: -12, right: -4,
+                          width: 22, height: 22, padding: 0, borderRadius: '50%',
+                          border: 'none', background: 'rgba(0,0,0,0.75)', color: '#fff',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          zIndex: 40,
+                        }}
+                        aria-label="Edit partner"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
                     {/* Corner resize handle */}
                     <div
                       onMouseDown={handleResizeStart}
@@ -1325,6 +1359,8 @@ export function FlyerGenerator() {
           return (
             <div
               key={`popped-${s.id}`}
+              onMouseEnter={() => setHoveredLogoId(s.id)}
+              onMouseLeave={() => setHoveredLogoId(prev => (prev === s.id ? null : prev))}
               style={{
                 position: 'absolute',
                 top: pos.y,
@@ -1351,6 +1387,23 @@ export function FlyerGenerator() {
                   outlineOffset: 4,
                 }}
               />
+              {hoveredLogoId === s.id && (
+                <button
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onClick={e => { e.preventDefault(); e.stopPropagation(); setEditingSponsor(s); }}
+                  style={{
+                    position: 'absolute', top: -12, right: -4,
+                    width: 22, height: 22, padding: 0, borderRadius: '50%',
+                    border: 'none', background: 'rgba(0,0,0,0.75)', color: '#fff',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 40,
+                  }}
+                  aria-label="Edit partner"
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
               {/* Corner resize handle */}
               <div
                 onMouseDown={handlePoppedResizeStart}
@@ -1489,6 +1542,14 @@ export function FlyerGenerator() {
           onClose={() => setShowAddSponsor(false)}
           isLoading={isSubmitting}
           defaultStatus="yes"
+        />
+      )}
+      {editingSponsor && (
+        <PartnerForm
+          sponsor={editingSponsor}
+          onSubmit={handleEditSponsor}
+          onClose={() => setEditingSponsor(null)}
+          isLoading={isSubmitting}
         />
       )}
     </div>
