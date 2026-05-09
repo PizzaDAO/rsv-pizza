@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
+import { Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart, Calendar } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
-import { getDonationStats } from '../lib/api';
+import { getDonationStats, PublicEvent } from '../lib/api';
+import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
 import { RSVPFormStep1 } from '../components/RSVPFormStep1';
@@ -40,6 +41,10 @@ export function RSVPPage() {
   }, [isGPP]);
 
   const { fire: fireConfetti, fireFromCenter, ConfettiOverlay } = useConfetti();
+
+  // Calendar popup state
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarBtnRef = useRef<HTMLButtonElement>(null);
 
   // Password protection state
   const [passwordInput, setPasswordInput] = useState('');
@@ -320,6 +325,34 @@ export function RSVPPage() {
               />
             );
           })()}
+          {!form.alreadyRegistered && !form.pendingApproval && party?.date && (
+            <div className="relative inline-block mt-2 mb-4">
+              <button
+                ref={calendarBtnRef}
+                onClick={() => setCalendarOpen(!calendarOpen)}
+                className="btn-secondary flex items-center gap-2 mx-auto"
+              >
+                <Calendar size={18} />
+                Add to Calendar
+              </button>
+              <AddToCalendarPopup
+                isOpen={calendarOpen}
+                onClose={() => setCalendarOpen(false)}
+                event={{
+                  name: party.name,
+                  date: party.date,
+                  duration: party.duration,
+                  timezone: party.timezone,
+                  address: party.address,
+                  venueName: party.venue_name,
+                  inviteCode: party.invite_code,
+                  customUrl: party.custom_url,
+                  description: party.description,
+                } as PublicEvent}
+                anchorRef={calendarBtnRef}
+              />
+            </div>
+          )}
           <button
             onClick={handleClose}
             className="btn-secondary"
