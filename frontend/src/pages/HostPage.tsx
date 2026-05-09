@@ -405,14 +405,18 @@ function HostPageContent() {
                 <SponsorCRM
                   partyId={party.id}
                   onAddAsCoHost={async (data) => {
-                    // Build avatar from X handle or Instagram
+                    // Use manually-provided avatar if available, otherwise auto-fetch from socials
                     let avatarUrl: string | undefined;
-                    const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
-                    if (xAvatar) {
-                      avatarUrl = await proxyAvatarToStorage(xAvatar);
-                    } else if (data.instagram) {
-                      const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
-                      avatarUrl = await proxyAvatarToStorage(igAvatar);
+                    if (data.avatarUrl) {
+                      avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
+                    } else {
+                      const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                      if (xAvatar) {
+                        avatarUrl = await proxyAvatarToStorage(xAvatar);
+                      } else if (data.instagram) {
+                        const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+                        avatarUrl = await proxyAvatarToStorage(igAvatar);
+                      }
                     }
 
                     const newCoHost: CoHost = {
