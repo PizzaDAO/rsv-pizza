@@ -2501,7 +2501,7 @@ export async function updateHostStatus(
 // Update underboss status on an event (underboss auth)
 export async function updateUnderbossStatus(
   partyId: string,
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'listed' | 'hidden'
 ): Promise<void> {
   await apiRequest(`/api/underboss/event/${partyId}/status`, {
     method: 'PATCH',

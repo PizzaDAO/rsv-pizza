@@ -10,7 +10,7 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
-export type UnderbossStatus = 'pending' | 'approved' | 'rejected';
+export type UnderbossStatus = 'pending' | 'approved' | 'rejected' | 'listed' | 'hidden';
 
 export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED' | 'INVITED';
 
