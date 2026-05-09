@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, AlertCircle, Loader2, X, Wallet, Heart } from 'lucide-react';
+import { Check, AlertCircle, Loader2, X, Wallet, Heart, Calendar } from 'lucide-react';
 import { ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from './IconInput';
@@ -10,6 +10,7 @@ import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/u
 import { RSVPFormStep1 } from './RSVPFormStep1';
 import { RSVPFormStep2 } from './RSVPFormStep2';
 import { ShareRSVP } from './ShareRSVP';
+import { AddToCalendarPopup } from './AddToCalendarPopup';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 import { useAccount } from 'wagmi';
@@ -34,6 +35,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   // Donation state (stays in modal success screen)
   const [showDonation, setShowDonation] = useState(false);
   const [donationComplete, setDonationComplete] = useState(false);
+
+  // Calendar popup state
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarBtnRef = useRef<HTMLButtonElement>(null);
 
   // Track closed->open transition for reset
   const wasOpenRef = useRef(false);
@@ -363,6 +368,24 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             <div className="flex items-center justify-center gap-2 mt-4 text-[#39d98a]">
               <Check size={16} />
               <span className="text-sm">Thanks for your support!</span>
+            </div>
+          )}
+          {event.date && (
+            <div className="relative inline-block mt-4">
+              <button
+                ref={calendarBtnRef}
+                onClick={() => setCalendarOpen(!calendarOpen)}
+                className="btn-secondary flex items-center gap-2 mx-auto"
+              >
+                <Calendar size={18} />
+                Add to Calendar
+              </button>
+              <AddToCalendarPopup
+                isOpen={calendarOpen}
+                onClose={() => setCalendarOpen(false)}
+                event={event}
+                anchorRef={calendarBtnRef}
+              />
             </div>
           )}
           <button
