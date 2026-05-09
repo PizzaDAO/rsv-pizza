@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza } from 'lucide-react';
-import { uploadEventImage } from '../lib/supabase';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
+import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
 
 export const PartyHeader: React.FC = () => {
@@ -194,7 +194,7 @@ export const PartyHeader: React.FC = () => {
             <div className="w-48 h-48 flex-shrink-0 rounded-xl overflow-hidden">
               {party.eventImageUrl ? (
                 <img
-                  src={party.eventImageUrl}
+                  src={cdnUrl(party.eventImageUrl)}
                   alt={party.name}
                   className="w-full h-full object-cover"
                 />
@@ -208,7 +208,27 @@ export const PartyHeader: React.FC = () => {
             {/* Content */}
             <div className="flex-1 flex flex-col justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-theme-text text-lg">{party.name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-theme-text text-lg">{party.name}</h3>
+                  {party.eventType === 'gpp' && party.underbossStatus === 'approved' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                      <Check size={12} />
+                      Approved
+                    </span>
+                  )}
+                  {party.eventType === 'gpp' && party.underbossStatus === 'listed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      <Globe size={12} />
+                      Community Event
+                    </span>
+                  )}
+                  {party.eventType === 'gpp' && party.underbossStatus === 'hidden' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      <EyeOff size={12} />
+                      Not Listed
+                    </span>
+                  )}
+                </div>
                 {party.date && (
                   <p className="text-sm text-theme-text-secondary mb-1 flex items-center gap-1.5">
                     <Calendar size={14} className="flex-shrink-0" />
@@ -232,13 +252,23 @@ export const PartyHeader: React.FC = () => {
                 )}
                 <p className="text-sm text-theme-text-muted">
                   {party.hostName && `Hosted by ${party.hostName} • `}
-                  {party.maxGuests ? (
-                    <span>
-                      {party.guests.length} of {party.maxGuests} guests responded
-                    </span>
-                  ) : (
-                    <span>{party.guests.length} guest{party.guests.length !== 1 ? 's' : ''}</span>
-                  )}
+                  {(() => {
+                    const invited = party.guests.filter(g => g.status === 'INVITED').length;
+                    const rsvpd = party.guests.filter(g => g.status !== 'INVITED').length;
+                    const checkedIn = party.guests.filter(g => g.checkedInAt).length;
+                    if (invited > 0) {
+                      return (
+                        <span>
+                          {invited} invited · {rsvpd} RSVP'd{party.maxGuests ? ` / ${party.maxGuests}` : ''} · {checkedIn} checked in
+                        </span>
+                      );
+                    }
+                    return party.maxGuests ? (
+                      <span>{rsvpd} of {party.maxGuests} guests responded</span>
+                    ) : (
+                      <span>{rsvpd} guest{rsvpd !== 1 ? 's' : ''}{checkedIn > 0 ? ` · ${checkedIn} checked in` : ''}</span>
+                    );
+                  })()}
                 </p>
               </div>
 
@@ -612,7 +642,7 @@ export const PartyHeader: React.FC = () => {
                 {party.eventImageUrl ? (
                   <div className="sm:w-48 sm:h-48 w-full aspect-square flex-shrink-0 bg-black/30">
                     <img
-                      src={party.eventImageUrl}
+                      src={cdnUrl(party.eventImageUrl)}
                       alt={party.name}
                       className="w-full h-full object-cover"
                     />

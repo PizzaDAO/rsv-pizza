@@ -26,7 +26,9 @@ export interface RSVPEventData {
   donationRecipientUrl?: string | null;
   availableBeverages: string[];
   availableToppings: string[];
+  availableDietaryOptions: string[];
   selectedPizzerias?: Pizzeria[];
+  turtleRolesEnabled?: boolean;
 }
 
 export interface RSVPSubmitResult {
@@ -66,7 +68,9 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     donationRecipientUrl: event.donationRecipientUrl,
     availableBeverages: event.availableBeverages || [],
     availableToppings: event.availableToppings || [],
+    availableDietaryOptions: event.availableDietaryOptions || [],
     selectedPizzerias: event.selectedPizzerias,
+    turtleRolesEnabled: event.turtleRolesEnabled,
   };
 }
 
@@ -88,7 +92,9 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     donationRecipientUrl: party.donation_recipient_url,
     availableBeverages: party.available_beverages || [],
     availableToppings: party.available_toppings || [],
+    availableDietaryOptions: party.available_dietary_options || [],
     selectedPizzerias: party.selected_pizzerias as Pizzeria[] | undefined,
+    turtleRolesEnabled: party.turtle_roles_enabled,
   };
 }
 
@@ -404,7 +410,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
       if (result) {
         // Save preferences to profile if checkbox is checked and email is provided
-        if (saveToProfile && email.trim() && !result.alreadyRegistered) {
+        if (email.trim() && !result.alreadyRegistered) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
             liked_toppings: likedToppings,
@@ -555,6 +561,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     excludedToppings,
     availableBeverages: eventData.availableBeverages,
     availableToppings: eventData.availableToppings,
+    availableDietaryOptions: eventData.availableDietaryOptions,
 
     // Reset
     resetForm,

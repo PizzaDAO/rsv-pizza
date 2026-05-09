@@ -8,12 +8,13 @@ import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, Im
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { uploadEventImage, updateParty } from '../../lib/supabase';
+import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
   CITY_BOX, VENUE_BOX, TIME_BOX, DEFAULT_SPONSOR_BOX,
 } from './renderFlyer';
+import { cancelFlyerRegen } from './autoRegenFlyer';
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -402,7 +403,7 @@ export function FlyerGenerator() {
   const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
 
   // Compute sponsor logo sizing to fit within bounding box
-  const sponsorCount = Math.min(sponsors.length, 8);
+  const sponsorCount = sponsors.length;
   const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
   const sponsorRows = sponsorCount <= 4 ? 1 : 2;
   const maxLogoWidth = sponsorCols > 0 ? (sponsorBoxSize.width - (sponsorCols - 1) * 16) / sponsorCols : 0;
@@ -466,8 +467,8 @@ export function FlyerGenerator() {
       const boxH = sponsorBoxSize.height;
 
       // Separate group logos from popped-out logos
-      const groupSponsors = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
-      const poppedSponsors = sponsors.slice(0, 8).filter(s => poppedLogos[s.id]);
+      const groupSponsors = sponsors.filter(s => !poppedLogos[s.id]);
+      const poppedSponsors = sponsors.filter(s => poppedLogos[s.id]);
 
       // Draw group logos in flex layout
       if (groupSponsors.length > 0) {
@@ -574,6 +575,9 @@ export function FlyerGenerator() {
         flyer_generated_at: new Date().toISOString(),
       });
       if (!success) throw new Error('Failed to update party');
+
+      // Cancel any pending auto-regen so it doesn't overwrite the manual flyer
+      cancelFlyerRegen(party.id);
 
       if (party.inviteCode) {
         await loadParty(party.inviteCode);
@@ -879,7 +883,7 @@ export function FlyerGenerator() {
         {/* Sponsor logos - left-aligned in bounding box (skip popped-out logos) */}
         {sponsors.length > 0 && (() => {
           const dragProps = getDragProps('sponsors');
-          const groupLogos = sponsors.slice(0, 8).filter(s => !poppedLogos[s.id]);
+          const groupLogos = sponsors.filter(s => !poppedLogos[s.id]);
           return groupLogos.length > 0 ? (
             <div
               onMouseDown={dragProps.onMouseDown}
@@ -1166,7 +1170,7 @@ export function FlyerGenerator() {
                     style={{ position: 'relative', display: 'inline-block' }}
                   >
                     <img
-                      src={s.logoUrl!}
+                      src={cdnUrl(s.logoUrl!)}
                       alt={s.name}
                       crossOrigin="anonymous"
                       onDoubleClick={(e) => handleLogoDoubleClick(s.id, e)}
@@ -1275,7 +1279,7 @@ export function FlyerGenerator() {
         })()}
 
         {/* Popped-out logos — freely positioned anywhere on the canvas */}
-        {sponsors.slice(0, 8).filter(s => poppedLogos[s.id]).map(s => {
+        {sponsors.filter(s => poppedLogos[s.id]).map(s => {
           const pos = poppedLogos[s.id];
           const size = logoSizes[s.id] ?? Math.min(defaultLogoSize, autoLogoSize);
           const isDragging = draggingLogo === s.id;
@@ -1333,7 +1337,7 @@ export function FlyerGenerator() {
               }}
             >
               <img
-                src={s.logoUrl!}
+                src={cdnUrl(s.logoUrl!)}
                 alt={s.name}
                 crossOrigin="anonymous"
                 onMouseDown={(e) => handleLogoDragStart(s.id, e)}

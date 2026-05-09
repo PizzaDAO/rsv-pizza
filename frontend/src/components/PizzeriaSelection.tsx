@@ -427,7 +427,8 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {pizzeria.phone && recommendations.length > 0 && (
+                  {/* AI Order button - disabled while AI ordering is Coming Soon */}
+                  {false && pizzeria.phone && recommendations.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setOrderPizzeria(pizzeria)}

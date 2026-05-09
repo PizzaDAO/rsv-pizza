@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, MapPin, Wallet, BarChart3, TrendingUp } from 'lucide-react';
+import { Users, MapPin, Wallet, BarChart3, TrendingUp, Mail } from 'lucide-react';
 import type { UnderbossStats } from '../../types';
 
 interface RegionStatsProps {
@@ -54,7 +54,7 @@ export function RegionStats({ stats }: RegionStatsProps) {
   return (
     <div className="space-y-4">
       {/* Top stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard
           icon={BarChart3}
           label={t('regionStats.events')}
@@ -67,6 +67,12 @@ export function RegionStats({ stats }: RegionStatsProps) {
           value={stats.totalRsvps}
           subValue={t('regionStats.perEvent', { avg: stats.avgRsvpsPerEvent })}
           color="bg-purple-500/20 text-purple-400"
+        />
+        <StatCard
+          icon={Mail}
+          label="Invited"
+          value={stats.totalInvited}
+          color="bg-blue-500/20 text-blue-400"
         />
         <StatCard
           icon={Users}

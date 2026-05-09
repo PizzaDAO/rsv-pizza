@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin, isUnderboss } from '../middleware/auth.js';
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
@@ -10,14 +10,23 @@ import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromA
 
 export const sponsorUserAdminRouter = Router();
 
-// GET /api/sponsor-users/list - List all sponsor users (admin only)
+// GET /api/sponsor-users/list - List sponsor users (admin: all, underboss: own)
 sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
+    }
+
+    const whereClause: any = {};
+    if (!adminUser) {
+      // Underboss: only see partners they created
+      whereClause.createdBy = req.userEmail;
     }
 
     const sponsorUsers = await prisma.sponsorUser.findMany({
+      where: whereClause,
       orderBy: [{ descriptionSortOrder: 'asc' }, { createdAt: 'desc' }],
       select: {
         id: true,
@@ -52,7 +61,7 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
     if (uniqueTags.length > 0) {
       for (const tag of uniqueTags) {
         const count = await prisma.party.count({
-          where: { eventTags: { has: tag } },
+          where: tag === 'pizzadao' ? {} : { eventTags: { has: tag } },
         });
         tagCounts[tag] = count;
       }
@@ -64,11 +73,13 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
-// POST /api/sponsor-users - Create a sponsor user (super admin only)
+// POST /api/sponsor-users - Create a sponsor user (admin or underboss)
 sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const {
@@ -85,14 +96,17 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
       throw new AppError('Email and tag are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Check for existing sponsor with same email
-    const existing = await prisma.sponsorUser.findUnique({
-      where: { email: email.toLowerCase() },
+    // Check for existing sponsor with same email+tag combo
+    const existing = await prisma.sponsorUser.findFirst({
+      where: { email: email.toLowerCase(), tag: tag.trim().toLowerCase() },
     });
 
     if (existing) {
-      throw new AppError('A sponsor user with this email already exists', 409, 'CONFLICT');
+      throw new AppError('This email is already registered for this tag', 409, 'CONFLICT');
     }
+
+    // Underboss: always set createdBy to their email (prevent spoofing)
+    const createdBy = underbossUser ? req.userEmail : (req.userEmail || null);
 
     const sponsorUser = await prisma.sponsorUser.create({
       data: {
@@ -100,7 +114,7 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
         tag: tag.trim().toLowerCase(),
         name: name?.trim() || null,
         notes: notes?.trim() || null,
-        createdBy: req.userEmail || null,
+        createdBy,
         coHostName: coHostName?.trim() || null,
         coHostWebsite: coHostWebsite?.trim() || null,
         coHostTwitter: coHostTwitter?.trim() || null,
@@ -134,18 +148,30 @@ sponsorUserAdminRouter.post('/', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
-// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin only)
+// PATCH /api/sponsor-users/reorder - Reorder sponsor users by descriptionSortOrder (admin or underboss)
 // NOTE: Must be registered before /:id to avoid Express matching 'reorder' as an id
 sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { sponsorUserIds } = req.body;
 
     if (!Array.isArray(sponsorUserIds) || sponsorUserIds.length === 0) {
       throw new AppError('sponsorUserIds must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+
+    // Underboss: verify all IDs belong to them
+    if (!adminUser) {
+      const ownedCount = await prisma.sponsorUser.count({
+        where: { id: { in: sponsorUserIds }, createdBy: req.userEmail },
+      });
+      if (ownedCount !== sponsorUserIds.length) {
+        throw new AppError('You can only reorder your own partners', 403, 'FORBIDDEN');
+      }
     }
 
     // Capture old global order BEFORE updating
@@ -246,11 +272,13 @@ sponsorUserAdminRouter.patch('/reorder', requireAuth, async (req: AuthRequest, r
   }
 });
 
-// PATCH /api/sponsor-users/:id - Update a sponsor user (super admin only)
+// PATCH /api/sponsor-users/:id - Update a sponsor user (admin or underboss)
 sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -270,6 +298,11 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
     });
     if (!oldSponsorUser) {
       throw new AppError('Sponsor user not found', 404, 'NOT_FOUND');
+    }
+
+    // Underboss: verify ownership
+    if (!adminUser && oldSponsorUser.createdBy !== req.userEmail) {
+      throw new AppError('You can only edit your own partners', 403, 'FORBIDDEN');
     }
 
     const updateData: any = {};
@@ -371,11 +404,13 @@ sponsorUserAdminRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: 
   }
 });
 
-// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (super admin only)
+// DELETE /api/sponsor-users/:id - Deactivate a sponsor user (admin or underboss)
 sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!(await isAdmin(req.userEmail))) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    const adminUser = await isAdmin(req.userEmail);
+    const underbossUser = !adminUser ? await isUnderboss(req.userEmail) : false;
+    if (!adminUser && !underbossUser) {
+      throw new AppError('Admin or underboss access required', 403, 'FORBIDDEN');
     }
 
     const { id } = req.params;
@@ -384,6 +419,11 @@ sponsorUserAdminRouter.delete('/:id', requireAuth, async (req: AuthRequest, res:
     const sponsorUser = await prisma.sponsorUser.findUnique({
       where: { id },
     });
+
+    // Underboss: verify ownership
+    if (!adminUser && sponsorUser?.createdBy !== req.userEmail) {
+      throw new AppError('You can only deactivate your own partners', 403, 'FORBIDDEN');
+    }
 
     await prisma.sponsorUser.update({
       where: { id },
@@ -427,7 +467,7 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
 
     const adminUser = await isAdmin(email);
 
-    const sponsorUser = await prisma.sponsorUser.findFirst({
+    const sponsorUsers = await prisma.sponsorUser.findMany({
       where: { email: email.toLowerCase(), isActive: true },
       select: {
         id: true,
@@ -438,16 +478,22 @@ sponsorDashboardRouter.get('/me', requireAuth, async (req: AuthRequest, res: Res
       },
     });
 
-    if (sponsorUser) {
+    if (sponsorUsers.length > 0) {
       return res.json({
         isSponsor: true,
         isAdmin: adminUser,
         sponsor: {
-          id: sponsorUser.id,
-          email: sponsorUser.email,
-          name: sponsorUser.name,
-          tag: sponsorUser.tag,
+          id: sponsorUsers[0].id,
+          email: sponsorUsers[0].email,
+          name: sponsorUsers[0].name,
+          tag: sponsorUsers[0].tag,
         },
+        sponsors: sponsorUsers.map(s => ({
+          id: s.id,
+          email: s.email,
+          name: s.name,
+          tag: s.tag,
+        })),
       });
     }
 
@@ -475,13 +521,18 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
   try {
     // Admins can pass ?tag= to filter, or see all tagged events
     const queryTag = req.query.tag as string | undefined;
-    const tag = queryTag?.trim().toLowerCase() || req.sponsorUser?.tag;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
     const sponsorUserId = req.sponsorUser?.id;
 
     // Build where clause — admins without a tag filter see all events that have any eventTags
     const where: any = {};
-    if (tag) {
+    if (tag && tag !== 'pizzadao') {
       where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      // PizzaDAO: show all GPP events (created via /gpp flow)
+      where.eventType = 'gpp';
     } else if (req.isAdminViewing) {
       // Admin with no tag filter — show events that have at least one eventTag
       where.NOT = { eventTags: { equals: [] } };
@@ -493,7 +544,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       include: {
         user: { select: { name: true, email: true, profilePictureUrl: true, website: true, twitter: true, instagram: true } },
         guests: {
-          select: { id: true, approved: true, checkedInAt: true },
+          select: { id: true, approved: true, checkedInAt: true, status: true },
         },
         budgetItems: {
           select: { id: true, cost: true, status: true },
@@ -519,7 +570,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           select: { notes: true },
           take: 1,
         },
-        _count: { select: { guests: true } },
+        _count: { select: { guests: true, photos: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -541,28 +592,81 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       allProfilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
     }
 
-    // Get link click stats per party (sponsor + host_social clicks)
+    // Get link click stats per party — filtered to the relevant partner's links
     const eventIds = events.map(e => e.id);
-    const clickStats = await prisma.linkClick.groupBy({
-      by: ['partyId'],
-      where: {
-        partyId: { in: eventIds },
-        linkType: { in: ['sponsor', 'host_social'] },
-      },
-      _count: true,
-    });
-    const clickCountMap = new Map(clickStats.map(r => [r.partyId, r._count]));
 
-    const uniqueClickStats = eventIds.length > 0
-      ? await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
-        SELECT party_id::text, COUNT(DISTINCT visitor_hash) as unique_count
+    // Determine which partner name(s) to filter clicks by:
+    // - Non-admin partner: filter to their own name
+    // - Admin viewing a specific tag: filter to ALL partner names for that tag
+    // - Admin with no tag filter: show all clicks (no filter)
+    let partnerNames: string[] = [];
+
+    if (!req.isAdminViewing && req.sponsorUser) {
+      // Regular partner: filter to their own name
+      const partnerRecord = await prisma.sponsorUser.findUnique({
+        where: { id: req.sponsorUser.id },
+        select: { coHostName: true, name: true, email: true },
+      });
+      const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
+      if (displayName) partnerNames = [displayName];
+    } else if (req.isAdminViewing) {
+      // Admin: filter to partners for the specific tag, or ALL partners for "all tags"
+      const tagPartners = await prisma.sponsorUser.findMany({
+        where: { ...(tag ? { tag } : {}), isActive: true },
+        select: { coHostName: true, name: true, email: true },
+      });
+      partnerNames = tagPartners
+        .map(p => p.coHostName || p.name || p.email)
+        .filter(Boolean) as string[];
+    }
+
+    // Build parameterized label filter: exact match OR prefix match (for "Name_twitter" etc.)
+    let labelFilter = Prisma.empty;
+    if (partnerNames.length === 1) {
+      labelFilter = Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`;
+    } else if (partnerNames.length > 1) {
+      // Build OR chain: (link_label = 'A' OR link_label LIKE 'A_%' OR link_label = 'B' OR link_label LIKE 'B_%')
+      const conditions = partnerNames.map(n =>
+        Prisma.sql`link_label = ${n} OR link_label LIKE ${n + '_%'}`
+      );
+      labelFilter = Prisma.sql`AND (${Prisma.join(conditions, ' OR ')})`;
+    }
+
+    const clicksByLink = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
+        SELECT
+          party_id::text,
+          url,
+          link_type,
+          MAX(link_label) as link_label,
+          COUNT(*) as total_clicks,
+          COUNT(DISTINCT visitor_hash) as unique_clicks
         FROM link_clicks
         WHERE party_id::text IN (${Prisma.join(eventIds)})
         AND link_type IN ('sponsor', 'host_social')
-        GROUP BY party_id
+        ${labelFilter}
+        GROUP BY party_id, url, link_type
+        ORDER BY total_clicks DESC
       `
       : [];
-    const uniqueClickMap = new Map(uniqueClickStats.map(r => [r.party_id, Number(r.unique_count)]));
+
+    // Build map: partyId -> [{ url, linkType, linkLabel, clicks, uniqueClickers }]
+    const byLinkMap = new Map<string, { url: string; linkType: string; linkLabel: string | null; clicks: number; uniqueClickers: number }[]>();
+    const clickCountMap = new Map<string, number>();
+    const uniqueClickMap = new Map<string, number>();
+    for (const row of clicksByLink) {
+      const list = byLinkMap.get(row.party_id) || [];
+      list.push({
+        url: row.url,
+        linkType: row.link_type,
+        linkLabel: row.link_label,
+        clicks: Number(row.total_clicks),
+        uniqueClickers: Number(row.unique_clicks),
+      });
+      byLinkMap.set(row.party_id, list);
+      clickCountMap.set(row.party_id, (clickCountMap.get(row.party_id) || 0) + Number(row.total_clicks));
+      uniqueClickMap.set(row.party_id, (uniqueClickMap.get(row.party_id) || 0) + Number(row.unique_clicks));
+    }
 
     // Get page view (impression) counts per party
     const viewStats = await prisma.pageView.groupBy({
@@ -583,8 +687,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     const uniqueViewMap = new Map(uniqueViewStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     const formattedEvents = events.map(event => {
-      const guestCount = event._count.guests;
-      const approvedCount = event.guests.filter(g => g.approved !== false).length;
+      const guestCount = event.guests.filter(g => g.status !== 'INVITED').length;
+      const approvedCount = event.guests.filter(g => g.approved !== false && g.status !== 'INVITED').length;
 
       // Budget summary
       let budget = null;
@@ -653,7 +757,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         id: event.id,
         name: event.name,
         slug: event.customUrl || event.inviteCode,
-        reportPublicSlug: event.reportPublicSlug || event.customUrl || event.inviteCode,
+        reportPublicSlug: event.reportPublished ? (event.reportPublicSlug || event.customUrl || event.inviteCode) : null,
         date: event.date,
         timezone: event.timezone,
         address: event.address,
@@ -671,6 +775,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         } : null,
         coHosts,
         rsvpCount: guestCount,
+        invitedCount: event.guests.filter(g => g.status === 'INVITED').length,
         approvedCount,
         maxGuests: event.maxGuests,
         expectedGuests: event.expectedGuests || null,
@@ -679,6 +784,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         clickStats: {
           totalClicks: clickCountMap.get(event.id) || 0,
           uniqueClickers: uniqueClickMap.get(event.id) || 0,
+          byLink: byLinkMap.get(event.id) || [],
         },
         impressions: {
           totalViews: viewCountMap.get(event.id) || 0,
@@ -687,6 +793,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         sponsorStatuses,
         sponsorCount,
         partnerNotes: event.partnerEventNotes.length > 0 ? event.partnerEventNotes[0].notes : null,
+        photoCount: event._count.photos,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,

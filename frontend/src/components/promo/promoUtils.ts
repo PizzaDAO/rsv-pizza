@@ -162,18 +162,17 @@ export function generateTwitterThread(party: Party): string[] {
   post1Lines.push('RSVP Below \u{1F447}');
   const post1 = post1Lines.join('\n');
 
-  // Post 2: Just the link
-  const post2 = rsvpUrl;
-
-  // Post 3: Hosts
-  const hostLines: string[] = ['At the event, connect w/:'];
+  // Post 2: RSVP link + hosts
+  const post2Lines: string[] = [`RSVP at ${rsvpUrl}`];
+  post2Lines.push('');
+  post2Lines.push('At the event, connect w/:');
 
   // Primary host
   if (party.hostProfile?.twitter) {
     const handle = party.hostProfile.twitter.replace(/^@/, '');
-    hostLines.push(`@${handle}`);
+    post2Lines.push(`@${handle}`);
   } else if (party.hostName) {
-    hostLines.push(party.hostName);
+    post2Lines.push(party.hostName);
   }
 
   // Co-hosts (only those shown on event)
@@ -182,16 +181,16 @@ export function generateTwitterThread(party: Party): string[] {
       if (coHost.showOnEvent === false) continue;
       if (coHost.twitter) {
         const handle = coHost.twitter.replace(/^@/, '');
-        hostLines.push(`@${handle}`);
+        post2Lines.push(`@${handle}`);
       } else {
-        hostLines.push(coHost.name);
+        post2Lines.push(coHost.name);
       }
     }
   }
 
-  const post3 = hostLines.join('\n');
+  const post2 = post2Lines.join('\n');
 
-  return [post1, post2, post3];
+  return [post1, post2];
 }
 
 /**
@@ -246,8 +245,6 @@ export function generateSocialPost(party: Party, platform: SocialPlatform): stri
       if (location !== 'TBD') lines.push(`Where: ${location}`);
       lines.push('');
       lines.push(`RSVP here: ${rsvpUrl}`);
-      lines.push('');
-      lines.push(hashtags.slice(0, 6).join(' '));
       return lines.join('\n');
     }
 
@@ -263,8 +260,6 @@ export function generateSocialPost(party: Party, platform: SocialPlatform): stri
       if (location !== 'TBD') lines.push(`Location: ${location}`);
       lines.push('');
       lines.push(`RSVP: ${rsvpUrl}`);
-      lines.push('');
-      lines.push(hashtags.slice(0, 5).join(' '));
       return lines.join('\n');
     }
   }
@@ -273,12 +268,8 @@ export function generateSocialPost(party: Party, platform: SocialPlatform): stri
 /**
  * Generate hashtags for the party.
  */
-function generateHashtags(party: Party, city: string): string[] {
-  const tags = ['#pizza', '#pizzaparty'];
-  if (city) tags.push(`#${city.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
-  if (party.eventType === 'gpp') tags.push('#globalpizzaparty', '#GPP');
-  tags.push('#rsvpizza');
-  return tags;
+function generateHashtags(_party: Party, _city: string): string[] {
+  return ['#globalpizzaparty', '#bitcoinpizzaday'];
 }
 
 /**

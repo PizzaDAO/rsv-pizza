@@ -1,6 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+
+const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
 const router = Router();
 
@@ -23,6 +26,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         pizzaStyle: true,
         availableBeverages: true,
         availableToppings: true,
+        availableDietaryOptions: true,
         address: true,
         latitude: true,
         longitude: true,
@@ -54,6 +58,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hiddenGppPhotos: true,
         extraGppPhotos: true,
         telegramGroup: true,
+        turtleRolesEnabled: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -89,6 +94,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           pizzaStyle: true,
           availableBeverages: true,
           availableToppings: true,
+          availableDietaryOptions: true,
           address: true,
           latitude: true,
           longitude: true,
@@ -120,6 +126,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           hiddenGppPhotos: true,
           extraGppPhotos: true,
           telegramGroup: true,
+          turtleRolesEnabled: true,
           password: true,
           userId: true,
           user: {
@@ -157,12 +164,15 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
-    // Fetch confirmed sponsors with descriptions for public display
+    // Fetch confirmed sponsors with descriptions or logos for public display
     const sponsors = await prisma.sponsor.findMany({
       where: {
         partyId: party.id,
         status: { in: ['yes', 'billed', 'paid'] },
-        brandDescription: { not: null },
+        OR: [
+          { brandDescription: { not: null } },
+          { logoUrl: { not: null } },
+        ],
       },
       select: {
         id: true,
@@ -174,6 +184,20 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
+
+    // Page view stats for one-sheet
+    const [totalViews, uniqueVisitorsResult] = await Promise.all([
+      prisma.pageView.count({ where: { partyId: party.id } }),
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT visitor_hash) as count
+        FROM page_views
+        WHERE party_id = ${party.id}::uuid AND visitor_hash IS NOT NULL
+      `,
+    ]);
+    const pageViewStats = {
+      totalViews,
+      uniqueVisitors: Number(uniqueVisitorsResult[0]?.count ?? 0),
+    };
 
     // Enrich coHosts with user profile data (avatar, socials) then strip emails
     const rawCoHosts = (party.coHosts as any[] || []);
@@ -206,7 +230,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       const pizzaCoHost = sanitizedCoHosts.find((h: any) => h.name === 'PizzaDAO');
       hostProfile = {
         name: 'PizzaDAO',
-        avatar_url: pizzaCoHost?.avatar_url || null,
+        avatar_url: pizzaCoHost?.avatar_url || PIZZADAO_AVATAR_URL,
         website: pizzaCoHost?.website || 'https://pizzadao.org',
         twitter: pizzaCoHost?.twitter || 'pizza_dao',
         instagram: pizzaCoHost?.instagram || 'pizza_dao',
@@ -239,6 +263,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         pizzaStyle: party.pizzaStyle,
         availableBeverages: party.availableBeverages,
         availableToppings: party.availableToppings,
+        availableDietaryOptions: party.availableDietaryOptions,
         address: party.address,
         latitude: party.latitude,
         longitude: party.longitude,
@@ -270,12 +295,14 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         hiddenGppPhotos: party.hiddenGppPhotos || [],
         extraGppPhotos: party.extraGppPhotos || [],
         telegramGroup: party.telegramGroup || null,
+        turtleRolesEnabled: party.turtleRolesEnabled || false,
         hasPassword: !!party.password,
         hostName: party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         hostProfile,
         guestCount: party._count.guests,
         userId: party.userId,
         sponsors,
+        pageViewStats,
       },
     });
   } catch (error) {
@@ -296,12 +323,12 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
     // Find party by invite code or custom URL
     let party = await prisma.party.findUnique({
       where: { inviteCode: slug },
-      select: { coHosts: true, userId: true },
+      select: { coHosts: true, userId: true, eventType: true },
     });
     if (!party) {
       party = await prisma.party.findUnique({
         where: { customUrl: slug },
-        select: { coHosts: true, userId: true },
+        select: { coHosts: true, userId: true, eventType: true },
       });
     }
     // Alias fallback: silently resolve old slugs
@@ -313,7 +340,7 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
       if (alias) {
         party = await prisma.party.findUnique({
           where: { id: alias.partyId },
-          select: { coHosts: true, userId: true },
+          select: { coHosts: true, userId: true, eventType: true },
         });
       }
     }
@@ -326,7 +353,18 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
       (h: any) => h.email?.toLowerCase() === email.toLowerCase()
     );
 
-    res.json({ isHost: !!matchedHost, canEdit: !!matchedHost?.canEdit });
+    // Check GPP global editor access
+    let isHost = !!matchedHost;
+    let canEdit = !!matchedHost?.canEdit;
+    if (!canEdit && (party as any).eventType === 'gpp' && email) {
+      const isGppEditor = GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === email.toLowerCase());
+      if (isGppEditor) {
+        isHost = true;
+        canEdit = true;
+      }
+    }
+
+    res.json({ isHost, canEdit });
   } catch (error) {
     next(error);
   }

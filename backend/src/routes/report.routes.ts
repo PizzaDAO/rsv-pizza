@@ -14,15 +14,17 @@ async function canUserViewReport(partyId: string, userId?: string, userEmail?: s
 
   // Check if user is a sponsor tagged on this event
   if (userEmail) {
-    const sponsorUser = await prisma.sponsorUser.findFirst({
+    const sponsorUsers = await prisma.sponsorUser.findMany({
       where: { email: userEmail.toLowerCase(), isActive: true },
+      select: { tag: true },
     });
-    if (sponsorUser) {
+    if (sponsorUsers.length > 0) {
+      const sponsorTags = sponsorUsers.map(s => s.tag);
       const party = await prisma.party.findUnique({
         where: { id: partyId },
         select: { eventTags: true },
       });
-      if (party && party.eventTags && Array.isArray(party.eventTags) && party.eventTags.includes(sponsorUser.tag)) {
+      if (party && party.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t))) {
         return true;
       }
     }
@@ -339,12 +341,14 @@ async function findPartyBySlug(slug: string) {
 // Helper: check if user is a sponsor tagged on an event (by any slug)
 async function isSponsorForReport(slug: string, userEmail?: string): Promise<boolean> {
   if (!userEmail) return false;
-  const sponsorUser = await prisma.sponsorUser.findFirst({
+  const sponsorUsers = await prisma.sponsorUser.findMany({
     where: { email: userEmail.toLowerCase(), isActive: true },
+    select: { tag: true },
   });
-  if (!sponsorUser) return false;
+  if (sponsorUsers.length === 0) return false;
+  const sponsorTags = sponsorUsers.map(s => s.tag);
   const party = await findPartyBySlug(slug);
-  return !!(party?.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).includes(sponsorUser.tag));
+  return !!(party?.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t)));
 }
 
 // GET /api/reports/:publicSlug/check - Check if report requires password (public, optionalAuth)

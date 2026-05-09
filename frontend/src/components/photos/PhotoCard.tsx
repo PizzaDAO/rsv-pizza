@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Trash2, User, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
 import { Photo } from '../../types';
 
 interface PhotoCardProps {
@@ -10,6 +10,13 @@ interface PhotoCardProps {
   onDelete?: (photoId: string) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
+}
+
+/** Format duration in seconds to "M:SS" display */
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export const PhotoCard: React.FC<PhotoCardProps> = ({
@@ -24,6 +31,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
+  const isVideo = photo.mimeType?.startsWith('video/');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -42,13 +50,41 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       }`}
       onClick={onClick}
     >
-      {/* Photo Image */}
-      <img
-        src={photo.thumbnailUrl || photo.url}
-        alt={photo.caption || 'Event photo'}
-        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        loading="lazy"
-      />
+      {/* Photo/Video Thumbnail */}
+      {isVideo ? (
+        <video
+          src={photo.url}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          preload="metadata"
+          muted
+          playsInline
+        />
+      ) : (
+        <img
+          src={photo.thumbnailUrl || photo.url}
+          alt={photo.caption || 'Event photo'}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
+      )}
+
+      {/* Play Icon Overlay for Videos */}
+      {isVideo && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/50 rounded-full p-2.5 group-hover:bg-black/70 transition-colors">
+            <Play size={20} className="text-white fill-white" />
+          </div>
+        </div>
+      )}
+
+      {/* Duration Badge for Videos (bottom-right) */}
+      {isVideo && photo.duration != null && (
+        <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
+          <span className="bg-black/70 text-white text-xs font-medium px-1.5 py-0.5 rounded">
+            {formatDuration(photo.duration)}
+          </span>
+        </div>
+      )}
 
       {/* Gradient Overlay on Hover */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />

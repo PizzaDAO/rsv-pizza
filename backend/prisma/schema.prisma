@@ -49,6 +49,7 @@ model Party {
   pizzaStyle         String    @default("new-york") @map("pizza_style")
   availableBeverages String[]  @map("available_beverages")
   availableToppings  String[]  @map("available_toppings")
+  availableDietaryOptions String[] @map("available_dietary_options")
   address            String?
   latitude           Float?
   longitude          Float?
@@ -162,7 +163,7 @@ model Party {
 
   // Underboss dashboard fields
   hostStatus        String?  @map("host_status")
-  underbossApproved Boolean  @default(false) @map("underboss_approved")
+  underbossStatus   String   @default("pending") @map("underboss_status")
   hostTags          Json     @default("[]") @map("host_tags")
   underbossNotes    String?  @map("underboss_notes")
 
@@ -172,6 +173,9 @@ model Party {
 
   // Quiz settings
   quizEnabled Boolean @default(false) @map("quiz_enabled")
+
+  // Turtle role selection on RSVP form
+  turtleRolesEnabled Boolean @default(false) @map("turtle_roles_enabled")
 
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -238,6 +242,10 @@ model Guest {
   status            String   @default("CONFIRMED")
   waitlistPosition  Int?     @map("waitlist_position")
   promotedAt        DateTime? @map("promoted_at") @db.Timestamptz
+
+  // Privy embedded wallet fields
+  privyUserId       String?   @map("privy_user_id") @db.VarChar
+  walletSource      String?   @map("wallet_source") @db.VarChar
 
   // Check-in fields
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
@@ -527,6 +535,9 @@ model Photo {
   reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
   reviewedBy String?   @map("reviewed_by")
 
+  // Video metadata
+  duration  Float?    // Video duration in seconds (null for images)
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -788,6 +799,8 @@ model Venue {
   capacity     Int?
   cost         Decimal?  @db.Decimal(10, 2)
   organization String?
+  latitude     Float?
+  longitude    Float?
 
   // Contact
   pointPerson   String?  @map("point_person")
@@ -1120,7 +1133,7 @@ model Admin {
 
 model SponsorUser {
   id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique
+  email     String
   name      String?
   tag       String
   isActive  Boolean  @default(true) @map("is_active")
@@ -1153,6 +1166,8 @@ model SponsorUser {
   quizQuestionTemplates QuizQuestionTemplate[]
   partnerEventNotes     PartnerEventNote[]
 
+  @@unique([email, tag])
+  @@index([email])
   @@index([tag])
   @@map("sponsor_users")
 }

@@ -132,9 +132,10 @@ const apps: AppItem[] = [
   {
     id: 'print-nametags',
     name: 'Print / Nametags',
-    description: 'Print nametags and table tents',
+    description: 'Stickers, flyers, name tags & more',
     icon: Printer,
-    status: 'coming-soon',
+    status: 'live',
+    tab: 'print',
   },
   {
     id: 'flyer',

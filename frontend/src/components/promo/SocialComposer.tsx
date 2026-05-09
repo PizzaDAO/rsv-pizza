@@ -17,7 +17,7 @@ interface SocialComposerProps {
 
 const PLATFORM_ORDER: SocialPlatform[] = ['twitter', 'instagram', 'facebook', 'linkedin'];
 
-const THREAD_LABELS = ['Post 1', 'Reply 1', 'Reply 2'];
+const THREAD_LABELS = ['Post 1', 'Reply 1'];
 
 // Platform icons as simple components
 function XIcon({ size = 16 }: { size?: number }) {
@@ -67,7 +67,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
   const { t } = useTranslation('host');
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>('twitter');
   const [postText, setPostText] = useState('');
-  const [threadPosts, setThreadPosts] = useState<string[]>(['', '', '']);
+  const [threadPosts, setThreadPosts] = useState<string[]>(['', '']);
   const [copied, setCopied] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [shared, setShared] = useState<Record<SocialPlatform, boolean>>({

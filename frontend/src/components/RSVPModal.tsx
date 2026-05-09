@@ -409,6 +409,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               eventName={event.name}
               isEditing={isEditing}
               showWallet={!!(event.nftEnabled || event.eventType === 'gpp')}
+              showTurtleRoles={!!event.turtleRolesEnabled}
               walletFieldSlot={walletFieldSlot}
             />
           </div>

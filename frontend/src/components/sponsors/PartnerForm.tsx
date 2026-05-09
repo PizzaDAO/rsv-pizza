@@ -6,6 +6,7 @@ import { CreateSponsorData, PartnerIntakeResponse } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { uploadSponsorLogo } from '../../lib/supabase';
+import { normalizeUrl } from '../../lib/utils';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
 
 // X (Twitter) icon component
@@ -209,6 +210,7 @@ interface PartnerFormProps {
   submitLabel?: string;
   wasPreviouslySubmitted?: boolean;
   defaultStatus?: SponsorStatus;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
 }
 
 /* ---------- Component ---------- */
@@ -227,6 +229,7 @@ export function PartnerForm({
   submitLabel,
   wasPreviouslySubmitted,
   defaultStatus,
+  onAddAsCoHost,
 }: PartnerFormProps) {
   const { t } = useTranslation('host');
   const isCrm = mode === 'crm';
@@ -251,6 +254,7 @@ export function PartnerForm({
     return null;
   });
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [addAsCoHost, setAddAsCoHost] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Re-initialize when sponsor changes (CRM mode)
@@ -345,6 +349,17 @@ export function PartnerForm({
         logoUrl,
         lastContactedAt: formData.lastContactedAt || null,
       });
+
+      // If "Also add as event host" was checked, fire the callback
+      if (addAsCoHost && onAddAsCoHost && !isEditing) {
+        onAddAsCoHost({
+          name: formData.name.trim(),
+          website: normalizeUrl(formData.website),
+          twitter: formData.brandTwitter.trim(),
+          instagram: formData.brandInstagram.trim(),
+          logoUrl,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }
@@ -415,6 +430,7 @@ export function PartnerForm({
             type="url"
             value={formData.website}
             onChange={e => handleChange('website', e.target.value)}
+            onBlur={() => handleChange('website', normalizeUrl(formData.website))}
             placeholder="Website"
           />
           <IconInput
@@ -445,6 +461,16 @@ export function PartnerForm({
           />
         )}
       </div>
+
+      {/* Also add as co-host — CRM mode, new partners only */}
+      {isCrm && !isEditing && onAddAsCoHost && (
+        <Checkbox
+          checked={addAsCoHost}
+          onChange={() => setAddAsCoHost(!addAsCoHost)}
+          label="Also add as event host"
+          labelClassName="text-sm text-theme-text-secondary"
+        />
+      )}
 
       {/* Co-Host Profile (avatar) — Partner mode only */}
       {isPartner && (

@@ -38,6 +38,7 @@ import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor
 import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
+import onesheetRoutes from './routes/onesheet.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -128,6 +129,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
 app.use('/api/events', quizPublicRouter); // Public quiz endpoints (before eventRoutes)
+app.use('/api/events', onesheetRoutes); // One Sheet interest form (public, before eventRoutes)
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);

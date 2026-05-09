@@ -472,6 +472,7 @@ const gppEventSelect = {
   eventImageUrl: true,
   eventType: true,
   eventTags: true,
+  underbossStatus: true,
   rsvpClosedAt: true,
   createdAt: true,
   _count: {
@@ -512,6 +513,9 @@ function formatGppEvent(event: any) {
     createdAt: event.createdAt,
     hostName: 'PizzaDAO',
     guestCount: event._count?.guests ?? 0,
+    underbossStatus: event.underbossStatus || 'pending',
+    approved: event.underbossStatus === 'approved',
+    community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
   };
 }
@@ -562,7 +566,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const { limit = '500', offset = '0', city, country, region } = req.query;
 
-    const where: any = { eventType: 'gpp' };
+    const where: any = { eventType: 'gpp', underbossStatus: { notIn: ['rejected', 'hidden'] } };
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }

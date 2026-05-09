@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check, Printer } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager, KitContentsModal } from '../components/shipping';
+import { PrintMaterials } from '../components/print';
 import {
   fetchShippingMe,
   fetchShippingKits,
@@ -60,6 +61,9 @@ export function ShippingDashboard() {
 
   // Kit contents modal
   const [showKitContents, setShowKitContents] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'kits' | 'print'>('kits');
 
   // Available regions based on role
   const availableRegions = useMemo(() => {
@@ -409,55 +413,87 @@ export function ShippingDashboard() {
             </div>
           </div>
 
-          {/* Stats */}
-          {stats && (
-            <section className="mb-6">
-              <KitStats
-                stats={stats}
-                onStatusFilter={handleStatCardFilter}
-                activeStatus={statusFilter || null}
-              />
-            </section>
+          {/* Tabs */}
+          <div className="flex gap-1 mb-6 border-b border-theme-stroke">
+            <button
+              onClick={() => setActiveTab('kits')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === 'kits'
+                  ? 'border-red-500 text-red-500'
+                  : 'border-transparent text-theme-text-muted hover:text-theme-text'
+              }`}
+            >
+              <Truck size={16} />
+              Kits
+            </button>
+            <button
+              onClick={() => setActiveTab('print')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === 'print'
+                  ? 'border-red-500 text-red-500'
+                  : 'border-transparent text-theme-text-muted hover:text-theme-text'
+              }`}
+            >
+              <Printer size={16} />
+              Print Materials
+            </button>
+          </div>
+
+          {activeTab === 'kits' && (
+            <>
+              {/* Stats */}
+              {stats && (
+                <section className="mb-6">
+                  <KitStats
+                    stats={stats}
+                    onStatusFilter={handleStatCardFilter}
+                    activeStatus={statusFilter || null}
+                  />
+                </section>
+              )}
+
+              {/* Filters */}
+              <section className="mb-6">
+                <KitFilters
+                  statusFilter={statusFilter}
+                  onStatusFilter={setStatusFilter}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  countryFilter={countryFilter}
+                  onCountryFilter={setCountryFilter}
+                  countries={countries}
+                  onExport={handleExport}
+                  exporting={exporting}
+                  onImport={() => setShowImportModal(true)}
+                  onShowKitContents={() => setShowKitContents(true)}
+                />
+              </section>
+
+              {/* Kit Table */}
+              <section>
+                <h2 className="text-lg font-semibold text-theme-text mb-4">
+                  Kit Requests ({kits.length})
+                </h2>
+                <KitTable
+                  kits={sortedKits}
+                  onStatusChange={handleStatusChange}
+                  onTierChange={handleTierChange}
+                  onTrackingChange={handleTrackingChange}
+                  onViewDetail={setDetailKit}
+                  onBulkUpdate={handleBulkUpdate}
+                  showRegion={showRegionColumn}
+                  sortField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </section>
+
+              {/* Coordinator Manager (admin only) */}
+              {meData?.role === 'admin' && <CoordinatorManager />}
+            </>
           )}
 
-          {/* Filters */}
-          <section className="mb-6">
-            <KitFilters
-              statusFilter={statusFilter}
-              onStatusFilter={setStatusFilter}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              countryFilter={countryFilter}
-              onCountryFilter={setCountryFilter}
-              countries={countries}
-              onExport={handleExport}
-              exporting={exporting}
-              onImport={() => setShowImportModal(true)}
-              onShowKitContents={() => setShowKitContents(true)}
-            />
-          </section>
-
-          {/* Kit Table */}
-          <section>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">
-              {t('shipping.kitRequests', { count: kits.length })}
-            </h2>
-            <KitTable
-              kits={sortedKits}
-              onStatusChange={handleStatusChange}
-              onTierChange={handleTierChange}
-              onTrackingChange={handleTrackingChange}
-              onViewDetail={setDetailKit}
-              onBulkUpdate={handleBulkUpdate}
-              showRegion={showRegionColumn}
-              sortField={sortField}
-              sortDir={sortDir}
-              onSort={handleSort}
-            />
-          </section>
-
-          {/* Coordinator Manager (admin only) */}
-          {meData?.role === 'admin' && <CoordinatorManager />}
+          {activeTab === 'print' && <PrintMaterials />}
         </div>
       </main>
 

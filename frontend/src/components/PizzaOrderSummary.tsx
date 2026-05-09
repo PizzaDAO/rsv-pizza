@@ -392,8 +392,20 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
         {isExpanded && recommendations.length > 0 && (
           <>
-            {/* Pizzeria Selection - MOVED TO TOP */}
+            {/* AI Ordering - Coming Soon */}
             <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Phone size={32} className="text-theme-text-faint mb-3" />
+                <h3 className="font-medium text-theme-text text-sm mb-1">AI Ordering</h3>
+                <span className="text-xs font-semibold text-[#ffb347] bg-[#ffb347]/10 px-3 py-1 rounded-full">Coming Soon</span>
+                <p className="text-xs text-theme-text-muted mt-2 max-w-xs">
+                  Automated pizza ordering via AI phone calls is being upgraded. Stay tuned!
+                </p>
+              </div>
+            </div>
+
+            {/* Original pizzeria selection - hidden while coming soon */}
+            {false && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
               {!hasSearched || pizzerias.length === 0 ? (
                 // Show search form if no results yet
                 <div className="space-y-3">
@@ -561,7 +573,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Order Summary */}
             <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">

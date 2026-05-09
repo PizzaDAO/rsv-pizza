@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
+import { cdnUrl } from '../../lib/supabase';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
@@ -234,7 +235,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                     <select
                       value={sponsor.status}
                       onChange={(e) => onStatusChange(sponsor, e.target.value as SponsorStatus)}
-                      className={`status-pill rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
+                      className={`status-pill rounded-full pl-2.5 pr-6 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-1 focus:ring-[#ff393a] cursor-pointer ${statusConfig.bgColor} ${statusConfig.color}`}
                     >
                       {Object.entries(STATUS_CONFIG).map(([status, config]) => (
                         <option key={status} value={status} className="bg-theme-header text-theme-text">
@@ -249,7 +250,7 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                     <div className="flex items-start gap-2">
                       {(avatarUrls?.[sponsor.id] || sponsor.logoUrl) && (
                         <img
-                          src={avatarUrls?.[sponsor.id] || sponsor.logoUrl!}
+                          src={cdnUrl(avatarUrls?.[sponsor.id] || sponsor.logoUrl!)}
                           alt=""
                           className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                         />

@@ -103,9 +103,9 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
               {kit.hostEmail && <p className="text-xs text-theme-text-faint">{kit.hostEmail}</p>}
             </div>
             <div>
-              <p className="text-xs text-theme-text-muted mb-1">Event Approved</p>
-              <p className={`text-sm font-medium ${kit.underbossApproved ? 'text-green-500' : 'text-yellow-500'}`}>
-                {kit.underbossApproved ? 'Yes' : 'Pending'}
+              <p className="text-xs text-theme-text-muted mb-1">Event Status</p>
+              <p className={`text-sm font-medium ${kit.underbossStatus === 'approved' ? 'text-green-500' : kit.underbossStatus === 'rejected' ? 'text-red-500' : 'text-yellow-500'}`}>
+                {kit.underbossStatus === 'approved' ? 'Approved' : kit.underbossStatus === 'rejected' ? 'Rejected' : 'Pending'}
               </p>
             </div>
           </div>

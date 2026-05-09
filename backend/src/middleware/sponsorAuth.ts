@@ -32,18 +32,22 @@ export async function requireSponsorAuth(
     if (await isAdmin(email)) {
       req.isAdminViewing = true;
       // Still check if admin is also a sponsor
-      const sponsorUser = await prisma.sponsorUser.findFirst({
+      const sponsorUsers = await prisma.sponsorUser.findMany({
         where: { email: email.toLowerCase(), isActive: true },
         select: { id: true, email: true, name: true, tag: true, isActive: true },
       });
-      if (sponsorUser) {
-        req.sponsorUser = sponsorUser;
+      if (sponsorUsers.length > 0) {
+        const requestedTag = (req.query?.tag as string)?.trim().toLowerCase();
+        const match = requestedTag
+          ? sponsorUsers.find(s => s.tag === requestedTag)
+          : sponsorUsers[0];
+        req.sponsorUser = match || sponsorUsers[0];
       }
       return next();
     }
 
     // Look up sponsor by email
-    const sponsorUser = await prisma.sponsorUser.findFirst({
+    const sponsorUsers = await prisma.sponsorUser.findMany({
       where: { email: email.toLowerCase(), isActive: true },
       select: {
         id: true,
@@ -54,13 +58,23 @@ export async function requireSponsorAuth(
       },
     });
 
-    if (sponsorUser) {
+    if (sponsorUsers.length > 0) {
+      const requestedTag = (req.query?.tag as string)?.trim().toLowerCase();
+      const match = requestedTag
+        ? sponsorUsers.find(s => s.tag === requestedTag)
+        : sponsorUsers[0];
+
+      if (requestedTag && !match) {
+        throw new AppError('Not authorized for this tag', 403, 'FORBIDDEN');
+      }
+
+      const selected = match || sponsorUsers[0];
       req.sponsorUser = {
-        id: sponsorUser.id,
-        email: sponsorUser.email,
-        name: sponsorUser.name,
-        tag: sponsorUser.tag,
-        isActive: sponsorUser.isActive,
+        id: selected.id,
+        email: selected.email,
+        name: selected.name,
+        tag: selected.tag,
+        isActive: selected.isActive,
       };
       return next();
     }

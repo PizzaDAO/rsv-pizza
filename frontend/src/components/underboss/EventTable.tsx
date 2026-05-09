@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X } from 'lucide-react';
+import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
-import { bulkApproveEvents, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
+import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
+import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
+import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
 
 interface EventTableProps {
   events: UnderbossEvent[];
@@ -101,6 +103,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [customTag, setCustomTag] = useState('');
   const [showCopyCitiesModal, setShowCopyCitiesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [discount, setDiscount] = useState(0);
 
   // Alphabetized city names from the currently-selected events.
   // Reuses the same extraction logic as the Send Telegram action: strip
@@ -154,7 +157,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           e.host.name?.toLowerCase().includes(q) ||
           e.host.email?.toLowerCase().includes(q) ||
           e.address?.toLowerCase().includes(q) ||
-          e.venueName?.toLowerCase().includes(q)
+          e.venueName?.toLowerCase().includes(q) ||
+          e.country?.toLowerCase().includes(q) ||
+          e.region?.toLowerCase().includes(q)
       );
     }
 
@@ -162,7 +167,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     if (progressIncludes.length > 0) {
       result = result.filter((e) =>
         progressIncludes.every((key) => {
-          if (key === 'approved') return e.underbossApproved;
+          if (key === 'approved') return e.underbossStatus === 'approved';
+          if (key === 'rejected') return e.underbossStatus === 'rejected';
+          if (key === 'hidden') return e.underbossStatus === 'hidden';
+          if (key === 'listed') return e.underbossStatus === 'listed';
           return e.progress[key as keyof typeof e.progress];
         })
       );
@@ -172,7 +180,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     if (progressExcludes.length > 0) {
       result = result.filter((e) =>
         progressExcludes.every((key) => {
-          if (key === 'approved') return !e.underbossApproved;
+          if (key === 'approved') return e.underbossStatus !== 'approved';
+          if (key === 'rejected') return e.underbossStatus !== 'rejected';
+          if (key === 'hidden') return e.underbossStatus !== 'hidden';
+          if (key === 'listed') return e.underbossStatus !== 'listed';
           return !e.progress[key as keyof typeof e.progress];
         })
       );
@@ -220,6 +231,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
     [events]
   );
+
+  const sponsorshipSuggestion = useMemo(() => {
+    if (tagFilter === 'all' || filteredEvents.length === 0) return null;
+    return calculateTagSponsorshipTotal(filteredEvents);
+  }, [tagFilter, filteredEvents]);
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
@@ -295,6 +311,27 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           onToggle={(newState) => setFilterState('approved', newState)}
         />
 
+        {/* Rejected filter */}
+        <FilterPill
+          label="Rejected"
+          state={getFilterState('rejected')}
+          onToggle={(newState) => setFilterState('rejected', newState)}
+        />
+
+        {/* Hidden filter */}
+        <FilterPill
+          label="Hidden"
+          state={getFilterState('hidden')}
+          onToggle={(newState) => setFilterState('hidden', newState)}
+        />
+
+        {/* Listed filter */}
+        <FilterPill
+          label="Listed"
+          state={getFilterState('listed')}
+          onToggle={(newState) => setFilterState('listed', newState)}
+        />
+
         {/* Country filter -- only when showRegion */}
         {showRegion && (
           <select
@@ -339,6 +376,42 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         )}
       </div>
 
+      {/* Sponsorship pricing suggestion banner */}
+      {sponsorshipSuggestion && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
+          <DollarSign size={14} className="text-theme-text-secondary" />
+          <span className="text-sm text-theme-text">
+            Suggested sponsorship for "<span className="font-medium">{tagFilter}</span>"
+            ({sponsorshipSuggestion.eventCount} events):
+            {discount > 0 ? (
+              <>
+                <span className="line-through text-theme-text-muted ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+                <span className="font-bold text-white ml-1">${Math.round(sponsorshipSuggestion.total * (1 - discount / 100)).toLocaleString()}</span>
+              </>
+            ) : (
+              <span className="font-bold text-white ml-1">${sponsorshipSuggestion.total.toLocaleString()}</span>
+            )}
+          </span>
+          <div className="flex items-center gap-1 ml-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={discount || ''}
+              onChange={(e) => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+              placeholder="0"
+              className="w-12 px-1.5 py-0.5 text-xs text-center rounded bg-black/30 border border-theme-stroke text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+            />
+            <span className="text-xs text-theme-text-muted">% off</span>
+          </div>
+          {sponsorshipSuggestion.missingExpectedGuests > 0 && (
+            <span className="text-xs text-amber-400 ml-2">
+              ({sponsorshipSuggestion.missingExpectedGuests} without expected guests)
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Bulk action bar — always visible */}
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
         {selectedIds.size > 0 ? (
@@ -360,20 +433,59 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               <>
                 <div className="fixed inset-0 z-40" onClick={() => { setShowActionDropdown(false); setShowTagSubmenu(null); setCustomTag(''); }} />
                 <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[180px]">
+                  {(() => {
+                    const selectedEvents = events.filter(e => selectedIds.has(e.id));
+                    const allApproved = selectedEvents.length > 0 && selectedEvents.every(e => e.underbossStatus === 'approved');
+                    return (
+                      <button
+                        onClick={async () => {
+                          setShowActionDropdown(false);
+                          setBulkLoading(true);
+                          const newStatus = allApproved ? 'pending' : 'approved';
+                          try {
+                            await bulkUpdateUnderbossStatus(Array.from(selectedIds), newStatus);
+                            for (const id of selectedIds) {
+                              onEventUpdate?.(id, { underbossStatus: newStatus });
+                            }
+                            setSelectedIds(new Set());
+                          } catch (err) { console.error(`Bulk ${newStatus} failed`, err); }
+                          setBulkLoading(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                      >
+                        {allApproved ? 'Unapprove' : 'Approve'}
+                      </button>
+                    );
+                  })()}
                   <button
                     onClick={async () => {
                       setShowActionDropdown(false);
                       setBulkLoading(true);
                       try {
-                        await bulkApproveEvents(Array.from(selectedIds), true);
+                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'rejected');
                         setSelectedIds(new Set());
                         onBulkAction?.();
-                      } catch (err) { console.error('Bulk approve failed', err); }
+                      } catch (err) { console.error('Bulk reject failed', err); }
+                      setBulkLoading(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowActionDropdown(false);
+                      setBulkLoading(true);
+                      try {
+                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'hidden');
+                        setSelectedIds(new Set());
+                        onBulkAction?.();
+                      } catch (err) { console.error('Bulk hide failed', err); }
                       setBulkLoading(false);
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >
-                    {t('eventTable.approve')}
+                    {t('eventTable.hide')}
                   </button>
                   <button
                     onClick={() => {
@@ -446,7 +558,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                     }
                                   }
                                 }
-                                onBulkAction?.();
+                                // Trigger flyer regen for affected events
+                                const affected = events.filter(e => selectedIds.has(e.id));
+                                triggerFlyerRegenForEvents(affected);
                               } catch (err) { console.error('Add tag failed', err); }
                               setBulkLoading(false);
                             }}
@@ -478,7 +592,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                       }
                                     }
                                   }
-                                  onBulkAction?.();
+                                  // Trigger flyer regen for affected events
+                                  const affected = events.filter(e2 => selectedIds.has(e2.id));
+                                  triggerFlyerRegenForEvents(affected);
                                 } catch (err) { console.error('Add custom tag failed', err); }
                                 setBulkLoading(false);
                                 setCustomTag('');
@@ -525,7 +641,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                       onEventUpdate?.(id, { eventTags: (evt.eventTags || []).filter(t => t !== tag) });
                                     }
                                   }
-                                  onBulkAction?.();
+                                  // Trigger flyer regen for affected events (partner logo may have been removed)
+                                  const affected = events.filter(e => selectedIds.has(e.id));
+                                  triggerFlyerRegenForEvents(affected);
                                 } catch (err) { console.error('Remove tag failed', err); }
                                 setBulkLoading(false);
                               }}

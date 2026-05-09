@@ -10,13 +10,17 @@ import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
 import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
+import { DietarySettings } from '../components/DietarySettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
-import { updateParty } from '../lib/supabase';
+import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
+import { uuid } from '../lib/utils';
+import { getXAvatarUrl } from '../utils/avatarUtils';
+import { CoHost } from '../types';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
@@ -31,6 +35,7 @@ import { ChecklistTab } from '../components/checklist';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { FlyerTab } from '../components/flyer';
+import { PrintTab } from '../components/print';
 import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
@@ -38,9 +43,9 @@ import { GPPDashboardTab } from '../components/gpp-dashboard';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -347,6 +352,7 @@ function HostPageContent() {
                   <AiCallHistory partyId={party.id} />
                   <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                   <BeverageSettings />
+                  <DietarySettings />
                 </>
               )}
 
@@ -398,7 +404,35 @@ function HostPageContent() {
               )}
 
               {activeTab === 'partners' && party && (
-                <SponsorCRM partyId={party.id} />
+                <SponsorCRM
+                  partyId={party.id}
+                  onAddAsCoHost={async (data) => {
+                    // Build avatar from X handle or Instagram
+                    let avatarUrl: string | undefined;
+                    const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                    if (xAvatar) {
+                      avatarUrl = await proxyAvatarToStorage(xAvatar);
+                    } else if (data.instagram) {
+                      const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+                      avatarUrl = await proxyAvatarToStorage(igAvatar);
+                    }
+
+                    const newCoHost: CoHost = {
+                      id: uuid(),
+                      name: data.name,
+                      website: data.website || undefined,
+                      twitter: data.twitter || undefined,
+                      instagram: data.instagram || undefined,
+                      avatar_url: avatarUrl,
+                      showOnEvent: true,
+                    };
+
+                    const existing = party.coHosts || [];
+                    const updated = [...existing, newCoHost];
+                    await updateParty(party.id, { co_hosts: updated });
+                    if (party.inviteCode) await loadParty(party.inviteCode);
+                  }}
+                />
               )}
 
               {activeTab === 'staff' && party && (
@@ -431,6 +465,10 @@ function HostPageContent() {
 
               {activeTab === 'flyer' && party && (
                 <FlyerTab />
+              )}
+
+              {activeTab === 'print' && party && (
+                <PrintTab />
               )}
 
               {activeTab === 'gpp' && party && (

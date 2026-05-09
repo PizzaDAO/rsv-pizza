@@ -132,10 +132,14 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
   let eventsWithBudget = 0;
   let eventsWithKit = 0;
 
-  for (const event of events) {
-    const guestCount = event._count?.guests || 0;
-    const approvedCount = event.guests?.filter((g: any) => g.approved !== false).length || 0;
+  let totalInvited = 0;
 
+  for (const event of events) {
+    const invited = event.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
+    const guestCount = (event._count?.guests || 0) - invited;
+    const approvedCount = event.guests?.filter((g: any) => g.approved !== false && g.status !== 'INVITED').length || 0;
+
+    totalInvited += invited;
     totalRsvps += guestCount;
     totalApproved += approvedCount;
 
@@ -148,6 +152,7 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
   return {
     totalEvents,
     totalRsvps,
+    totalInvited,
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
@@ -163,8 +168,9 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
 
 // Helper: format event for response
 function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMap?: Map<string, Date>) {
-  const guestCount = party._count?.guests || 0;
-  const approvedCount = party.guests?.filter((g: any) => g.approved !== false).length || 0;
+  const invitedCount = party.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
+  const guestCount = (party._count?.guests || 0) - invitedCount;
+  const approvedCount = party.guests?.filter((g: any) => g.approved !== false && g.status !== 'INVITED').length || 0;
   const checkedInCount = party.guests?.filter((g: any) => g.checkedInAt).length || 0;
   const photoCount = party._count?.photos || 0;
 
@@ -203,6 +209,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     coHosts: party.coHosts || [],
     progress: computeProgress(party, underbossEmails),
     guestCount,
+    invitedCount,
     approvedCount,
     checkedInCount,
     photoCount,
@@ -210,11 +217,12 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     fundraisingGoal: party.fundraisingGoal ? Number(party.fundraisingGoal) : null,
     totalSponsored,
     hostStatus: party.hostStatus || null,
-    underbossApproved: party.underbossApproved || false,
+    underbossStatus: party.underbossStatus || 'pending',
     hostTags: party.hostTags || [],
     eventTags: party.eventTags || [],
     underbossNotes: party.underbossNotes || null,
     expectedGuests: party.expectedGuests || null,
+    telegramGroup: party.telegramGroup || null,
     createdAt: party.createdAt,
     flyerGeneratedAt,
     latestSponsorAt: latestSponsorAtStr,
@@ -372,7 +380,7 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       include: {
         user: { select: { name: true, email: true } },
         guests: {
-          select: { id: true, approved: true, checkedInAt: true },
+          select: { id: true, approved: true, checkedInAt: true, status: true },
         },
         partyKit: { select: { status: true } },
         sponsors: { select: { status: true, amount: true } },
@@ -439,7 +447,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
         include: {
           user: { select: { name: true, email: true } },
           guests: {
-            select: { id: true, approved: true, checkedInAt: true },
+            select: { id: true, approved: true, checkedInAt: true, status: true },
           },
           partyKit: { select: { status: true } },
           sponsors: { select: { status: true, amount: true } },
@@ -564,7 +572,7 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
         include: {
           user: { select: { name: true, email: true } },
           guests: {
-            select: { id: true, approved: true, checkedInAt: true },
+            select: { id: true, approved: true, checkedInAt: true, status: true },
           },
           partyKit: { select: { status: true } },
           _count: { select: { guests: true, photos: true } },
@@ -589,21 +597,22 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
 // Bulk action routes (underboss auth)
 // ============================================
 
-// PATCH /api/underboss/events/bulk-approve - Bulk approve/unapprove events
-router.patch('/events/bulk-approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+// PATCH /api/underboss/events/bulk-status - Bulk update underboss status
+router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { partyIds, approved } = req.body;
+    const { partyIds, status } = req.body;
 
     if (!Array.isArray(partyIds) || partyIds.length === 0) {
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    const validStatuses = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
     const result = await prisma.party.updateMany({
       where: { id: { in: partyIds } },
-      data: { underbossApproved: approved },
+      data: { underbossStatus: status },
     });
 
     res.json({ updated: result.count });
@@ -766,23 +775,73 @@ router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, a
   }
 });
 
-// PATCH /api/underboss/event/:partyId/approve - Toggle underboss approval
-router.patch('/event/:partyId/approve', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+// PATCH /api/underboss/event/:partyId/status - Update underboss status
+// Allows both underbosses (all statuses) and event owners (listed/hidden only from rejected/listed/hidden)
+router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { approved } = req.body;
+    const { status } = req.body;
+    const email = req.userEmail;
 
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    if (!email) {
+      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
     }
 
-    const party = await prisma.party.update({
-      where: { id: partyId },
-      data: { underbossApproved: approved },
-      select: { id: true, underbossApproved: true },
+    const allValidStatuses = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
+    if (!allValidStatuses.includes(status)) {
+      throw new AppError(`status must be one of: ${allValidStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
+    // Check if user is an underboss or admin
+    const isAdminUser = await isAdmin(email);
+    const underboss = isAdminUser ? { id: 'admin' } : await prisma.underboss.findFirst({
+      where: { email: email.toLowerCase(), isActive: true },
+      select: { id: true },
     });
 
-    res.json({ party });
+    if (underboss) {
+      // Underboss/admin: allow all statuses
+      const party = await prisma.party.update({
+        where: { id: partyId },
+        data: { underbossStatus: status },
+        select: { id: true, underbossStatus: true },
+      });
+      return res.json({ party });
+    }
+
+    // Not an underboss — check if user is the event owner
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, underbossStatus: true, user: { select: { email: true } } },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    if (party.user?.email?.toLowerCase() !== email.toLowerCase()) {
+      throw new AppError('Not authorized', 403, 'FORBIDDEN');
+    }
+
+    // Event owner: only allow listed/hidden transitions from rejected/listed/hidden
+    const ownerAllowedStatuses = ['listed', 'hidden'];
+    const ownerAllowedFromStatuses = ['rejected', 'listed', 'hidden'];
+
+    if (!ownerAllowedStatuses.includes(status)) {
+      throw new AppError('Event owners can only set status to listed or hidden', 403, 'FORBIDDEN');
+    }
+
+    if (!ownerAllowedFromStatuses.includes(party.underbossStatus || '')) {
+      throw new AppError('Cannot change status from current state', 403, 'FORBIDDEN');
+    }
+
+    const updated = await prisma.party.update({
+      where: { id: partyId },
+      data: { underbossStatus: status },
+      select: { id: true, underbossStatus: true },
+    });
+
+    res.json({ party: updated });
   } catch (error) {
     next(error);
   }

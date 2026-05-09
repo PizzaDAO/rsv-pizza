@@ -1,8 +1,9 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 
 const router = Router();
 
@@ -496,6 +497,133 @@ router.patch('/gpp-description', requireAuth, async (req: AuthRequest, res: Resp
       updatedCount: result.count,
       skippedCount,
       newDefault: newDescription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// Privy Wallet Backfill
+// ============================================
+
+/**
+ * POST /api/admin/provision-wallets
+ *
+ * Provisions Privy embedded wallets for all existing guests who have an email
+ * but no wallet address. Processes in batches of 10 with a 200ms delay between
+ * individual calls and a 1s pause between batches to respect Privy rate limits.
+ *
+ * Auth: requires x-admin-secret header matching ADMIN_SECRET env var.
+ *
+ * Returns: { total, provisioned, failed, skipped, errors }
+ */
+router.post('/provision-wallets', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Auth check: require ADMIN_SECRET header
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return res.status(500).json({ error: 'ADMIN_SECRET not configured on server' });
+    }
+    if (req.headers['x-admin-secret'] !== adminSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Find all guests with an email but no wallet address
+    const guests = await prisma.guest.findMany({
+      where: {
+        ethereumAddress: null,
+        email: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+      orderBy: { submittedAt: 'asc' },
+    });
+
+    const total = guests.length;
+    let provisioned = 0;
+    let failed = 0;
+    let skipped = 0;
+    const errors: Array<{ guestId: string; email: string; error: string }> = [];
+
+    console.log(`[provision-wallets] Starting backfill for ${total} guests without wallets`);
+
+    const BATCH_SIZE = 10;
+    const DELAY_BETWEEN_CALLS_MS = 200;
+    const DELAY_BETWEEN_BATCHES_MS = 1000;
+
+    for (let i = 0; i < guests.length; i += BATCH_SIZE) {
+      const batch = guests.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(guests.length / BATCH_SIZE);
+
+      console.log(`[provision-wallets] Processing batch ${batchNum}/${totalBatches} (${batch.length} guests)`);
+
+      for (const guest of batch) {
+        if (!guest.email) {
+          skipped++;
+          continue;
+        }
+
+        // Double-check the guest still has no wallet (idempotency)
+        const current = await prisma.guest.findUnique({
+          where: { id: guest.id },
+          select: { ethereumAddress: true },
+        });
+        if (current?.ethereumAddress) {
+          skipped++;
+          console.log(`[provision-wallets] Skipping guest ${guest.id} — already has wallet`);
+          continue;
+        }
+
+        try {
+          const walletResult = await createEmbeddedWalletForGuest(guest.email, guest.name);
+          if (walletResult) {
+            await prisma.guest.update({
+              where: { id: guest.id },
+              data: {
+                ethereumAddress: walletResult.walletAddress,
+                privyUserId: walletResult.privyUserId,
+                walletSource: 'privy-embedded',
+              },
+            });
+            provisioned++;
+            console.log(`[provision-wallets] Provisioned wallet for guest ${guest.id}: ${walletResult.walletAddress}`);
+          } else {
+            skipped++;
+            console.log(`[provision-wallets] Privy returned null for guest ${guest.id} (${guest.email}), skipped`);
+          }
+        } catch (err: any) {
+          failed++;
+          const errorMsg = err?.message || String(err);
+          errors.push({ guestId: guest.id, email: guest.email, error: errorMsg });
+          console.error(`[provision-wallets] Failed for guest ${guest.id} (${guest.email}):`, errorMsg);
+        }
+
+        // Rate-limit delay between individual calls
+        if (DELAY_BETWEEN_CALLS_MS > 0) {
+          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CALLS_MS));
+        }
+      }
+
+      // Pause between batches (unless this is the last batch)
+      if (i + BATCH_SIZE < guests.length && DELAY_BETWEEN_BATCHES_MS > 0) {
+        console.log(`[provision-wallets] Pausing ${DELAY_BETWEEN_BATCHES_MS}ms between batches...`);
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
+      }
+    }
+
+    console.log(`[provision-wallets] Complete: ${provisioned} provisioned, ${failed} failed, ${skipped} skipped out of ${total} total`);
+
+    res.json({
+      total,
+      provisioned,
+      failed,
+      skipped,
+      errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
     next(error);

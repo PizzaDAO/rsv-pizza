@@ -374,6 +374,12 @@ export const PlatformPublisher: React.FC = () => {
                 <p className="text-xs text-theme-text-faint text-center">
                   {t('promo.copyDetailsThen', { platform: config.name })}
                 </p>
+
+                {platform === 'luma' && (
+                  <p className="text-xs text-theme-text-muted text-center mt-1">
+                    Add <span className="font-medium text-theme-text-secondary">hello@rarepizzas.com</span> as a host on your Luma event
+                  </p>
+                )}
               </div>
             )}
           </div>

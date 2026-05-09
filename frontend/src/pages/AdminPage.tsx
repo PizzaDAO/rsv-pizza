@@ -7,7 +7,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -16,10 +16,12 @@ import {
   fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault, deleteChecklistDefault,
   fetchSponsorUsers, createSponsorUser, deleteSponsorUser,
   fetchGppDescription, updateGppDescription,
+  fetchUnderbossDashboard,
 } from '../lib/api';
 import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser } from '../types';
+import { fetchSheetCities } from '../lib/cities';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -31,6 +33,7 @@ export function AdminPage() {
   const [currentRole, setCurrentRole] = useState('');
   const [currentEmail, setCurrentEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   // Admin list state
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -178,6 +181,47 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [descMessage]);
+
+  async function handleExportEventsCsv() {
+    setExportingCsv(true);
+    try {
+      const [data, sheetCities] = await Promise.all([
+        fetchUnderbossDashboard('all'),
+        fetchSheetCities(),
+      ]);
+      // Build city→chatUrl map (same pattern as PartnerDashboardPage)
+      const cityChats = new Map<string, string>();
+      for (const c of sheetCities) {
+        if (c.chatUrl) cityChats.set(c.city.toLowerCase().trim(), c.chatUrl);
+      }
+      const headers = ['City Name', 'Address', 'Event Link', 'Telegram Chat', 'Country'];
+      const rows = data.events.map(e => {
+        const city = e.name.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
+        const telegramLink = e.telegramGroup || cityChats.get(city) || '';
+        return [
+          e.name,
+          e.address || '',
+          e.customUrl ? `https://rsv.pizza/${e.customUrl}` : '',
+          telegramLink,
+          e.country || '',
+        ];
+      });
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'events.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Failed to export events');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
 
   async function handleSaveGppDescription() {
     setSavingDesc(true);
@@ -444,6 +488,18 @@ export function AdminPage() {
               <h1 className="text-2xl font-bold">{t('title')}</h1>
               <p className="text-sm text-theme-text-muted">{t('subtitle')}</p>
             </div>
+          </div>
+
+          {/* Export Events CSV */}
+          <div className="mb-6">
+            <button
+              onClick={handleExportEventsCsv}
+              disabled={exportingCsv}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Export All Events CSV
+            </button>
           </div>
 
           {/* Admin Management */}

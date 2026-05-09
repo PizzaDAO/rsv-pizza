@@ -17,13 +17,17 @@ import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
 import { PartnerForm, extractSponsorData } from './PartnerForm';
 import type { PartnerFormData } from './PartnerForm';
+import { usePizza } from '../../contexts/PizzaContext';
+import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
 
 interface SponsorCRMProps {
   partyId: string;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
 }
 
-export function SponsorCRM({ partyId }: SponsorCRMProps) {
+export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const { t } = useTranslation('host');
+  const { party, loadParty } = usePizza();
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,6 +128,12 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       const statsResult = await getSponsorStats(partyId);
       if (statsResult) setStats(statsResult);
 
+      // Auto-regenerate flyer if sponsor has yes/paid status and a logo
+      const FLYER_STATUSES = new Set(['yes', 'paid']);
+      if (party && data.status && FLYER_STATUSES.has(data.status) && data.logoUrl) {
+        triggerFlyerRegen(party, loadParty);
+      }
+
       // Close form
       setShowForm(false);
       setEditingSponsor(null);
@@ -134,12 +144,20 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
 
   // Handle sponsor deletion
   const handleDelete = async (sponsorId: string) => {
+    // Capture sponsor before removing it so we can check if flyer needs regen
+    const deletedSponsor = sponsors.find(s => s.id === sponsorId);
     const success = await deleteSponsor(partyId, sponsorId);
     if (success) {
       setSponsors(prev => prev.filter(s => s.id !== sponsorId));
       // Refresh stats
       const statsResult = await getSponsorStats(partyId);
       if (statsResult) setStats(statsResult);
+
+      // Auto-regenerate flyer if deleted sponsor was on the flyer
+      const FLYER_STATUSES = new Set(['yes', 'paid']);
+      if (party && deletedSponsor && FLYER_STATUSES.has(deletedSponsor.status) && deletedSponsor.logoUrl) {
+        triggerFlyerRegen(party, loadParty);
+      }
     }
   };
 
@@ -183,6 +201,12 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
       // Refresh stats since status change affects pipeline counts
       const statsResult = await getSponsorStats(partyId);
       if (statsResult) setStats(statsResult);
+
+      // Auto-regenerate flyer when a sponsor transitions to/from yes/paid
+      const FLYER_STATUSES = new Set(['yes', 'paid']);
+      if (party && (FLYER_STATUSES.has(oldStatus) || FLYER_STATUSES.has(newStatus))) {
+        triggerFlyerRegen(party, loadParty);
+      }
     } catch {
       // Revert on failure
       setSponsors(prev =>
@@ -371,6 +395,7 @@ export function SponsorCRM({ partyId }: SponsorCRMProps) {
           onSubmit={handleFormSubmit}
           onClose={handleCloseForm}
           isLoading={isSubmitting}
+          onAddAsCoHost={onAddAsCoHost}
         />
       )}
     </div>

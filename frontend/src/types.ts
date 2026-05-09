@@ -10,13 +10,16 @@ export interface Beverage {
   type: 'soda' | 'juice' | 'water' | 'other' | 'alcohol';
 }
 
-export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
+export type UnderbossStatus = 'pending' | 'approved' | 'rejected' | 'listed' | 'hidden';
+
+export type GuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED' | 'INVITED';
 
 export interface Guest {
   id?: string;
   name: string;
   email?: string;
   ethereumAddress?: string;
+  walletSource?: 'manual' | 'connectkit' | 'privy-embedded' | null;
   roles?: string[];
   mailingListOptIn?: boolean;
   dietaryRestrictions: string[];
@@ -160,6 +163,8 @@ export interface Venue {
   capacity: number | null;
   cost: number | null;
   organization: string | null;
+  latitude: number | null;
+  longitude: number | null;
   pointPerson: string | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -220,6 +225,7 @@ export interface Party {
   pizzaStyle: string;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   maxGuests: number | null;
   expectedGuests?: number | null;
   hideGuests: boolean;
@@ -278,6 +284,8 @@ export interface Party {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   telegramGroup?: string | null;
+  underbossStatus?: UnderbossStatus | null;
+  turtleRolesEnabled?: boolean;
 }
 
 export interface Donation {
@@ -415,6 +423,7 @@ export interface Photo {
   status: 'approved' | 'pending' | 'rejected';
   reviewedAt: string | null;
   reviewedBy: string | null;
+  duration: number | null; // Video duration in seconds (null for images)
   createdAt: string;
   updatedAt: string;
   guest?: {
@@ -1009,6 +1018,7 @@ export interface UnderbossEvent {
   coHosts: any[];
   progress: UnderbossEventProgress;
   guestCount: number;
+  invitedCount: number;
   approvedCount: number;
   checkedInCount: number;
   photoCount: number;
@@ -1016,11 +1026,12 @@ export interface UnderbossEvent {
   fundraisingGoal: number | null;
   totalSponsored: number;
   hostStatus: HostStatus | null;
-  underbossApproved: boolean;
+  underbossStatus: UnderbossStatus;
   hostTags: string[];
   eventTags: string[];
   underbossNotes: string | null;
   expectedGuests: number | null;
+  telegramGroup?: string | null;
   createdAt: string;
   flyerGeneratedAt: string | null;
   latestSponsorAt: string | null;
@@ -1030,6 +1041,7 @@ export interface UnderbossEvent {
 export interface UnderbossStats {
   totalEvents: number;
   totalRsvps: number;
+  totalInvited: number;
   totalApproved: number;
   eventsWithVenue: number;
   eventsWithBudget: number;
@@ -1083,7 +1095,7 @@ export interface ShippingKit {
   hostEmail: string | null;
   eventAddress: string | null;
   eventVenue: string | null;
-  underbossApproved: boolean;
+  underbossStatus: UnderbossStatus;
   requestedTier: KitTier;
   allocatedTier: KitTier | null;
   recipientName: string;
@@ -1193,6 +1205,7 @@ export interface SponsorDashboardEvent {
   } | null;
   coHosts: CoHost[];
   rsvpCount: number;
+  invitedCount: number;
   approvedCount: number;
   maxGuests: number | null;
   expectedGuests?: number | null;
@@ -1217,12 +1230,20 @@ export interface SponsorDashboardEvent {
   clickStats?: {
     totalClicks: number;
     uniqueClickers: number;
+    byLink?: {
+      url: string;
+      linkType: string;
+      linkLabel: string | null;
+      clicks: number;
+      uniqueClickers: number;
+    }[];
   };
   impressions?: {
     totalViews: number;
     uniqueVisitors: number;
   };
   partnerNotes: string | null;
+  photoCount: number;
   checklist: SponsorChecklistItem[];
 }
 
@@ -1235,6 +1256,12 @@ export interface SponsorMeResponse {
     name: string | null;
     tag: string;
   } | null;
+  sponsors?: {
+    id: string;
+    email: string;
+    name: string | null;
+    tag: string;
+  }[];
 }
 
 export interface SponsorDashboardData {

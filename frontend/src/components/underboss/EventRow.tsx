@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
+import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
+import { calculateEventPrice } from '../../utils/sponsorshipPricing';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface DisplayPhoto {
@@ -141,11 +143,13 @@ function HostStatusBadge({
 function HostTagsPills({
   tags,
   eventId,
+  event,
   onUpdate,
   partnerTags = [],
 }: {
   tags: string[];
   eventId: string;
+  event: UnderbossEvent;
   onUpdate: (tags: string[]) => void;
   partnerTags?: string[];
 }) {
@@ -163,6 +167,7 @@ function HostTagsPills({
     setIsAdding(false);
     try {
       await bulkUpdateEventTags([eventId], [cleaned], 'add');
+      triggerFlyerRegenForEvents([event]);
     } catch {
       onUpdate(tags);
     }
@@ -173,6 +178,7 @@ function HostTagsPills({
     onUpdate(newTags);
     try {
       await bulkUpdateEventTags([eventId], [tag], 'remove');
+      triggerFlyerRegenForEvents([event]);
     } catch {
       onUpdate(tags);
     }
@@ -464,6 +470,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
 
+  const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
+  const priceGuests = event.expectedGuests ?? event.guestCount ?? 30;
+  const price = calculateEventPrice(priceGuests, cityName);
+
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
   const displayedPhotos = showAllPhotos ? displayPhotos : displayPhotos.slice(0, 12);
@@ -491,8 +501,17 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
           <div className="flex items-start gap-2">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                {event.underbossApproved && (
+                {event.underbossStatus === 'approved' && (
                   <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+                )}
+                {event.underbossStatus === 'rejected' && (
+                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title="Rejected" />
+                )}
+                {event.underbossStatus === 'hidden' && (
+                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title="Hidden" />
+                )}
+                {event.underbossStatus === 'listed' && (
+                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title="Community Listed" />
                 )}
                 <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
                 {eventUrl && (
@@ -516,12 +535,24 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 >
                   <StickyNote size={12} />
                 </button>
+                {event.telegramGroup && (
+                  <a
+                    href={event.telegramGroup}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#29B6F6] hover:text-[#4FC3F7] transition-colors shrink-0"
+                    title="Telegram group"
+                  >
+                    <MessageCircle size={12} />
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5" title={fullDate}>
                 <Calendar size={10} className="text-theme-text-faint" />
                 <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {relTime.text}
                 </span>
+                <span className="text-xs font-medium text-green-400 ml-1">&middot; ${price.toLocaleString()}</span>
               </div>
               {/* Inline notes editor */}
               {notesOpen && (
@@ -584,6 +615,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
           <HostTagsPills
             tags={eventTags}
             eventId={event.id}
+            event={event}
             partnerTags={partnerTags}
             onUpdate={(tags) => {
               setEventTags(tags);
@@ -614,6 +646,9 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             <Users size={12} className="text-theme-text-faint" />
             <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
           </div>
+          {event.invitedCount > 0 && (
+            <div className="text-xs text-blue-400/60">{event.invitedCount} invited</div>
+          )}
           {event.checkedInCount > 0 && (
             <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
           )}

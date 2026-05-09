@@ -17,6 +17,7 @@ interface PizzaContextType {
   getHostLink: () => string;
   updatePartyBeverages: (beverages: string[]) => Promise<void>;
   updatePartyToppings: (toppings: string[]) => Promise<void>;
+  updatePartyDietaryOptions: (dietaryOptions: string[]) => Promise<void>;
   // Guest management
   guests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
@@ -91,6 +92,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
+    availableDietaryOptions: dbParty.available_dietary_options || [],
     maxGuests: dbParty.max_guests,
     expectedGuests: dbParty.expected_guests || null,
     hideGuests: dbParty.hide_guests || false,
@@ -134,6 +136,8 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     eventbriteUrl: dbParty.eventbrite_url || null,
     externalLinks: dbParty.external_links || [],
     telegramGroup: dbParty.telegram_group || null,
+    underbossStatus: (dbParty.underboss_status as any) || null,
+    turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
     guests,
   };
 }
@@ -355,12 +359,26 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updatePartyDietaryOptions = async (dietaryOptions: string[]) => {
+    if (!party) return;
+
+    const dbParty = await db.updatePartyDietaryOptions(party.id, dietaryOptions);
+    if (dbParty) {
+      const updatedParty = dbPartyToParty(dbParty, guests);
+      // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
+      updatedParty.canEdit = party.canEdit;
+      updatedParty.allowedTabs = party.allowedTabs;
+      setParty(updatedParty);
+    }
+  };
+
   const generateRecommendations = () => {
     if (!party) return;
 
     // Generate wave-based recommendations (handles both single and multi-wave)
     // Pass orderExpectedGuests as override if set
-    const waves = generateWaveRecommendations(guests, pizzaSettings.style, party, availableBeverages, orderExpectedGuests);
+    const activeGuests = guests.filter(g => g.status !== 'INVITED');
+    const waves = generateWaveRecommendations(activeGuests, pizzaSettings.style, party, availableBeverages, orderExpectedGuests);
     setWaveRecommendations(waves);
 
     // Also update single recommendations for backward compatibility
@@ -415,6 +433,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       getHostLink,
       updatePartyBeverages,
       updatePartyToppings,
+      updatePartyDietaryOptions,
       guests,
       addGuest,
       removeGuest,

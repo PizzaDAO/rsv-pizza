@@ -52,7 +52,7 @@ router.post('/:partyId/venues', async (req: AuthRequest, res: Response, next: Ne
     const {
       name, address, website, capacity, cost, organization,
       pointPerson, contactName, contactEmail, contactPhone,
-      status, notes, pros, cons
+      status, notes, pros, cons, latitude, longitude
     } = req.body;
 
     // Verify ownership or super admin
@@ -88,6 +88,8 @@ router.post('/:partyId/venues', async (req: AuthRequest, res: Response, next: Ne
         notes: notes?.trim() || null,
         pros: pros?.trim() || null,
         cons: cons?.trim() || null,
+        latitude: latitude != null ? parseFloat(latitude) : null,
+        longitude: longitude != null ? parseFloat(longitude) : null,
       },
     });
 
@@ -104,7 +106,7 @@ router.patch('/:partyId/venues/:venueId', async (req: AuthRequest, res: Response
     const {
       name, address, website, capacity, cost, organization,
       pointPerson, contactName, contactEmail, contactPhone,
-      status, notes, pros, cons
+      status, notes, pros, cons, latitude, longitude
     } = req.body;
 
     // Verify ownership or super admin
@@ -145,6 +147,8 @@ router.patch('/:partyId/venues/:venueId', async (req: AuthRequest, res: Response
         ...(notes !== undefined && { notes: notes?.trim() || null }),
         ...(pros !== undefined && { pros: pros?.trim() || null }),
         ...(cons !== undefined && { cons: cons?.trim() || null }),
+        ...(latitude !== undefined && { latitude: latitude != null ? parseFloat(latitude) : null }),
+        ...(longitude !== undefined && { longitude: longitude != null ? parseFloat(longitude) : null }),
       },
       include: {
         photos: {
@@ -224,7 +228,7 @@ router.patch('/:partyId/venues/:venueId/select', async (req: AuthRequest, res: R
     // Use a transaction to:
     // 1. Deselect all other venues for this party
     // 2. Select this venue
-    // 3. Copy venue name and address to party
+    // 3. Copy venue name, address, and coordinates to party
     const [, venue, party] = await prisma.$transaction([
       // Deselect all venues for this party
       prisma.venue.updateMany({
@@ -236,12 +240,14 @@ router.patch('/:partyId/venues/:venueId/select', async (req: AuthRequest, res: R
         where: { id: venueId },
         data: { isSelected: true },
       }),
-      // Update party with venue name and address
+      // Update party with venue name, address, and coordinates
       prisma.party.update({
         where: { id: partyId },
         data: {
           venueName: existingVenue.name,
           address: existingVenue.address,
+          latitude: existingVenue.latitude,
+          longitude: existingVenue.longitude,
         },
       }),
     ]);

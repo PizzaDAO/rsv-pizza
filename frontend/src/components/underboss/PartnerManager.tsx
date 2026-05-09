@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical } from 'lucide-react';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, Copy } from 'lucide-react';
 import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
 import { proxyAvatarToStorage } from '../../lib/supabase';
 import type { SponsorUser } from '../../types';
@@ -7,10 +7,12 @@ import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 
 interface PartnerManagerProps {
+  isAdmin?: boolean;
   onSyncComplete?: () => void;
+  onFlyerRegenNeeded?: (tag: string) => void;
 }
 
-export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
+export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
   const [partners, setPartners] = useState<SponsorUser[]>([]);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,7 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -104,6 +107,8 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
 
       if (newSyncMessage) {
         setSyncMessage(newSyncMessage);
+        // Trigger flyer regen for events with this partner's tag
+        onFlyerRegenNeeded?.(data.tag);
       }
 
       await loadPartners();
@@ -205,21 +210,23 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
           {partners.map((partner, index) => (
             <div
               key={partner.id}
-              draggable
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
-              className={`p-3 rounded-xl border transition-colors cursor-move ${
+              draggable={!!isAdmin}
+              onDragStart={isAdmin ? () => handleDragStart(index) : undefined}
+              onDragOver={isAdmin ? (e) => handleDragOver(e, index) : undefined}
+              onDragEnd={isAdmin ? handleDragEnd : undefined}
+              className={`p-3 rounded-xl border transition-colors ${isAdmin ? 'cursor-move' : ''} ${
                 partner.isActive
                   ? 'bg-theme-surface border-theme-stroke'
                   : 'bg-theme-surface/50 border-theme-stroke/50 opacity-60'
               } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
             >
               <div className="flex items-start gap-3">
-                {/* Drag handle */}
-                <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
-                  <GripVertical size={16} />
-                </div>
+                {/* Drag handle (admin only) */}
+                {isAdmin && (
+                  <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0 pt-1">
+                    <GripVertical size={16} />
+                  </div>
+                )}
 
                 {/* Avatar */}
                 {partner.coHostAvatarUrl ? (
@@ -249,7 +256,21 @@ export function PartnerManager({ onSyncComplete }: PartnerManagerProps) {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-theme-text-faint truncate">{partner.email}</div>
+                  <div className="flex items-center gap-1">
+                    <div className="text-xs text-theme-text-faint truncate">{partner.email}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(partner.email);
+                        setCopiedEmail(partner.id);
+                        setTimeout(() => setCopiedEmail(null), 1500);
+                      }}
+                      className="shrink-0 opacity-40 hover:opacity-100 transition-opacity text-theme-text-faint"
+                      title="Copy email"
+                    >
+                      {copiedEmail === partner.id ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
                   <div className="flex items-center gap-3 mt-1">
                     {partner.autoCoHost && (
                       <span className="text-[10px] text-green-400 flex items-center gap-1">

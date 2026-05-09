@@ -97,6 +97,7 @@ export interface CreatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   password?: string;
   eventImageUrl?: string;
   description?: string;
@@ -130,6 +131,7 @@ export interface UpdatePartyData {
   requireApproval?: boolean;
   availableBeverages?: string[];
   availableToppings?: string[];
+  availableDietaryOptions?: string[];
   selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
@@ -181,6 +183,7 @@ export async function createPartyApi(data: CreatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      availableDietaryOptions: data.availableDietaryOptions,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
       description: data.description,
@@ -221,6 +224,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       requireApproval: data.requireApproval,
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
+      availableDietaryOptions: data.availableDietaryOptions,
       selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
@@ -312,13 +316,14 @@ export interface BulkInviteResult {
 export async function bulkInviteGuests(
   partyId: string,
   guests: Array<{ name: string; email: string }>,
-  customMessage?: string
+  customMessage?: string,
+  testOnly?: boolean
 ): Promise<BulkInviteResult> {
   return apiRequest<BulkInviteResult>(
     `/api/v1/parties/${partyId}/guests/bulk-invite`,
     {
       method: 'POST',
-      body: { guests, customMessage },
+      body: { guests, customMessage, ...(testOnly && { testOnly: true }) },
     }
   );
 }
@@ -383,6 +388,7 @@ export interface PublicEvent {
   pizzaStyle: string;
   availableBeverages: string[];
   availableToppings: string[];
+  availableDietaryOptions: string[];
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -416,7 +422,9 @@ export interface PublicEvent {
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   telegramGroup?: string | null;
+  turtleRolesEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
+  pageViewStats?: { totalViews: number; uniqueVisitors: number };
 }
 
 // Public Event API (no auth required)
@@ -443,6 +451,31 @@ export async function getEventBySlug(slug: string): Promise<PublicEvent | { redi
     console.error('Error fetching event:', error);
     return null;
   }
+}
+
+// One Sheet interest form
+export interface OneSheetInterestData {
+  name: string;
+  email: string;
+  company: string;
+  message?: string;
+}
+
+export async function submitOneSheetInterest(slug: string, data: OneSheetInterestData): Promise<{ success: boolean; id: string }> {
+  const response = await fetch(`${API_URL}/api/events/${slug}/interest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    const err = new Error(error.message || error.error || `API error: ${response.status}`);
+    (err as any).status = response.status;
+    throw err;
+  }
+
+  return response.json();
 }
 
 // Donation API functions
@@ -556,6 +589,7 @@ export interface PhotoUploadData {
   caption?: string;
   tags?: string[];
   photoYear?: number;
+  duration?: number; // Video duration in seconds
 }
 
 export interface PhotosListResponse {
@@ -1158,6 +1192,8 @@ export interface VenueCreateData {
   notes?: string;
   pros?: string;
   cons?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface VenueUpdateData extends Partial<VenueCreateData> {}
@@ -2462,14 +2498,14 @@ export async function updateHostStatus(
   });
 }
 
-// Toggle underboss approval on an event (underboss auth)
-export async function updateUnderbossApproval(
+// Update underboss status on an event (underboss auth)
+export async function updateUnderbossStatus(
   partyId: string,
-  approved: boolean
+  status: 'pending' | 'approved' | 'rejected' | 'listed' | 'hidden'
 ): Promise<void> {
-  await apiRequest(`/api/underboss/event/${partyId}/approve`, {
+  await apiRequest(`/api/underboss/event/${partyId}/status`, {
     method: 'PATCH',
-    body: { approved },
+    body: { status },
   });
 }
 
@@ -2506,11 +2542,11 @@ export async function updateExpectedGuests(
   });
 }
 
-// Bulk approve events (underboss auth)
-export async function bulkApproveEvents(partyIds: string[], approved: boolean = true): Promise<void> {
-  await apiRequest('/api/underboss/events/bulk-approve', {
+// Bulk update underboss status (underboss auth)
+export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pending' | 'approved' | 'rejected'): Promise<void> {
+  await apiRequest('/api/underboss/events/bulk-status', {
     method: 'PATCH',
-    body: { partyIds, approved },
+    body: { partyIds, status },
   });
 }
 

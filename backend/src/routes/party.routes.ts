@@ -4,7 +4,7 @@ import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 
 // Helper function to get party with ownership check
@@ -28,6 +28,13 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
   // Check if user is the owner
   if (party.userId === userId) {
     return party;
+  }
+
+  // Check if user is a GPP global editor
+  if (userEmail && (party as any).eventType === 'gpp') {
+    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+      return party;
+    }
   }
 
   // Check if user is a co-host with edit permissions
@@ -113,6 +120,16 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       });
     }
 
+    // 4. GPP global editor parties (if user is a GPP global editor)
+    let gppEditorParties: typeof ownedParties = [];
+    if (userEmail && GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
+      gppEditorParties = await prisma.party.findMany({
+        where: { eventType: 'gpp' },
+        select: slimSelect,
+        orderBy: { date: 'asc' },
+      });
+    }
+
     // Deduplicate by party ID, assign roles (host > cohost > guest)
     const partyMap = new Map<string, any>();
 
@@ -120,6 +137,11 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       partyMap.set(p.id, { ...p, role: 'host' as const });
     }
     for (const p of cohostParties) {
+      if (!partyMap.has(p.id)) {
+        partyMap.set(p.id, { ...p, role: 'cohost' as const });
+      }
+    }
+    for (const p of gppEditorParties) {
       if (!partyMap.has(p.id)) {
         partyMap.set(p.id, { ...p, role: 'cohost' as const });
       }
@@ -209,7 +231,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
   try {
     const {
       name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
-      availableBeverages, availableToppings, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress
@@ -255,6 +277,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         pizzaStyle: pizzaStyle || 'new-york',
         availableBeverages: availableBeverages || [],
         availableToppings: availableToppings || [],
+        availableDietaryOptions: availableDietaryOptions || [],
         address: address || null,
         venueName: venueName || null,
         maxGuests: maxGuests || null,
@@ -383,7 +406,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const { id } = req.params;
     const {
       name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
-      availableBeverages, availableToppings, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -397,7 +420,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       hiddenGppPhotos, extraGppPhotos,
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
-      telegramGroup
+      telegramGroup,
+      turtleRolesEnabled
     } = req.body;
 
     // Verify ownership or super admin
@@ -497,6 +521,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
+        ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
@@ -531,6 +556,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
+        ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
       },
       include: {
         user: { select: { name: true } },

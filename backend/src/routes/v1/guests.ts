@@ -5,6 +5,7 @@ import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
+import { canUserAccessTab } from '../../helpers/partyAccess.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -30,6 +31,7 @@ export function buildInviteEmail(
     inviteCode: string;
     customUrl: string | null;
     timezone: string | null;
+    eventImageUrl?: string | null;
   },
   guest: { name: string; email: string },
   customMessage?: string
@@ -66,6 +68,13 @@ export function buildInviteEmail(
           </div>`
     : '';
 
+  const flyerBlock = party.eventImageUrl
+    ? `
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="${party.eventImageUrl}" alt="${escape(party.name)}" style="max-width: 100%; border-radius: 12px;" />
+          </div>`
+    : '';
+
   const subject = `You're invited to ${party.name}!`;
 
   const html = `
@@ -76,9 +85,7 @@ export function buildInviteEmail(
           <title>You're invited!</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #ffffff; font-size: 32px; margin: 0;">You're Invited!</h1>
-          </div>
+          ${flyerBlock}
           <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
             <h2 style="color: #1a1a2e; margin-top: 0;">${escape(party.name)}</h2>
             <p><strong>When:</strong> ${escape(dateText)}</p>
@@ -248,7 +255,7 @@ router.post('/', requireApiKey(SCOPES.GUESTS_WRITE), async (req: ApiKeyRequest, 
 
     // Check max guests
     if (party.maxGuests) {
-      const guestCount = await prisma.guest.count({ where: { partyId } });
+      const guestCount = await prisma.guest.count({ where: { partyId, status: { not: 'INVITED' } } });
       if (guestCount >= party.maxGuests) {
         throw new AppError('Party has reached maximum guests', 400, 'MAX_GUESTS_REACHED');
       }
@@ -572,6 +579,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
         inviteCode: party.inviteCode,
         customUrl: party.customUrl,
         timezone: party.timezone,
+        eventImageUrl: party.eventImageUrl,
       },
       { name: guest.name, email: guest.email }
     );
@@ -619,17 +627,20 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
       throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    // Verify party ownership (user must own the party to bulk-invite)
-    const party = await prisma.party.findFirst({
-      where: { id: partyId, userId },
-    });
+    // Verify the user can access the promo tab (owner, co-host, or super admin)
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, userId, 'promo');
+    if (!canAccess) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const party = await prisma.party.findUnique({ where: { id: partyId } });
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    const { guests, customMessage } = req.body as {
+    const { guests, customMessage, testOnly } = req.body as {
       guests?: Array<{ name?: string; email?: string }>;
       customMessage?: string;
+      testOnly?: boolean;
     };
 
     if (!Array.isArray(guests) || guests.length === 0) {
@@ -677,35 +688,36 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
             return;
           }
 
-          if (existingEmails.has(normalizedEmail)) {
-            results.skipped.push({ email: displayEmail, reason: 'already invited' });
-            return;
-          }
-          // Reserve this email so duplicates within the same batch are also skipped
-          existingEmails.add(normalizedEmail);
-
           const name = (g.name || '').trim() || normalizedEmail.split('@')[0];
 
-          let newGuest;
-          try {
-            newGuest = await prisma.guest.create({
-              data: {
-                partyId,
-                name,
-                email: normalizedEmail,
-                status: 'PENDING',
-                submittedVia: 'invite',
-                approved: null,
-                roles: [],
-              },
-            });
-            results.createdGuestIds.push(newGuest.id);
-          } catch (err: any) {
-            results.failed.push({
-              email: displayEmail,
-              reason: err?.message || 'failed to create guest',
-            });
-            return;
+          if (!testOnly) {
+            if (existingEmails.has(normalizedEmail)) {
+              results.skipped.push({ email: displayEmail, reason: 'already invited' });
+              return;
+            }
+            // Reserve this email so duplicates within the same batch are also skipped
+            existingEmails.add(normalizedEmail);
+
+            try {
+              const newGuest = await prisma.guest.create({
+                data: {
+                  partyId,
+                  name,
+                  email: normalizedEmail,
+                  status: 'INVITED',
+                  submittedVia: 'invite',
+                  approved: null,
+                  roles: [],
+                },
+              });
+              results.createdGuestIds.push(newGuest.id);
+            } catch (err: any) {
+              results.failed.push({
+                email: displayEmail,
+                reason: err?.message || 'failed to create guest',
+              });
+              return;
+            }
           }
 
           // Send invite email (if Resend configured). If email fails, keep the
@@ -720,6 +732,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   inviteCode: party.inviteCode,
                   customUrl: party.customUrl,
                   timezone: party.timezone,
+                  eventImageUrl: party.eventImageUrl,
                 },
                 { name, email: normalizedEmail },
                 customMessage

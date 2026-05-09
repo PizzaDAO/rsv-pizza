@@ -177,12 +177,20 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             onVenueNameChangeRef.current(selectedVenueName);
           }
 
-          // Call onPlaceSelected callback for auto-save
-          if (onPlaceSelectedRef.current && selectedAddress) {
-            onPlaceSelectedRef.current(selectedAddress, selectedVenueName);
+          // Set location coords + fetch timezone BEFORE onPlaceSelected
+          // so that callers reading pendingCoordsRef see the value in time
+          if (place.geometry?.location) {
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            fetchTimezone(lat, lng);
+            if (onLocationSelectedRef.current) {
+              onLocationSelectedRef.current({ lat, lng });
+            }
+          } else if (onLocationSelectedRef.current) {
+            onLocationSelectedRef.current(null);
           }
 
-          // Parse city data from address_components when onCitySelected is provided
+          // Parse city data from address_components
           if (onCitySelectedRef.current && place.address_components && place.geometry?.location) {
             const components = place.address_components;
             const getComponent = (type: string) =>
@@ -205,16 +213,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             }
           }
 
-          // Fetch timezone based on location coordinates
-          if (place.geometry?.location) {
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
-            fetchTimezone(lat, lng);
-            if (onLocationSelectedRef.current) {
-              onLocationSelectedRef.current({ lat, lng });
-            }
-          } else if (onLocationSelectedRef.current) {
-            onLocationSelectedRef.current(null);
+          // Call onPlaceSelected LAST — callers may trigger a save here
+          // that reads coords set by onLocationSelected above
+          if (onPlaceSelectedRef.current && selectedAddress) {
+            onPlaceSelectedRef.current(selectedAddress, selectedVenueName);
           }
         });
 

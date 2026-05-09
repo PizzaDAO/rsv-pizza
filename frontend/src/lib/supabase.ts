@@ -20,6 +20,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const SUPABASE_STORAGE_PREFIX = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/';
+
+/**
+ * Rewrite a Supabase Storage public URL to go through the Vercel edge CDN.
+ * Non-matching URLs pass through unchanged.
+ */
+export function cdnUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith(SUPABASE_STORAGE_PREFIX)) {
+    return '/cdn/' + url.slice(SUPABASE_STORAGE_PREFIX.length);
+  }
+  return url;
+}
+
 // Helper to check if user is authenticated
 function isAuthenticated(): boolean {
   return !!localStorage.getItem('authToken');
@@ -435,6 +449,124 @@ export async function uploadVenuePhoto(
 }
 
 /**
+ * Upload a video to Supabase Storage (event-videos bucket) and return public URL + metadata
+ * @param file The video file to upload
+ * @param partyId The party ID for organizing uploads
+ * @returns Object with URL, metadata, and duration, or null if upload failed
+ */
+export async function uploadEventVideo(
+  file: File,
+  partyId: string
+): Promise<{
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+} | null> {
+  try {
+    // Validate video MIME types
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!allowedVideoTypes.includes(file.type)) {
+      console.error('Invalid video file type:', file.type);
+      return null;
+    }
+
+    // Validate file size (50MB max for videos)
+    if (file.size > 50 * 1024 * 1024) {
+      console.error('Video file too large:', file.size);
+      return null;
+    }
+
+    // Get video duration and dimensions
+    let duration: number | undefined;
+    let width: number | undefined;
+    let height: number | undefined;
+
+    try {
+      const metadata = await getVideoMetadata(file);
+      duration = metadata.duration;
+      width = metadata.width;
+      height = metadata.height;
+    } catch (e) {
+      console.warn('Could not get video metadata:', e);
+    }
+
+    // Validate duration (5 minutes max)
+    if (duration && duration > 300) {
+      console.error('Video too long:', duration, 'seconds');
+      return null;
+    }
+
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop() || 'mp4';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const fileName = `${partyId}/${timestamp}-${random}.${fileExt}`;
+
+    // Upload to Supabase Storage (event-videos bucket)
+    const { error } = await supabase.storage
+      .from('event-videos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading video:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('event-videos')
+      .getPublicUrl(fileName);
+
+    return {
+      url: urlData.publicUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      width,
+      height,
+      duration,
+    };
+  } catch (error) {
+    console.error('Error uploading video:', error);
+    return null;
+  }
+}
+
+/**
+ * Get video metadata (duration, width, height) from a File object using HTML5 Video element
+ */
+function getVideoMetadata(file: File): Promise<{ duration: number; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const objectUrl = URL.createObjectURL(file);
+
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load video metadata'));
+    };
+
+    video.src = objectUrl;
+  });
+}
+
+/**
  * Get image dimensions from a File object
  */
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -483,6 +615,7 @@ export interface DbParty {
   pizza_style: string;
   available_beverages: string[];
   available_toppings: string[];
+  available_dietary_options: string[];
   max_guests: number | null;
   expected_guests?: number | null;
   hide_guests: boolean;
@@ -533,6 +666,10 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Underboss status
+  underboss_status?: string | null;
+  // Turtle role selection toggle
+  turtle_roles_enabled?: boolean;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -572,7 +709,7 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, max_guests, expected_guests, hide_guests,
+  pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, latitude, longitude, country, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
@@ -593,7 +730,9 @@ export const SAFE_PARTY_COLUMNS = `
   flyer_generated_at,
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
-  telegram_group
+  telegram_group,
+  turtle_roles_enabled,
+  underboss_status
 `;
 
 /**
@@ -661,6 +800,7 @@ export async function createParty(
         pizza_style: party.pizzaStyle,
         available_beverages: party.availableBeverages || [],
         available_toppings: party.availableToppings || [],
+        available_dietary_options: party.availableDietaryOptions || [],
         max_guests: party.maxGuests,
         hide_guests: party.hideGuests || false,
         event_image_url: party.eventImageUrl,
@@ -1050,6 +1190,22 @@ export async function updatePartyBeverages(partyId: string, availableBeverages: 
 export async function updatePartyToppings(partyId: string, availableToppings: string[]): Promise<DbParty | null> {
   // Use the updateParty function which handles API routing
   const success = await updateParty(partyId, { available_toppings: availableToppings });
+  if (!success) return null;
+
+  // Fetch the updated party
+  const { data } = await supabase
+    .from('parties')
+    .select(SAFE_PARTY_COLUMNS)
+    .eq('id', partyId)
+    .single();
+
+  if (data) normalizePartyCoHosts(data);
+  return data;
+}
+
+export async function updatePartyDietaryOptions(partyId: string, availableDietaryOptions: string[]): Promise<DbParty | null> {
+  // Use the updateParty function which handles API routing
+  const success = await updateParty(partyId, { available_dietary_options: availableDietaryOptions });
   if (!success) return null;
 
   // Fetch the updated party
@@ -1509,6 +1665,7 @@ export async function updateParty(
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
     telegram_group?: string | null;
+    turtle_roles_enabled?: boolean;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1541,6 +1698,7 @@ export async function updateParty(
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
+        availableDietaryOptions: updates.available_dietary_options,
         selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,
@@ -1573,6 +1731,7 @@ export async function updateParty(
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
         telegramGroup: updates.telegram_group,
+        turtleRolesEnabled: updates.turtle_roles_enabled,
       });
       return true;
     } catch (error) {

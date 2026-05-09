@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getChecklist, seedChecklist } from '../../lib/api';
+import { getChecklist, seedChecklist, updateUnderbossStatus } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
@@ -17,6 +17,7 @@ export const GPPDashboardTab: React.FC = () => {
   const [hostsExpanded, setHostsExpanded] = useState(false);
   const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -146,9 +147,12 @@ export const GPPDashboardTab: React.FC = () => {
   // Days until event
   const daysUntil = useMemo(() => {
     if (!party?.date) return null;
-    const diff = new Date(party.date).getTime() - Date.now();
+    const eventDate = new Date(party.date.slice(0, 10) + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = eventDate.getTime() - today.getTime();
     if (diff < 0) return null;
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return Math.round(diff / (1000 * 60 * 60 * 24));
   }, [party?.date]);
 
   if (!party) return null;
@@ -156,9 +160,17 @@ export const GPPDashboardTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-theme-text">{guests.length}</div>
+          <div className="text-2xl font-bold text-theme-text">
+            {guests.filter(g => g.status === 'INVITED').length}
+          </div>
+          <div className="text-xs text-theme-text-muted">Invited</div>
+        </div>
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-theme-text">
+            {guests.filter(g => g.status !== 'INVITED').length}
+          </div>
           <div className="text-xs text-theme-text-muted">RSVPs</div>
         </div>
         <div className="card p-4 text-center">
@@ -173,7 +185,80 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
           <div className="text-xs text-theme-text-muted">Pending Approval</div>
         </div>
+        {party.underbossStatus === 'approved' && (
+          <div className="card p-4 text-center border border-green-500/30">
+            <div className="flex items-center justify-center gap-1.5 text-green-400">
+              <Check size={20} />
+              <span className="text-sm font-medium">Approved</span>
+            </div>
+            <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
+          </div>
+        )}
       </div>
+
+      {/* Rejected status callout */}
+      {party.underbossStatus === 'rejected' && (
+        <div className="card p-6 border border-amber-500/30 bg-amber-500/5">
+          <p className="text-sm text-theme-text mb-4">
+            We can't support your event financially this year, but we're happy to list your event on the site!
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateUnderbossStatus(party.id, 'listed');
+                  window.location.reload();
+                } catch (err) {
+                  console.error('Failed to update status:', err);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : null}
+              List My Event
+            </button>
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateUnderbossStatus(party.id, 'hidden');
+                  window.location.reload();
+                } catch (err) {
+                  console.error('Failed to update status:', err);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="btn-secondary flex items-center gap-2"
+            >
+              Maybe Next Year
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden status callout */}
+      {party.underbossStatus === 'hidden' && (
+        <div className="card p-6 border border-theme-stroke">
+          <p className="text-sm text-theme-text-muted">
+            Your event is currently not listed on the site.
+          </p>
+        </div>
+      )}
+
+      {/* Listed status callout */}
+      {party.underbossStatus === 'listed' && (
+        <div className="card p-6 border border-green-500/30 bg-green-500/5">
+          <p className="text-sm text-green-400">
+            Your event is listed as a Community event on the site.
+          </p>
+        </div>
+      )}
 
       {/* Checklist progress */}
       <div className="card p-6">

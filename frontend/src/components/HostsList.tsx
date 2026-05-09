@@ -1,5 +1,7 @@
 import React from 'react';
 import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
+import { cdnUrl } from '../lib/supabase';
+import { normalizeUrl } from '../lib/utils';
 
 interface CoHost {
   id: string;
@@ -94,7 +96,7 @@ export const HostsList: React.FC<HostsListProps> = ({
           <div className={`flex items-center ${config.gap}`}>
             {hostProfile?.avatar_url ? (
               <img
-                src={hostProfile.avatar_url}
+                src={cdnUrl(hostProfile.avatar_url)}
                 alt={displayHostName}
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
               />
@@ -108,7 +110,7 @@ export const HostsList: React.FC<HostsListProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 {hostProfile.website && (
                   <a
-                    href={hostProfile.website}
+                    href={normalizeUrl(hostProfile.website)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
@@ -182,7 +184,7 @@ export const HostsList: React.FC<HostsListProps> = ({
           <div key={coHost.id} className={`flex items-center ${config.gap}`}>
             {coHost.avatar_url ? (
               <img
-                src={coHost.avatar_url}
+                src={cdnUrl(coHost.avatar_url)}
                 alt={coHost.name}
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
               />
@@ -196,7 +198,7 @@ export const HostsList: React.FC<HostsListProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 {coHost.website && (
                   <a
-                    href={coHost.website}
+                    href={normalizeUrl(coHost.website)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-theme-text-muted hover:text-theme-text transition-colors"
@@ -263,7 +265,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
         {displayHostName && (
           hostProfile?.avatar_url ? (
             <img
-              src={hostProfile.avatar_url}
+              src={cdnUrl(hostProfile.avatar_url)}
               alt={displayHostName}
               className="w-8 min-w-8 h-8 min-h-8 rounded-full object-cover flex-shrink-0 border-2 border-theme-card"
               style={{ zIndex: 10, marginLeft: '-8px' }}
@@ -282,7 +284,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
           <div key={coHost.id} className="flex-shrink-0" style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
             {coHost.avatar_url ? (
               <img
-                src={coHost.avatar_url}
+                src={cdnUrl(coHost.avatar_url)}
                 alt={coHost.name}
                 className="w-8 min-w-8 h-8 min-h-8 rounded-full object-cover border-2 border-theme-card"
               />

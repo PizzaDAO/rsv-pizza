@@ -7,6 +7,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager } from '../components/underboss';
+import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,12 +18,14 @@ import type { UnderbossDashboardData, UnderbossStats, UnderbossEvent } from '../
 function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
   const totalEvents = events.length;
   let totalRsvps = 0;
+  let totalInvited = 0;
   let totalApproved = 0;
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
 
   for (const e of events) {
     totalRsvps += e.guestCount;
+    totalInvited += e.invitedCount || 0;
     totalApproved += e.approvedCount;
     if (e.progress.hasVenue) eventsWithVenue++;
     if (e.progress.hasBudget) eventsWithBudget++;
@@ -31,6 +34,7 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
   return {
     totalEvents,
     totalRsvps,
+    totalInvited,
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
@@ -190,6 +194,15 @@ export function UnderbossDashboard() {
     const allSelected = selectedRegions.length === availableRegions.length;
     setSelectedRegions(allSelected ? [] : [...availableRegions]);
   };
+
+  // Handle flyer regen when a partner is created/updated and synced to events
+  const handleFlyerRegenForTag = useCallback((tag: string) => {
+    if (!allData) return;
+    const affected = allData.events.filter(e => e.eventTags?.includes(tag));
+    if (affected.length > 0) {
+      triggerFlyerRegenForEvents(affected);
+    }
+  }, [allData]);
 
   // Handle optimistic event updates from EventRow (host status, approval, tags)
   const handleEventUpdate = useCallback((eventId: string, updates: Partial<UnderbossEvent>) => {
@@ -408,21 +421,19 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('partners')}
-                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
-                  activeTab === 'partners'
-                    ? 'text-theme-text'
-                    : 'text-theme-text-muted hover:text-theme-text-secondary'
-                }`}
-              >
-                {t('underbossDashboard.tabs.partners')}
-                {activeTab === 'partners' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
-                )}
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('partners')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'partners'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.partners')}
+              {activeTab === 'partners' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -433,8 +444,8 @@ export function UnderbossDashboard() {
             <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
           )}
 
-          {activeTab === 'partners' && isAdmin && (
-            <PartnerManager onSyncComplete={loadDashboard} />
+          {activeTab === 'partners' && (
+            <PartnerManager isAdmin={isAdmin} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
         </section>
         </div>

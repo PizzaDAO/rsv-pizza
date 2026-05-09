@@ -17,6 +17,7 @@ import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { Party } from '../../types';
 import { usePizza } from '../../contexts/PizzaContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { parseCsv, ParsedCsvRow } from '../../lib/csvParser';
 import { bulkInviteGuests, BulkInviteResult } from '../../lib/api';
 
@@ -64,8 +65,16 @@ function statusBadgeClass(status: RowStatus): string {
 export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
   const { t } = useTranslation('host');
   const { guests, loadParty } = usePizza();
+  const { user } = useAuth();
 
   const [stage, setStage] = useState<Stage>('upload');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<'sent' | 'error' | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testExpanded, setTestExpanded] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [testName, setTestName] = useState('');
+  const [testMessage, setTestMessage] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [customMessage, setCustomMessage] = useState('');
@@ -211,6 +220,38 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
     }
   };
 
+  const handleTestEmail = async () => {
+    const email = testEmail.trim();
+    if (!email || !EMAIL_REGEX.test(email)) return;
+    setTestSending(true);
+    setTestResult(null);
+    setTestError(null);
+    try {
+      const name = testName.trim() || email.split('@')[0];
+      const res = await bulkInviteGuests(
+        party.id,
+        [{ name, email }],
+        testMessage.trim() || undefined,
+        true // testOnly — skip duplicate check, don't create guest row
+      );
+      if (res.sent.length > 0) {
+        setTestResult('sent');
+        setTimeout(() => setTestResult(null), 5000);
+      } else if (res.skipped.length > 0) {
+        setTestResult('error');
+        setTestError(`Skipped: ${res.skipped[0].reason}`);
+      } else if (res.failed.length > 0) {
+        setTestResult('error');
+        setTestError(`Failed: ${res.failed[0].reason}`);
+      }
+    } catch (err: any) {
+      setTestResult('error');
+      setTestError(err?.message || 'Failed to send');
+    } finally {
+      setTestSending(false);
+    }
+  };
+
   // ---------------- Upload stage ----------------
   if (stage === 'upload') {
     return (
@@ -251,6 +292,75 @@ export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
             <span className="text-xs text-yellow-500/80">{parseError}</span>
           </div>
         )}
+
+        <div className="border border-theme-stroke rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setTestExpanded((v) => !v)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-theme-surface transition-colors"
+          >
+            <span className="flex items-center gap-2 text-sm text-theme-text-secondary font-medium">
+              <Send size={14} />
+              Send a test invite
+            </span>
+            {testExpanded ? (
+              <ChevronUp size={16} className="text-theme-text-muted" />
+            ) : (
+              <ChevronDown size={16} className="text-theme-text-muted" />
+            )}
+          </button>
+          {testExpanded && (
+            <div className="border-t border-theme-stroke p-3 space-y-3">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <IconInput
+                    icon={Send}
+                    value={testEmail}
+                    onChange={(e) => { setTestEmail(e.target.value); setTestResult(null); setTestError(null); }}
+                    placeholder="Recipient email"
+                    type="email"
+                  />
+                </div>
+                <div className="flex-1">
+                  <IconInput
+                    icon={Users}
+                    value={testName}
+                    onChange={(e) => setTestName(e.target.value)}
+                    placeholder="Recipient name (optional)"
+                  />
+                </div>
+              </div>
+              <IconInput
+                icon={MessageSquare}
+                multiline
+                rows={3}
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Custom message (optional, shown in invite email)"
+              />
+              {testResult === 'error' && testError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                  <AlertTriangle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-xs text-red-300">{testError}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleTestEmail}
+                disabled={testSending || !testEmail.trim() || !EMAIL_REGEX.test(testEmail.trim())}
+                className="w-full flex items-center justify-center gap-2 bg-theme-surface hover:bg-theme-surface-hover disabled:opacity-50 disabled:cursor-not-allowed text-theme-text-secondary font-medium py-2 rounded-lg transition-colors text-sm border border-theme-stroke"
+              >
+                {testSending ? (
+                  <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                ) : testResult === 'sent' ? (
+                  <><CheckCircle size={14} className="text-green-400" /> Test sent to {testEmail}</>
+                ) : (
+                  <><Send size={14} /> Send test invite</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
 
         <p className="text-xs text-theme-text-faint">
           {t('promo.csvInfoNote')}
