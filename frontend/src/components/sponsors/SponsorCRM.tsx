@@ -21,7 +21,7 @@ import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
 
 interface SponsorCRMProps {
   partyId: string;
-  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => void;
 }
 
 export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {

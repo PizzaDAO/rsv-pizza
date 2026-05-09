@@ -209,7 +209,7 @@ interface PartnerFormProps {
   submitLabel?: string;
   wasPreviouslySubmitted?: boolean;
   defaultStatus?: SponsorStatus;
-  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => void;
 }
 
 /* ---------- Component ---------- */
@@ -356,6 +356,7 @@ export function PartnerForm({
           twitter: formData.brandTwitter.trim(),
           instagram: formData.brandInstagram.trim(),
           logoUrl,
+          avatarUrl: formData.coHostAvatarUrl.trim() || undefined,
         });
       }
     } catch (err) {
@@ -470,8 +471,8 @@ export function PartnerForm({
         />
       )}
 
-      {/* Co-Host Profile (avatar) — Partner mode only */}
-      {isPartner && (
+      {/* Co-Host Profile (avatar) — Partner + CRM (when adding as co-host) */}
+      {(isPartner || (isCrm && addAsCoHost)) && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
