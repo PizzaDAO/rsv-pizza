@@ -413,21 +413,30 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               <>
                 <div className="fixed inset-0 z-40" onClick={() => { setShowActionDropdown(false); setShowTagSubmenu(null); setCustomTag(''); }} />
                 <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[180px]">
-                  <button
-                    onClick={async () => {
-                      setShowActionDropdown(false);
-                      setBulkLoading(true);
-                      try {
-                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'approved');
-                        setSelectedIds(new Set());
-                        onBulkAction?.();
-                      } catch (err) { console.error('Bulk approve failed', err); }
-                      setBulkLoading(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
-                  >
-                    Approve
-                  </button>
+                  {(() => {
+                    const selectedEvents = events.filter(e => selectedIds.has(e.id));
+                    const allApproved = selectedEvents.length > 0 && selectedEvents.every(e => e.underbossStatus === 'approved');
+                    return (
+                      <button
+                        onClick={async () => {
+                          setShowActionDropdown(false);
+                          setBulkLoading(true);
+                          const newStatus = allApproved ? 'pending' : 'approved';
+                          try {
+                            await bulkUpdateUnderbossStatus(Array.from(selectedIds), newStatus);
+                            for (const id of selectedIds) {
+                              onEventUpdate?.(id, { underbossStatus: newStatus });
+                            }
+                            setSelectedIds(new Set());
+                          } catch (err) { console.error(`Bulk ${newStatus} failed`, err); }
+                          setBulkLoading(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                      >
+                        {allApproved ? 'Unapprove' : 'Approve'}
+                      </button>
+                    );
+                  })()}
                   <button
                     onClick={async () => {
                       setShowActionDropdown(false);
@@ -517,7 +526,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                 // Trigger flyer regen for affected events
                                 const affected = events.filter(e => selectedIds.has(e.id));
                                 triggerFlyerRegenForEvents(affected);
-                                onBulkAction?.();
                               } catch (err) { console.error('Add tag failed', err); }
                               setBulkLoading(false);
                             }}
@@ -552,7 +560,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                   // Trigger flyer regen for affected events
                                   const affected = events.filter(e2 => selectedIds.has(e2.id));
                                   triggerFlyerRegenForEvents(affected);
-                                  onBulkAction?.();
                                 } catch (err) { console.error('Add custom tag failed', err); }
                                 setBulkLoading(false);
                                 setCustomTag('');
@@ -602,7 +609,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                   // Trigger flyer regen for affected events (partner logo may have been removed)
                                   const affected = events.filter(e => selectedIds.has(e.id));
                                   triggerFlyerRegenForEvents(affected);
-                                  onBulkAction?.();
                                 } catch (err) { console.error('Remove tag failed', err); }
                                 setBulkLoading(false);
                               }}
