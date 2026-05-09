@@ -26,12 +26,24 @@ export function CheckInButton({
   const [showQR, setShowQR] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [localCheckedInAt, setLocalCheckedInAt] = useState<string | null>(checkedInAt);
+  const [showCheckedInToast, setShowCheckedInToast] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevCheckedInRef = useRef<string | null>(checkedInAt);
 
   // Sync prop changes
   useEffect(() => {
     setLocalCheckedInAt(checkedInAt);
   }, [checkedInAt]);
+
+  // Detect transition from not-checked-in to checked-in
+  useEffect(() => {
+    if (prevCheckedInRef.current === null && localCheckedInAt !== null) {
+      setShowCheckedInToast(true);
+      const timer = setTimeout(() => setShowCheckedInToast(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    prevCheckedInRef.current = localCheckedInAt;
+  }, [localCheckedInAt]);
 
   // Poll for check-in status while QR is shown (guest waiting to be vouched)
   const startPolling = useCallback(() => {
@@ -120,9 +132,15 @@ export function CheckInButton({
         >
           Checked In
         </button>
+        {showCheckedInToast && (
+          <p className="text-xs text-green-400 mt-1 text-center animate-pulse">
+            Now you can check in other guests!
+          </p>
+        )}
         {showScanner && (
           <CheckInScanner
             inviteCode={inviteCode}
+            currentGuestId={guestId}
             onVouchSuccess={handleVouchSuccess}
             onClose={() => setShowScanner(false)}
           />

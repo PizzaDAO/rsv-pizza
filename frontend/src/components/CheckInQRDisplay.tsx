@@ -10,7 +10,7 @@ interface CheckInQRDisplayProps {
 }
 
 export function CheckInQRDisplay({ inviteCode, guestId, guestName, onClose }: CheckInQRDisplayProps) {
-  const qrData = `checkin:${inviteCode}:${guestId}`;
+  const qrData = `https://rsv.pizza/checkin/${inviteCode}/${guestId}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`;
 
   return createPortal(
