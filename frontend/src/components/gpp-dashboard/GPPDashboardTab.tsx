@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getChecklist, seedChecklist } from '../../lib/api';
+import { getChecklist, seedChecklist, updateUnderbossStatus } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
@@ -17,6 +17,7 @@ export const GPPDashboardTab: React.FC = () => {
   const [hostsExpanded, setHostsExpanded] = useState(false);
   const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -193,16 +194,71 @@ export const GPPDashboardTab: React.FC = () => {
             <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
           </div>
         )}
-        {party.underbossStatus === 'rejected' && (
-          <div className="card p-4 text-center border border-red-500/30">
-            <div className="flex items-center justify-center gap-1.5 text-red-400">
-              <X size={20} />
-              <span className="text-sm font-medium">Not Approved</span>
-            </div>
-            <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
-          </div>
-        )}
       </div>
+
+      {/* Rejected status callout */}
+      {party.underbossStatus === 'rejected' && (
+        <div className="card p-6 border border-amber-500/30 bg-amber-500/5">
+          <p className="text-sm text-theme-text mb-4">
+            We can't support your event financially this year, but we're happy to list your event on the site!
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateUnderbossStatus(party.id, 'listed');
+                  window.location.reload();
+                } catch (err) {
+                  console.error('Failed to update status:', err);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : null}
+              List My Event
+            </button>
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateUnderbossStatus(party.id, 'hidden');
+                  window.location.reload();
+                } catch (err) {
+                  console.error('Failed to update status:', err);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="btn-secondary flex items-center gap-2"
+            >
+              Maybe Next Year
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden status callout */}
+      {party.underbossStatus === 'hidden' && (
+        <div className="card p-6 border border-theme-stroke">
+          <p className="text-sm text-theme-text-muted">
+            Your event is currently not listed on the site.
+          </p>
+        </div>
+      )}
+
+      {/* Listed status callout */}
+      {party.underbossStatus === 'listed' && (
+        <div className="card p-6 border border-green-500/30 bg-green-500/5">
+          <p className="text-sm text-green-400">
+            Your event is listed as a Community event on the site.
+          </p>
+        </div>
+      )}
 
       {/* Checklist progress */}
       <div className="card p-6">

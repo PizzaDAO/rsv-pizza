@@ -167,6 +167,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         progressIncludes.every((key) => {
           if (key === 'approved') return e.underbossStatus === 'approved';
           if (key === 'rejected') return e.underbossStatus === 'rejected';
+          if (key === 'hidden') return e.underbossStatus === 'hidden';
+          if (key === 'listed') return e.underbossStatus === 'listed';
           return e.progress[key as keyof typeof e.progress];
         })
       );
@@ -178,6 +180,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         progressExcludes.every((key) => {
           if (key === 'approved') return e.underbossStatus !== 'approved';
           if (key === 'rejected') return e.underbossStatus !== 'rejected';
+          if (key === 'hidden') return e.underbossStatus !== 'hidden';
+          if (key === 'listed') return e.underbossStatus !== 'listed';
           return !e.progress[key as keyof typeof e.progress];
         })
       );
@@ -310,6 +314,20 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           label="Rejected"
           state={getFilterState('rejected')}
           onToggle={(newState) => setFilterState('rejected', newState)}
+        />
+
+        {/* Hidden filter */}
+        <FilterPill
+          label="Hidden"
+          state={getFilterState('hidden')}
+          onToggle={(newState) => setFilterState('hidden', newState)}
+        />
+
+        {/* Listed filter */}
+        <FilterPill
+          label="Listed"
+          state={getFilterState('listed')}
+          onToggle={(newState) => setFilterState('listed', newState)}
         />
 
         {/* Country filter -- only when showRegion */}
@@ -451,6 +469,21 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
                   >
                     Reject
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowActionDropdown(false);
+                      setBulkLoading(true);
+                      try {
+                        await bulkUpdateUnderbossStatus(Array.from(selectedIds), 'hidden');
+                        setSelectedIds(new Set());
+                        onBulkAction?.();
+                      } catch (err) { console.error('Bulk hide failed', err); }
+                      setBulkLoading(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
+                  >
+                    Hide
                   </button>
                   <button
                     onClick={() => {

@@ -412,6 +412,12 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
             {event.underbossStatus === 'rejected' && (
               <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title="Rejected" />
             )}
+            {event.underbossStatus === 'hidden' && (
+              <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title="Hidden" />
+            )}
+            {event.underbossStatus === 'listed' && (
+              <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title="Community Listed" />
+            )}
             <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
             {eventUrl && (
               <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0">

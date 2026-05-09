@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza } from 'lucide-react';
+import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
 
@@ -216,10 +216,16 @@ export const PartyHeader: React.FC = () => {
                       Approved
                     </span>
                   )}
-                  {party.eventType === 'gpp' && party.underbossStatus === 'rejected' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-                      <X size={12} />
-                      Not Approved
+                  {party.eventType === 'gpp' && party.underbossStatus === 'listed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      <Globe size={12} />
+                      Community Event
+                    </span>
+                  )}
+                  {party.eventType === 'gpp' && party.underbossStatus === 'hidden' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      <EyeOff size={12} />
+                      Not Listed
                     </span>
                   )}
                 </div>

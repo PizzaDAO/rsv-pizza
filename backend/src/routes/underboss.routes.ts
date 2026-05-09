@@ -605,7 +605,7 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
     if (!Array.isArray(partyIds) || partyIds.length === 0) {
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    const validStatuses = ['pending', 'approved', 'rejected'];
+    const validStatuses = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
     if (!validStatuses.includes(status)) {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
@@ -776,23 +776,72 @@ router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, a
 });
 
 // PATCH /api/underboss/event/:partyId/status - Update underboss status
-router.patch('/event/:partyId/status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+// Allows both underbosses (all statuses) and event owners (listed/hidden only from rejected/listed/hidden)
+router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
     const { status } = req.body;
+    const email = req.userEmail;
 
-    const validStatuses = ['pending', 'approved', 'rejected'];
-    if (!validStatuses.includes(status)) {
-      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
+    if (!email) {
+      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
     }
 
-    const party = await prisma.party.update({
+    const allValidStatuses = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
+    if (!allValidStatuses.includes(status)) {
+      throw new AppError(`status must be one of: ${allValidStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
+    // Check if user is an underboss or admin
+    const isAdminUser = await isAdmin(email);
+    const underboss = isAdminUser ? { id: 'admin' } : await prisma.underboss.findFirst({
+      where: { email: email.toLowerCase(), isActive: true },
+      select: { id: true },
+    });
+
+    if (underboss) {
+      // Underboss/admin: allow all statuses
+      const party = await prisma.party.update({
+        where: { id: partyId },
+        data: { underbossStatus: status },
+        select: { id: true, underbossStatus: true },
+      });
+      return res.json({ party });
+    }
+
+    // Not an underboss — check if user is the event owner
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, underbossStatus: true, user: { select: { email: true } } },
+    });
+
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    if (party.user?.email?.toLowerCase() !== email.toLowerCase()) {
+      throw new AppError('Not authorized', 403, 'FORBIDDEN');
+    }
+
+    // Event owner: only allow listed/hidden transitions from rejected/listed/hidden
+    const ownerAllowedStatuses = ['listed', 'hidden'];
+    const ownerAllowedFromStatuses = ['rejected', 'listed', 'hidden'];
+
+    if (!ownerAllowedStatuses.includes(status)) {
+      throw new AppError('Event owners can only set status to listed or hidden', 403, 'FORBIDDEN');
+    }
+
+    if (!ownerAllowedFromStatuses.includes(party.underbossStatus || '')) {
+      throw new AppError('Cannot change status from current state', 403, 'FORBIDDEN');
+    }
+
+    const updated = await prisma.party.update({
       where: { id: partyId },
       data: { underbossStatus: status },
       select: { id: true, underbossStatus: true },
     });
 
-    res.json({ party });
+    res.json({ party: updated });
   } catch (error) {
     next(error);
   }
