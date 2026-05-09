@@ -325,7 +325,7 @@ export function RSVPPage() {
               />
             );
           })()}
-          {!form.alreadyRegistered && !form.pendingApproval && party?.date && (
+          {party?.date && (
             <div className="relative inline-block mt-2 mb-4">
               <button
                 ref={calendarBtnRef}
