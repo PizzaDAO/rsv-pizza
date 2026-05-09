@@ -3,6 +3,8 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 
+const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
+
 const router = Router();
 
 // GET /api/events/:slug - Get public event details with host profile (public)
@@ -228,7 +230,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       const pizzaCoHost = sanitizedCoHosts.find((h: any) => h.name === 'PizzaDAO');
       hostProfile = {
         name: 'PizzaDAO',
-        avatar_url: pizzaCoHost?.avatar_url || null,
+        avatar_url: pizzaCoHost?.avatar_url || PIZZADAO_AVATAR_URL,
         website: pizzaCoHost?.website || 'https://pizzadao.org',
         twitter: pizzaCoHost?.twitter || 'pizza_dao',
         instagram: pizzaCoHost?.instagram || 'pizza_dao',
