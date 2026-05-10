@@ -25,6 +25,7 @@ import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
+import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -46,6 +47,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/new" element={<NewEventPage />} />
             <Route path="/gpp" element={<GPPLandingPage />} />
+            <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/parties" element={<PartiesListPage />} />
