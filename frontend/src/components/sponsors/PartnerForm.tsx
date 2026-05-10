@@ -520,12 +520,20 @@ export function PartnerForm({
       )}
 
       {/* Contact Info — CRM + Intake */}
-      {(isCrm || isIntake) && (
+      {(isCrm || isIntake) && (() => {
+        // Disable contact fields for underboss-added sponsors when backend has stripped the data
+        const contactFieldsDisabled = !!(isCrm && sponsor?.addedByUnderboss && !sponsor?.contactEmail);
+        return (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
             Contact Info
           </h3>
+          {contactFieldsDisabled && (
+            <p className="text-xs text-purple-400 flex items-center gap-1">
+              <Globe size={12} /> Managed by global partner admin
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {isCrm && (
               <IconInput
@@ -542,6 +550,7 @@ export function PartnerForm({
               value={formData.contactName}
               onChange={e => handleChange('contactName', e.target.value)}
               placeholder="Contact Name"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               icon={Mail}
@@ -549,6 +558,7 @@ export function PartnerForm({
               value={formData.contactEmail}
               onChange={e => handleChange('contactEmail', e.target.value)}
               placeholder="Email"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               icon={Phone}
@@ -556,6 +566,7 @@ export function PartnerForm({
               value={formData.contactPhone}
               onChange={e => handleChange('contactPhone', e.target.value)}
               placeholder="Phone"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
@@ -563,6 +574,7 @@ export function PartnerForm({
               value={formData.contactTwitter}
               onChange={e => handleChange('contactTwitter', e.target.value)}
               placeholder="Contact X Handle"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               customIcon={<TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
@@ -573,7 +585,8 @@ export function PartnerForm({
             />
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Pipeline — CRM mode only */}
       {isCrm && (

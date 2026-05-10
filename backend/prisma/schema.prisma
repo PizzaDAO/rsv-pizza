@@ -895,6 +895,9 @@ model Sponsor {
   intakeSubmittedAt DateTime? @map("intake_submitted_at") @db.Timestamptz
   sponsorMessage    String?   @map("sponsor_message")
 
+  // Whether this sponsor was bulk-added by an underboss (contact info hidden from hosts)
+  addedByUnderboss Boolean @default(false) @map("added_by_underboss")
+
   // Display order (for flyer logo row)
   sortOrder Int @default(0) @map("sort_order")
 

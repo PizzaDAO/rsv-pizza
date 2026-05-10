@@ -139,6 +139,7 @@ export async function addPartnerToParty(
           contactEmail: sponsorUser.email,
           status: 'yes',
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+          addedByUnderboss: true,
         },
       });
       sponsorId = created.id;
@@ -300,6 +301,7 @@ export async function syncAutoSponsorsToAllEvents(
           contactEmail: sponsorUser.email,
           status: 'yes',
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+          addedByUnderboss: true,
         },
       });
       sponsorId = created.id;
