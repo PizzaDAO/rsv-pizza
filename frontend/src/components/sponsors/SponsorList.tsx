@@ -27,7 +27,7 @@ const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgCol
   yes: { label: 'Confirmed', color: 'text-green-300', bgColor: 'bg-green-500' },
   billed: { label: 'Billed', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
   paid: { label: 'Paid', color: 'text-blue-300', bgColor: 'bg-blue-500' },
-  stuck: { label: 'Stuck', color: 'text-white', bgColor: 'bg-red-500' },
+  stuck: { label: 'Stuck', color: 'text-black', bgColor: 'bg-red-500' },
   alum: { label: 'Alum', color: 'text-purple-300', bgColor: 'bg-purple-500' },
   skip: { label: 'Skip', color: 'text-gray-400', bgColor: 'bg-gray-700' },
 };
