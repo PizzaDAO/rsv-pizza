@@ -1127,6 +1127,17 @@ model Admin {
   @@map("admins")
 }
 
+model GraphicsAdmin {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("graphics_admins")
+}
+
 // ============================================
 // Sponsor Dashboard Models
 // ============================================

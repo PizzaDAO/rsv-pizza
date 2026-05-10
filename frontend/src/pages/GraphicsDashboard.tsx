@@ -35,7 +35,7 @@ export function GraphicsDashboard() {
     try {
       const me = await fetchUnderbossMe();
       setMeData(me);
-      if (!me.isUnderboss && !me.isAdmin) {
+      if (!me.isUnderboss && !me.isAdmin && !me.isGraphicsAdmin) {
         setLoading(false);
         return;
       }
