@@ -1,0 +1,26 @@
+{
+  "title": "来宾签到",
+  "loading": "正在签到...",
+  "success": {
+    "title": "签到成功！",
+    "backToDashboard": "返回活动面板"
+  },
+  "alreadyCheckedIn": {
+    "title": "已签到",
+    "checkedInAt": "签到时间：{{time}}"
+  },
+  "unauthorized": {
+    "title": "未授权",
+    "message": "您无权为此活动签到来宾。只有主办方和联合主办方可以签到来宾。",
+    "goHome": "返回首页"
+  },
+  "notFound": {
+    "title": "未找到",
+    "goHome": "返回首页"
+  },
+  "error": {
+    "title": "签到失败",
+    "tryAgain": "重试",
+    "goHome": "返回首页"
+  }
+}

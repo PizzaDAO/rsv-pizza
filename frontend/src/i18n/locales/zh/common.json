@@ -1,0 +1,28 @@
+{
+  "header": {
+    "logIn": "登录 / 注册"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "pt": "PT",
+    "zh": "中文"
+  },
+  "buttons": {
+    "close": "关闭",
+    "back": "返回",
+    "next": "下一步",
+    "continue": "继续",
+    "submit": "提交",
+    "save": "保存",
+    "cancel": "取消",
+    "clear": "清除",
+    "connect": "连接"
+  },
+  "errors": {
+    "partyNotFound": "未找到派对",
+    "partyNotFoundDesc": "未找到派对。邀请链接可能无效或已过期。",
+    "incorrectPassword": "密码错误，请重试。",
+    "invalidWallet": "请输入有效地址 (0x...) 或 ENS 名称 (.eth)"
+  }
+}

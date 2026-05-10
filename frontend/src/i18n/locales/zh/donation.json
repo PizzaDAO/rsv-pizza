@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "进行捐赠",
+    "buyPizzaFor": "为 {{recipient}} 购买披萨",
+    "buyPizzaForEvent": "为 {{eventName}} 购买披萨",
+    "donateTitle": "捐赠",
+    "supportingRecipient": "支持 {{recipient}}",
+    "supportingEvent": "支持 {{eventName}}",
+    "defaultMessage": "您愿意捐款帮助举办此活动吗？",
+    "donorCount_one": "{{count}} 人已捐赠",
+    "donorCount_other": "{{count}} 人已捐赠",
+    "raised": "已筹集 {{amount}}",
+    "goal": "目标：${{amount}}",
+    "recentSupporters": "最近的支持者：",
+    "anonymous": "匿名",
+    "makeADonation": "进行捐赠",
+    "back": "返回"
+  },
+  "form": {
+    "payWithCard": "使用银行卡或钱包支付",
+    "cardSubtitle": "信用卡/借记卡、Apple Pay、Google Pay 等",
+    "crypto": "加密货币",
+    "cryptoSubtitle": "ETH、USDC 或其他代币",
+    "cancel": "取消",
+    "backToPaymentOptions": "返回支付选项",
+    "customAmount": "自定义金额",
+    "minimumDonation": "最低捐赠 $0.50",
+    "donate": "捐赠",
+    "donateAmount": "捐赠 ${{amount}}",
+    "loading": "加载中...",
+    "processing": "处理中...",
+    "paymentFailed": "支付失败",
+    "unexpectedError": "发生意外错误",
+    "failedToInitialize": "初始化支付失败，请重试。",
+    "thankYou": "谢谢！",
+    "donationReceived": "您的 ${{amount}} 捐赠已收到。",
+    "back": "返回"
+  },
+  "calendar": {
+    "addToCalendar": "添加到日历",
+    "googleCalendar": "Google 日历",
+    "appleCalendar": "Apple 日历",
+    "outlook": "Outlook"
+  }
+}

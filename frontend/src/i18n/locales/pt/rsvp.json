@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "RSVP para {{eventName}}",
+    "editTitle": "Editar RSVP",
+    "stepIndicator": "Etapa 1 de 2",
+    "namePlaceholder": "Nome",
+    "emailPlaceholder": "Email",
+    "walletPlaceholder": "Endereço da Carteira ou ENS (ex. vitalik.eth)",
+    "roleQuestion": "Com qual tartaruga ninja você mais se identifica?",
+    "mailingList": "Inscrever-se na lista de emails do PizzaDAO",
+    "swcJoin": "Participar do Stand with Crypto",
+    "swcNotify": "Notifique-me sobre futuros eventos Stand With Crypto.",
+    "ethconfDiscount": "Envie-me um desconto ETHConf",
+    "next": "Próximo"
+  },
+  "step2": {
+    "title": "Pedidos de Pizza",
+    "editTitle": "Editar Preferências de Pizza",
+    "stepIndicator": "Etapa 2 de 2",
+    "diet": "Dieta",
+    "toppings": "Coberturas",
+    "drinkPreferences": "Preferências de Bebida",
+    "favoritePizzerias": "Pizzarias Favoritas",
+    "clickToRank": "(clique para classificar 1-3)",
+    "suggestPizzeria": "Sugerir uma Pizzaria",
+    "suggestPizzeriaPrompt": "Sugerir uma pizzaria",
+    "searchPizzeria": "Buscar uma pizzaria...",
+    "saveToProfile": "Salvar no perfil",
+    "saveToProfileDesc": "Lembrar minhas preferências para eventos futuros",
+    "back": "Voltar",
+    "submit": "Confirmar Presença",
+    "editSubmit": "Editar RSVP",
+    "submitting": "Enviando...",
+    "saving": "Salvando..."
+  },
+  "success": {
+    "seeYou": "Nos vemos em {{eventName}}!",
+    "alreadyRegistered": "Você já está registrado!",
+    "alreadyRegisteredDesc": "Este email já foi usado para confirmar presença neste evento.",
+    "rsvpSubmitted": "RSVP Enviado!",
+    "pendingApproval": "Seu RSVP está aguardando aprovação do organizador. Você receberá um email com seu QR code de check-in após a aprovação.",
+    "rsvpUpdated": "RSVP Atualizado",
+    "preferenceSaved": "Suas preferências foram salvas.",
+    "waitlisted": "Você está na Lista de Espera!",
+    "waitlistedDesc": "Este evento está lotado, mas você é o #{{position}} na lista de espera! Notificaremos se uma vaga abrir.",
+    "backToEvent": "Voltar ao Evento"
+  },
+  "password": {
+    "title": "Senha Necessária",
+    "subtitle": "Este evento é protegido por senha",
+    "placeholder": "Senha do Evento",
+    "continue": "Continuar"
+  },
+  "donation": {
+    "donate": "Doar",
+    "defaultMessage": "Faça uma doação para ajudar a tornar este evento possível",
+    "makeADonation": "Fazer uma Doação",
+    "buyPizzaFor": "Comprar Pizza para {{recipient}}",
+    "buyPizzaForEvent": "Comprar Pizza para este evento",
+    "buyPizzaForEventName": "Comprar Pizza para {{eventName}}",
+    "thanksForSupport": "Obrigado pelo seu apoio!"
+  },
+  "nft": {
+    "minting": "Cunhando seu NFT...",
+    "minted": "NFT Cunhado!",
+    "alreadyClaimed": "NFT Já Resgatado!",
+    "viewOnOpenSea": "Ver no OpenSea",
+    "viewTransaction": "Ver Transação",
+    "mintFailed": "Falha na cunhagem do NFT"
+  },
+  "share": {
+    "tellFriends": "Conte aos seus amigos sobre a festa!",
+    "shareOnX": "Compartilhar no X",
+    "x": "X",
+    "download": "Baixar",
+    "save": "Salvar",
+    "copyLink": "Copiar Link",
+    "link": "Link",
+    "copied": "Copiado!"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "Ao marcar a caixa, você consente em se tornar membro da Stand with Crypto Alliance, Inc., um movimento popular para capacitar consumidores, construtores e apoiadores de cripto a se fazerem ouvir. Ao marcar a caixa e concordar em se tornar membro, você entende que a SWC e seus fornecedores podem coletar e usar suas informações pessoais. Para saber mais, visite",
+    "privacyPolicy": "Política de Privacidade SWC",
+    "termsConditions": "Termos e Condições"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Canadá",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Stand with Crypto sobre futuros eventos e esforços de advocacia no Canadá. Você entende que a SWC e seus fornecedores podem coletar e usar suas informações pessoais. Para saber mais, visite",
+    "privacyPolicy": "Política de Privacidade SWC Canadá",
+    "termsOfService": "Termos de Serviço"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Austrália",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Stand with Crypto sobre futuros eventos e esforços de advocacia na Austrália. Você entende que a SWC e seus fornecedores podem coletar e usar suas informações pessoais. Para saber mais, visite",
+    "privacyPolicy": "Política de Privacidade SWC Austrália",
+    "termsOfService": "Termos de Serviço"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto UE",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Stand with Crypto sobre futuros eventos e esforços de advocacia na Europa. Você entende que a SWC e seus fornecedores podem coletar e usar suas informações pessoais. Para saber mais, visite",
+    "privacyPolicy": "Política de Privacidade SWC UE",
+    "termsOfService": "Termos de Serviço"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto Reino Unido",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Stand with Crypto sobre futuros eventos e esforços de advocacia no Reino Unido. Você entende que a SWC e seus fornecedores podem coletar e usar suas informações pessoais. Para saber mais, visite",
+    "privacyPolicy": "Política de Privacidade SWC Reino Unido",
+    "termsOfService": "Termos de Serviço"
+  },
+  "roles": {
+    "Organizer": "Organizador",
+    "Builder": "Construtor",
+    "Creative": "Criativo",
+    "Connector": "Conector",
+    "Storyteller": "Contador de Histórias",
+    "Counsel": "Conselheiro",
+    "Ground Support": "Apoio Local"
+  },
+  "dietary": {
+    "Vegetarian": "Vegetariano",
+    "Vegan": "Vegano",
+    "Gluten-Free": "Sem Glúten",
+    "Dairy-Free": "Sem Laticínios"
+  }
+}

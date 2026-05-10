@@ -4,7 +4,9 @@
   },
   "languageSwitcher": {
     "en": "EN",
-    "es": "ES"
+    "es": "ES",
+    "pt": "PT",
+    "zh": "中文"
   },
   "buttons": {
     "close": "Close",

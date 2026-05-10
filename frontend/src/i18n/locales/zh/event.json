@@ -1,0 +1,72 @@
+{
+  "notFound": {
+    "title": "未找到活动",
+    "goHome": "返回首页"
+  },
+  "password": {
+    "title": "需要密码",
+    "placeholder": "密码",
+    "verifying": "验证中...",
+    "continue": "继续",
+    "alreadyRsvpd": "已确认参加？请登录",
+    "or": "或",
+    "postToGetIn": "发帖进入",
+    "pasteTweetUrl": "粘贴您的推文链接以解锁活动",
+    "verifyUnlock": "验证并解锁"
+  },
+  "editPassword": {
+    "title": "需要主办方密码",
+    "subtitle": "输入您创建此活动时设置的密码以进行编辑。",
+    "label": "密码",
+    "placeholder": "输入密码",
+    "cancel": "取消",
+    "continue": "继续"
+  },
+  "hostDashboard": "主办方面板",
+  "donate": "捐赠",
+  "buyPizzaFor": "为 {{recipient}} 购买披萨",
+  "buyPizzaForEvent": "为 {{eventName}} 购买披萨",
+  "supportingRecipient": "支持 {{recipient}}",
+  "supportingEvent": "支持 {{eventName}}",
+  "guest_one": "{{count}} 位来宾",
+  "guest_other": "{{count}} 位来宾",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "（候补名单开放）",
+  "spotsLeft": "（剩余 {{count}} 个名额）",
+  "rsvp": "确认参加",
+  "editRsvp": "编辑 RSVP",
+  "rsvpsClosed": "此活动已停止接受报名",
+  "viewPhotos": "查看照片 ({{count}})",
+  "sharePhotos": "分享照片",
+  "pizzadaoDescription": "是一个国际披萨合作社，正在将披萨行业带入链上。我们每年举办全球披萨派对，每月安排会议活动，并以披萨支持其他组织者的聚会。",
+  "dateTbd": "日期待定",
+  "partiesList": {
+    "title": "所有派对",
+    "newParty": "+ 新派对",
+    "noParties": "未找到派对。",
+    "createFirst": "创建您的第一个派对",
+    "host": "主办方：{{name}}",
+    "closed": "已结束",
+    "created": "创建时间：",
+    "guests": "{{count}} 位来宾",
+    "loading": "加载派对中..."
+  },
+  "report": {
+    "notFound": "未找到报告",
+    "notFoundDesc": "此报告可能已取消发布或链接无效。",
+    "passwordProtected": "密码保护",
+    "enterPassword": "输入密码以查看此报告。",
+    "enterPasswordPlaceholder": "输入密码",
+    "incorrectPassword": "密码错误",
+    "viewReport": "查看报告"
+  },
+  "venueReport": {
+    "notFound": "未找到场地报告",
+    "notFoundDesc": "此场地报告可能已取消发布或链接无效。",
+    "passwordProtected": "密码保护",
+    "enterPassword": "输入密码以查看此场地报告。",
+    "enterPasswordPlaceholder": "输入密码",
+    "incorrectPassword": "密码错误",
+    "viewReport": "查看报告"
+  }
+}

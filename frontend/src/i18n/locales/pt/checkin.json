@@ -1,0 +1,26 @@
+{
+  "title": "Check-in de Convidados",
+  "loading": "Fazendo check-in do convidado...",
+  "success": {
+    "title": "Check-in Realizado!",
+    "backToDashboard": "Voltar ao Painel do Evento"
+  },
+  "alreadyCheckedIn": {
+    "title": "Já Realizou Check-in",
+    "checkedInAt": "Check-in realizado às {{time}}"
+  },
+  "unauthorized": {
+    "title": "Não Autorizado",
+    "message": "Você não está autorizado a fazer check-in de convidados neste evento. Apenas organizadores e co-organizadores podem fazer check-in.",
+    "goHome": "Ir para Início"
+  },
+  "notFound": {
+    "title": "Não Encontrado",
+    "goHome": "Ir para Início"
+  },
+  "error": {
+    "title": "Falha no Check-in",
+    "tryAgain": "Tentar Novamente",
+    "goHome": "Ir para Início"
+  }
+}

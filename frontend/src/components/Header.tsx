@@ -1,9 +1,16 @@
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, LogIn, Globe } from 'lucide-react';
+import { User, LogIn, Globe, ChevronDown } from 'lucide-react';
 import { LoginModal } from './LoginModal';
 import { useTranslation } from 'react-i18next';
+
+const LANGUAGES = [
+  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'es', label: 'ES', name: 'Español' },
+  { code: 'pt', label: 'PT', name: 'Português' },
+  { code: 'zh', label: '中文', name: '中文' },
+];
 
 interface HeaderProps {
   rightContent?: ReactNode;
@@ -18,18 +25,28 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, loading } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   const { t, i18n } = useTranslation('common');
 
   const bgClass = variant === 'transparent'
     ? 'bg-theme-bg'
     : 'bg-theme-header';
 
-  const currentLang = i18n.language?.startsWith('es') ? 'es' : 'en';
+  const currentLang = LANGUAGES.find(l => i18n.language?.startsWith(l.code)) || LANGUAGES[0];
 
-  const toggleLanguage = () => {
-    const newLang = currentLang === 'en' ? 'es' : 'en';
-    i18n.changeLanguage(newLang);
-  };
+  // Close language menu on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangMenuOpen(false);
+      }
+    }
+    if (langMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [langMenuOpen]);
 
   return (
     <header className={`site-header border-b border-theme-stroke ${bgClass}`}>
@@ -52,16 +69,37 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3">
           {rightContent}
           {/* Language Switcher */}
-          <button
-            onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
-            title={currentLang === 'en' ? 'Cambiar a Espanol' : 'Switch to English'}
-          >
-            <Globe size={14} />
-            <span className={currentLang === 'en' ? 'font-bold text-theme-text' : ''}>EN</span>
-            <span className="text-theme-text-muted">/</span>
-            <span className={currentLang === 'es' ? 'font-bold text-theme-text' : ''}>ES</span>
-          </button>
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => setLangMenuOpen(prev => !prev)}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
+            >
+              <Globe size={14} />
+              <span className="font-bold text-theme-text">{currentLang.label}</span>
+              <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {langMenuOpen && (
+              <div className="absolute right-0 mt-1 z-50 card shadow-lg overflow-hidden !p-0 min-w-[120px]">
+                {LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      i18n.changeLanguage(lang.code);
+                      setLangMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                      currentLang.code === lang.code
+                        ? 'bg-[#ff393a]/10 text-theme-text font-bold'
+                        : 'text-theme-text-secondary hover:bg-theme-surface-hover hover:text-theme-text'
+                    }`}
+                  >
+                    <span>{lang.label}</span>
+                    <span className="text-xs text-theme-text-muted">{lang.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {!loading && (
             user ? (
               <Link

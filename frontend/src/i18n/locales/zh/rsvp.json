@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "确认参加 {{eventName}}",
+    "editTitle": "编辑 RSVP",
+    "stepIndicator": "第 1 步，共 2 步",
+    "namePlaceholder": "姓名",
+    "emailPlaceholder": "电子邮件",
+    "walletPlaceholder": "钱包地址或 ENS（例如 vitalik.eth）",
+    "roleQuestion": "你最像哪只忍者龟？",
+    "mailingList": "订阅 PizzaDAO 邮件列表",
+    "swcJoin": "加入 Stand with Crypto",
+    "swcNotify": "通知我未来的 Stand With Crypto 活动。",
+    "ethconfDiscount": "给我发送 ETHConf 折扣",
+    "next": "下一步"
+  },
+  "step2": {
+    "title": "披萨偏好",
+    "editTitle": "编辑披萨偏好",
+    "stepIndicator": "第 2 步，共 2 步",
+    "diet": "饮食",
+    "toppings": "配料",
+    "drinkPreferences": "饮料偏好",
+    "favoritePizzerias": "最爱的披萨店",
+    "clickToRank": "（点击排名 1-3）",
+    "suggestPizzeria": "推荐一家披萨店",
+    "suggestPizzeriaPrompt": "推荐一家披萨店",
+    "searchPizzeria": "搜索披萨店...",
+    "saveToProfile": "保存到个人资料",
+    "saveToProfileDesc": "为未来活动记住我的偏好",
+    "back": "返回",
+    "submit": "确认参加",
+    "editSubmit": "编辑 RSVP",
+    "submitting": "提交中...",
+    "saving": "保存中..."
+  },
+  "success": {
+    "seeYou": "{{eventName}} 见！",
+    "alreadyRegistered": "您已注册！",
+    "alreadyRegisteredDesc": "此邮箱已用于确认参加此活动。",
+    "rsvpSubmitted": "RSVP 已提交！",
+    "pendingApproval": "您的 RSVP 正在等待主办方批准。批准后，您将收到包含签到二维码的邮件。",
+    "rsvpUpdated": "RSVP 已更新",
+    "preferenceSaved": "您的偏好已保存。",
+    "waitlisted": "您已加入候补名单！",
+    "waitlistedDesc": "此活动已满员，但您排在候补名单第 {{position}} 位！如有空位，我们会通知您。",
+    "backToEvent": "返回活动"
+  },
+  "password": {
+    "title": "需要密码",
+    "subtitle": "此活动受密码保护",
+    "placeholder": "活动密码",
+    "continue": "继续"
+  },
+  "donation": {
+    "donate": "捐赠",
+    "defaultMessage": "捐款帮助举办此活动",
+    "makeADonation": "进行捐赠",
+    "buyPizzaFor": "为 {{recipient}} 购买披萨",
+    "buyPizzaForEvent": "为此活动购买披萨",
+    "buyPizzaForEventName": "为 {{eventName}} 购买披萨",
+    "thanksForSupport": "感谢您的支持！"
+  },
+  "nft": {
+    "minting": "正在铸造您的 NFT...",
+    "minted": "NFT 已铸造！",
+    "alreadyClaimed": "NFT 已领取！",
+    "viewOnOpenSea": "在 OpenSea 查看",
+    "viewTransaction": "查看交易",
+    "mintFailed": "NFT 铸造失败"
+  },
+  "share": {
+    "tellFriends": "告诉朋友们这个派对！",
+    "shareOnX": "分享到 X",
+    "x": "X",
+    "download": "下载",
+    "save": "保存",
+    "copyLink": "复制链接",
+    "link": "链接",
+    "copied": "已复制！"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "勾选此框即表示您同意成为 Stand with Crypto Alliance, Inc. 的成员，这是一个赋予加密消费者、建设者和支持者发声权利的草根运动。勾选此框并同意成为成员即表示您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 隐私政策",
+    "termsConditions": "条款与条件"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto 加拿大",
+    "description": "勾选此框即表示您同意接收 Stand with Crypto 关于加拿大未来活动和倡导工作的通讯。您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 加拿大隐私政策",
+    "termsOfService": "服务条款"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto 澳大利亚",
+    "description": "勾选此框即表示您同意接收 Stand with Crypto 关于澳大利亚未来活动和倡导工作的通讯。您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 澳大利亚隐私政策",
+    "termsOfService": "服务条款"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto 欧盟",
+    "description": "勾选此框即表示您同意接收 Stand with Crypto 关于欧洲未来活动和倡导工作的通讯。您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 欧盟隐私政策",
+    "termsOfService": "服务条款"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto 英国",
+    "description": "勾选此框即表示您同意接收 Stand with Crypto 关于英国未来活动和倡导工作的通讯。您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 英国隐私政策",
+    "termsOfService": "服务条款"
+  },
+  "roles": {
+    "Organizer": "组织者",
+    "Builder": "建设者",
+    "Creative": "创意者",
+    "Connector": "连接者",
+    "Storyteller": "故事讲述者",
+    "Counsel": "顾问",
+    "Ground Support": "后勤支持"
+  },
+  "dietary": {
+    "Vegetarian": "素食",
+    "Vegan": "纯素",
+    "Gluten-Free": "无麸质",
+    "Dairy-Free": "无乳制品"
+  }
+}

@@ -24,6 +24,28 @@ import esCheckin from './locales/es/checkin.json';
 import esHost from './locales/es/host.json';
 import esAdmin from './locales/es/admin.json';
 import esPartner from './locales/es/partner.json';
+import ptCommon from './locales/pt/common.json';
+import ptRsvp from './locales/pt/rsvp.json';
+import ptEvent from './locales/pt/event.json';
+import ptAuth from './locales/pt/auth.json';
+import ptDonation from './locales/pt/donation.json';
+import ptGpp from './locales/pt/gpp.json';
+import ptAccount from './locales/pt/account.json';
+import ptCheckin from './locales/pt/checkin.json';
+import ptHost from './locales/pt/host.json';
+import ptAdmin from './locales/pt/admin.json';
+import ptPartner from './locales/pt/partner.json';
+import zhCommon from './locales/zh/common.json';
+import zhRsvp from './locales/zh/rsvp.json';
+import zhEvent from './locales/zh/event.json';
+import zhAuth from './locales/zh/auth.json';
+import zhDonation from './locales/zh/donation.json';
+import zhGpp from './locales/zh/gpp.json';
+import zhAccount from './locales/zh/account.json';
+import zhCheckin from './locales/zh/checkin.json';
+import zhHost from './locales/zh/host.json';
+import zhAdmin from './locales/zh/admin.json';
+import zhPartner from './locales/zh/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -55,6 +77,32 @@ i18n
         host: esHost,
         admin: esAdmin,
         partner: esPartner,
+      },
+      pt: {
+        common: ptCommon,
+        rsvp: ptRsvp,
+        event: ptEvent,
+        auth: ptAuth,
+        donation: ptDonation,
+        gpp: ptGpp,
+        account: ptAccount,
+        checkin: ptCheckin,
+        host: ptHost,
+        admin: ptAdmin,
+        partner: ptPartner,
+      },
+      zh: {
+        common: zhCommon,
+        rsvp: zhRsvp,
+        event: zhEvent,
+        auth: zhAuth,
+        donation: zhDonation,
+        gpp: zhGpp,
+        account: zhAccount,
+        checkin: zhCheckin,
+        host: zhHost,
+        admin: zhAdmin,
+        partner: zhPartner,
       },
     },
     fallbackLng: 'en',

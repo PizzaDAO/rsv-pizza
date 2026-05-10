@@ -1,0 +1,28 @@
+{
+  "header": {
+    "logIn": "Entrar / Cadastrar"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "pt": "PT",
+    "zh": "中文"
+  },
+  "buttons": {
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "continue": "Continuar",
+    "submit": "Enviar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "clear": "Limpar",
+    "connect": "Conectar"
+  },
+  "errors": {
+    "partyNotFound": "Festa Não Encontrada",
+    "partyNotFoundDesc": "Festa não encontrada. O link do convite pode ser inválido ou expirado.",
+    "incorrectPassword": "Senha incorreta. Tente novamente.",
+    "invalidWallet": "Insira um endereço válido (0x...) ou nome ENS (.eth)"
+  }
+}
