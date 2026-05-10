@@ -25,6 +25,15 @@ import { fetchSheetCities } from '../lib/cities';
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
 
+function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
+  return [...items].sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+}
+
 export function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isAdminUser, setIsAdminUser] = useState(false);
@@ -120,7 +129,7 @@ export function AdminPage() {
         setUnderbosses(ubList);
         setGppNftEnabled(nftSettings.nftEnabled);
         setGppNftChain(nftSettings.nftChain || 'base');
-        setChecklistItems(clDefaults.items);
+        setChecklistItems(sortByDueDate(clDefaults.items));
         setSponsorUsers(spList.sponsorUsers);
         if (gppDescData) {
           setGppDescription(gppDescData.defaultDescription);
@@ -299,7 +308,7 @@ export function AdminPage() {
       setChecklistEdits({});
       // Refresh
       const clDefaults = await fetchChecklistDefaults();
-      setChecklistItems(clDefaults.items);
+      setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to update' });
     } finally {
@@ -318,7 +327,7 @@ export function AdminPage() {
       setNewItemName('');
       setNewItemDate('');
       const clDefaults = await fetchChecklistDefaults();
-      setChecklistItems(clDefaults.items);
+      setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to add item' });
     } finally {
@@ -332,7 +341,7 @@ export function AdminPage() {
     if (result) {
       setChecklistMessage({ type: 'success', text: `Removed "${name}" from ${result.totalDeleted} events` });
       const clDefaults = await fetchChecklistDefaults();
-      if (clDefaults) setChecklistItems(clDefaults.items);
+      if (clDefaults) setChecklistItems(sortByDueDate(clDefaults.items));
     } else {
       setChecklistMessage({ type: 'error', text: `Failed to remove "${name}"` });
     }
