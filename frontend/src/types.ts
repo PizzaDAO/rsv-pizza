@@ -1072,6 +1072,14 @@ export interface AdminUser {
   createdAt: string;
 }
 
+export interface GraphicsAdmin {
+  id: string;
+  email: string;
+  name: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
 export interface UnderbossAdmin {
   id: string;
   name: string;

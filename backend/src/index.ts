@@ -34,6 +34,7 @@ import telegramRoutes from './routes/telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
@@ -99,6 +100,7 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/admin', adminRoutes);          // Admin management routes
+app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management

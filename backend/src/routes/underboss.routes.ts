@@ -244,12 +244,19 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
     }
 
+    // Check graphics admin status
+    const graphicsAdmin = await prisma.graphicsAdmin.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+    const isGraphicsAdmin = !!graphicsAdmin;
+
     // Check admin first
     const adminStatus = await isAdmin(email);
     if (adminStatus) {
       return res.json({
         isAdmin: true,
         isUnderboss: false,
+        isGraphicsAdmin,
         region: null,
         regions: ['__admin__'],
         name: 'Admin',
@@ -268,6 +275,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       return res.json({
         isAdmin: false,
         isUnderboss: true,
+        isGraphicsAdmin,
         region: underboss.region,
         regions,
         name: underboss.name,
@@ -279,6 +287,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
     return res.json({
       isAdmin: false,
       isUnderboss: false,
+      isGraphicsAdmin,
       region: null,
       regions: [],
       name: null,

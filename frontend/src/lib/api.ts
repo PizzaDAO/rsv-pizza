@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -2470,6 +2470,7 @@ export async function deleteChecklistDefault(name: string): Promise<{ success: b
 export interface UnderbossMeResponse {
   isAdmin: boolean;
   isUnderboss: boolean;
+  isGraphicsAdmin?: boolean;
   region: string | null;
   regions: string[];
   name: string | null;
@@ -3134,5 +3135,24 @@ export async function vouchForGuest(inviteCode: string, targetGuestId: string): 
     method: 'POST',
     body: { targetGuestId },
   });
+}
+
+// ── Graphics Admin Management ──
+
+export async function fetchGraphicsAdminList(): Promise<GraphicsAdmin[]> {
+  const data = await apiRequest<{ admins: GraphicsAdmin[] }>('/api/graphics-admin/list');
+  return data.admins;
+}
+
+export async function addGraphicsAdmin(data: { email: string; name?: string }): Promise<GraphicsAdmin> {
+  const result = await apiRequest<{ admin: GraphicsAdmin }>('/api/graphics-admin/add', {
+    method: 'POST',
+    body: data,
+  });
+  return result.admin;
+}
+
+export async function removeGraphicsAdmin(id: string): Promise<void> {
+  await apiRequest(`/api/graphics-admin/${id}`, { method: 'DELETE' });
 }
 
