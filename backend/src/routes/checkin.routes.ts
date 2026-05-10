@@ -185,6 +185,11 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('You must be an RSVPd guest to vouch for others', 403, 'NOT_A_GUEST');
     }
 
+    // Prevent self-vouch
+    if (voucher.id === targetGuestId) {
+      throw new AppError("You can't check yourself in!", 400, 'SELF_VOUCH');
+    }
+
     // Voucher must be checked in
     if (!voucher.checkedInAt) {
       throw new AppError('You must be checked in to vouch for others', 403, 'NOT_CHECKED_IN');
@@ -249,10 +254,33 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    // Verify user can check in guests for this party
-    const canCheck = await canUserCheckIn(party.id, req.userId, req.userEmail);
-    if (!canCheck) {
-      throw new AppError('You are not authorized to view check-in status for this event', 403, 'UNAUTHORIZED');
+    // Allow: hosts/co-hosts, the target guest themselves, or any checked-in guest
+    const isHostOrCohost = await canUserCheckIn(party.id, req.userId, req.userEmail);
+
+    let isTargetGuest = false;
+    let isCheckedInGuest = false;
+
+    if (!isHostOrCohost) {
+      // Check if caller is the target guest
+      const callerGuest = await prisma.guest.findFirst({
+        where: {
+          partyId: party.id,
+          email: req.userEmail?.toLowerCase(),
+        },
+        select: { id: true, checkedInAt: true },
+      });
+
+      if (callerGuest) {
+        if (callerGuest.id === guestId) {
+          isTargetGuest = true;
+        } else if (callerGuest.checkedInAt) {
+          isCheckedInGuest = true;
+        }
+      }
+
+      if (!isTargetGuest && !isCheckedInGuest) {
+        throw new AppError('You are not authorized to view check-in status for this event', 403, 'UNAUTHORIZED');
+      }
     }
 
     // Find the guest
@@ -277,6 +305,8 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
     res.json({
       guest,
       isCheckedIn: !!guest.checkedInAt,
+      callerIsTarget: isTargetGuest,
+      callerIsHost: isHostOrCohost,
     });
   } catch (error) {
     next(error);

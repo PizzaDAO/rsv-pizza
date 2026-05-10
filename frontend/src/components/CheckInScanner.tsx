@@ -6,11 +6,12 @@ import { vouchForGuest } from '../lib/api';
 
 interface CheckInScannerProps {
   inviteCode: string;
+  currentGuestId?: string;
   onVouchSuccess: (guestName: string) => void;
   onClose: () => void;
 }
 
-export function CheckInScanner({ inviteCode, onVouchSuccess, onClose }: CheckInScannerProps) {
+export function CheckInScanner({ inviteCode, currentGuestId, onVouchSuccess, onClose }: CheckInScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<string>('Starting camera...');
@@ -25,11 +26,21 @@ export function CheckInScanner({ inviteCode, onVouchSuccess, onClose }: CheckInS
     toastTimerRef.current = setTimeout(() => setToast(null), durationMs);
   }, []);
 
-  // Parse QR data: "checkin:{inviteCode}:{guestId}"
   const parseQR = useCallback((data: string): { inviteCode: string; guestId: string } | null => {
+    // Format 1: checkin:{inviteCode}:{guestId}  (legacy on-screen QR)
     const parts = data.split(':');
-    if (parts.length !== 3 || parts[0] !== 'checkin') return null;
-    return { inviteCode: parts[1], guestId: parts[2] };
+    if (parts.length === 3 && parts[0] === 'checkin') {
+      return { inviteCode: parts[1], guestId: parts[2] };
+    }
+    // Format 2: https://rsv.pizza/checkin/{inviteCode}/{guestId}  (email QR / unified)
+    try {
+      const url = new URL(data);
+      const segments = url.pathname.split('/').filter(Boolean);
+      if (segments.length === 3 && segments[0] === 'checkin') {
+        return { inviteCode: segments[1], guestId: segments[2] };
+      }
+    } catch {}
+    return null;
   }, []);
 
   const handleScan = useCallback(async (decodedText: string) => {
@@ -38,6 +49,11 @@ export function CheckInScanner({ inviteCode, onVouchSuccess, onClose }: CheckInS
     const parsed = parseQR(decodedText);
     if (!parsed) {
       showToast('Invalid QR code');
+      return;
+    }
+
+    if (currentGuestId && parsed.guestId === currentGuestId) {
+      showToast("You can't check yourself in!");
       return;
     }
 
