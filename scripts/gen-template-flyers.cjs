@@ -115,11 +115,12 @@ async function renderFlyer(templateImg, opts) {
   const positions = config?.positions || DEFAULT_POSITIONS;
   const sponsorBox = config?.sponsorBoxSize || DEFAULT_SPONSOR_BOX;
 
-  // Apply text overrides from config
-  const displayCity = config?.editCity ?? city;
-  const displayVenueName = config?.editVenueName ?? venueName;
-  const displayStreetAddress = config?.editStreetAddress ?? streetAddress;
-  const displayTime = config?.editTime ?? timeDisplay;
+  // Always use fresh event data for text — text overrides are only for the
+  // interactive editor, not for batch/mass generation scripts.
+  const displayCity = city;
+  const displayVenueName = venueName;
+  const displayStreetAddress = streetAddress;
+  const displayTime = timeDisplay;
 
   const canvas = createCanvas(1080, 1080);
   const ctx = canvas.getContext('2d');

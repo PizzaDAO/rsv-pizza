@@ -208,7 +208,17 @@ async function doRegen(
     dateDisplay = `${monthFormatter.format(eventDate).toUpperCase()} ${dayFormatter.format(eventDate)}`;
   }
 
-  // 4. Render to canvas (uses DB config if available, otherwise defaults)
+  // 4. Render to canvas (uses DB config layout but always fresh event text).
+  //    Strip text overrides so auto-regen picks up venue/time/city changes.
+  const layoutConfig: FlyerConfig | undefined = dbConfig
+    ? {
+        positions: dbConfig.positions,
+        poppedLogos: dbConfig.poppedLogos as FlyerConfig['poppedLogos'],
+        logoSizes: dbConfig.logoSizes as FlyerConfig['logoSizes'],
+        sponsorBoxSize: dbConfig.sponsorBoxSize as FlyerConfig['sponsorBoxSize'],
+      }
+    : undefined;
+
   const canvas = await renderFlyer({
     city,
     venueName,
@@ -217,7 +227,7 @@ async function doRegen(
     timeDisplay,
     is12h,
     sponsors: sponsors.map((s) => ({ id: s.id, logoUrl: s.logoUrl! })),
-    config: dbConfig || undefined,
+    config: layoutConfig,
   });
 
   // 5. Convert canvas to blob
