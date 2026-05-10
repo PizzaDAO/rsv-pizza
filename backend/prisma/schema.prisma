@@ -73,6 +73,7 @@ model Party {
   password           String?
   eventImageUrl      String?   @map("event_image_url")
   flyerGeneratedAt   DateTime? @map("flyer_generated_at") @db.Timestamptz
+  flyerConfig        Json?     @map("flyer_config")
   description        String?
   rsvpClosedAt       DateTime? @map("rsvp_closed_at") @db.Timestamptz
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz

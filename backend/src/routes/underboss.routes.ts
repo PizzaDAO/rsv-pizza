@@ -225,6 +225,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     telegramGroup: party.telegramGroup || null,
     createdAt: party.createdAt,
     flyerGeneratedAt,
+    flyerConfig: party.flyerConfig || null,
     latestSponsorAt: latestSponsorAtStr,
     flyerStale,
   };

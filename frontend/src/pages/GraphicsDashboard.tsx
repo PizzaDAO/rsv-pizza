@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import type { UnderbossEvent } from '../types';
 import { GPP_REGIONS } from '../types';
-import { renderFlyer, uses12Hour, formatFlyerTime } from '../components/flyer/renderFlyer';
+import { renderFlyer, uses12Hour, formatFlyerTime, type FlyerConfig } from '../components/flyer/renderFlyer';
 import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
 
@@ -145,6 +145,7 @@ export function GraphicsDashboard() {
           timeDisplay,
           is12h,
           sponsors: [],
+          config: (event.flyerConfig as FlyerConfig) || undefined,
         });
 
         const blob = await new Promise<Blob | null>(resolve =>
