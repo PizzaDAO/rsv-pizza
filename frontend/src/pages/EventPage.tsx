@@ -33,6 +33,7 @@ import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
+import { GuestScorecard } from '../components/scorecard';
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -1029,6 +1030,11 @@ export function EventPage() {
                   <p className="text-theme-text-muted text-sm">
                     RSVPs are closed for this event
                   </p>
+                )}
+
+                {/* Guest Scorecard - shown after check-in on event day */}
+                {isEventDay && existingGuestData?.checkedInAt && (
+                  <GuestScorecard inviteCode={event.customUrl || event.inviteCode} />
                 )}
 
                 {/* Guest Count - Mobile */}

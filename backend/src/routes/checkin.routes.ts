@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { autoCompleteScorecardItem } from './scorecard.routes.js';
 
 const router = Router();
 
@@ -229,6 +230,9 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
         checkedInBy: voucher.id, // voucher's guest ID
       },
     });
+
+    // Auto-complete the voucher's "vouch" scorecard item
+    autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
 
     res.status(200).json({
       success: true,
