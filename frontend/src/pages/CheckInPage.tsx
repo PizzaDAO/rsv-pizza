@@ -1,10 +1,22 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
+
+const C = {
+  skyTop: '#7EC8E3',
+  skyBot: '#B6E4F7',
+  red: '#E52828',
+  green: '#2E7D32',
+  darkText: '#1a1a1a',
+  mutedText: '#555',
+  cardBg: 'rgba(255,255,255,0.92)',
+  cardBorder: 'rgba(0,0,0,0.08)',
+};
 
 type CheckInState = 'loading' | 'show-qr' | 'vouching' | 'success' | 'already-checked-in' | 'not-checked-in' | 'unauthorized' | 'error' | 'not-found' | 'discount-available' | 'discount-claimed' | 'discount-ineligible';
 
@@ -346,6 +358,98 @@ export function CheckInPage() {
       </div>
     );
   };
+
+  const renderDiscountContent = () => {
+    if (state === 'discount-available') {
+      return (
+        <>
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg" />
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Claim 10% Discount</h2>
+          <p className="text-sm mb-6" style={{ color: C.mutedText }}>One-time Use</p>
+          <button
+            onClick={handleClaimDiscount}
+            className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
+            style={{ background: C.red }}
+          >
+            Claim Discount
+          </button>
+        </>
+      );
+    }
+
+    if (state === 'discount-claimed') {
+      return (
+        <>
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg" />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${C.green}22` }}>
+            <CheckCircle2 size={36} style={{ color: C.green }} />
+          </div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.green }}>Discount Claimed!</h2>
+          <p className="text-sm mb-2" style={{ color: C.darkText }}>Your 10% pizza discount is active.</p>
+          <p className="text-xs" style={{ color: C.mutedText }}>
+            Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
+          </p>
+        </>
+      );
+    }
+
+    if (state === 'discount-ineligible') {
+      return (
+        <>
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg opacity-50" />
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Discount Unavailable</h2>
+          <p className="text-sm" style={{ color: C.mutedText }}>This discount is for verified attendees only.</p>
+        </>
+      );
+    }
+
+    return null;
+  };
+
+  const renderDiscountPage = () => (
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}>
+      <Helmet>
+        <title>Claim 10% Discount | Global Pizza Party</title>
+        <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta name="twitter:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
+
+      {/* Light header */}
+      <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
+            <span className="hidden sm:inline" style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem', color: C.darkText }}>
+              RSV.Pizza
+            </span>
+          </a>
+        </div>
+      </header>
+
+      {/* Content centered */}
+      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
+        <div className="max-w-md w-full text-center">
+          {renderDiscountContent()}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+        <div className="flex flex-col items-center gap-1">
+          <a href="https://pizzadao.org" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+            <img src="/pizzadao-logo.svg" alt="PizzaDAO" className="h-7" />
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+
+  const isDiscountState = state === 'discount-available' || state === 'discount-claimed' || state === 'discount-ineligible';
+
+  if (isDiscountState) {
+    return renderDiscountPage();
+  }
 
   return (
     <Layout>
