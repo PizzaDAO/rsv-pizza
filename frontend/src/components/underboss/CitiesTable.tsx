@@ -91,26 +91,53 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     load();
   }, []);
 
-  // Build a map of city names to their matching GPP events
-  const eventCityMap = useMemo(() => {
-    const map: Record<string, UnderbossEvent[]> = {};
+  // Normalize: strip diacritics, lowercase, collapse whitespace
+  const normalize = useCallback((s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' '), []);
+
+  // Build list of GPP events with their extracted + normalized city names
+  const gppEvents = useMemo(() => {
+    const list: { event: UnderbossEvent; raw: string; norm: string }[] = [];
     for (const event of events) {
       const match = event.name.match(/Global Pizza Party\s+(.+)/i);
       if (match) {
-        const cityName = match[1].trim().toLowerCase();
-        if (!map[cityName]) map[cityName] = [];
-        map[cityName].push(event);
+        const raw = match[1].trim().toLowerCase();
+        list.push({ event, raw, norm: normalize(raw) });
       }
     }
-    return map;
-  }, [events]);
+    return list;
+  }, [events, normalize]);
+
+  // Find matching events for a sheet city (exact then fuzzy)
+  const findMatchingEvents = useCallback((sheetCity: string): UnderbossEvent[] => {
+    const key = sheetCity.toLowerCase().trim();
+    const norm = normalize(sheetCity);
+
+    // 1. Exact match on raw lowercase
+    const exact = gppEvents.filter(e => e.raw === key);
+    if (exact.length > 0) return exact.map(e => e.event);
+
+    // 2. Exact match on normalized (strips diacritics)
+    const normExact = gppEvents.filter(e => e.norm === norm);
+    if (normExact.length > 0) return normExact.map(e => e.event);
+
+    // 3. Containment match (one contains the other, min 4 chars to avoid false positives)
+    if (norm.length >= 4) {
+      const contained = gppEvents.filter(e =>
+        e.norm.length >= 4 && (e.norm.includes(norm) || norm.includes(e.norm))
+      );
+      if (contained.length > 0) return contained.map(e => e.event);
+    }
+
+    return [];
+  }, [gppEvents, normalize]);
 
   // Merge sheet cities with statuses and event matching
   const mergedCities = useMemo<MergedCity[]>(() => {
     return sheetCities.map((sc) => {
       const key = sc.city.toLowerCase().trim();
       const dbStatus = cityStatuses[key];
-      const matchedEvents = eventCityMap[key] || [];
+      const matchedEvents = findMatchingEvents(sc.city);
       const matchedEvent = matchedEvents.length > 0 ? (matchedEvents[0].customUrl || matchedEvents[0].id) : null;
 
       let status: CityStatusValue;
@@ -143,7 +170,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         matchedEventIds: matchedEvents.map(e => e.id),
       };
     });
-  }, [sheetCities, cityStatuses, eventCityMap, gppCounts]);
+  }, [sheetCities, cityStatuses, findMatchingEvents, gppCounts]);
 
   // Apply filters + sorting
   const filteredCities = useMemo(() => {
