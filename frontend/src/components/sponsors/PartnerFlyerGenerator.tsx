@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Download, Type } from 'lucide-react';
+import { Download, Pencil } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { renderPartnerFlyer } from '../flyer/renderFlyer';
-import { IconInput } from '../IconInput';
 
 interface PartnerFlyerGeneratorProps {
   sponsors: Sponsor[];
@@ -20,6 +19,8 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
 
   // Tagline text shown between city name and logo
   const [tagline, setTagline] = useState('supported by');
+  const [editingField, setEditingField] = useState<'tagline' | null>(null);
+  const [containerWidth, setContainerWidth] = useState(400);
 
   // Logo position & size state (canvas coordinates, 1080x1080)
   const [logoPos, setLogoPos] = useState<{ x: number; y: number } | null>(null);
@@ -44,6 +45,20 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
       setFontsReady(true);
     })();
   }, []);
+
+  // Track container width for overlay font scaling
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [previewUrl]);
+
+  const previewScale = containerWidth / 1080;
 
   // Reset position/size when partner changes
   useEffect(() => {
@@ -252,15 +267,6 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
         ))}
       </select>
 
-      <div className="mb-3">
-        <IconInput
-          icon={Type}
-          value={tagline}
-          onChange={e => setTagline(e.target.value)}
-          placeholder="e.g. supported by"
-        />
-      </div>
-
       {previewUrl && (
         <div
           ref={containerRef}
@@ -273,6 +279,62 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
             className="w-full rounded-lg pointer-events-none"
             draggable={false}
           />
+
+          {/* Tagline text overlay — inline editable */}
+          <div
+            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('tagline'); }}
+            style={{
+              position: 'absolute',
+              top: `${(640 / 1080) * 100}%`,
+              left: `${(50 / 1080) * 100}%`,
+              width: `${(600 / 1080) * 100}%`,
+              height: `${(60 / 1080) * 100}%`,
+              color: '#0497C1',
+              fontSize: 46 * previewScale,
+              fontFamily: '"Hub 191", "Comic Sans MS", cursive',
+              textTransform: 'uppercase',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              zIndex: 15,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {editingField === 'tagline' ? (
+              <input
+                autoFocus
+                value={tagline}
+                onChange={e => setTagline(e.target.value)}
+                onBlur={() => setEditingField(null)}
+                onKeyDown={e => { if (e.key === 'Enter') setEditingField(null); }}
+                className="w-full"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'inherit',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                  textTransform: 'inherit' as React.CSSProperties['textTransform'],
+                  lineHeight: 'inherit',
+                  padding: 0,
+                  margin: 0,
+                }}
+              />
+            ) : (
+              <span
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative', paddingRight: 24, cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
+              >
+                {(tagline || 'supported by').toUpperCase()}
+                <Pencil
+                  size={16}
+                  style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
+                  onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
+                />
+              </span>
+            )}
+          </div>
 
           {/* Transparent drag overlay for logo area */}
           {logoOverlayStyle ? (
