@@ -75,7 +75,23 @@ async function requireUnderbossAuth(
       return next();
     }
 
-    // Neither underboss nor admin
+    // Check if user is a graphics admin
+    const graphicsAdmin = await prisma.graphicsAdmin.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+    if (graphicsAdmin) {
+      req.underboss = {
+        id: 'graphics-admin',
+        name: graphicsAdmin.name || 'Graphics Admin',
+        email,
+        region: '__admin__',
+        regions: ['__admin__'],
+        isActive: true,
+      };
+      return next();
+    }
+
+    // Neither underboss, admin, nor graphics admin
     throw new AppError('Not authorized as underboss', 403, 'FORBIDDEN');
   } catch (error) {
     next(error);
