@@ -18,6 +18,7 @@ const TEMPLATE_URL = 'https://www.rsv.pizza/gpp-flyer-2026-og.jpg';
 // Paths
 const FONT_DIR = path.join(__dirname, '..', 'frontend', 'public', 'fonts');
 const TEMPLATE_PATH = path.join(__dirname, '..', 'frontend', 'public', 'gpp-flyer-2026-template.png');
+const AVAX_TEMPLATE_PATH = path.join(__dirname, '..', 'frontend', 'public', 'gpp-flyer-avax-template.png');
 
 // Register fonts
 registerFont(path.join(FONT_DIR, 'Hub-191-Display.otf'), { family: 'Hub 191 Display' });
@@ -276,6 +277,9 @@ async function main() {
   const templateImg = await loadImage(TEMPLATE_PATH);
   console.log('Template loaded (1080x1080)');
 
+  const avaxTemplateImg = await loadImage(AVAX_TEMPLATE_PATH);
+  console.log('Avax template loaded');
+
   // 2) Fetch events with template image
   const events = await prisma.party.findMany({
     where: { eventType: 'gpp', eventImageUrl: TEMPLATE_URL },
@@ -290,6 +294,7 @@ async function main() {
       customUrl: true,
       inviteCode: true,
       flyerConfig: true,
+      eventTags: true,
       sponsors: {
         where: {
           logoUrl: { not: null },
@@ -339,10 +344,11 @@ async function main() {
     const sponsorLogos = event.sponsors.map(s => ({ id: s.id, logoUrl: s.logoUrl }));
     const flyerCfg = event.flyerConfig || null;
 
-    console.log(`[${i + 1}/${events.length}] ${city} — venue: ${venueName}, date: ${dateDisplay || 'TBA'}, sponsors: ${sponsorLogos.length}${flyerCfg ? ' (has config)' : ''}`);
+    console.log(`[${i + 1}/${events.length}] ${city}${(event.eventTags || []).includes('avax') ? ' [avax]' : ''} — venue: ${venueName}, date: ${dateDisplay || 'TBA'}, sponsors: ${sponsorLogos.length}${flyerCfg ? ' (has config)' : ''}`);
 
     try {
-      const canvas = await renderFlyer(templateImg, {
+      const tpl = (event.eventTags || []).includes('avax') ? avaxTemplateImg : templateImg;
+      const canvas = await renderFlyer(tpl, {
         city,
         venueName,
         streetAddress,

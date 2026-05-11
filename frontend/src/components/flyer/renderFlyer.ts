@@ -82,6 +82,12 @@ export function formatFlyerTime(timeStr: string, is12h: boolean): string {
     : `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
+/** Pick the correct GPP flyer template based on event tags. */
+export function getTemplateUrl(eventTags?: string[]): string {
+  if (eventTags?.includes('avax')) return '/gpp-flyer-avax-template.png';
+  return '/gpp-flyer-2026-template.png';
+}
+
 // ---- FlyerConfig type (persisted to DB) ----
 
 export interface FlyerConfig {
@@ -106,6 +112,7 @@ export interface RenderFlyerOptions {
   is12h: boolean;
   sponsors: { id?: string; logoUrl: string }[];
   config?: FlyerConfig;
+  eventTags?: string[];
 }
 
 /**
@@ -132,7 +139,7 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
   const ctx = canvas.getContext('2d')!;
 
   // 1) Draw template image
-  const templateImg = await loadImg('/gpp-flyer-2026-template.png');
+  const templateImg = await loadImg(getTemplateUrl(opts.eventTags));
   ctx.drawImage(templateImg, 0, 0, 1080, 1080);
 
   ctx.textBaseline = 'top';

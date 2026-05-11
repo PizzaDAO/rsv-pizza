@@ -9,7 +9,7 @@ import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
 import {
-  fitText, loadImg, uses12Hour, formatFlyerTime,
+  fitText, loadImg, uses12Hour, formatFlyerTime, getTemplateUrl,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
   CITY_BOX, VENUE_BOX, TIME_BOX, DEFAULT_SPONSOR_BOX,
 } from './renderFlyer';
@@ -460,7 +460,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     const ctx = canvas.getContext('2d')!;
 
     // 1) Draw template image
-    const templateImg = await loadImg('/gpp-flyer-2026-template.png');
+    const templateImg = await loadImg(getTemplateUrl(party.eventTags));
     ctx.drawImage(templateImg, 0, 0, 1080, 1080);
 
     ctx.textBaseline = 'top';
@@ -718,7 +718,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       >
         {/* Template background */}
         <img
-          src="/gpp-flyer-2026-template.png"
+          src={getTemplateUrl(party.eventTags)}
           alt=""
           style={{ width: '100%', height: '100%', display: 'block' }}
           crossOrigin="anonymous"

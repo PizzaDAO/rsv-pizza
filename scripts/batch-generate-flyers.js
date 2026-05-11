@@ -19,6 +19,7 @@ const TEMPLATE_IMG = 'https://www.rsv.pizza/gpp-flyer-2026-og.jpg';
 const DRY_RUN = process.argv.includes('--dry-run');
 const REGENERATE = process.argv.includes('--regenerate');
 const BACKEND_URL = 'https://backend-pizza-dao.vercel.app';
+const AVAX_TEMPLATE_PATH = path.join(__dirname, '..', 'frontend', 'public', 'gpp-flyer-avax-template.png');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -292,10 +293,13 @@ async function main() {
   const templateImage = await loadImage(templatePath);
   console.log('Template loaded.');
 
+  const avaxTemplateImage = await loadImage(AVAX_TEMPLATE_PATH);
+  console.log('Avax template loaded.');
+
   // Fetch events to process
   let query = supabase
     .from('parties')
-    .select('id, name, custom_url, invite_code, venue_name, address, date, end_time, timezone, event_image_url')
+    .select('id, name, custom_url, invite_code, venue_name, address, date, end_time, timezone, event_image_url, event_tags')
     .eq('event_type', 'gpp');
 
   if (REGENERATE) {
@@ -354,7 +358,8 @@ async function main() {
     }
 
     try {
-      const canvas = await renderFlyer(templateImage, event, sponsors);
+      const tpl = (event.event_tags || []).includes('avax') ? avaxTemplateImage : templateImage;
+      const canvas = await renderFlyer(tpl, event, sponsors);
       const imageUrl = await uploadFlyer(canvas, event.invite_code);
       await updatePartyImage(event.id, imageUrl);
       console.log('OK');
