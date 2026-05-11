@@ -34,6 +34,7 @@ function SponsorIntakeRedirect() {
 }
 
 const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
+const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
 
 function App() {
   return (
@@ -66,6 +67,7 @@ function App() {
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
+            <Route path="/graphics/:slug/edit" element={<Suspense fallback={null}><GraphicsFlyerEdit /></Suspense>} />
             <Route path="/post" element={<PostComposerPage />} />
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />

@@ -1605,6 +1605,7 @@ export function FlyerGenerator() {
           onSubmit={handleEditSponsor}
           onClose={() => setEditingSponsor(null)}
           isLoading={isSubmitting}
+          logoOnly
         />
       )}
     </div>

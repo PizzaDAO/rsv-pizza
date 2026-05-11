@@ -1007,6 +1007,7 @@ export interface UnderbossEventProgress {
 export interface UnderbossEvent {
   id: string;
   name: string;
+  inviteCode: string;
   customUrl: string | null;
   date: string | null;
   address: string | null;

@@ -1,5 +1,5 @@
 import { prisma } from '../config/database.js';
-import { isSuperAdmin } from '../middleware/auth.js';
+import { isSuperAdmin, isAdmin, isUnderboss } from '../middleware/auth.js';
 
 /**
  * Emails that automatically get editor access to ALL GPP events.
@@ -75,6 +75,16 @@ export async function canUserEditParty(
     }
   }
 
+  // For GPP events, admins, underbosses, and graphics admins can edit
+  if (userEmail && (party as any).eventType === 'gpp') {
+    if (await isAdmin(userEmail)) return true;
+    if (await isUnderboss(userEmail)) return true;
+    const gfxAdmin = await prisma.graphicsAdmin.findUnique({
+      where: { email: userEmail.toLowerCase() },
+    });
+    if (gfxAdmin) return true;
+  }
+
   // Check if user is a co-host with edit permissions
   if (userEmail) {
     const coHosts = party.coHosts as Array<{ email?: string; canEdit?: boolean }> | null;
@@ -134,6 +144,16 @@ export async function canUserAccessTab(
     if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
       return true;
     }
+  }
+
+  // For GPP events, admins, underbosses, and graphics admins can access all tabs
+  if (userEmail && party.eventType === 'gpp') {
+    if (await isAdmin(userEmail)) return true;
+    if (await isUnderboss(userEmail)) return true;
+    const gfxAdmin = await prisma.graphicsAdmin.findUnique({
+      where: { email: userEmail.toLowerCase() },
+    });
+    if (gfxAdmin) return true;
   }
 
   // Check co-host tab permissions
