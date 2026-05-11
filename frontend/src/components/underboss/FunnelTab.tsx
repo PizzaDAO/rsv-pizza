@@ -29,13 +29,20 @@ export function FunnelTab({ regions }: FunnelTabProps) {
   const [data, setData] = useState<FunnelStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Stabilize regions reference to prevent infinite re-renders
+  const regionsKey = regions.join(',');
+
   useEffect(() => {
     setLoading(true);
     fetchFunnelStats(regions).then((result) => {
       setData(result);
       setLoading(false);
+    }).catch(() => {
+      setData(null);
+      setLoading(false);
     });
-  }, [regions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionsKey]);
 
   if (loading) {
     return (
@@ -45,22 +52,22 @@ export function FunnelTab({ regions }: FunnelTabProps) {
     );
   }
 
-  if (!data) {
+  if (!data || !data.totals || !data.events) {
     return <p className="text-white/60 text-center py-8">Failed to load funnel data.</p>;
   }
 
   const { totals, events } = data;
-  const maxVal = Math.max(totals.views, 1);
+  const maxVal = Math.max(totals.views || 0, 1);
 
   return (
     <div className="space-y-6">
       {/* Aggregate funnel */}
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Overall RSVP Funnel</h3>
-        <FunnelBar label="Views" value={totals.views} max={maxVal} color="bg-blue-500" />
-        <FunnelBar label="Opened" value={totals.opened} max={maxVal} color="bg-cyan-500" />
-        <FunnelBar label="Step 1" value={totals.step1Complete} max={maxVal} color="bg-amber-500" />
-        <FunnelBar label="Submitted" value={totals.submitted} max={maxVal} color="bg-green-500" />
+        <FunnelBar label="Views" value={totals.views || 0} max={maxVal} color="bg-blue-500" />
+        <FunnelBar label="Opened" value={totals.opened || 0} max={maxVal} color="bg-cyan-500" />
+        <FunnelBar label="Step 1" value={totals.step1Complete || 0} max={maxVal} color="bg-amber-500" />
+        <FunnelBar label="Submitted" value={totals.submitted || 0} max={maxVal} color="bg-green-500" />
         <div className="mt-3 text-xs text-white/50 flex gap-4">
           <span>Open rate: {totals.views > 0 ? Math.round((totals.opened / totals.views) * 100) : 0}%</span>
           <span>Completion: {totals.opened > 0 ? Math.round((totals.submitted / totals.opened) * 100) : 0}%</span>
