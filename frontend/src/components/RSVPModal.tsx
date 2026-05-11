@@ -371,11 +371,11 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             </div>
           )}
           {event.date && (
-            <div className="relative inline-block mt-4">
+            <div className="relative mt-4">
               <button
                 ref={calendarBtnRef}
                 onClick={() => setCalendarOpen(!calendarOpen)}
-                className="btn-secondary flex items-center gap-2 mx-auto"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
               >
                 <Calendar size={18} />
                 Add to Calendar
