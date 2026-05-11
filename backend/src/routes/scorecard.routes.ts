@@ -11,7 +11,6 @@ const SCORECARD_ITEMS = [
   'photo',
   'vouch',
   'pizza_selfie',
-  'sticker',
   'follow_pizzadao',
   'signup_pizzadao',
 ] as const;
