@@ -116,7 +116,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     } else {
       // First drag -- logo is centered in default box, compute center
       const cx = 50 + 980 / 2; // 540
-      const cy = 660 + 380 / 2; // 850
+      const cy = 730 + 310 / 2; // 885
       dragOffsetRef.current = { x: pos.x - cx, y: pos.y - cy };
       setLogoPos({ x: cx, y: cy });
     }
@@ -148,7 +148,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     if (logoPos) {
       dragOffsetRef.current = { x: pos.x - logoPos.x, y: pos.y - logoPos.y };
     } else {
-      const cx = 540, cy = 850;
+      const cx = 540, cy = 885;
       dragOffsetRef.current = { x: pos.x - cx, y: pos.y - cy };
       setLogoPos({ x: cx, y: cy });
     }
@@ -182,7 +182,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
 
     // If logo hasn't been positioned yet, place it at center of default box
     if (!logoPos) {
-      setLogoPos({ x: 540, y: 850 });
+      setLogoPos({ x: 540, y: 885 });
     }
 
     const handleMove = (moveEvent: MouseEvent) => {
@@ -206,7 +206,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     const sc = rect ? rect.width / 1080 : 1;
 
     if (!logoPos) {
-      setLogoPos({ x: 540, y: 850 });
+      setLogoPos({ x: 540, y: 885 });
     }
 
     const handleMove = (moveEvent: TouchEvent) => {
@@ -285,12 +285,12 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
             onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('tagline'); }}
             style={{
               position: 'absolute',
-              top: `${(640 / 1080) * 100}%`,
+              top: `${(660 / 1080) * 100}%`,
               left: `${(50 / 1080) * 100}%`,
               width: `${(600 / 1080) * 100}%`,
-              height: `${(60 / 1080) * 100}%`,
+              height: `${(70 / 1080) * 100}%`,
               color: '#0497C1',
-              fontSize: 46 * previewScale,
+              fontSize: 58 * previewScale,
               fontFamily: '"Hub 191", "Comic Sans MS", cursive',
               textTransform: 'uppercase',
               lineHeight: 1.2,
@@ -323,13 +323,13 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
               />
             ) : (
               <span
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative', paddingRight: 24, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
               >
                 {(tagline || 'supported by').toUpperCase()}
                 <Pencil
-                  size={16}
-                  style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
+                  size={12 * previewScale > 8 ? 12 * previewScale : 8}
+                  style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, marginTop: -2 }}
                   onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
                 />
               </span>
@@ -366,9 +366,9 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
               style={{
                 position: 'absolute',
                 left: `${(50 / 1080) * 100}%`,
-                top: `${(660 / 1080) * 100}%`,
+                top: `${(730 / 1080) * 100}%`,
                 width: `${(980 / 1080) * 100}%`,
-                height: `${(380 / 1080) * 100}%`,
+                height: `${(310 / 1080) * 100}%`,
                 cursor: 'grab',
               }}
               onMouseDown={handleDragStart}
