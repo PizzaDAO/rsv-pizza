@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, Copy } from 'lucide-react';
+import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, Copy, Image } from 'lucide-react';
 import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
 import { proxyAvatarToStorage } from '../../lib/supabase';
-import type { SponsorUser } from '../../types';
+import type { SponsorUser, UnderbossEvent } from '../../types';
 import { PartnerForm } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
+import { PartnerCitiesFlyer } from './PartnerCitiesFlyer';
 
 interface PartnerManagerProps {
   isAdmin?: boolean;
+  events?: UnderbossEvent[];
   onSyncComplete?: () => void;
   onFlyerRegenNeeded?: (tag: string) => void;
 }
 
-export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
+export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
   const [partners, setPartners] = useState<SponsorUser[]>([]);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -23,6 +25,7 @@ export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: 
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [flyerPartnerId, setFlyerPartnerId] = useState<string | null>(null);
 
   const loadPartners = useCallback(async () => {
     try {
@@ -290,6 +293,15 @@ export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: 
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  {partner.coHostLogoUrl && events && events.length > 0 && (
+                    <button
+                      onClick={() => setFlyerPartnerId(partner.id)}
+                      className="p-1.5 text-theme-text-faint hover:text-red-400 transition-colors"
+                      title="Generate partner flyer"
+                    >
+                      <Image size={14} />
+                    </button>
+                  )}
                   <button
                     onClick={() => openEditModal(partner)}
                     className="p-1.5 text-theme-text-faint hover:text-theme-text-muted transition-colors"
@@ -324,6 +336,14 @@ export function PartnerManager({ isAdmin, onSyncComplete, onFlyerRegenNeeded }: 
           syncMessage={syncMessage}
         />
       )}
+
+      {/* Partner Cities Flyer Modal */}
+      {flyerPartnerId && events && (() => {
+        const p = partners.find(x => x.id === flyerPartnerId);
+        return p ? (
+          <PartnerCitiesFlyer partner={p} events={events} onClose={() => setFlyerPartnerId(null)} />
+        ) : null;
+      })()}
     </div>
   );
 }
