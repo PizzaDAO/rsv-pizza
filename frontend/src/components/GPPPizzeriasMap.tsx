@@ -84,6 +84,20 @@ export default function GPPPizzeriasMap({
 
       const map = mapRef.current;
 
+      // Inject InfoWindow style overrides once
+      if (!document.getElementById('gpp-iw-styles')) {
+        const style = document.createElement('style');
+        style.id = 'gpp-iw-styles';
+        style.textContent = `
+          .gm-style-iw-chr { height: auto !important; }
+          .gm-style-iw-chr button { width: 24px !important; height: 24px !important; }
+          .gm-style-iw-chr button span { width: 16px !important; height: 16px !important; margin: 4px !important; }
+          .gm-style-iw-d { overflow: auto !important; padding-top: 0 !important; }
+          .gm-style-iw { padding-top: 0 !important; }
+        `;
+        document.head.appendChild(style);
+      }
+
       // Shared InfoWindow
       if (!infoWindowRef.current) {
         infoWindowRef.current = new google.maps.InfoWindow();
