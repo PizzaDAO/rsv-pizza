@@ -6,6 +6,7 @@ import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-reac
 import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
+import { GPPClouds } from '../components/GPPClouds';
 
 const C = {
   skyTop: '#7EC8E3',
@@ -363,7 +364,7 @@ export function CheckInPage() {
     if (state === 'discount-available') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg" />
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg" />
           <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Claim 10% Discount</h2>
           <p className="text-sm mb-6" style={{ color: C.mutedText }}>One-time Use</p>
           <button
@@ -380,7 +381,7 @@ export function CheckInPage() {
     if (state === 'discount-claimed') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg" />
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg" />
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${C.green}22` }}>
             <CheckCircle2 size={36} style={{ color: C.green }} />
           </div>
@@ -396,7 +397,7 @@ export function CheckInPage() {
     if (state === 'discount-ineligible') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-64 mx-auto mb-6 rounded-2xl shadow-lg opacity-50" />
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg opacity-50" />
           <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Discount Unavailable</h2>
           <p className="text-sm" style={{ color: C.mutedText }}>This discount is for verified attendees only.</p>
         </>
@@ -407,7 +408,8 @@ export function CheckInPage() {
   };
 
   const renderDiscountPage = () => (
-    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}>
+    <div className="min-h-screen relative overflow-hidden" style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}>
+      <GPPClouds />
       <Helmet>
         <title>Claim 10% Discount | Global Pizza Party</title>
         <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
