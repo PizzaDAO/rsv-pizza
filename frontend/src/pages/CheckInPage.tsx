@@ -75,18 +75,19 @@ export function CheckInPage() {
     checkDiscount();
   }, [inviteCode, guestId, discountChecked]);
 
-  // Redirect to login if not authenticated (skip if discount flow is active)
+  // Redirect to login if not authenticated (skip if discount flow is active, wait for discount check)
   useEffect(() => {
+    if (!discountChecked) return;
     if (!authLoading && !user && state !== 'discount-available' && state !== 'discount-claimed' && state !== 'discount-ineligible') {
       const currentUrl = `/checkin/${inviteCode}/${guestId}`;
       sessionStorage.setItem('authReturnUrl', currentUrl);
       navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     }
-  }, [authLoading, user, inviteCode, guestId, navigate, state]);
+  }, [authLoading, user, inviteCode, guestId, navigate, state, discountChecked]);
 
   // Determine what to show
   useEffect(() => {
-    if (authLoading || !user || hasAttempted || !inviteCode || !guestId) return;
+    if (authLoading || !user || hasAttempted || !inviteCode || !guestId || !discountChecked) return;
     // Skip check-in flow if discount state is already resolved
     if (state === 'discount-available' || state === 'discount-claimed' || state === 'discount-ineligible') return;
 
@@ -171,7 +172,7 @@ export function CheckInPage() {
     };
 
     determine();
-  }, [authLoading, user, inviteCode, guestId, hasAttempted, state]);
+  }, [authLoading, user, inviteCode, guestId, hasAttempted, state, discountChecked]);
 
   const handleClaimDiscount = async () => {
     try {
