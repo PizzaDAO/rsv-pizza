@@ -548,7 +548,7 @@ export function AdminPage() {
             <button
               onClick={handleExportEventsCsv}
               disabled={exportingCsv}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 text-gray-700 text-sm font-medium hover:bg-white border border-gray-300 disabled:opacity-50"
             >
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Export All Events CSV
