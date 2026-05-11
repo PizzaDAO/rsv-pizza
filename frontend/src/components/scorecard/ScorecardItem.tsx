@@ -7,6 +7,7 @@ import {
   Pizza,
   UserPlus,
   Globe,
+  MessageCircle,
   Loader2,
   Link2,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ export type ScorecardItemKey =
   | 'vouch'
   | 'pizza_selfie'
   | 'sign_pizza_box'
+  | 'join_telegram'
   | 'follow_pizzadao'
   | 'signup_pizzadao';
 
@@ -34,6 +36,7 @@ const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; icon: React.Element
   vouch: { label: 'Check someone in', icon: Users, color: '#4ade80' },
   pizza_selfie: { label: 'Pizza selfie', icon: Pizza, color: '#FFC107' },
   sign_pizza_box: { label: 'Sign the party pizza box', icon: Pizza, color: '#FF6B35' },
+  join_telegram: { label: "Join your city's PizzaDAO Telegram", icon: MessageCircle, color: '#0088cc' },
   follow_pizzadao: { label: 'Follow @pizza_dao', icon: UserPlus, color: '#1DA1F2' },
   signup_pizzadao: { label: 'Sign up on pizzadao.org', icon: Globe, color: '#A855F7' },
 };
@@ -49,7 +52,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
   // Auto-complete items (no user action needed from this UI)
   const isAutoItem = itemKey === 'photo' || itemKey === 'vouch' || itemKey === 'pizza_selfie';
   // Self-report items
-  const isSelfReport = itemKey === 'sign_pizza_box' || itemKey === 'follow_pizzadao' || itemKey === 'signup_pizzadao';
+  const isSelfReport = itemKey === 'sign_pizza_box' || itemKey === 'join_telegram' || itemKey === 'follow_pizzadao' || itemKey === 'signup_pizzadao';
 
   const handleAction = () => {
     if (completed) return;
@@ -74,6 +77,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
   const getActionLabel = (): string => {
     if (itemKey === 'post') return 'Share';
     if (itemKey === 'sign_pizza_box') return 'I signed it!';
+    if (itemKey === 'join_telegram') return 'I joined!';
     if (itemKey === 'follow_pizzadao') return 'I followed!';
     if (itemKey === 'signup_pizzadao') return 'I signed up!';
     return '';
