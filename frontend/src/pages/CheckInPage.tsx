@@ -8,6 +8,17 @@ import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 import { GPPClouds } from '../components/GPPClouds';
 
+const DISCOUNT_CLOUDS = [
+  // Mobile clouds — above and below content
+  { src: '/gpp-cloud-2.png', top: '4%', left: '-8%', width: 140, anim: 'cloud-drift-left 40s ease-in-out infinite' },
+  { src: '/gpp-cloud-3.png', top: '10%', right: '-5%', width: 110, anim: 'cloud-drift-right 48s ease-in-out infinite' },
+  { src: '/gpp-cloud-1.png', bottom: '12%', left: '-5%', width: 130, anim: 'cloud-drift-left 44s ease-in-out infinite', flip: true },
+  { src: '/gpp-cloud-2.png', bottom: '6%', right: '-8%', width: 120, anim: 'cloud-drift-right 52s ease-in-out infinite' },
+  // Desktop extras — sides
+  { src: '/gpp-cloud-1.png', top: '20%', left: '-4%', width: 260, anim: 'cloud-drift-left 50s ease-in-out infinite', mdOnly: true },
+  { src: '/gpp-cloud-1.png', top: '55%', right: '-3%', width: 240, anim: 'cloud-drift-right 46s ease-in-out infinite', flip: true, mdOnly: true },
+] as const;
+
 const C = {
   skyTop: '#7EC8E3',
   skyBot: '#B6E4F7',
@@ -220,7 +231,7 @@ export function CheckInPage() {
             <CheckCircle2 size={48} className="text-green-500" />
           </div>
           <h2 className="text-2xl font-bold text-green-400 mb-2">Discount Claimed!</h2>
-          <p className="text-theme-text-secondary mb-2">Your 10% pizza discount is active.</p>
+          <p className="text-theme-text-secondary mb-2">Your 10% pizza discount has been used.</p>
           <p className="text-theme-text-muted text-sm">
             Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
           </p>
@@ -385,7 +396,7 @@ export function CheckInPage() {
             <CheckCircle2 size={36} style={{ color: C.green }} />
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: C.green }}>Discount Claimed!</h2>
-          <p className="text-sm mb-2" style={{ color: C.darkText }}>Your 10% pizza discount is active.</p>
+          <p className="text-sm mb-2" style={{ color: C.darkText }}>Your 10% pizza discount has been used.</p>
           <p className="text-xs" style={{ color: C.mutedText }}>
             Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
           </p>
@@ -408,7 +419,27 @@ export function CheckInPage() {
 
   const renderDiscountPage = () => (
     <div className="min-h-screen relative overflow-hidden" style={{ background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)` }}>
-      <GPPClouds />
+      {/* Clouds — visible on mobile above/below content */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+        {DISCOUNT_CLOUDS.map((c, i) => (
+          <img
+            key={i}
+            src={c.src}
+            alt=""
+            className={`absolute${c.mdOnly ? ' hidden md:block' : ''}`}
+            style={{
+              ...(c.top ? { top: c.top } : {}),
+              ...(c.bottom ? { bottom: c.bottom } : {}),
+              ...(c.right ? { right: c.right } : {}),
+              ...(c.left ? { left: c.left } : {}),
+              width: c.width,
+              opacity: 0.7,
+              ...(c.flip ? { transform: 'scaleX(-1)' } : {}),
+              animation: c.anim,
+            }}
+          />
+        ))}
+      </div>
       <Helmet>
         <title>Claim 10% Discount | Global Pizza Party</title>
         <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
@@ -417,7 +448,7 @@ export function CheckInPage() {
       </Helmet>
 
       {/* Light header */}
-      <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+      <header className="relative z-10 border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -429,14 +460,14 @@ export function CheckInPage() {
       </header>
 
       {/* Content centered */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
+      <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
         <div className="max-w-md w-full text-center">
           {renderDiscountContent()}
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+      <footer className="relative z-10 py-6 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="flex flex-col items-center gap-1">
           <a href="https://pizzadao.org" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
             <img src="/pizzadao-logo.svg" alt="PizzaDAO" className="h-7" />
