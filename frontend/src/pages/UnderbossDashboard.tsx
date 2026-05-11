@@ -5,7 +5,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, FunnelTab } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -67,7 +67,7 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'funnel'>('events');
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
@@ -432,6 +432,19 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('funnel')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'funnel'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Funnel
+              {activeTab === 'funnel' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -444,6 +457,10 @@ export function UnderbossDashboard() {
 
           {activeTab === 'partners' && (
             <PartnerManager isAdmin={isAdmin} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+          )}
+
+          {activeTab === 'funnel' && (
+            <FunnelTab regions={selectedRegions} />
           )}
         </section>
         </div>

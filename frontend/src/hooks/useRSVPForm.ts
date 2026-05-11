@@ -3,7 +3,7 @@ import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuest
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
-import { PublicEvent } from '../lib/api';
+import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 
@@ -369,8 +369,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       return;
     }
     setError(null);
+    // Track funnel step
+    const slug = eventData.customUrl || eventData.inviteCode;
+    if (slug) trackRsvpFunnel(slug, 'rsvp_step1_complete');
     setStep(2);
-  }, [name]);
+  }, [name, eventData.customUrl, eventData.inviteCode]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
