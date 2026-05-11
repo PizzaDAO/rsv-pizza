@@ -257,3 +257,54 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
 
   return canvas;
 }
+
+/**
+ * Render a partner-specific GPP flyer with the template background,
+ * city name, and one partner logo displayed large.
+ */
+export async function renderPartnerFlyer(
+  city: string,
+  logoUrl: string,
+  logoPos?: { x: number; y: number },
+  logoSize?: number,
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d')!;
+
+  // Draw template
+  const templateImg = await loadImg('/gpp-flyer-2026-template.png');
+  ctx.drawImage(templateImg, 0, 0, 1080, 1080);
+
+  // Draw city name
+  ctx.textBaseline = 'top';
+  const cityFontSize = fitText(city, 'Hub 191 Display', 64, CITY_BOX.width);
+  ctx.fillStyle = CITY_COLOR;
+  ctx.font = `${cityFontSize}px "Hub 191 Display"`;
+  ctx.fillText(city.toUpperCase(), DEFAULT_POSITIONS.city.x, DEFAULT_POSITIONS.city.y);
+
+  // Draw partner logo
+  const logoImg = await loadImg(logoUrl);
+  if (logoPos) {
+    // Custom position: draw centered at logoPos with aspect-fit into logoSize box
+    const size = logoSize ?? 200;
+    const maxW = size * 2.5;
+    const maxH = size;
+    const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+    const w = logoImg.width * fitScale;
+    const h = logoImg.height * fitScale;
+    ctx.drawImage(logoImg, logoPos.x - w / 2, logoPos.y - h / 2, w, h);
+  } else {
+    // Default: large, centered in box
+    const boxX = 50, boxY = 660, boxW = 980, boxH = 380;
+    const scale = Math.min(boxW / logoImg.width, boxH / logoImg.height);
+    const w = logoImg.width * scale;
+    const h = logoImg.height * scale;
+    const x = boxX + (boxW - w) / 2;
+    const y = boxY + (boxH - h) / 2;
+    ctx.drawImage(logoImg, x, y, w, h);
+  }
+
+  return canvas;
+}

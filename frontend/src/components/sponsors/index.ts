@@ -4,3 +4,4 @@ export { SponsorList } from './SponsorList';
 export { PartnerForm, extractSponsorData } from './PartnerForm';
 export type { PartnerFormData } from './PartnerForm';
 export { PartnerIntakeButton } from './PartnerIntakeButton';
+export { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
