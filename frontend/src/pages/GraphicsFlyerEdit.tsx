@@ -53,7 +53,7 @@ function FlyerEditInner() {
           Back to Graphics Dashboard
         </button>
       </div>
-      <FlyerTab />
+      <FlyerTab sponsorLogoOnly />
     </div>
   );
 }

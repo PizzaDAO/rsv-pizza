@@ -26,7 +26,7 @@ function parseCityFromAddress(address: string): string {
 const SPONSOR_BOX_MIN = 100;
 const SPONSOR_BOX_MAX = 1080;
 
-export function FlyerGenerator() {
+export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { party, loadParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -1605,7 +1605,7 @@ export function FlyerGenerator() {
           onSubmit={handleEditSponsor}
           onClose={() => setEditingSponsor(null)}
           isLoading={isSubmitting}
-          logoOnly
+          logoOnly={sponsorLogoOnly}
         />
       )}
     </div>
