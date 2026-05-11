@@ -39,7 +39,7 @@ export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useTranslation('event');
+  const { t, i18n } = useTranslation('event');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1058,7 +1058,10 @@ export function EventPage() {
                 {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
                   <div className="border-y border-theme-stroke/50 py-4 mt-4">
                     <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
-                      {event.description && (
+                      {event.description && (() => {
+                        const isDefaultGpp = event.description!.startsWith('On May 22, 2010, two pizzas changed the world');
+                        const displayDescription = (isDefaultGpp && i18n.language !== 'en') ? t('gppDefaultDescription') : event.description!;
+                        return (
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkBreaks]}
                           components={{
@@ -1118,9 +1121,10 @@ export function EventPage() {
                             ),
                           }}
                         >
-                          {event.description}
+                          {displayDescription}
                         </ReactMarkdown>
-                      )}
+                        );
+                      })()}
                       <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
                         {/* PizzaDAO — always first */}
                         <p className="mb-2 last:mb-0 text-base">
