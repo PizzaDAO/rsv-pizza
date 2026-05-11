@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Pencil } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { renderPartnerFlyer } from '../flyer/renderFlyer';
 
@@ -16,6 +16,11 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
   const [fontsReady, setFontsReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Tagline text shown between city name and logo
+  const [tagline, setTagline] = useState('supported by');
+  const [editingField, setEditingField] = useState<'tagline' | null>(null);
+  const [containerWidth, setContainerWidth] = useState(400);
 
   // Logo position & size state (canvas coordinates, 1080x1080)
   const [logoPos, setLogoPos] = useState<{ x: number; y: number } | null>(null);
@@ -40,6 +45,20 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
       setFontsReady(true);
     })();
   }, []);
+
+  // Track container width for overlay font scaling
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [previewUrl]);
+
+  const previewScale = containerWidth / 1080;
 
   // Reset position/size when partner changes
   useEffect(() => {
@@ -70,6 +89,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
           sponsor.logoUrl!,
           logoPos ?? undefined,
           logoSize,
+          tagline,
         );
         if (cancelled) return;
         canvasRef.current = canvas;
@@ -80,7 +100,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     })();
 
     return () => { cancelled = true; };
-  }, [fontsReady, selectedId, cityName, sponsors, logoPos, logoSize]);
+  }, [fontsReady, selectedId, cityName, sponsors, logoPos, logoSize, tagline]);
 
   // --- Drag handlers ---
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -96,7 +116,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     } else {
       // First drag -- logo is centered in default box, compute center
       const cx = 50 + 980 / 2; // 540
-      const cy = 660 + 380 / 2; // 850
+      const cy = 730 + 310 / 2; // 885
       dragOffsetRef.current = { x: pos.x - cx, y: pos.y - cy };
       setLogoPos({ x: cx, y: cy });
     }
@@ -128,7 +148,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     if (logoPos) {
       dragOffsetRef.current = { x: pos.x - logoPos.x, y: pos.y - logoPos.y };
     } else {
-      const cx = 540, cy = 850;
+      const cx = 540, cy = 885;
       dragOffsetRef.current = { x: pos.x - cx, y: pos.y - cy };
       setLogoPos({ x: cx, y: cy });
     }
@@ -162,7 +182,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
 
     // If logo hasn't been positioned yet, place it at center of default box
     if (!logoPos) {
-      setLogoPos({ x: 540, y: 850 });
+      setLogoPos({ x: 540, y: 885 });
     }
 
     const handleMove = (moveEvent: MouseEvent) => {
@@ -186,7 +206,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     const sc = rect ? rect.width / 1080 : 1;
 
     if (!logoPos) {
-      setLogoPos({ x: 540, y: 850 });
+      setLogoPos({ x: 540, y: 885 });
     }
 
     const handleMove = (moveEvent: TouchEvent) => {
@@ -260,6 +280,62 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
             draggable={false}
           />
 
+          {/* Tagline text overlay — inline editable */}
+          <div
+            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingField('tagline'); }}
+            style={{
+              position: 'absolute',
+              top: `${(660 / 1080) * 100}%`,
+              left: `${(50 / 1080) * 100}%`,
+              width: `${(600 / 1080) * 100}%`,
+              height: `${(70 / 1080) * 100}%`,
+              color: '#0497C1',
+              fontSize: 58 * previewScale,
+              fontFamily: '"Hub 191", "Comic Sans MS", cursive',
+              textTransform: 'uppercase',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              zIndex: 15,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {editingField === 'tagline' ? (
+              <input
+                autoFocus
+                value={tagline}
+                onChange={e => setTagline(e.target.value)}
+                onBlur={() => setEditingField(null)}
+                onKeyDown={e => { if (e.key === 'Enter') setEditingField(null); }}
+                className="w-full"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'inherit',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                  textTransform: 'inherit' as React.CSSProperties['textTransform'],
+                  lineHeight: 'inherit',
+                  padding: 0,
+                  margin: 0,
+                }}
+              />
+            ) : (
+              <span
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
+              >
+                {(tagline || 'supported by').toUpperCase()}
+                <Pencil
+                  size={30 * previewScale > 14 ? 30 * previewScale : 14}
+                  style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, marginTop: -2 }}
+                  onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
+                />
+              </span>
+            )}
+          </div>
+
           {/* Transparent drag overlay for logo area */}
           {logoOverlayStyle ? (
             <div
@@ -290,9 +366,9 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
               style={{
                 position: 'absolute',
                 left: `${(50 / 1080) * 100}%`,
-                top: `${(660 / 1080) * 100}%`,
+                top: `${(730 / 1080) * 100}%`,
                 width: `${(980 / 1080) * 100}%`,
-                height: `${(380 / 1080) * 100}%`,
+                height: `${(310 / 1080) * 100}%`,
                 cursor: 'grab',
               }}
               onMouseDown={handleDragStart}
