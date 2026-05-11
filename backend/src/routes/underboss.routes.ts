@@ -1375,23 +1375,13 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
       ? {}
       : { region: { in: regions } };
 
-    // Get events with funnel data
+    // Get events with funnel data — use separate count queries to avoid Prisma issues
     const events = await prisma.party.findMany({
       where: regionFilter,
       select: {
         id: true,
         name: true,
         address: true,
-        _count: {
-          select: { pageViews: true },
-        },
-        guests: {
-          where: { status: { not: 'INVITED' } },
-          select: { id: true },
-        },
-        rsvpFunnelEvents: {
-          select: { step: true },
-        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1401,11 +1391,17 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
     let totalStep1 = 0;
     let totalSubmitted = 0;
 
-    const eventStats = events.map((e) => {
-      const views = e._count.pageViews;
-      const opened = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_opened').length;
-      const step1Complete = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
-      const submitted = e.guests.length;
+    const eventStats = await Promise.all(events.map(async (e) => {
+      const [viewCount, guestCount, funnelEvents] = await Promise.all([
+        prisma.pageView.count({ where: { partyId: e.id } }),
+        prisma.guest.count({ where: { partyId: e.id, status: { not: 'INVITED' } } }),
+        prisma.rsvpFunnelEvent.findMany({ where: { partyId: e.id }, select: { step: true } }),
+      ]);
+
+      const views = viewCount;
+      const opened = funnelEvents.filter((f) => f.step === 'rsvp_opened').length;
+      const step1Complete = funnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
+      const submitted = guestCount;
 
       totalViews += views;
       totalOpened += opened;
