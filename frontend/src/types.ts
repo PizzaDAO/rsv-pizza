@@ -274,6 +274,7 @@ export interface Party {
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
+  flyerConfig?: Record<string, any> | null;
   canEdit?: boolean;
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];
@@ -1035,6 +1036,7 @@ export interface UnderbossEvent {
   telegramGroup?: string | null;
   createdAt: string;
   flyerGeneratedAt: string | null;
+  flyerConfig?: Record<string, any> | null;
   latestSponsorAt: string | null;
   flyerStale: boolean;
 }

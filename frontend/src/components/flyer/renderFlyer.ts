@@ -1,4 +1,4 @@
-import { DEFAULT_POSITIONS } from './useFlyerDrag';
+import { DEFAULT_POSITIONS, type FlyerPositions } from './useFlyerDrag';
 
 // ---- Shared constants ----
 export const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';
@@ -82,6 +82,19 @@ export function formatFlyerTime(timeStr: string, is12h: boolean): string {
     : `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
+// ---- FlyerConfig type (persisted to DB) ----
+
+export interface FlyerConfig {
+  positions?: FlyerPositions;
+  poppedLogos?: Record<string, { x: number; y: number }>;
+  logoSizes?: Record<string, number>;
+  sponsorBoxSize?: { width: number; height: number };
+  editVenueName?: string | null;
+  editStreetAddress?: string | null;
+  editCity?: string | null;
+  editTime?: string | null;
+}
+
 // ---- Standalone render function ----
 
 export interface RenderFlyerOptions {
@@ -91,7 +104,8 @@ export interface RenderFlyerOptions {
   dateDisplay: string;
   timeDisplay: string;
   is12h: boolean;
-  sponsors: { logoUrl: string }[];
+  sponsors: { id?: string; logoUrl: string }[];
+  config?: FlyerConfig;
 }
 
 /**
@@ -100,9 +114,17 @@ export interface RenderFlyerOptions {
  * suitable for batch/mass generation.
  */
 export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasElement> {
-  const { city, venueName, streetAddress, dateDisplay, timeDisplay, sponsors } = opts;
+  const { city, venueName, streetAddress, dateDisplay, timeDisplay, sponsors, config } = opts;
 
-  const positions = DEFAULT_POSITIONS;
+  // Use config positions/sponsorBoxSize when provided, otherwise defaults
+  const positions = config?.positions || DEFAULT_POSITIONS;
+  const sponsorBox = config?.sponsorBoxSize || DEFAULT_SPONSOR_BOX;
+
+  // Apply text overrides from config
+  const displayCity = config?.editCity ?? city;
+  const displayVenueName = config?.editVenueName ?? venueName;
+  const displayStreetAddress = config?.editStreetAddress ?? streetAddress;
+  const displayTime = config?.editTime ?? timeDisplay;
 
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
@@ -116,25 +138,25 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
   ctx.textBaseline = 'top';
 
   // 2) City name
-  const cityFontSize = fitText(city, 'Hub 191 Display', 64, CITY_BOX.width);
+  const cityFontSize = fitText(displayCity, 'Hub 191 Display', 64, CITY_BOX.width);
   ctx.fillStyle = CITY_COLOR;
   ctx.font = `${cityFontSize}px "Hub 191 Display"`;
-  ctx.fillText(city.toUpperCase(), positions.city.x, positions.city.y);
+  ctx.fillText(displayCity.toUpperCase(), positions.city.x, positions.city.y);
 
   // 3) Venue name + street address
   const venueX = positions.city.x;
-  const venueNameFontSize = fitText(venueName, 'Hub 191', 46, VENUE_BOX.width);
+  const venueNameFontSize = fitText(displayVenueName, 'Hub 191', 46, VENUE_BOX.width);
   ctx.fillStyle = VENUE_COLOR;
   ctx.font = `${venueNameFontSize}px "Hub 191"`;
-  ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y);
-  if (streetAddress) {
-    const streetFontSize = fitText(streetAddress, 'Hub 191', 46, VENUE_BOX.width);
+  ctx.fillText(displayVenueName.toUpperCase(), venueX, positions.venue.y);
+  if (displayStreetAddress) {
+    const streetFontSize = fitText(displayStreetAddress, 'Hub 191', 46, VENUE_BOX.width);
     ctx.font = `${streetFontSize}px "Hub 191"`;
-    ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y + venueNameFontSize + 4);
+    ctx.fillText(displayStreetAddress.toUpperCase(), venueX, positions.venue.y + venueNameFontSize + 4);
   }
 
   // 4) Date + Time
-  const fullTimeDisplay = `${dateDisplay}  ${timeDisplay || '6PM - 9PM'}`;
+  const fullTimeDisplay = `${dateDisplay}  ${displayTime || '6PM - 9PM'}`;
   const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', 55, TIME_BOX.width);
   {
     ctx.font = `${timeFontSize}px "Hub 191"`;
@@ -143,21 +165,44 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
     ctx.fillText(dateStr, positions.time.x, positions.time.y);
     const dateWidth = ctx.measureText(dateStr).width;
     const gap = 15;
-    if (timeDisplay) {
+    if (displayTime) {
       ctx.fillStyle = TIME_COLOR;
-      ctx.fillText(timeDisplay, positions.time.x + dateWidth + gap, positions.time.y);
+      ctx.fillText(displayTime, positions.time.x + dateWidth + gap, positions.time.y);
     }
   }
 
-  // 5) Sponsor logos (flex layout, no popped logos for mass gen)
-  if (sponsors.length > 0) {
+  // 5) Separate sponsors into group (flex layout) vs popped (absolute positioned)
+  const poppedLogos = config?.poppedLogos || {};
+  const configLogoSizes = config?.logoSizes || {};
+  const groupSponsors = sponsors.filter(s => !s.id || !poppedLogos[s.id]);
+  const poppedSponsors = sponsors.filter(s => s.id && poppedLogos[s.id]);
+
+  // 5a) Render popped logos at their absolute positions
+  for (const s of poppedSponsors) {
+    try {
+      const logoImg = await loadImg(s.logoUrl);
+      const pos = poppedLogos[s.id!];
+      const customSize = configLogoSizes[s.id!] || 80;
+      const maxW = customSize * 2.5;
+      const maxH = customSize;
+      const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+      const w = logoImg.width * fitScale;
+      const h = logoImg.height * fitScale;
+      ctx.drawImage(logoImg, pos.x - w / 2, pos.y - h / 2, w, h);
+    } catch {
+      // Skip logos that fail to load
+    }
+  }
+
+  // 5b) Render group sponsors in flex layout
+  if (groupSponsors.length > 0) {
     const gap = 16;
     const boxX = positions.sponsors.x;
-    const boxW = DEFAULT_SPONSOR_BOX.width;
-    const boxH = DEFAULT_SPONSOR_BOX.height;
+    const boxW = sponsorBox.width;
+    const boxH = sponsorBox.height;
 
     // Compute auto logo size
-    const sponsorCount = sponsors.length;
+    const sponsorCount = groupSponsors.length;
     const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
     const sponsorRows = sponsorCount <= 4 ? 1 : 2;
     const maxLogoWidth = sponsorCols > 0 ? (boxW - (sponsorCols - 1) * 16) / sponsorCols : 0;
@@ -166,11 +211,13 @@ export async function renderFlyer(opts: RenderFlyerOptions): Promise<HTMLCanvasE
 
     type LogoItem = { img: HTMLImageElement; w: number; h: number };
     const items: LogoItem[] = [];
-    for (const s of sponsors) {
+    for (const s of groupSponsors) {
       try {
         const logoImg = await loadImg(s.logoUrl);
-        const maxW = autoLogoSize * 2.5;
-        const maxH = autoLogoSize;
+        // Use per-sponsor size if available, else auto
+        const customSize = s.id && configLogoSizes[s.id] ? configLogoSizes[s.id] : autoLogoSize;
+        const maxW = customSize * 2.5;
+        const maxH = customSize;
         const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
         items.push({ img: logoImg, w: logoImg.width * fitScale, h: logoImg.height * fitScale });
       } catch {

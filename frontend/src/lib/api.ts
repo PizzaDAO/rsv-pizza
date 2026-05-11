@@ -158,6 +158,7 @@ export interface UpdatePartyData {
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
+  flyerConfig?: Record<string, any> | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   lumaUrl?: string | null;
@@ -251,6 +252,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       pinnedApps: data.pinnedApps,
       region: data.region,
       flyerGeneratedAt: data.flyerGeneratedAt,
+      flyerConfig: data.flyerConfig,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
       lumaUrl: data.lumaUrl,

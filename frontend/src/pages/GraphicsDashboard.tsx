@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import type { UnderbossEvent } from '../types';
 import { GPP_REGIONS } from '../types';
-import { renderFlyer, uses12Hour, formatFlyerTime } from '../components/flyer/renderFlyer';
+import { renderFlyer, uses12Hour, formatFlyerTime, type FlyerConfig } from '../components/flyer/renderFlyer';
 import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
 
@@ -137,6 +137,18 @@ export function GraphicsDashboard() {
           dateDisplay = `${monthStr} ${dayStr}`;
         }
 
+        // Use layout config (positions, logos) but NOT text overrides —
+        // mass gen should always use fresh event data for text.
+        const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+        const layoutConfig: FlyerConfig | undefined = rawCfg
+          ? {
+              positions: rawCfg.positions,
+              poppedLogos: rawCfg.poppedLogos,
+              logoSizes: rawCfg.logoSizes,
+              sponsorBoxSize: rawCfg.sponsorBoxSize,
+            }
+          : undefined;
+
         const canvas = await renderFlyer({
           city,
           venueName,
@@ -145,6 +157,7 @@ export function GraphicsDashboard() {
           timeDisplay,
           is12h,
           sponsors: [],
+          config: layoutConfig,
         });
 
         const blob = await new Promise<Blob | null>(resolve =>
