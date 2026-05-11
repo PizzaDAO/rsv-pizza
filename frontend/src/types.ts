@@ -484,6 +484,7 @@ export interface Sponsor {
   intakeToken: string | null;
   intakeSubmittedAt: string | null;
   sponsorMessage: string | null;
+  addedByUnderboss?: boolean;
   createdAt: string;
   updatedAt: string;
 }

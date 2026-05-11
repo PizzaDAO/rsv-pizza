@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin, isUnderboss } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
@@ -49,7 +49,18 @@ router.get('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Resp
       orderBy,
     });
 
-    res.json({ sponsors });
+    // Strip contact info from underboss-added sponsors for non-privileged users
+    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
+    const sanitized = userIsPrivileged
+      ? sponsors
+      : sponsors.map(s => {
+          if (s.addedByUnderboss) {
+            return { ...s, contactEmail: null, contactPhone: null, contactName: null, contactTwitter: null };
+          }
+          return s;
+        });
+
+    res.json({ sponsors: sanitized });
   } catch (error) {
     next(error);
   }
@@ -237,6 +248,7 @@ router.post('/:partyId/sponsors/ensure-from-underboss', requireAuth, async (req:
           status: 'yes',
           sortOrder: sponsorUser.descriptionSortOrder,
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+          addedByUnderboss: true,
         },
       });
 
@@ -505,7 +517,13 @@ router.get('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequest
       throw new AppError('Sponsor not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ sponsor });
+    // Strip contact info from underboss-added sponsors for non-privileged users
+    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
+    const sanitizedSponsor = (!userIsPrivileged && sponsor.addedByUnderboss)
+      ? { ...sponsor, contactEmail: null, contactPhone: null, contactName: null, contactTwitter: null }
+      : sponsor;
+
+    res.json({ sponsor: sanitizedSponsor });
   } catch (error) {
     next(error);
   }
@@ -577,6 +595,10 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       throw new AppError(`Invalid category. Must be one of: ${validCategories.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // Protect contact fields for underboss-added sponsors from non-privileged users
+    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
+    const stripContactFields = existingSponsor.addedByUnderboss && !userIsPrivileged;
+
     const sponsor = await prisma.sponsor.update({
       where: { id: sponsorId },
       data: {
@@ -586,10 +608,10 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
         ...(brandInstagram !== undefined && { brandInstagram: brandInstagram?.trim() || null }),
         ...(brandDescription !== undefined && { brandDescription: brandDescription?.trim() || null }),
         ...(pointPerson !== undefined && { pointPerson: pointPerson?.trim() || null }),
-        ...(contactName !== undefined && { contactName: contactName?.trim() || null }),
-        ...(contactEmail !== undefined && { contactEmail: contactEmail?.trim()?.toLowerCase() || null }),
-        ...(contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
-        ...(contactTwitter !== undefined && { contactTwitter: contactTwitter?.trim() || null }),
+        ...(!stripContactFields && contactName !== undefined && { contactName: contactName?.trim() || null }),
+        ...(!stripContactFields && contactEmail !== undefined && { contactEmail: contactEmail?.trim()?.toLowerCase() || null }),
+        ...(!stripContactFields && contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
+        ...(!stripContactFields && contactTwitter !== undefined && { contactTwitter: contactTwitter?.trim() || null }),
         ...(telegram !== undefined && { telegram: telegram?.trim() || null }),
         ...(status !== undefined && { status }),
         ...(amount !== undefined && { amount: amount !== null && amount !== '' ? amount : null }),
