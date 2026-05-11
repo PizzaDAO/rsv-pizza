@@ -193,6 +193,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
   return {
     id: party.id,
     name: party.name,
+    inviteCode: party.inviteCode,
     customUrl: party.customUrl,
     date: party.date,
     address: party.address,
