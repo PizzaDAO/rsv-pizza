@@ -1417,7 +1417,7 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
         step1Complete,
         submitted,
       };
-    });
+    }));
 
     res.json({
       events: eventStats,
