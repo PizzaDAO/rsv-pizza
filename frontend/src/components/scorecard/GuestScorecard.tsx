@@ -12,7 +12,6 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'photo',
   'vouch',
   'pizza_selfie',
-  'sticker',
   'follow_pizzadao',
   'signup_pizzadao',
 ];
@@ -20,7 +19,7 @@ const ITEM_ORDER: ScorecardItemKey[] = [
 export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
-  const [totalItems, setTotalItems] = useState(7);
+  const [totalItems, setTotalItems] = useState(6);
   const [loading, setLoading] = useState(true);
   const [completingItem, setCompletingItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +86,7 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
       <div className="px-4 py-3 border-b border-theme-stroke/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy className={`w-5 h-5 ${isComplete ? 'text-yellow-400' : 'text-[#ff393a]'}`} />
-          <span className="text-sm font-semibold text-white">Pizza Chef Score</span>
+          <span className="text-sm font-semibold text-white">Party Guest Score</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-lg font-bold ${isComplete ? 'text-yellow-400' : 'text-white'}`}>

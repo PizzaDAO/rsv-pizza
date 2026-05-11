@@ -5,7 +5,6 @@ import {
   Camera,
   Users,
   Pizza,
-  Sticker,
   UserPlus,
   Globe,
   Loader2,
@@ -18,7 +17,6 @@ export type ScorecardItemKey =
   | 'photo'
   | 'vouch'
   | 'pizza_selfie'
-  | 'sticker'
   | 'follow_pizzadao'
   | 'signup_pizzadao';
 
@@ -32,9 +30,8 @@ interface ScorecardItemProps {
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; icon: React.ElementType; color: string }> = {
   post: { label: 'Post about the party', icon: Share2, color: '#1DA1F2' },
   photo: { label: 'Upload a photo', icon: Camera, color: '#E1306C' },
-  vouch: { label: 'Check in someone', icon: Users, color: '#4ade80' },
+  vouch: { label: 'Check someone in', icon: Users, color: '#4ade80' },
   pizza_selfie: { label: 'Pizza selfie', icon: Pizza, color: '#FFC107' },
-  sticker: { label: 'Molto benny sticker', icon: Sticker, color: '#FF6B35' },
   follow_pizzadao: { label: 'Follow @pizza_dao', icon: UserPlus, color: '#1DA1F2' },
   signup_pizzadao: { label: 'Sign up on pizzadao.org', icon: Globe, color: '#A855F7' },
 };
@@ -50,7 +47,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
   // Auto-complete items (no user action needed from this UI)
   const isAutoItem = itemKey === 'photo' || itemKey === 'vouch' || itemKey === 'pizza_selfie';
   // Self-report items
-  const isSelfReport = itemKey === 'sticker' || itemKey === 'follow_pizzadao' || itemKey === 'signup_pizzadao';
+  const isSelfReport = itemKey === 'follow_pizzadao' || itemKey === 'signup_pizzadao';
 
   const handleAction = () => {
     if (completed) return;
@@ -74,7 +71,6 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
 
   const getActionLabel = (): string => {
     if (itemKey === 'post') return 'Share';
-    if (itemKey === 'sticker') return 'I used it!';
     if (itemKey === 'follow_pizzadao') return 'I followed!';
     if (itemKey === 'signup_pizzadao') return 'I signed up!';
     return '';
