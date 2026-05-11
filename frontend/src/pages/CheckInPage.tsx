@@ -365,15 +365,14 @@ export function CheckInPage() {
       return (
         <>
           <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg" />
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Claim 10% Discount</h2>
-          <p className="text-sm mb-6" style={{ color: C.mutedText }}>One-time Use</p>
           <button
             onClick={handleClaimDiscount}
             className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
             style={{ background: C.red }}
           >
-            Claim Discount
+            Claim 10% Discount
           </button>
+          <p className="text-sm mt-4" style={{ color: C.mutedText }}>One-time Use</p>
         </>
       );
     }
