@@ -3156,3 +3156,21 @@ export async function removeGraphicsAdmin(id: string): Promise<void> {
   await apiRequest(`/api/graphics-admin/${id}`, { method: 'DELETE' });
 }
 
+// GPP Pizzerias Map
+export interface GPPPizzeriaMapItem {
+  id: string;
+  name: string;
+  address: string;
+  url?: string;
+  rating?: number;
+  reviewCount?: number;
+  description?: string;
+  location: { lat: number; lng: number };
+  eventCity: string;
+  eventSlug: string;
+}
+
+export async function fetchGppPizzerias(): Promise<GPPPizzeriaMapItem[]> {
+  return apiRequest<GPPPizzeriaMapItem[]>('/api/gpp/pizzerias', { requireAuth: false });
+}
+
