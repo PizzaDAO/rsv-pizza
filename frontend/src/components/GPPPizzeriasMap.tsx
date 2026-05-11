@@ -160,8 +160,15 @@ export default function GPPPizzeriasMap({
             linkHtml = `<a href="${pizzeria.url}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">Visit Website &rarr;</a>`;
           }
 
+          // Photo (Google Places photo URL)
+          let photoHtml = '';
+          if (pizzeria.photo) {
+            photoHtml = `<img src="${pizzeria.photo}" alt="${pizzeria.name}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
+          }
+
           const content = `
             <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
+              ${photoHtml}
               <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${pizzeria.name}</h3>
               ${ratingHtml}
               <p style="color:#888;font-size:12px;margin:2px 0">${pizzeria.address || ''}</p>

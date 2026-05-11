@@ -635,9 +635,10 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventSlug = party.customUrl || party.inviteCode;
 
       for (const p of raw as any[]) {
-        // Strip heavy fields
+        // Strip heavy fields, keep only first photo
         const { photos, orderingOptions, ...light } = p;
-        pizzerias.push({ ...light, eventCity, eventSlug });
+        const photo = Array.isArray(photos) && photos.length > 0 ? photos[0] : undefined;
+        pizzerias.push({ ...light, photo, eventCity, eventSlug });
       }
     }
 
