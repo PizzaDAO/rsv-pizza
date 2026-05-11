@@ -1,0 +1,26 @@
+{
+  "title": "ゲストチェックイン",
+  "loading": "ゲストをチェックイン中...",
+  "success": {
+    "title": "チェックイン完了！",
+    "backToDashboard": "イベントダッシュボードに戻る"
+  },
+  "alreadyCheckedIn": {
+    "title": "チェックイン済み",
+    "checkedInAt": "{{time}}にチェックイン済み"
+  },
+  "unauthorized": {
+    "title": "権限がありません",
+    "message": "このイベントのゲストをチェックインする権限がありません。ゲストのチェックインは主催者と共同主催者のみが行えます。",
+    "goHome": "ホームに戻る"
+  },
+  "notFound": {
+    "title": "見つかりません",
+    "goHome": "ホームに戻る"
+  },
+  "error": {
+    "title": "チェックインに失敗しました",
+    "tryAgain": "もう一度試す",
+    "goHome": "ホームに戻る"
+  }
+}

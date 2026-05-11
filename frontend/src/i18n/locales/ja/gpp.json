@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "グローバルピザパーティーを主催 | RSV.Pizza",
+    "description": "世界中のピザのお祝いに参加しましょう！あなたの街でグローバルピザパーティーを主催して、世界中のピザ愛好家とつながりましょう。"
+  },
+  "header": {
+    "logIn": "ログイン / 新規登録"
+  },
+  "form": {
+    "title": "イベントを作成",
+    "subtitle": "詳細を入力して始めましょう",
+    "cityPlaceholder": "どの都市で主催しますか？",
+    "namePlaceholder": "あなたの名前は？",
+    "telegramPlaceholder": "Telegramユーザー名",
+    "telegramHint": "主催者グループチャットに追加するため",
+    "emailPlaceholder": "メールアドレス",
+    "emailHint": "イベント管理用のログインコードを送信します",
+    "submit": "イベントを作成",
+    "submitting": "イベントを作成中...",
+    "selectCity": "ドロップダウンの候補から都市を選択してください。"
+  },
+  "map": {
+    "title": "昨年のグローバルピザパーティー",
+    "subtitle": "世界中のコミュニティがピザのために集まった場所を見てみましょう",
+    "openFullMap": "全画面マップを開く"
+  },
+  "success": {
+    "pageTitle": "イベント作成完了！ | グローバルピザパーティー",
+    "signedIn": "ログインしました！",
+    "redirecting": "主催者ダッシュボードにリダイレクト中...",
+    "title": "グローバルピザパーティーが公開されました！",
+    "created": "{{eventName}}が作成されました。",
+    "otpPrompt": "{{email}}に送信した6桁のコードを入力してください",
+    "verifying": "確認中...",
+    "returnHome": "ホームに戻る",
+    "checkSpam": "コードが届きませんか？迷惑メールフォルダを確認してください。"
+  }
+}

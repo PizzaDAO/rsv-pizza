@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "寄付する",
+    "buyPizzaFor": "{{recipient}}にピザを贈る",
+    "buyPizzaForEvent": "{{eventName}}にピザを贈る",
+    "donateTitle": "寄付",
+    "supportingRecipient": "{{recipient}}を応援",
+    "supportingEvent": "{{eventName}}を応援",
+    "defaultMessage": "このイベントの実現を支援するために寄付をしませんか？",
+    "donorCount_one": "{{count}}人が寄付しました",
+    "donorCount_other": "{{count}}人が寄付しました",
+    "raised": "{{amount}}調達済み",
+    "goal": "目標：${{amount}}",
+    "recentSupporters": "最近の支援者：",
+    "anonymous": "匿名",
+    "makeADonation": "寄付する",
+    "back": "戻る"
+  },
+  "form": {
+    "payWithCard": "カードまたはウォレットで支払い",
+    "cardSubtitle": "クレジット/デビットカード、Apple Pay、Google Payなど",
+    "crypto": "暗号通貨",
+    "cryptoSubtitle": "ETH、USDC、またはその他のトークン",
+    "cancel": "キャンセル",
+    "backToPaymentOptions": "支払いオプションに戻る",
+    "customAmount": "カスタム金額",
+    "minimumDonation": "最低寄付額は$0.50です",
+    "donate": "寄付する",
+    "donateAmount": "${{amount}}を寄付",
+    "loading": "読み込み中...",
+    "processing": "処理中...",
+    "paymentFailed": "支払いに失敗しました",
+    "unexpectedError": "予期しないエラーが発生しました",
+    "failedToInitialize": "支払いの初期化に失敗しました。もう一度お試しください。",
+    "thankYou": "ありがとうございます！",
+    "donationReceived": "${{amount}}の寄付を受け取りました。",
+    "back": "戻る"
+  },
+  "calendar": {
+    "addToCalendar": "カレンダーに追加",
+    "googleCalendar": "Googleカレンダー",
+    "appleCalendar": "Appleカレンダー",
+    "outlook": "Outlook"
+  }
+}

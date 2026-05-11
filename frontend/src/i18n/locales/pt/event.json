@@ -39,7 +39,12 @@
   "viewPhotos": "Ver Fotos ({{count}})",
   "sharePhotos": "Compartilhar Fotos",
   "pizzadaoDescription": "é uma cooperativa internacional de pizza que está trazendo a indústria de pizza para a blockchain. Organizamos uma festa global de pizza todos os anos, arranjamos eventos em conferências todo mês e apoiamos outros organizadores com pizza.",
-  "gppDefaultDescription": "Em 22 de maio de 2010, duas pizzas mudaram o mundo. Laszlo Hanyecz pagou 10.000 BTC a Jeremy Sturdivant para pedir duas pizzas. Foi a primeira transação de Bitcoin no mundo real e a faísca de um movimento global.\n\nAgora, a PizzaDAO convida você para a Global Pizza Party, uma celebração mundial do Bitcoin Pizza Day em mais de 500 cidades. Junte-se a nós enquanto homenageamos as fatias que começaram tudo.\n\nO que esperar:\n🍕 Pizza grátis\n🌍 Uma celebração global em mais de 500 cidades\n₿ Entusiastas e construtores de cripto\n💬 Ótimas conversas, novos amigos e boas vibrações\n\nEsteja você imerso em cripto ou apenas aqui por uma fatia, este é seu convite para fazer parte da história, novamente.",
+  "gppDefaultDescription": "Em 22 de maio de 2010, duas pizzas mudaram o mundo. Laszlo Hanyecz pagou 10.000 BTC a Jeremy Sturdivant para pedir duas pizzas. Foi a primeira transação de Bitcoin no mundo real e a faísca de um movimento global.\n\nAgora, a PizzaDAO convida você para a [Global Pizza Party](https://globalpizza.party), uma celebração mundial do Bitcoin Pizza Day em mais de 500 cidades. Junte-se a nós enquanto homenageamos as fatias que começaram tudo.\n\nO que esperar:\n🍕 Pizza grátis\n🌍 Uma celebração global em mais de 500 cidades\n₿ Entusiastas e construtores de cripto\n💬 Ótimas conversas, novos amigos e boas vibrações\n\nEsteja você imerso em cripto ou apenas aqui por uma fatia, este é seu convite para fazer parte da história, novamente.",
+  "sponsorDescription": {
+    "ens": "(Ethereum Name Service) é o protocolo de nomes descentralizado que alimenta nomes legíveis na internet. Em vez de copiar e colar endereços blockchain longos e complexos, o ENS permite substituí-los por um nome simples e memorável (como pizzadao.eth) que funciona em carteiras, aplicativos e na web descentralizada.",
+    "brave": "é um navegador web rápido, privado e seguro para PC, Mac e celular. Baixe agora para desfrutar de uma navegação mais rápida e sem anúncios que economiza dados.",
+    "wpc": "é uma organização sem fins lucrativos sediada nos EUA, um grupo multinacional de profissionais de pizza de elite. Dedicados à divulgação educacional, ao serviço comunitário e à promoção da pizza!"
+  },
   "dateTbd": "Data a Definir",
   "partiesList": {
     "title": "Todas as Festas",

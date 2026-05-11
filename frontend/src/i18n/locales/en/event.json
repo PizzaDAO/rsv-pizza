@@ -39,7 +39,12 @@
   "viewPhotos": "View Photos ({{count}})",
   "sharePhotos": "Share Photos",
   "pizzadaoDescription": "is an international pizza co-op that's bringing the pizza industry onchain. We throw a global pizza party every year, arrange conference events every month, and support other organizers' meetups with pizza.",
-  "gppDefaultDescription": "On May 22, 2010, two pizzas changed the world. Laszlo Hanyecz paid 10,000 BTC to Jeremy Sturdivant to order him two pizzas. It was the first real-world Bitcoin transaction and the spark of a global movement.\n\nNow, PizzaDAO invites you to the Global Pizza Party, a worldwide celebration of Bitcoin Pizza Day across 500+ cities. Join us as we honor the slices that started it all.\n\nWhat to expect:\n🍕 Free pizza\n🌍 A global celebration across 500+ cities\n₿ Crypto enthusiasts and builders\n💬 Great conversations, new friends, and good vibes\n\nWhether you're deep in crypto or just here for a slice, this is your invitation to be part of history, again.",
+  "gppDefaultDescription": "On May 22, 2010, two pizzas changed the world. Laszlo Hanyecz paid 10,000 BTC to Jeremy Sturdivant to order him two pizzas. It was the first real-world Bitcoin transaction and the spark of a global movement.\n\nNow, PizzaDAO invites you to the [Global Pizza Party](https://globalpizza.party), a worldwide celebration of Bitcoin Pizza Day across 500+ cities. Join us as we honor the slices that started it all.\n\nWhat to expect:\n🍕 Free pizza\n🌍 A global celebration across 500+ cities\n₿ Crypto enthusiasts and builders\n💬 Great conversations, new friends, and good vibes\n\nWhether you're deep in crypto or just here for a slice, this is your invitation to be part of history, again.",
+  "sponsorDescription": {
+    "ens": "(Ethereum Name Service) is the decentralized naming protocol that powers human-readable names on the internet. Instead of copying and pasting long, complex blockchain addresses, ENS lets you replace them with a simple, memorable name (like pizzadao.eth) that works across wallets, apps, and the decentralized web.",
+    "brave": "browser is a fast, private and secure web browser for PC, Mac and mobile. Download now to enjoy a faster ad-free browsing experience that saves data.",
+    "wpc": "is a U.S. based non-profit, multinational group of elite pizza professionals. Dedicated to educational outreach, community service, and promoting pizza!"
+  },
   "dateTbd": "Date TBD",
   "partiesList": {
     "title": "All Parties",
