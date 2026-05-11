@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
+import { FunnelTab } from '../components/underboss/FunnelTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
@@ -1272,6 +1273,13 @@ export function AdminPage() {
               </div>
             </section>
           )}
+          {/* Analytics — RSVP Funnel */}
+          <section className="mb-10">
+            <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
+              Analytics
+            </h2>
+            <FunnelTab regions={[]} />
+          </section>
         </div>
       </main>
 
