@@ -106,9 +106,12 @@ export default function GPPPizzeriasMap({
             text: '\u{1F355}',
             fontSize: '22px',
           },
+          optimized: false,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 0,
+            scale: 14,
+            fillOpacity: 0,
+            strokeWeight: 0,
           },
         });
 
