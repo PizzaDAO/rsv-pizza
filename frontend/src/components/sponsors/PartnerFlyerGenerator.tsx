@@ -328,7 +328,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
               >
                 {(tagline || 'supported by').toUpperCase()}
                 <Pencil
-                  size={12 * previewScale > 8 ? 12 * previewScale : 8}
+                  size={30 * previewScale > 14 ? 30 * previewScale : 14}
                   style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, marginTop: -2 }}
                   onClick={(e) => { e.stopPropagation(); setEditingField('tagline'); }}
                 />
