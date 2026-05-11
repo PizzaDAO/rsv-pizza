@@ -168,7 +168,7 @@ const apps: AppItem[] = [
     description: 'Manage event partners and sponsorships',
     icon: Handshake,
     status: 'live',
-    category: 'after-party',
+    category: 'planning',
     tab: 'partners',
   },
   {
