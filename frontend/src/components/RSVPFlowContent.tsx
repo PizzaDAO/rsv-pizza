@@ -112,6 +112,25 @@ export function RSVPFlowContent({
             customUrl={event.customUrl}
             inviteCode={event.inviteCode}
             twitterHandles={twitterHandles}
+            calendarSlot={event.date ? (
+              <div className="relative flex-1">
+                <button
+                  ref={calendarBtnRef}
+                  onClick={() => setCalendarOpen(!calendarOpen)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
+                >
+                  <Calendar size={14} />
+                  <span className="hidden sm:inline">Add to Calendar</span>
+                  <span className="sm:hidden">Calendar</span>
+                </button>
+                <AddToCalendarPopup
+                  isOpen={calendarOpen}
+                  onClose={() => setCalendarOpen(false)}
+                  event={event}
+                  anchorRef={calendarBtnRef}
+                />
+              </div>
+            ) : undefined}
           />
         )}
         {/* NFT Minting Status */}
@@ -192,25 +211,7 @@ export function RSVPFlowContent({
             <span className="text-sm">Thanks for your support!</span>
           </div>
         )}
-        {/* Calendar Button */}
-        {event.date && (
-          <div className="mt-4 relative">
-            <button
-              ref={calendarBtnRef}
-              onClick={() => setCalendarOpen(!calendarOpen)}
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              <Calendar size={16} />
-              Add to Calendar
-            </button>
-            <AddToCalendarPopup
-              isOpen={calendarOpen}
-              onClose={() => setCalendarOpen(false)}
-              event={event}
-              anchorRef={calendarBtnRef}
-            />
-          </div>
-        )}
+
         <button
           onClick={onClose}
           className="btn-secondary mt-4"

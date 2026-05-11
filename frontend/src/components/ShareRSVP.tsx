@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { Download, Link, Check } from 'lucide-react';
+import React from 'react';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -7,6 +6,7 @@ interface ShareRSVPProps {
   customUrl: string | null;
   inviteCode: string;
   twitterHandles?: string[];
+  calendarSlot?: React.ReactNode;
 }
 
 // X (Twitter) icon
@@ -38,10 +38,7 @@ function buildShareText(base: string, handles: string[], maxLen: number): string
   return text;
 }
 
-export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [] }: ShareRSVPProps) {
-  const [copied, setCopied] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-
+export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [], calendarSlot }: ShareRSVPProps) {
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
   const baseText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
@@ -64,36 +61,6 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
     window.open(intentUrl, '_blank');
   };
 
-  const handleDownload = async () => {
-    if (downloading || !eventImageUrl) return;
-    setDownloading(true);
-    try {
-      const res = await fetch(eventImageUrl);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${city.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}-pizza-party.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to download image:', err);
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(eventUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy link:', err);
-    }
-  };
 
   return (
     <div className="mt-6 pt-6 border-t border-theme-stroke">
@@ -109,6 +76,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
       )}
 
       <div className="flex gap-2">
+        {calendarSlot}
         <button
           onClick={handleShareX}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
@@ -116,36 +84,6 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
           <XIcon size={14} />
           <span className="hidden sm:inline">Share on X</span>
           <span className="sm:hidden">X</span>
-        </button>
-
-        {eventImageUrl && (
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm disabled:opacity-50"
-          >
-            <Download size={14} />
-            <span className="hidden sm:inline">Download</span>
-            <span className="sm:hidden">Save</span>
-          </button>
-        )}
-
-        <button
-          onClick={handleCopyLink}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-sm"
-        >
-          {copied ? (
-            <>
-              <Check size={14} className="text-[#39d98a]" />
-              <span className="text-[#39d98a]">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Link size={14} className="text-theme-text" />
-              <span className="text-theme-text hidden sm:inline">Copy Link</span>
-              <span className="text-theme-text sm:hidden">Link</span>
-            </>
-          )}
         </button>
       </div>
     </div>
