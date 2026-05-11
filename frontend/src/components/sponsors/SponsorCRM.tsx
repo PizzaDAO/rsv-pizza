@@ -18,6 +18,7 @@ import { PartnerForm, extractSponsorData } from './PartnerForm';
 import type { PartnerFormData } from './PartnerForm';
 import { usePizza } from '../../contexts/PizzaContext';
 import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
+import { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
 
 interface SponsorCRMProps {
   partyId: string;
@@ -383,6 +384,17 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
           </div>
         </div>
       )}
+
+      {/* Partner Flyer Generator (GPP only) */}
+      {party?.eventType === 'gpp' && (() => {
+        const flyerSponsors = sponsors.filter(
+          s => (s.status === 'yes' || s.status === 'paid') && s.logoUrl
+        );
+        const cityName = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || '';
+        return flyerSponsors.length > 0 ? (
+          <PartnerFlyerGenerator sponsors={flyerSponsors} cityName={cityName} />
+        ) : null;
+      })()}
 
       {/* Form Modal */}
       {showForm && (
