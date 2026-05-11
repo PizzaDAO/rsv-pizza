@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Check,
-  Share2,
-  Camera,
-  Users,
-  Pizza,
-  UserPlus,
-  Globe,
-  MessageCircle,
   Loader2,
   Link2,
 } from 'lucide-react';
@@ -30,22 +22,21 @@ interface ScorecardItemProps {
   onComplete: (itemKey: ScorecardItemKey, proofUrl?: string, proofType?: string) => void;
 }
 
-const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; icon: React.ElementType; color: string }> = {
-  post: { label: 'Post about the party', icon: Share2, color: '#1DA1F2' },
-  photo: { label: 'Upload a photo', icon: Camera, color: '#E1306C' },
-  vouch: { label: 'Check someone in', icon: Users, color: '#4ade80' },
-  pizza_selfie: { label: 'Pizza selfie', icon: Pizza, color: '#FFC107' },
-  sign_pizza_box: { label: 'Sign the party pizza box', icon: Pizza, color: '#FF6B35' },
-  join_telegram: { label: "Join your city's PizzaDAO Telegram", icon: MessageCircle, color: '#0088cc' },
-  follow_pizzadao: { label: 'Follow @pizza_dao', icon: UserPlus, color: '#1DA1F2' },
-  signup_pizzadao: { label: 'Sign up on pizzadao.org', icon: Globe, color: '#A855F7' },
+const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
+  post: { label: 'Post about the party', emoji: '📣' },
+  photo: { label: 'Upload a photo', emoji: '📸' },
+  vouch: { label: 'Check someone in', emoji: '🤝' },
+  pizza_selfie: { label: 'Pizza selfie', emoji: '🍕' },
+  sign_pizza_box: { label: 'Sign the party pizza box', emoji: '✍️' },
+  join_telegram: { label: "Join your city's PizzaDAO Telegram", emoji: '💬' },
+  follow_pizzadao: { label: 'Follow @pizza_dao', emoji: '🐦' },
+  signup_pizzadao: { label: 'Sign up on pizzadao.org', emoji: '🌐' },
 };
 
 export function ScorecardItem({ itemKey, completed, loading, onComplete }: ScorecardItemProps) {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const config = ITEM_CONFIG[itemKey];
-  const Icon = config.icon;
 
   // Items that need URL proof
   const needsUrlProof = itemKey === 'post';
@@ -86,16 +77,12 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
   return (
     <div className="space-y-2">
       <div className={`flex items-center gap-3 py-2.5 px-3 rounded-lg transition-colors ${completed ? 'bg-green-500/10' : 'bg-white/5 hover:bg-white/10'}`}>
-        {/* Icon */}
+        {/* Emoji */}
         <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${completed ? 'bg-green-500/20' : 'bg-white/10'}`}
-          style={{ borderColor: completed ? '#4ade80' : config.color, borderWidth: '1.5px' }}
+          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${completed ? 'bg-green-500/20 border-green-400' : 'bg-white/10 border-white/20'}`}
+          style={{ borderWidth: '1.5px' }}
         >
-          {completed ? (
-            <Check className="w-4 h-4 text-green-400" />
-          ) : (
-            <Icon className="w-4 h-4" style={{ color: config.color }} />
-          )}
+          <span className="text-base leading-none">{completed ? '✅' : config.emoji}</span>
         </div>
 
         {/* Label */}
