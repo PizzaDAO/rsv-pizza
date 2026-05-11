@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Download, RotateCcw } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT } from '../flyer/renderFlyer';
+import { getCityTier } from '../../utils/sponsorshipPricing';
 
 interface PartnerCitiesFlyerProps {
   partner: SponsorUser;
@@ -13,8 +14,7 @@ interface PartnerCitiesFlyerProps {
 const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
 const CITY_BOX = { x: 40, y: 550, width: 500, height: 490 };
-const MAX_VISIBLE = 20;
-const OVERFLOW_SHOW = 18;
+const MAX_VISIBLE = 10;
 
 async function renderCitiesFlyer(
   cities: string[],
@@ -45,8 +45,8 @@ async function renderCitiesFlyer(
   // 3) City names
   ctx.textBaseline = 'top';
   const hasOverflow = cities.length > MAX_VISIBLE;
-  const display = hasOverflow ? cities.slice(0, OVERFLOW_SHOW) : cities;
-  const suffix = hasOverflow ? `+ ${cities.length - OVERFLOW_SHOW} MORE` : null;
+  const display = hasOverflow ? cities.slice(0, MAX_VISIBLE) : cities;
+  const suffix = hasOverflow ? `+ ${cities.length - MAX_VISIBLE} MORE` : null;
   const lines = display.length + (suffix ? 1 : 0);
 
   // Auto-size font
@@ -94,7 +94,14 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
       .filter(e => e.eventTags?.includes(partner.tag))
       .map(e => e.name.replace(/^Global Pizza Party\s*/i, '').trim())
       .filter(Boolean);
-    return [...new Set(raw)].sort();
+    const unique = [...new Set(raw)];
+    // Sort by tier (1 first) then alphabetical within each tier
+    return unique.sort((a, b) => {
+      const tierA = getCityTier(a);
+      const tierB = getCityTier(b);
+      if (tierA !== tierB) return tierA - tierB;
+      return a.localeCompare(b);
+    });
   }, [events, partner.tag]);
 
   const scale = containerWidth / 1080;
