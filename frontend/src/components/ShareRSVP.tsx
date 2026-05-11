@@ -79,7 +79,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
         {calendarSlot}
         <button
           onClick={handleShareX}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text"
         >
           <XIcon size={14} />
           <span className="hidden sm:inline">Share on X</span>

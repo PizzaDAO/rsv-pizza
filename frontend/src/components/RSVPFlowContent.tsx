@@ -117,7 +117,7 @@ export function RSVPFlowContent({
                 <button
                   ref={calendarBtnRef}
                   onClick={() => setCalendarOpen(!calendarOpen)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text"
                 >
                   <Calendar size={14} />
                   <span className="hidden sm:inline">Add to Calendar</span>
@@ -214,7 +214,7 @@ export function RSVPFlowContent({
 
         <button
           onClick={onClose}
-          className="btn-secondary mt-4"
+          className="btn-secondary mt-4 text-sm py-2"
         >
           {closeButtonLabel}
         </button>
