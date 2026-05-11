@@ -3139,6 +3139,36 @@ export async function vouchForGuest(inviteCode: string, targetGuestId: string): 
   });
 }
 
+// ── Post-Event Discount Claim ──
+
+export interface DiscountStatusResponse {
+  guestName: string;
+  isCheckedIn: boolean;
+  hasEnded: boolean;
+  discountClaimedAt: string | null;
+}
+
+export interface DiscountClaimResponse {
+  success: boolean;
+  alreadyClaimed: boolean;
+  claimedAt: string;
+}
+
+/** Get discount eligibility status for a guest (no auth required) */
+export async function getDiscountStatus(inviteCode: string, guestId: string): Promise<DiscountStatusResponse> {
+  return apiRequest<DiscountStatusResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+    requireAuth: false,
+  });
+}
+
+/** Claim post-event discount for a checked-in guest (no auth required) */
+export async function claimDiscount(inviteCode: string, guestId: string): Promise<DiscountClaimResponse> {
+  return apiRequest<DiscountClaimResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+    method: 'POST',
+    requireAuth: false,
+  });
+}
+
 // ── Graphics Admin Management ──
 
 export async function fetchGraphicsAdminList(): Promise<GraphicsAdmin[]> {
