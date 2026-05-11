@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "Organisez une Global Pizza Party | RSV.Pizza",
+    "description": "Rejoignez la célébration mondiale de la pizza ! Organisez une Global Pizza Party dans votre ville et connectez-vous avec les amoureux de la pizza du monde entier."
+  },
+  "header": {
+    "logIn": "Connexion / Inscription"
+  },
+  "form": {
+    "title": "Créez votre événement",
+    "subtitle": "Remplissez vos informations pour commencer",
+    "cityPlaceholder": "Dans quelle ville organisez-vous ?",
+    "namePlaceholder": "Quel est votre nom ?",
+    "telegramPlaceholder": "Nom d'utilisateur Telegram",
+    "telegramHint": "Pour vous ajouter au groupe de discussion des hôtes",
+    "emailPlaceholder": "Adresse e-mail",
+    "emailHint": "Nous vous enverrons un code de connexion pour gérer votre événement",
+    "submit": "Créer votre événement",
+    "submitting": "Création de votre événement...",
+    "selectCity": "Veuillez sélectionner une ville dans les suggestions."
+  },
+  "map": {
+    "title": "La Global Pizza Party de l'année dernière",
+    "subtitle": "Découvrez où les communautés du monde entier se sont réunies autour de la pizza",
+    "openFullMap": "Ouvrir la carte complète"
+  },
+  "success": {
+    "pageTitle": "Événement créé ! | Global Pizza Party",
+    "signedIn": "Vous êtes connecté !",
+    "redirecting": "Redirection vers votre tableau de bord...",
+    "title": "Votre Global Pizza Party est en ligne !",
+    "created": "{{eventName}} a été créé.",
+    "otpPrompt": "Entrez le code à 6 chiffres envoyé à {{email}}",
+    "verifying": "Vérification...",
+    "returnHome": "Retour à l'accueil",
+    "checkSpam": "Vous n'avez pas reçu de code ? Vérifiez votre dossier spam."
+  }
+}

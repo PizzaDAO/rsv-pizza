@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "Faire un don",
+    "buyPizzaFor": "Offrir une pizza à {{recipient}}",
+    "buyPizzaForEvent": "Offrir une pizza pour {{eventName}}",
+    "donateTitle": "Donner",
+    "supportingRecipient": "Soutenir {{recipient}}",
+    "supportingEvent": "Soutenir {{eventName}}",
+    "defaultMessage": "Souhaitez-vous faire un don pour aider à rendre cet événement possible ?",
+    "donorCount_one": "{{count}} personne a fait un don",
+    "donorCount_other": "{{count}} personnes ont fait un don",
+    "raised": "{{amount}} collectés",
+    "goal": "Objectif : ${{amount}}",
+    "recentSupporters": "Derniers contributeurs :",
+    "anonymous": "Anonyme",
+    "makeADonation": "Faire un don",
+    "back": "Retour"
+  },
+  "form": {
+    "payWithCard": "Payer par carte ou portefeuille",
+    "cardSubtitle": "Carte de crédit/débit, Apple Pay, Google Pay et plus",
+    "crypto": "Crypto",
+    "cryptoSubtitle": "ETH, USDC ou autres jetons",
+    "cancel": "Annuler",
+    "backToPaymentOptions": "Retour aux options de paiement",
+    "customAmount": "Montant personnalisé",
+    "minimumDonation": "Le don minimum est de 0,50 $",
+    "donate": "Donner",
+    "donateAmount": "Donner ${{amount}}",
+    "loading": "Chargement...",
+    "processing": "Traitement...",
+    "paymentFailed": "Échec du paiement",
+    "unexpectedError": "Une erreur inattendue s'est produite",
+    "failedToInitialize": "Échec de l'initialisation du paiement. Veuillez réessayer.",
+    "thankYou": "Merci !",
+    "donationReceived": "Votre don de ${{amount}} a été reçu.",
+    "back": "Retour"
+  },
+  "calendar": {
+    "addToCalendar": "Ajouter au calendrier",
+    "googleCalendar": "Google Agenda",
+    "appleCalendar": "Apple Calendrier",
+    "outlook": "Outlook"
+  }
+}

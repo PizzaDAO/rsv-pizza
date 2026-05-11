@@ -46,6 +46,17 @@ import zhCheckin from './locales/zh/checkin.json';
 import zhHost from './locales/zh/host.json';
 import zhAdmin from './locales/zh/admin.json';
 import zhPartner from './locales/zh/partner.json';
+import frCommon from './locales/fr/common.json';
+import frRsvp from './locales/fr/rsvp.json';
+import frEvent from './locales/fr/event.json';
+import frAuth from './locales/fr/auth.json';
+import frDonation from './locales/fr/donation.json';
+import frGpp from './locales/fr/gpp.json';
+import frAccount from './locales/fr/account.json';
+import frCheckin from './locales/fr/checkin.json';
+import frHost from './locales/fr/host.json';
+import frAdmin from './locales/fr/admin.json';
+import frPartner from './locales/fr/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -103,6 +114,19 @@ i18n
         host: zhHost,
         admin: zhAdmin,
         partner: zhPartner,
+      },
+      fr: {
+        common: frCommon,
+        rsvp: frRsvp,
+        event: frEvent,
+        auth: frAuth,
+        donation: frDonation,
+        gpp: frGpp,
+        account: frAccount,
+        checkin: frCheckin,
+        host: frHost,
+        admin: frAdmin,
+        partner: frPartner,
       },
     },
     fallbackLng: 'en',

@@ -1,0 +1,72 @@
+{
+  "notFound": {
+    "title": "Événement introuvable",
+    "goHome": "Retour à l'accueil"
+  },
+  "password": {
+    "title": "Mot de passe requis",
+    "placeholder": "Mot de passe",
+    "verifying": "Vérification...",
+    "continue": "Continuer",
+    "alreadyRsvpd": "Déjà inscrit ? Connectez-vous",
+    "or": "ou",
+    "postToGetIn": "Publiez pour entrer",
+    "pasteTweetUrl": "Collez l'URL de votre tweet pour déverrouiller l'événement",
+    "verifyUnlock": "Vérifier et déverrouiller"
+  },
+  "editPassword": {
+    "title": "Mot de passe hôte requis",
+    "subtitle": "Entrez le mot de passe que vous avez défini lors de la création de cet événement pour le modifier.",
+    "label": "Mot de passe",
+    "placeholder": "Entrez le mot de passe",
+    "cancel": "Annuler",
+    "continue": "Continuer"
+  },
+  "hostDashboard": "Tableau de bord hôte",
+  "donate": "Donner",
+  "buyPizzaFor": "Offrir une pizza à {{recipient}}",
+  "buyPizzaForEvent": "Offrir une pizza pour {{eventName}}",
+  "supportingRecipient": "Soutenir {{recipient}}",
+  "supportingEvent": "Soutenir {{eventName}}",
+  "guest_one": "{{count}} invité",
+  "guest_other": "{{count}} invités",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "(Liste d'attente ouverte)",
+  "spotsLeft": "({{count}} places restantes)",
+  "rsvp": "RSVP",
+  "editRsvp": "Modifier le RSVP",
+  "rsvpsClosed": "Les inscriptions sont fermées pour cet événement",
+  "viewPhotos": "Voir les photos ({{count}})",
+  "sharePhotos": "Partager les photos",
+  "pizzadaoDescription": "est une coopérative internationale de pizza qui met l'industrie de la pizza onchain. Nous organisons une fête mondiale de la pizza chaque année, des événements lors de conférences chaque mois, et soutenons les rencontres d'autres organisateurs avec de la pizza.",
+  "dateTbd": "Date à confirmer",
+  "partiesList": {
+    "title": "Tous les événements",
+    "newParty": "+ Nouvel événement",
+    "noParties": "Aucun événement trouvé.",
+    "createFirst": "Créez votre premier événement",
+    "host": "Hôte : {{name}}",
+    "closed": "Fermé",
+    "created": "Créé :",
+    "guests": "{{count}} invités",
+    "loading": "Chargement des événements..."
+  },
+  "report": {
+    "notFound": "Rapport introuvable",
+    "notFoundDesc": "Ce rapport a peut-être été retiré ou le lien est invalide.",
+    "passwordProtected": "Protégé par mot de passe",
+    "enterPassword": "Entrez le mot de passe pour voir ce rapport.",
+    "enterPasswordPlaceholder": "Entrez le mot de passe",
+    "incorrectPassword": "Mot de passe incorrect",
+    "viewReport": "Voir le rapport"
+  },
+  "venueReport": {
+    "notFound": "Rapport de lieu introuvable",
+    "notFoundDesc": "Ce rapport de lieu a peut-être été retiré ou le lien est invalide.",
+    "passwordProtected": "Protégé par mot de passe",
+    "enterPassword": "Entrez le mot de passe pour voir ce rapport de lieu.",
+    "enterPasswordPlaceholder": "Entrez le mot de passe",
+    "incorrectPassword": "Mot de passe incorrect",
+    "viewReport": "Voir le rapport"
+  }
+}

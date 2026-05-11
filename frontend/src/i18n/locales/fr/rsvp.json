@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "RSVP à {{eventName}}",
+    "editTitle": "Modifier le RSVP",
+    "stepIndicator": "Étape 1 sur 2",
+    "namePlaceholder": "Nom",
+    "emailPlaceholder": "E-mail",
+    "walletPlaceholder": "Adresse de portefeuille ou ENS (ex. vitalik.eth)",
+    "roleQuestion": "À quelle(s) tortue(s) ninja ressemblez-vous le plus ?",
+    "mailingList": "Rejoindre la liste de diffusion PizzaDAO",
+    "swcJoin": "Rejoindre Stand with Crypto",
+    "swcNotify": "Me notifier des futurs événements Stand With Crypto.",
+    "ethconfDiscount": "M'envoyer une réduction ETHConf",
+    "next": "Suivant"
+  },
+  "step2": {
+    "title": "Préférences pizza",
+    "editTitle": "Modifier les préférences pizza",
+    "stepIndicator": "Étape 2 sur 2",
+    "diet": "Régime alimentaire",
+    "toppings": "Garnitures",
+    "drinkPreferences": "Préférences de boissons",
+    "favoritePizzerias": "Pizzerias préférées",
+    "clickToRank": "(cliquez pour classer de 1 à 3)",
+    "suggestPizzeria": "Suggérer une pizzeria",
+    "suggestPizzeriaPrompt": "Suggérer une pizzeria",
+    "searchPizzeria": "Rechercher une pizzeria...",
+    "saveToProfile": "Enregistrer dans le profil",
+    "saveToProfileDesc": "Mémoriser mes préférences pour les futurs événements",
+    "back": "Retour",
+    "submit": "RSVP",
+    "editSubmit": "Modifier le RSVP",
+    "submitting": "Envoi en cours...",
+    "saving": "Enregistrement..."
+  },
+  "success": {
+    "seeYou": "À bientôt à {{eventName}} !",
+    "alreadyRegistered": "Vous êtes déjà inscrit !",
+    "alreadyRegisteredDesc": "Cet e-mail a déjà été utilisé pour un RSVP à cet événement.",
+    "rsvpSubmitted": "RSVP envoyé !",
+    "pendingApproval": "Votre RSVP est en attente d'approbation par l'hôte. Vous recevrez un e-mail avec votre QR code d'enregistrement une fois approuvé.",
+    "rsvpUpdated": "RSVP mis à jour",
+    "preferenceSaved": "Vos préférences ont été enregistrées.",
+    "waitlisted": "Vous êtes sur la liste d'attente !",
+    "waitlistedDesc": "Cet événement est complet, mais vous êtes #{{position}} sur la liste d'attente ! Nous vous notifierons si une place se libère.",
+    "backToEvent": "Retour à l'événement"
+  },
+  "password": {
+    "title": "Mot de passe requis",
+    "subtitle": "Cet événement est protégé par mot de passe",
+    "placeholder": "Mot de passe de l'événement",
+    "continue": "Continuer"
+  },
+  "donation": {
+    "donate": "Donner",
+    "defaultMessage": "Faites un don pour aider à rendre cet événement possible",
+    "makeADonation": "Faire un don",
+    "buyPizzaFor": "Offrir une pizza à {{recipient}}",
+    "buyPizzaForEvent": "Offrir une pizza pour cet événement",
+    "buyPizzaForEventName": "Offrir une pizza pour {{eventName}}",
+    "thanksForSupport": "Merci pour votre soutien !"
+  },
+  "nft": {
+    "minting": "Création de votre NFT...",
+    "minted": "NFT créé !",
+    "alreadyClaimed": "NFT déjà réclamé !",
+    "viewOnOpenSea": "Voir sur OpenSea",
+    "viewTransaction": "Voir la transaction",
+    "mintFailed": "Échec de la création du NFT"
+  },
+  "share": {
+    "tellFriends": "Parlez de la fête à vos amis !",
+    "shareOnX": "Partager sur X",
+    "x": "X",
+    "download": "Télécharger",
+    "save": "Enregistrer",
+    "copyLink": "Copier le lien",
+    "link": "Lien",
+    "copied": "Copié !"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "En cochant la case, vous consentez à devenir membre de Stand with Crypto Alliance, Inc., un mouvement populaire pour donner aux consommateurs, développeurs et partisans de la crypto les moyens de se faire entendre. En cochant la case et en acceptant de devenir membre, vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC",
+    "termsConditions": "Conditions générales"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Canada",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Stand with Crypto concernant les futurs événements et les efforts de plaidoyer au Canada. Vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC Canada",
+    "termsOfService": "Conditions d'utilisation"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Australie",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Stand with Crypto concernant les futurs événements et les efforts de plaidoyer en Australie. Vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC Australie",
+    "termsOfService": "Conditions d'utilisation"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto UE",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Stand with Crypto concernant les futurs événements et les efforts de plaidoyer en Europe. Vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC UE",
+    "termsOfService": "Conditions d'utilisation"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto Royaume-Uni",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Stand with Crypto concernant les futurs événements et les efforts de plaidoyer au Royaume-Uni. Vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC Royaume-Uni",
+    "termsOfService": "Conditions d'utilisation"
+  },
+  "roles": {
+    "Organizer": "Organisateur",
+    "Builder": "Bâtisseur",
+    "Creative": "Créatif",
+    "Connector": "Connecteur",
+    "Storyteller": "Conteur",
+    "Counsel": "Conseiller",
+    "Ground Support": "Soutien terrain"
+  },
+  "dietary": {
+    "Vegetarian": "Végétarien",
+    "Vegan": "Végétalien",
+    "Gluten-Free": "Sans gluten",
+    "Dairy-Free": "Sans produits laitiers"
+  }
+}
