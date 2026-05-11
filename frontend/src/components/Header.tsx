@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [langMenuOpen]);
 
   return (
-    <header className={`site-header border-b border-theme-stroke overflow-visible ${bgClass}`}>
+    <header className={`site-header border-b border-theme-stroke overflow-visible relative z-50 ${bgClass}`}>
       <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <img
