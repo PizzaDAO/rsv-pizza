@@ -1378,14 +1378,10 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
     // Get events with funnel data
     const events = await prisma.party.findMany({
       where: regionFilter,
-      select: {
-        id: true,
-        name: true,
-        city: true,
+      include: {
         _count: {
           select: {
             pageViews: true,
-            guests: true,
           },
         },
         guests: {
@@ -1406,8 +1402,8 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
 
     const eventStats = events.map((e) => {
       const views = e._count.pageViews;
-      const opened = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_opened').length;
-      const step1Complete = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
+      const opened = e.rsvpFunnelEvents.filter((f: { step: string }) => f.step === 'rsvp_opened').length;
+      const step1Complete = e.rsvpFunnelEvents.filter((f: { step: string }) => f.step === 'rsvp_step1_complete').length;
       const submitted = e.guests.length;
 
       totalViews += views;
@@ -1418,7 +1414,7 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
       return {
         eventId: e.id,
         eventName: e.name,
-        city: e.city || '',
+        city: e.address || '',
         views,
         opened,
         step1Complete,
