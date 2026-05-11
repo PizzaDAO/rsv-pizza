@@ -376,15 +376,15 @@ export function CheckInPage() {
     if (state === 'discount-available') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg" />
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs md:max-w-md mx-auto mb-6 md:mb-8 rounded-2xl shadow-lg" />
           <button
             onClick={handleClaimDiscount}
-            className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 py-4 text-lg font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
+            className="w-full max-w-xs md:max-w-md mx-auto flex items-center justify-center gap-2 py-4 md:py-5 text-lg md:text-xl font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
             style={{ background: C.red }}
           >
             Claim 10% Discount
           </button>
-          <p className="text-sm mt-4" style={{ color: C.mutedText }}>One-time Use</p>
+          <p className="text-sm md:text-base mt-4" style={{ color: C.mutedText }}>One-time Use</p>
         </>
       );
     }
@@ -392,13 +392,13 @@ export function CheckInPage() {
     if (state === 'discount-claimed') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg" />
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${C.green}22` }}>
-            <CheckCircle2 size={36} style={{ color: C.green }} />
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs md:max-w-md mx-auto mb-6 md:mb-8 rounded-2xl shadow-lg" />
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${C.green}22` }}>
+            <CheckCircle2 className="w-9 h-9 md:w-12 md:h-12" style={{ color: C.green }} />
           </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.green }}>Discount Claimed!</h2>
-          <p className="text-sm mb-2" style={{ color: C.darkText }}>Your 10% pizza discount has been used.</p>
-          <p className="text-xs" style={{ color: C.mutedText }}>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.green }}>Discount Claimed!</h2>
+          <p className="text-sm md:text-base mb-2" style={{ color: C.darkText }}>Your 10% pizza discount has been used.</p>
+          <p className="text-xs md:text-sm" style={{ color: C.mutedText }}>
             Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
           </p>
         </>
@@ -408,9 +408,9 @@ export function CheckInPage() {
     if (state === 'discount-ineligible') {
       return (
         <>
-          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs mx-auto mb-6 rounded-2xl shadow-lg opacity-50" />
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.darkText }}>Discount Unavailable</h2>
-          <p className="text-sm" style={{ color: C.mutedText }}>This discount is for verified attendees only.</p>
+          <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs md:max-w-md mx-auto mb-6 md:mb-8 rounded-2xl shadow-lg opacity-50" />
+          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.darkText }}>Discount Unavailable</h2>
+          <p className="text-sm md:text-base" style={{ color: C.mutedText }}>This discount is for verified attendees only.</p>
         </>
       );
     }
@@ -462,7 +462,7 @@ export function CheckInPage() {
 
       {/* Content centered */}
       <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
-        <div className="max-w-md w-full text-center">
+        <div className="max-w-sm md:max-w-lg w-full text-center">
           {renderDiscountContent()}
         </div>
       </div>
