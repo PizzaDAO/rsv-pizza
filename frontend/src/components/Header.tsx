@@ -80,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
               <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {langMenuOpen && (
-              <div className="!absolute right-0 mt-1 z-50 card shadow-lg overflow-hidden !p-0 min-w-[120px]" style={{ background: 'var(--bg-header)', backdropFilter: 'none' }}>
+              <div className="absolute right-0 mt-1 shadow-lg overflow-hidden min-w-[120px] rounded-xl border border-theme-stroke" style={{ zIndex: 9999, background: 'var(--bg-header)' }}>
                 {LANGUAGES.map((lang) => (
                   <button
                     key={lang.code}

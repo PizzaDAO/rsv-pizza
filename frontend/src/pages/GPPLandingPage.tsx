@@ -272,7 +272,7 @@ export function GPPLandingPage() {
                 <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {langMenuOpen && (
-                <div className="absolute right-0 mt-1 z-50 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
                   {LANGUAGES.map((lang) => (
                     <button
                       key={lang.code}
@@ -429,7 +429,7 @@ export function GPPLandingPage() {
                 <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {langMenuOpen && (
-                <div className="absolute right-0 mt-1 z-50 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
                   {LANGUAGES.map((lang) => (
                     <button
                       key={lang.code}
