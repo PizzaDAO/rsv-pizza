@@ -6,7 +6,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
-import { PartiesListPage } from './pages/PartiesListPage';
 import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
 import { LoginPage } from './pages/LoginPage';
@@ -50,7 +49,6 @@ function App() {
             <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
-            <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
             <Route path="/venue-report/:slug" element={<PublicVenueReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
