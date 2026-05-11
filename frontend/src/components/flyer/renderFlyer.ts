@@ -267,6 +267,7 @@ export async function renderPartnerFlyer(
   logoUrl: string,
   logoPos?: { x: number; y: number },
   logoSize?: number,
+  tagline?: string,
 ): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
@@ -283,6 +284,15 @@ export async function renderPartnerFlyer(
   ctx.fillStyle = CITY_COLOR;
   ctx.font = `${cityFontSize}px "Hub 191 Display"`;
   ctx.fillText(city.toUpperCase(), DEFAULT_POSITIONS.city.x, DEFAULT_POSITIONS.city.y);
+
+  // Draw tagline text (e.g. "supported by") in venue style
+  const tagText = tagline ?? 'supported by';
+  if (tagText) {
+    const tagFontSize = fitText(tagText, 'Hub 191', 46, 600);
+    ctx.fillStyle = VENUE_COLOR;
+    ctx.font = `${tagFontSize}px "Hub 191"`;
+    ctx.fillText(tagText.toUpperCase(), DEFAULT_POSITIONS.city.x, 640);
+  }
 
   // Draw partner logo
   const logoImg = await loadImg(logoUrl);

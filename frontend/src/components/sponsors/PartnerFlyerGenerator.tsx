@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Type } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { renderPartnerFlyer } from '../flyer/renderFlyer';
+import { IconInput } from '../IconInput';
 
 interface PartnerFlyerGeneratorProps {
   sponsors: Sponsor[];
@@ -16,6 +17,9 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
   const [fontsReady, setFontsReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Tagline text shown between city name and logo
+  const [tagline, setTagline] = useState('supported by');
 
   // Logo position & size state (canvas coordinates, 1080x1080)
   const [logoPos, setLogoPos] = useState<{ x: number; y: number } | null>(null);
@@ -70,6 +74,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
           sponsor.logoUrl!,
           logoPos ?? undefined,
           logoSize,
+          tagline,
         );
         if (cancelled) return;
         canvasRef.current = canvas;
@@ -80,7 +85,7 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
     })();
 
     return () => { cancelled = true; };
-  }, [fontsReady, selectedId, cityName, sponsors, logoPos, logoSize]);
+  }, [fontsReady, selectedId, cityName, sponsors, logoPos, logoSize, tagline]);
 
   // --- Drag handlers ---
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -246,6 +251,15 @@ export function PartnerFlyerGenerator({ sponsors, cityName }: PartnerFlyerGenera
           <option key={s.id} value={s.id}>{s.name}</option>
         ))}
       </select>
+
+      <div className="mb-3">
+        <IconInput
+          icon={Type}
+          value={tagline}
+          onChange={e => setTagline(e.target.value)}
+          placeholder="e.g. supported by"
+        />
+      </div>
 
       {previewUrl && (
         <div
