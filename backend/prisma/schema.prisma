@@ -38,46 +38,46 @@ model User {
 }
 
 model Party {
-  id                 String    @id @default(uuid()) @db.Uuid
-  name               String
-  inviteCode         String    @unique @default(cuid()) @map("invite_code")
-  customUrl          String?   @unique @map("custom_url")
-  date               DateTime? @db.Timestamptz
-  endTime            DateTime? @map("end_time") @db.Timestamptz
-  duration           Float?
-  timezone           String?   @db.VarChar
-  pizzaStyle         String    @default("new-york") @map("pizza_style")
-  availableBeverages String[]  @map("available_beverages")
-  availableToppings  String[]  @map("available_toppings")
-  availableDietaryOptions String[] @map("available_dietary_options")
-  address            String?
-  latitude           Float?
-  longitude          Float?
-  venueName          String?   @map("venue_name")
-  venueStatus        String?   @map("venue_status")
-  venueCapacity      Int?      @map("venue_capacity")
-  venueCost          Decimal?  @map("venue_cost") @db.Decimal(10, 2)
-  venuePointPerson   String?   @map("venue_point_person")
-  venueContactName   String?   @map("venue_contact_name")
-  venueContactEmail  String?   @map("venue_contact_email")
-  venueContactPhone  String?   @map("venue_contact_phone")
-  venueOrganization  String?   @map("venue_organization")
-  venueWebsite       String?   @map("venue_website")
-  venueNotes         String?   @map("venue_notes")
-  maxGuests          Int?      @map("max_guests")
-  expectedGuests     Int?      @map("expected_guests")
-  hideGuests         Boolean   @default(false) @map("hide_guests")
-  requireApproval    Boolean   @default(false) @map("require_approval")
-  coHosts            Json      @default("[]") @map("co_hosts")
-  selectedPizzerias  Json?     @map("selected_pizzerias")
-  password           String?
-  eventImageUrl      String?   @map("event_image_url")
-  flyerGeneratedAt   DateTime? @map("flyer_generated_at") @db.Timestamptz
-  flyerConfig        Json?     @map("flyer_config")
-  description        String?
-  rsvpClosedAt       DateTime? @map("rsvp_closed_at") @db.Timestamptz
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                      String    @id @default(uuid()) @db.Uuid
+  name                    String
+  inviteCode              String    @unique @default(cuid()) @map("invite_code")
+  customUrl               String?   @unique @map("custom_url")
+  date                    DateTime? @db.Timestamptz
+  endTime                 DateTime? @map("end_time") @db.Timestamptz
+  duration                Float?
+  timezone                String?   @db.VarChar
+  pizzaStyle              String    @default("new-york") @map("pizza_style")
+  availableBeverages      String[]  @map("available_beverages")
+  availableToppings       String[]  @map("available_toppings")
+  availableDietaryOptions String[]  @map("available_dietary_options")
+  address                 String?
+  latitude                Float?
+  longitude               Float?
+  venueName               String?   @map("venue_name")
+  venueStatus             String?   @map("venue_status")
+  venueCapacity           Int?      @map("venue_capacity")
+  venueCost               Decimal?  @map("venue_cost") @db.Decimal(10, 2)
+  venuePointPerson        String?   @map("venue_point_person")
+  venueContactName        String?   @map("venue_contact_name")
+  venueContactEmail       String?   @map("venue_contact_email")
+  venueContactPhone       String?   @map("venue_contact_phone")
+  venueOrganization       String?   @map("venue_organization")
+  venueWebsite            String?   @map("venue_website")
+  venueNotes              String?   @map("venue_notes")
+  maxGuests               Int?      @map("max_guests")
+  expectedGuests          Int?      @map("expected_guests")
+  hideGuests              Boolean   @default(false) @map("hide_guests")
+  requireApproval         Boolean   @default(false) @map("require_approval")
+  coHosts                 Json      @default("[]") @map("co_hosts")
+  selectedPizzerias       Json?     @map("selected_pizzerias")
+  password                String?
+  eventImageUrl           String?   @map("event_image_url")
+  flyerGeneratedAt        DateTime? @map("flyer_generated_at") @db.Timestamptz
+  flyerConfig             Json?     @map("flyer_config")
+  description             String?
+  rsvpClosedAt            DateTime? @map("rsvp_closed_at") @db.Timestamptz
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Photo settings
   photosEnabled   Boolean @default(true) @map("photos_enabled")
@@ -89,25 +89,25 @@ model Party {
   kitDeadline DateTime? @map("kit_deadline") @db.Date
 
   // Event type and tagging (for GPP and other special events)
-  eventType  String?  @map("event_type")  // 'standard', 'gpp', 'private', etc.
-  eventTags  String[] @default([]) @map("event_tags")  // Tags for filtering/grouping
+  eventType String?  @map("event_type") // 'standard', 'gpp', 'private', etc.
+  eventTags String[] @default([]) @map("event_tags") // Tags for filtering/grouping
 
   // Donation settings
-  donationEnabled    Boolean   @default(false) @map("donation_enabled")
-  donationGoal       Decimal?  @db.Decimal(10, 2) @map("donation_goal")
-  donationMessage    String?   @map("donation_message")
-  suggestedAmounts   Json      @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
-  donationRecipient     String?   @map("donation_recipient")
-  donationRecipientUrl  String?   @map("donation_recipient_url")
-  donationEthAddress    String?   @map("donation_eth_address")
+  donationEnabled      Boolean  @default(false) @map("donation_enabled")
+  donationGoal         Decimal? @map("donation_goal") @db.Decimal(10, 2)
+  donationMessage      String?  @map("donation_message")
+  suggestedAmounts     Json     @default("[500, 1000, 2500, 5000]") @map("suggested_amounts") // cents
+  donationRecipient    String?  @map("donation_recipient")
+  donationRecipientUrl String?  @map("donation_recipient_url")
+  donationEthAddress   String?  @map("donation_eth_address")
 
   // Share-to-unlock settings
-  shareToUnlock    Boolean  @default(false) @map("share_to_unlock")
-  shareTweetText   String?  @map("share_tweet_text")
+  shareToUnlock  Boolean @default(false) @map("share_to_unlock")
+  shareTweetText String? @map("share_tweet_text")
 
   // NFT settings
-  nftEnabled              Boolean   @default(false) @map("nft_enabled")
-  nftChain                String?   @map("nft_chain")
+  nftEnabled Boolean @default(false) @map("nft_enabled")
+  nftChain   String? @map("nft_chain")
 
   // Music settings
   musicEnabled Boolean @default(false) @map("music_enabled")
@@ -121,56 +121,56 @@ model Party {
   budgetTotal   Decimal? @map("budget_total") @db.Decimal(10, 2)
 
   // Report-specific fields
-  reportRecap        String?   @map("report_recap")       // Host-written event summary
-  reportVideoUrl     String?   @map("report_video_url")   // Link to party video
-  reportPhotosUrl    String?   @map("report_photos_url")  // Link to raw photos/video
-  flyerArtist        String?   @map("flyer_artist")       // Flyer artist credit
-  flyerArtistUrl     String?   @map("flyer_artist_url")   // Flyer artist link
+  reportRecap     String? @map("report_recap") // Host-written event summary
+  reportVideoUrl  String? @map("report_video_url") // Link to party video
+  reportPhotosUrl String? @map("report_photos_url") // Link to raw photos/video
+  flyerArtist     String? @map("flyer_artist") // Flyer artist credit
+  flyerArtistUrl  String? @map("flyer_artist_url") // Flyer artist link
 
   // KPI tracking
-  xPostUrl           String?   @map("x_post_url")         // Main X/Twitter post
-  xPostViews         Int?      @map("x_post_views")       // X post view count
-  farcasterPostUrl   String?   @map("farcaster_post_url") // Main Farcaster post
-  farcasterViews     Int?      @map("farcaster_views")    // Farcaster view count
-  lumaUrl            String?   @map("luma_url")           // Luma event URL
-  lumaViews          Int?      @map("luma_views")         // Luma page views
-  meetupUrl          String?   @map("meetup_url")         // Meetup event URL
-  eventbriteUrl      String?   @map("eventbrite_url")     // Eventbrite event URL
-  externalLinks      Json?     @default("[]") @map("external_links") // Custom external links [{label, url}]
-  telegramGroup      String?   @map("telegram_group") @db.VarChar     // City Telegram group link
-  poapEventId        String?   @map("poap_event_id")      // POAP event ID
-  poapMints          Int?      @map("poap_mints")         // POAP mint count
-  poapMoments        Int?      @map("poap_moments")       // POAP moments count
+  xPostUrl         String? @map("x_post_url") // Main X/Twitter post
+  xPostViews       Int?    @map("x_post_views") // X post view count
+  farcasterPostUrl String? @map("farcaster_post_url") // Main Farcaster post
+  farcasterViews   Int?    @map("farcaster_views") // Farcaster view count
+  lumaUrl          String? @map("luma_url") // Luma event URL
+  lumaViews        Int?    @map("luma_views") // Luma page views
+  meetupUrl        String? @map("meetup_url") // Meetup event URL
+  eventbriteUrl    String? @map("eventbrite_url") // Eventbrite event URL
+  externalLinks    Json?   @default("[]") @map("external_links") // Custom external links [{label, url}]
+  telegramGroup    String? @map("telegram_group") @db.VarChar // City Telegram group link
+  poapEventId      String? @map("poap_event_id") // POAP event ID
+  poapMints        Int?    @map("poap_mints") // POAP mint count
+  poapMoments      Int?    @map("poap_moments") // POAP moments count
 
   // Report settings
-  reportPublished    Boolean   @default(false) @map("report_published")
-  reportPublicSlug   String?   @unique @map("report_public_slug")
-  reportPassword     String?   @map("report_password")
-  reportStatsConfig  Json?     @map("report_stats_config")
+  reportPublished   Boolean @default(false) @map("report_published")
+  reportPublicSlug  String? @unique @map("report_public_slug")
+  reportPassword    String? @map("report_password")
+  reportStatsConfig Json?   @map("report_stats_config")
 
   // Venue report settings
-  venueReportPublished Boolean  @default(false) @map("venue_report_published")
-  venueReportSlug      String?  @unique @map("venue_report_slug")
-  venueReportPassword  String?  @map("venue_report_password")
-  venueReportTitle     String?  @map("venue_report_title")
-  venueReportNotes     String?  @map("venue_report_notes")
+  venueReportPublished Boolean @default(false) @map("venue_report_published")
+  venueReportSlug      String? @unique @map("venue_report_slug")
+  venueReportPassword  String? @map("venue_report_password")
+  venueReportTitle     String? @map("venue_report_title")
+  venueReportNotes     String? @map("venue_report_notes")
 
   // Pinned apps (for Apps Hub tab bar)
-  pinnedApps  Json?   @default("[]") @map("pinned_apps")
+  pinnedApps Json? @default("[]") @map("pinned_apps")
 
   // Region (for underboss dashboard)
   region  String?
   country String?
 
   // Underboss dashboard fields
-  hostStatus        String?  @map("host_status")
-  underbossStatus   String   @default("pending") @map("underboss_status")
-  hostTags          Json     @default("[]") @map("host_tags")
-  underbossNotes    String?  @map("underboss_notes")
+  hostStatus      String? @map("host_status")
+  underbossStatus String  @default("pending") @map("underboss_status")
+  hostTags        Json    @default("[]") @map("host_tags")
+  underbossNotes  String? @map("underboss_notes")
 
   // GPP (Global Pizza Party/Previous year) photo management
-  hiddenGppPhotos  Json  @default("[]") @map("hidden_gpp_photos")  // Array of hidden app.gpp.day photo src paths
-  extraGppPhotos   Json  @default("[]") @map("extra_gpp_photos")   // Array of host-uploaded previous year photo URLs
+  hiddenGppPhotos Json @default("[]") @map("hidden_gpp_photos") // Array of hidden app.gpp.day photo src paths
+  extraGppPhotos  Json @default("[]") @map("extra_gpp_photos") // Array of host-uploaded previous year photo URLs
 
   // Quiz settings
   quizEnabled Boolean @default(false) @map("quiz_enabled")
@@ -181,22 +181,22 @@ model Party {
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests           Guest[]
-  orders           Order[]
-  photos           Photo[]
-  partyKit         PartyKit?
-  donations        Donation[]
-  raffles          Raffle[]
-  displays         Display[]
-  staff            Staff[]
-  performers       Performer[]
-  venues           Venue[]
-  sponsors         Sponsor[]
-  budgetItems      BudgetItem[]
-  checklistItems   ChecklistItem[]
-  socialPosts      SocialPost[]
-  notableAttendees NotableAttendee[]
-  aiPhoneCalls     AIPhoneCall[]
+  guests                Guest[]
+  orders                Order[]
+  photos                Photo[]
+  partyKit              PartyKit?
+  donations             Donation[]
+  raffles               Raffle[]
+  displays              Display[]
+  staff                 Staff[]
+  performers            Performer[]
+  venues                Venue[]
+  sponsors              Sponsor[]
+  budgetItems           BudgetItem[]
+  checklistItems        ChecklistItem[]
+  socialPosts           SocialPost[]
+  notableAttendees      NotableAttendee[]
+  aiPhoneCalls          AIPhoneCall[]
   pageViews             PageView[]
   linkClicks            LinkClick[]
   rsvpFunnelEvents      RsvpFunnelEvent[]
@@ -214,7 +214,7 @@ model Guest {
   email               String?  @db.VarChar
   ethereumAddress     String?  @map("ethereum_address") @db.VarChar
   roles               String[]
-  role                String?  // Single role for report chart: "dev", "designer", "artist", etc.
+  role                String? // Single role for report chart: "dev", "designer", "artist", etc.
   mailingListOptIn    Boolean  @default(false) @map("mailing_list_opt_in")
   swcOptIn            Boolean  @default(false) @map("swc_opt_in")
   swcCaOptIn          Boolean  @default(false) @map("swc_ca_opt_in")
@@ -241,17 +241,18 @@ model Guest {
   suggestedPizzerias Json @default("[]") @map("suggested_pizzerias")
 
   // Waitlist fields
-  status            String   @default("CONFIRMED")
-  waitlistPosition  Int?     @map("waitlist_position")
-  promotedAt        DateTime? @map("promoted_at") @db.Timestamptz
+  status           String    @default("CONFIRMED")
+  waitlistPosition Int?      @map("waitlist_position")
+  promotedAt       DateTime? @map("promoted_at") @db.Timestamptz
 
   // Privy embedded wallet fields
-  privyUserId       String?   @map("privy_user_id") @db.VarChar
-  walletSource      String?   @map("wallet_source") @db.VarChar
+  privyUserId  String? @map("privy_user_id") @db.VarChar
+  walletSource String? @map("wallet_source") @db.VarChar
 
   // Check-in fields
-  checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
-  checkedInBy String?   @map("checked_in_by")
+  checkedInAt       DateTime? @map("checked_in_at") @db.Timestamptz
+  checkedInBy       String?   @map("checked_in_by")
+  discountClaimedAt DateTime? @map("discount_claimed_at") @db.Timestamptz
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -270,18 +271,18 @@ model Guest {
 
 // Social media posts about the event (for reports)
 model SocialPost {
-  id           String   @id @default(uuid()) @db.Uuid
-  partyId      String   @map("party_id") @db.Uuid
-  party        Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  platform     String   // "twitter", "farcaster", "instagram", "facebook", "linkedin"
-  url          String   // Full URL to the post
-  authorHandle String?  @map("author_handle")
-  title        String?  // Title/description of what the post is about
-  views        Int?     // Number of views the post received
+  platform     String // "twitter", "farcaster", "instagram", "facebook", "linkedin"
+  url          String // Full URL to the post
+  authorHandle String? @map("author_handle")
+  title        String? // Title/description of what the post is about
+  views        Int? // Number of views the post received
 
-  sortOrder    Int      @default(0) @map("sort_order")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([partyId])
   @@map("social_posts")
@@ -289,14 +290,14 @@ model SocialPost {
 
 // Notable attendees for event reports
 model NotableAttendee {
-  id        String   @id @default(uuid()) @db.Uuid
-  partyId   String   @map("party_id") @db.Uuid
-  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  name      String   // Person or company name
-  link      String?  // Optional link to profile/website
-  guestId   String?  @map("guest_id") @db.Uuid
-  guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  name    String // Person or company name
+  link    String? // Optional link to profile/website
+  guestId String? @map("guest_id") @db.Uuid
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -306,27 +307,27 @@ model NotableAttendee {
 }
 
 model Donation {
-  id              String   @id @default(cuid())
-  amount          Decimal  @db.Decimal(10, 2)
-  currency        String   @default("usd")
-  status          String   @default("pending") // pending, succeeded, failed, refunded
-  paymentIntentId String?  @map("payment_intent_id")
-  chargeId        String?  @map("charge_id")
-  donorName       String?  @map("donor_name")
-  donorEmail      String?  @map("donor_email")
-  isAnonymous     Boolean  @default(false) @map("is_anonymous")
+  id              String  @id @default(cuid())
+  amount          Decimal @db.Decimal(10, 2)
+  currency        String  @default("usd")
+  status          String  @default("pending") // pending, succeeded, failed, refunded
+  paymentIntentId String? @map("payment_intent_id")
+  chargeId        String? @map("charge_id")
+  donorName       String? @map("donor_name")
+  donorEmail      String? @map("donor_email")
+  isAnonymous     Boolean @default(false) @map("is_anonymous")
   message         String?
 
   // Crypto donation fields
-  paymentMethod   String   @default("stripe") @map("payment_method") // "stripe" or "crypto"
-  chainId         Int?     @map("chain_id")         // 1 = Ethereum, 8453 = Base
-  tokenSymbol     String?  @map("token_symbol")     // "ETH", "USDC", etc.
-  tokenAddress    String?  @map("token_address")    // null for native ETH
-  txHash          String?  @map("tx_hash")          // on-chain tx hash
-  walletAddress   String?  @map("wallet_address")   // donor's wallet
+  paymentMethod String  @default("stripe") @map("payment_method") // "stripe" or "crypto"
+  chainId       Int?    @map("chain_id") // 1 = Ethereum, 8453 = Base
+  tokenSymbol   String? @map("token_symbol") // "ETH", "USDC", etc.
+  tokenAddress  String? @map("token_address") // null for native ETH
+  txHash        String? @map("tx_hash") // on-chain tx hash
+  walletAddress String? @map("wallet_address") // donor's wallet
 
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -366,20 +367,20 @@ model Order {
 
 // Individual pizza items in an order (for ML training)
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  pizzaIndex    Int       // Position in the order (1st pizza, 2nd pizza, etc.)
+  pizzaIndex    Int // Position in the order (1st pizza, 2nd pizza, etc.)
   size          String
   toppings      String[]
-  isHalfAndHalf Boolean   @default(false)
+  isHalfAndHalf Boolean  @default(false)
   leftToppings  String[]
   rightToppings String[]
-  priceEstimate Decimal?  @db.Decimal(10, 2)
+  priceEstimate Decimal? @db.Decimal(10, 2)
 
   guestMappings GuestPizzaMapping[]
-  createdAt     DateTime @default(now())
+  createdAt     DateTime            @default(now())
 }
 
 // Maps guests to their assigned pizzas (for ML training)
@@ -393,10 +394,10 @@ model GuestPizzaMapping {
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   orderId String
-  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   whichHalf          String? // 'left', 'right', or null for whole pizza
-  satisfactionRating Int?    // 1-5 rating (optional feedback)
+  satisfactionRating Int? // 1-5 rating (optional feedback)
 
   createdAt DateTime @default(now())
 
@@ -423,22 +424,22 @@ model MagicLink {
 // ============================================
 
 model ApiKey {
-  id          String       @id @default(cuid())
-  name        String       // Friendly name for the API key
-  key         String       @unique // SHA-256 hash of the actual key
-  keyPrefix   String       @map("key_prefix") // First 8 chars for identification (e.g., "rsvp_sk_a1b2")
-  scopes      String[]     // Array of scopes: parties:read, parties:write, etc.
-  rateLimit   Int          @default(500) @map("rate_limit") // Requests per hour
-  expiresAt   DateTime?    @map("expires_at") @db.Timestamptz
-  revoked     Boolean      @default(false)
-  revokedAt   DateTime?    @map("revoked_at") @db.Timestamptz
-  status      String       @default("pending") // pending, approved, rejected
-  requestedAt DateTime     @default(now()) @map("requested_at") @db.Timestamptz
-  approvedAt  DateTime?    @map("approved_at") @db.Timestamptz
-  approvedBy  String?      @map("approved_by") // Admin user ID who approved
-  lastUsedAt  DateTime?    @map("last_used_at") @db.Timestamptz
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  id          String    @id @default(cuid())
+  name        String // Friendly name for the API key
+  key         String    @unique // SHA-256 hash of the actual key
+  keyPrefix   String    @map("key_prefix") // First 8 chars for identification (e.g., "rsvp_sk_a1b2")
+  scopes      String[] // Array of scopes: parties:read, parties:write, etc.
+  rateLimit   Int       @default(500) @map("rate_limit") // Requests per hour
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz
+  revoked     Boolean   @default(false)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz
+  status      String    @default("pending") // pending, approved, rejected
+  requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz
+  approvedBy  String?   @map("approved_by") // Admin user ID who approved
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -451,8 +452,8 @@ model ApiKey {
 
 model Webhook {
   id        String   @id @default(cuid())
-  url       String   // Webhook endpoint URL
-  secret    String   // Secret for HMAC-SHA256 signature
+  url       String // Webhook endpoint URL
+  secret    String // Secret for HMAC-SHA256 signature
   events    String[] // Array of events: party.created, guest.registered, etc.
   active    Boolean  @default(true)
   failCount Int      @default(0) @map("fail_count") // Consecutive failures
@@ -468,15 +469,15 @@ model Webhook {
 }
 
 model WebhookDelivery {
-  id           String   @id @default(cuid())
-  event        String   // Event type (e.g., party.created)
-  payload      Json     // Payload sent to webhook
-  status       String   @default("pending") // pending, success, failed
-  statusCode   Int?     @map("status_code") // HTTP response code
-  responseBody String?  @map("response_body") // Response from webhook
-  attempts     Int      @default(0)
+  id           String    @id @default(cuid())
+  event        String // Event type (e.g., party.created)
+  payload      Json // Payload sent to webhook
+  status       String    @default("pending") // pending, success, failed
+  statusCode   Int?      @map("status_code") // HTTP response code
+  responseBody String?   @map("response_body") // Response from webhook
+  attempts     Int       @default(0)
   lastAttempt  DateTime? @map("last_attempt") @db.Timestamptz
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   webhookId String  @map("webhook_id")
   webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
@@ -486,11 +487,11 @@ model WebhookDelivery {
 
 model ApiRequest {
   id           String   @id @default(cuid())
-  method       String   // HTTP method (GET, POST, etc.)
-  path         String   // Request path
+  method       String // HTTP method (GET, POST, etc.)
+  path         String // Request path
   statusCode   Int      @map("status_code") // Response status code
   responseTime Int      @map("response_time") // Response time in ms
-  ip           String?  // Client IP address
+  ip           String? // Client IP address
   userAgent    String?  @map("user_agent") // User agent string
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -506,30 +507,30 @@ model ApiRequest {
 // ============================================
 
 model Photo {
-  id           String    @id @default(uuid()) @db.Uuid
-  partyId      String    @map("party_id") @db.Uuid
-  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   // Upload info
-  url          String    // Supabase Storage public URL
-  thumbnailUrl String?   @map("thumbnail_url") // Optional smaller version
-  fileName     String    @map("file_name")
-  fileSize     Int       @map("file_size") // In bytes
-  mimeType     String    @map("mime_type")
+  url          String // Supabase Storage public URL
+  thumbnailUrl String? @map("thumbnail_url") // Optional smaller version
+  fileName     String  @map("file_name")
+  fileSize     Int     @map("file_size") // In bytes
+  mimeType     String  @map("mime_type")
   width        Int?
   height       Int?
 
   // Uploader info (can be guest or anonymous)
-  uploadedBy     String? @map("uploaded_by") @db.Uuid // Guest ID if known
-  uploaderName   String? @map("uploader_name") // Display name
-  uploaderEmail  String? @map("uploader_email") // For tracking
-  guest          Guest?  @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  uploadedBy    String? @map("uploaded_by") @db.Uuid // Guest ID if known
+  uploaderName  String? @map("uploader_name") // Display name
+  uploaderEmail String? @map("uploader_email") // For tracking
+  guest         Guest?  @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
 
   // Organization
   caption   String?
-  tags      String[] @default([])
-  photoYear Int?     @map("photo_year")
-  starred   Boolean  @default(false) // Host can star photos
+  tags      String[]  @default([])
+  photoYear Int?      @map("photo_year")
+  starred   Boolean   @default(false) // Host can star photos
   starredAt DateTime? @map("starred_at") @db.Timestamptz
 
   // Moderation
@@ -538,7 +539,7 @@ model Photo {
   reviewedBy String?   @map("reviewed_by")
 
   // Video metadata
-  duration  Float?    // Video duration in seconds (null for images)
+  duration Float? // Video duration in seconds (null for images)
 
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -574,9 +575,9 @@ model PartyKit {
   phone         String?
 
   // Status: pending, approved, shipped, delivered, declined
-  status         String    @default("pending")
-  trackingNumber String?   @map("tracking_number")
-  trackingUrl    String?   @map("tracking_url")
+  status         String  @default("pending")
+  trackingNumber String? @map("tracking_number")
+  trackingUrl    String? @map("tracking_url")
 
   // Notes
   notes      String? // Host notes/special requests
@@ -598,50 +599,50 @@ model PartyKit {
 // ============================================
 
 model Raffle {
-  id              String    @id @default(uuid()) @db.Uuid
-  partyId         String    @map("party_id") @db.Uuid
-  party           Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  name            String    @db.VarChar(255)
+  name            String  @db.VarChar(255)
   description     String?
-  status          String    @default("draft") @db.VarChar(50) // draft, open, closed, drawn
-  entriesPerGuest Int       @default(1) @map("entries_per_guest")
+  status          String  @default("draft") @db.VarChar(50) // draft, open, closed, drawn
+  entriesPerGuest Int     @default(1) @map("entries_per_guest")
 
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  prizes          RafflePrize[]
-  entries         RaffleEntry[]
-  winners         RaffleWinner[]
+  prizes  RafflePrize[]
+  entries RaffleEntry[]
+  winners RaffleWinner[]
 
   @@index([partyId])
   @@map("raffles")
 }
 
 model RafflePrize {
-  id          String    @id @default(uuid()) @db.Uuid
-  raffleId    String    @map("raffle_id") @db.Uuid
-  raffle      Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid()) @db.Uuid
+  raffleId String @map("raffle_id") @db.Uuid
+  raffle   Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
 
-  name        String    @db.VarChar(255)
+  name        String  @db.VarChar(255)
   description String?
-  imageUrl    String?   @map("image_url")
-  quantity    Int       @default(1)
+  imageUrl    String? @map("image_url")
+  quantity    Int     @default(1)
 
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  winners     RaffleWinner[]
+  winners RaffleWinner[]
 
   @@index([raffleId])
   @@map("raffle_prizes")
 }
 
 model RaffleEntry {
-  id        String   @id @default(uuid()) @db.Uuid
-  raffleId  String   @map("raffle_id") @db.Uuid
-  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
-  guestId   String   @map("guest_id") @db.Uuid
-  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid()) @db.Uuid
+  raffleId String @map("raffle_id") @db.Uuid
+  raffle   Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  guestId  String @map("guest_id") @db.Uuid
+  guest    Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -652,13 +653,13 @@ model RaffleEntry {
 }
 
 model RaffleWinner {
-  id        String    @id @default(uuid()) @db.Uuid
-  raffleId  String    @map("raffle_id") @db.Uuid
-  raffle    Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
-  prizeId   String    @map("prize_id") @db.Uuid
-  prize     RafflePrize @relation(fields: [prizeId], references: [id], onDelete: Cascade)
-  guestId   String    @map("guest_id") @db.Uuid
-  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  id       String      @id @default(uuid()) @db.Uuid
+  raffleId String      @map("raffle_id") @db.Uuid
+  raffle   Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  prizeId  String      @map("prize_id") @db.Uuid
+  prize    RafflePrize @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  guestId  String      @map("guest_id") @db.Uuid
+  guest    Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   claimedAt DateTime? @map("claimed_at") @db.Timestamptz
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -713,15 +714,15 @@ model Display {
 // ============================================
 
 model Staff {
-  id          String    @id @default(uuid()) @db.Uuid
-  partyId     String    @map("party_id") @db.Uuid
-  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   // Staff info
-  name        String
-  email       String?
-  phone       String?
-  role        String    // Role/position (e.g., "Coordinator", "Door", "Bar", "DJ", etc.)
+  name  String
+  email String?
+  phone String?
+  role  String // Role/position (e.g., "Coordinator", "Door", "Bar", "DJ", etc.)
 
   // Status
   status      String    @default("invited") // invited, confirmed, declined, checked_in
@@ -729,11 +730,11 @@ model Staff {
   checkedInAt DateTime? @map("checked_in_at") @db.Timestamptz
 
   // Notes
-  notes       String?
+  notes String?
 
   // Metadata
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([partyId, status])
   @@map("staff")
@@ -749,12 +750,12 @@ model Performer {
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   // Basic Info
-  name  String                    // DJ/performer name
-  type  String @default("dj")     // dj, live_band, solo, playlist
-  genre String?                   // Music genre/style
+  name  String // DJ/performer name
+  type  String  @default("dj") // dj, live_band, solo, playlist
+  genre String? // Music genre/style
 
   // Schedule
-  setTime     String? @map("set_time")     // Time as string (e.g., "21:00")
+  setTime     String? @map("set_time") // Time as string (e.g., "21:00")
   setDuration Int?    @map("set_duration") // Duration in minutes
   sortOrder   Int     @default(0) @map("sort_order")
 
@@ -769,10 +770,10 @@ model Performer {
   status String @default("confirmed") // pending, confirmed, cancelled
 
   // Logistics
-  equipmentProvided Boolean @default(false) @map("equipment_provided")
-  equipmentNotes    String? @map("equipment_notes")
+  equipmentProvided Boolean  @default(false) @map("equipment_provided")
+  equipmentNotes    String?  @map("equipment_notes")
   fee               Decimal? @db.Decimal(10, 2)
-  feePaid           Boolean @default(false) @map("fee_paid")
+  feePaid           Boolean  @default(false) @map("fee_paid")
 
   // Notes
   notes String?
@@ -790,50 +791,50 @@ model Performer {
 // ============================================
 
 model Venue {
-  id           String    @id @default(uuid()) @db.Uuid
-  partyId      String    @map("party_id") @db.Uuid
-  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   // Venue info
   name         String
   address      String?
   website      String?
   capacity     Int?
-  cost         Decimal?  @db.Decimal(10, 2)
+  cost         Decimal? @db.Decimal(10, 2)
   organization String?
   latitude     Float?
   longitude    Float?
 
   // Contact
-  pointPerson   String?  @map("point_person")
-  contactName   String?  @map("contact_name")
-  contactEmail  String?  @map("contact_email")
-  contactPhone  String?  @map("contact_phone")
+  pointPerson  String? @map("point_person")
+  contactName  String? @map("contact_name")
+  contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
 
   // Status tracking
-  status       String    @default("researching")  // researching, contacted, negotiating, confirmed, deposit_paid, paid_in_full, declined
+  status String @default("researching") // researching, contacted, negotiating, confirmed, deposit_paid, paid_in_full, declined
 
   // Selection
-  isSelected   Boolean   @default(false) @map("is_selected")
+  isSelected Boolean @default(false) @map("is_selected")
 
   // Pros/Cons
-  pros         String?
-  cons         String?
+  pros String?
+  cons String?
 
-  notes        String?
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  photos       VenuePhoto[]
+  photos VenuePhoto[]
 
   @@index([partyId, isSelected])
   @@map("venues")
 }
 
 model VenuePhoto {
-  id        String   @id @default(uuid()) @db.Uuid
-  venueId   String   @map("venue_id") @db.Uuid
-  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  venueId String @map("venue_id") @db.Uuid
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
   url       String
   fileName  String   @map("file_name")
@@ -860,8 +861,8 @@ model Sponsor {
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   // Basic Info
-  name         String  // Sponsor/company name
-  website      String? // Company website
+  name             String // Sponsor/company name
+  website          String? // Company website
   brandTwitter     String? @map("brand_twitter") // Brand's X/Twitter handle
   brandInstagram   String? @map("brand_instagram") // Brand's Instagram handle
   brandDescription String? @map("brand_description") // 1-2 sentence brand description
@@ -920,21 +921,21 @@ model Sponsor {
 // ============================================
 
 model BudgetItem {
-  id          String   @id @default(uuid()) @db.Uuid
-  partyId     String   @map("party_id") @db.Uuid
-  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  name        String
-  category    String
-  cost        Decimal  @db.Decimal(10, 2)
-  status      String   @default("pending")
+  name     String
+  category String
+  cost     Decimal @db.Decimal(10, 2)
+  status   String  @default("pending")
 
-  pointPerson String?  @map("point_person")
+  pointPerson String? @map("point_person")
   notes       String?
-  receiptUrl  String?  @map("receipt_url")
+  receiptUrl  String? @map("receipt_url")
 
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([partyId, category])
   @@map("budget_items")
@@ -1178,14 +1179,14 @@ model SponsorUser {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Co-host profile fields (for auto co-hosting via tag)
-  coHostName      String?   @map("co_host_name")
-  coHostWebsite   String?   @map("co_host_website")
-  coHostTwitter   String?   @map("co_host_twitter")
-  coHostInstagram String?   @map("co_host_instagram")
-  coHostAvatarUrl String?   @map("co_host_avatar_url")
-  coHostLogoUrl   String?   @map("co_host_logo_url")
-  autoCoHost      Boolean   @default(false) @map("auto_co_host")
-  autoSponsor     Boolean   @default(false) @map("auto_sponsor")
+  coHostName      String? @map("co_host_name")
+  coHostWebsite   String? @map("co_host_website")
+  coHostTwitter   String? @map("co_host_twitter")
+  coHostInstagram String? @map("co_host_instagram")
+  coHostAvatarUrl String? @map("co_host_avatar_url")
+  coHostLogoUrl   String? @map("co_host_logo_url")
+  autoCoHost      Boolean @default(false) @map("auto_co_host")
+  autoSponsor     Boolean @default(false) @map("auto_sponsor")
   category        String?
 
   // Brand info (synced to Sponsor records)
@@ -1193,7 +1194,7 @@ model SponsorUser {
   descriptionSortOrder Int     @default(0) @map("description_sort_order")
 
   // Granular co-host permissions (applied when autoCoHost adds them to events)
-  coHostShowOnEvent Boolean @default(true)  @map("co_host_show_on_event")
+  coHostShowOnEvent Boolean @default(true) @map("co_host_show_on_event")
   coHostCanEdit     Boolean @default(false) @map("co_host_can_edit")
   coHostAllowedTabs Json?   @map("co_host_allowed_tabs")
 
@@ -1208,19 +1209,19 @@ model SponsorUser {
 }
 
 model SponsorChecklistItem {
-  id            String    @id @default(uuid()) @db.Uuid
-  sponsorUserId String    @map("sponsor_user_id") @db.Uuid
+  id            String      @id @default(uuid()) @db.Uuid
+  sponsorUserId String      @map("sponsor_user_id") @db.Uuid
   sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
-  partyId       String    @map("party_id") @db.Uuid
-  party         Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  partyId       String      @map("party_id") @db.Uuid
+  party         Party       @relation(fields: [partyId], references: [id], onDelete: Cascade)
   name          String
-  completed     Boolean   @default(false)
-  completedAt   DateTime? @map("completed_at") @db.Timestamptz
-  dueDate       DateTime? @map("due_date") @db.Date
-  sortOrder     Int       @default(0) @map("sort_order")
-  isDefault     Boolean   @default(false) @map("is_default")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  completed     Boolean     @default(false)
+  completedAt   DateTime?   @map("completed_at") @db.Timestamptz
+  dueDate       DateTime?   @map("due_date") @db.Date
+  sortOrder     Int         @default(0) @map("sort_order")
+  isDefault     Boolean     @default(false) @map("is_default")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([sponsorUserId])
   @@index([partyId])
@@ -1282,12 +1283,12 @@ model QuizQuestionTemplate {
 
 // Quiz questions (per event, copied from templates or created by host)
 model QuizQuestion {
-  id       String  @id @default(uuid()) @db.Uuid
-  partyId  String  @map("party_id") @db.Uuid
-  party    Party   @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
-  sponsorId  String?  @map("sponsor_id") @db.Uuid
-  sponsor    Sponsor? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  sponsorId String?  @map("sponsor_id") @db.Uuid
+  sponsor   Sponsor? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
 
   templateId String?               @map("template_id") @db.Uuid
   template   QuizQuestionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)

@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { vouchForGuest } from '../lib/api';
+import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 
-type CheckInState = 'loading' | 'show-qr' | 'vouching' | 'success' | 'already-checked-in' | 'not-checked-in' | 'unauthorized' | 'error' | 'not-found';
+type CheckInState = 'loading' | 'show-qr' | 'vouching' | 'success' | 'already-checked-in' | 'not-checked-in' | 'unauthorized' | 'error' | 'not-found' | 'discount-available' | 'discount-claimed' | 'discount-ineligible';
 
 export function CheckInPage() {
   const { inviteCode, guestId } = useParams<{ inviteCode: string; guestId: string }>();
@@ -18,19 +18,53 @@ export function CheckInPage() {
   const [checkedInAt, setCheckedInAt] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [hasAttempted, setHasAttempted] = useState(false);
+  const [discountData, setDiscountData] = useState<any>(null);
+  const [discountChecked, setDiscountChecked] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Pre-auth discount check: if event has ended, show discount flow instead of check-in
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!inviteCode || !guestId || discountChecked) return;
+
+    const checkDiscount = async () => {
+      try {
+        const status = await getDiscountStatus(inviteCode, guestId);
+        setDiscountChecked(true);
+
+        if (status.hasEnded) {
+          setDiscountData(status);
+          setGuestName(status.guestName);
+          if (status.isCheckedIn && !status.discountClaimedAt) {
+            setState('discount-available');
+          } else if (status.isCheckedIn && status.discountClaimedAt) {
+            setState('discount-claimed');
+          } else {
+            setState('discount-ineligible');
+          }
+          return;
+        }
+      } catch {
+        // If discount check fails, fall through to normal check-in flow
+      }
+      setDiscountChecked(true);
+    };
+
+    checkDiscount();
+  }, [inviteCode, guestId, discountChecked]);
+
+  // Redirect to login if not authenticated (skip if discount flow is active)
+  useEffect(() => {
+    if (!authLoading && !user && state !== 'discount-available' && state !== 'discount-claimed' && state !== 'discount-ineligible') {
       const currentUrl = `/checkin/${inviteCode}/${guestId}`;
       sessionStorage.setItem('authReturnUrl', currentUrl);
       navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     }
-  }, [authLoading, user, inviteCode, guestId, navigate]);
+  }, [authLoading, user, inviteCode, guestId, navigate, state]);
 
   // Determine what to show
   useEffect(() => {
     if (authLoading || !user || hasAttempted || !inviteCode || !guestId) return;
+    // Skip check-in flow if discount state is already resolved
+    if (state === 'discount-available' || state === 'discount-claimed' || state === 'discount-ineligible') return;
 
     const determine = async () => {
       setHasAttempted(true);
@@ -113,7 +147,18 @@ export function CheckInPage() {
     };
 
     determine();
-  }, [authLoading, user, inviteCode, guestId, hasAttempted]);
+  }, [authLoading, user, inviteCode, guestId, hasAttempted, state]);
+
+  const handleClaimDiscount = async () => {
+    try {
+      const result = await claimDiscount(inviteCode!, guestId!);
+      setDiscountData(result);
+      setState('discount-claimed');
+    } catch (err) {
+      setState('error');
+      setErrorMessage('Failed to claim discount');
+    }
+  };
 
   const formatCheckInTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -135,6 +180,47 @@ export function CheckInPage() {
           <p className="text-theme-text-secondary">
             {state === 'vouching' ? 'Checking in guest...' : 'Loading...'}
           </p>
+        </div>
+      );
+    }
+
+    if (state === 'discount-available') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-6xl mb-4">🍕</div>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Claim Your 10% Pizza Discount</h2>
+          <p className="text-theme-text-secondary mb-6">Thanks for attending! As a verified guest, you earned a discount.</p>
+          <button
+            onClick={handleClaimDiscount}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors"
+          >
+            Claim Discount
+          </button>
+        </div>
+      );
+    }
+
+    if (state === 'discount-claimed') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
+            <CheckCircle2 size={48} className="text-green-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-green-400 mb-2">Discount Claimed!</h2>
+          <p className="text-theme-text-secondary mb-2">Your 10% pizza discount is active.</p>
+          <p className="text-theme-text-muted text-sm">
+            Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
+          </p>
+        </div>
+      );
+    }
+
+    if (state === 'discount-ineligible') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Discount Unavailable</h2>
+          <p className="text-theme-text-secondary">This discount is for verified attendees only.</p>
         </div>
       );
     }

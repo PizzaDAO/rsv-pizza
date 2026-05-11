@@ -313,4 +313,124 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
+// GET /api/checkin/:inviteCode/:guestId/discount — Get discount claim status (no auth required)
+router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the guest
+    const guest = await prisma.guest.findFirst({
+      where: {
+        id: guestId,
+        partyId: party.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        checkedInAt: true,
+        discountClaimedAt: true,
+        party: {
+          select: {
+            date: true,
+            duration: true,
+          },
+        },
+      },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Compute hasEnded
+    let hasEnded = false;
+    if (guest.party.date) {
+      const eventEnd = new Date(guest.party.date.getTime() + (guest.party.duration || 0) * 60 * 60 * 1000);
+      hasEnded = new Date() > eventEnd;
+    }
+
+    res.json({
+      guestName: guest.name,
+      isCheckedIn: !!guest.checkedInAt,
+      hasEnded,
+      discountClaimedAt: guest.discountClaimedAt,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/checkin/:inviteCode/:guestId/discount — Claim post-event discount (no auth required)
+router.post('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the guest
+    const guest = await prisma.guest.findFirst({
+      where: {
+        id: guestId,
+        partyId: party.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        checkedInAt: true,
+        discountClaimedAt: true,
+        party: {
+          select: {
+            date: true,
+            duration: true,
+          },
+        },
+      },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Validate: guest must be checked in
+    if (!guest.checkedInAt) {
+      return res.status(403).json({ error: 'Must be checked in to claim discount' });
+    }
+
+    // Compute hasEnded
+    let hasEnded = false;
+    if (guest.party.date) {
+      const eventEnd = new Date(guest.party.date.getTime() + (guest.party.duration || 0) * 60 * 60 * 1000);
+      hasEnded = new Date() > eventEnd;
+    }
+
+    // Validate: event must have ended
+    if (!hasEnded) {
+      return res.status(400).json({ error: 'Event has not ended yet' });
+    }
+
+    // If already claimed, return existing timestamp
+    if (guest.discountClaimedAt) {
+      return res.json({ success: true, alreadyClaimed: true, claimedAt: guest.discountClaimedAt });
+    }
+
+    // Claim the discount
+    const updated = await prisma.guest.update({
+      where: { id: guestId },
+      data: { discountClaimedAt: new Date() },
+    });
+
+    res.json({ success: true, alreadyClaimed: false, claimedAt: updated.discountClaimedAt });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
