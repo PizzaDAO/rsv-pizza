@@ -1362,4 +1362,82 @@ router.patch('/admin/assign-region/:partyId', requireAuth, async (req: AuthReque
   }
 });
 
+// GET /api/underboss/funnel-stats — RSVP funnel stats per event
+router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const underboss = req.underboss!;
+    const regionsParam = req.query.regions as string | undefined;
+    const regions = regionsParam ? regionsParam.split(',') : underboss.regions;
+
+    // Build region filter
+    const isAdminUser = underboss.regions.includes('__admin__');
+    const regionFilter = isAdminUser && (!regionsParam || regions.includes('__admin__'))
+      ? {}
+      : { region: { in: regions } };
+
+    // Get events with funnel data
+    const events = await prisma.party.findMany({
+      where: regionFilter,
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        _count: {
+          select: {
+            pageViews: true,
+            guests: true,
+          },
+        },
+        guests: {
+          where: { status: { not: 'INVITED' } },
+          select: { id: true },
+        },
+        rsvpFunnelEvents: {
+          select: { step: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let totalViews = 0;
+    let totalOpened = 0;
+    let totalStep1 = 0;
+    let totalSubmitted = 0;
+
+    const eventStats = events.map((e) => {
+      const views = e._count.pageViews;
+      const opened = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_opened').length;
+      const step1Complete = e.rsvpFunnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
+      const submitted = e.guests.length;
+
+      totalViews += views;
+      totalOpened += opened;
+      totalStep1 += step1Complete;
+      totalSubmitted += submitted;
+
+      return {
+        eventId: e.id,
+        eventName: e.name,
+        city: e.city || '',
+        views,
+        opened,
+        step1Complete,
+        submitted,
+      };
+    });
+
+    res.json({
+      events: eventStats,
+      totals: {
+        views: totalViews,
+        opened: totalOpened,
+        step1Complete: totalStep1,
+        submitted: totalSubmitted,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

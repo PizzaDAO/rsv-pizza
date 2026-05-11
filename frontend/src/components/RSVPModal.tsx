@@ -4,7 +4,7 @@ import { Check, X, Wallet } from 'lucide-react';
 import { ExistingGuestData } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from './IconInput';
-import { PublicEvent } from '../lib/api';
+import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/useRSVPForm';
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { useAccount } from 'wagmi';
@@ -111,6 +111,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
       document.body.classList.remove('modal-open');
     };
   }, [isOpen, existingGuest]);
+
+  // Track RSVP funnel: opened
+  useEffect(() => {
+    if (isOpen) {
+      const slug = event.customUrl || event.inviteCode;
+      if (slug) trackRsvpFunnel(slug, 'rsvp_opened');
+    }
+  }, [isOpen, event.customUrl, event.inviteCode]);
 
   // Auto-fill wallet address when user connects via ConnectKit
   useEffect(() => {

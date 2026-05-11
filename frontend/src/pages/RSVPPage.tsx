@@ -4,7 +4,7 @@ import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
-import { PublicEvent, getDonationStats } from '../lib/api';
+import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
 // GPP theme applied conditionally
@@ -142,6 +142,13 @@ export function RSVPPage() {
     }
     loadParty();
   }, [inviteCode, user?.email]);
+
+  // Track RSVP funnel: opened
+  useEffect(() => {
+    if (party && inviteCode) {
+      trackRsvpFunnel(inviteCode, 'rsvp_opened');
+    }
+  }, [party, inviteCode]);
 
   // Create the eventData only when party is loaded
   const eventData = party ? dbPartyToRSVPData(party) : null;

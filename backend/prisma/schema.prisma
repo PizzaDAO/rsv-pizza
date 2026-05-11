@@ -199,6 +199,7 @@ model Party {
   aiPhoneCalls     AIPhoneCall[]
   pageViews             PageView[]
   linkClicks            LinkClick[]
+  rsvpFunnelEvents      RsvpFunnelEvent[]
   sponsorChecklistItems SponsorChecklistItem[]
   partnerEventNotes     PartnerEventNote[]
   quizQuestions         QuizQuestion[]
@@ -1064,6 +1065,25 @@ model LinkClick {
   @@index([partyId, clickedAt])
   @@index([partyId, visitorHash])
   @@map("link_clicks")
+}
+
+// ============================================
+// RSVP Funnel Tracking
+// ============================================
+
+model RsvpFunnelEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  step        String   // 'rsvp_opened' | 'rsvp_step1_complete'
+  visitorHash String   @map("visitor_hash")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([partyId, visitorHash, step])
+  @@map("rsvp_funnel_events")
 }
 
 // ============================================
