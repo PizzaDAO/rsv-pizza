@@ -250,7 +250,7 @@ export function GPPLandingPage() {
           <title>{t('success.pageTitle')}</title>
         </Helmet>
 
-        <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm relative z-50 overflow-visible">
+        <header className="border-b border-black/10 relative z-50 overflow-visible" style={{ background: 'rgba(255,255,255,0.95)' }}>
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -406,7 +406,7 @@ export function GPPLandingPage() {
       </Helmet>
 
       {/* ─── LIGHT HEADER ─── */}
-      <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+      <header className="border-b border-black/10 relative z-50 overflow-visible" style={{ background: 'rgba(255,255,255,0.95)' }}>
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -429,7 +429,7 @@ export function GPPLandingPage() {
                 <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {langMenuOpen && (
-                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: '#ffffff', borderColor: 'rgba(0,0,0,0.1)' }}>
                   {LANGUAGES.map((lang) => (
                     <button
                       key={lang.code}
