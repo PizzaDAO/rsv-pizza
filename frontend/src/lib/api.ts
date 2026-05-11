@@ -3255,3 +3255,47 @@ export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats 
   }
 }
 
+// ── Guest Scorecard ──
+
+export interface ScorecardItem {
+  id: string;
+  guestId: string;
+  partyId: string;
+  itemKey: string;
+  completed: boolean;
+  completedAt: string | null;
+  proofUrl: string | null;
+  proofType: string | null;
+  metadata: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScorecardResponse {
+  items: ScorecardItem[];
+  pizzaChefScore: number;
+  totalItems: number;
+}
+
+export interface CompleteScorecardResponse {
+  item: ScorecardItem;
+  pizzaChefScore: number;
+  totalItems: number;
+}
+
+export async function getScorecard(inviteCode: string): Promise<ScorecardResponse> {
+  return apiRequest<ScorecardResponse>(`/api/scorecard/${inviteCode}`);
+}
+
+export async function completeScorecardItem(
+  inviteCode: string,
+  itemKey: string,
+  proofUrl?: string,
+  proofType?: string
+): Promise<CompleteScorecardResponse> {
+  return apiRequest<CompleteScorecardResponse>(`/api/scorecard/${inviteCode}/complete`, {
+    method: 'POST',
+    body: { itemKey, proofUrl, proofType },
+  });
+}
+

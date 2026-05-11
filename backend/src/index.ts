@@ -41,6 +41,7 @@ import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
+import scorecardRoutes from './routes/scorecard.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -138,6 +139,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/checkin', checkinRoutes);
+app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
 app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug

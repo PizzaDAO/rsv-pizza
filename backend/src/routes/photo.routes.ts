@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { autoCompleteScorecardItem } from './scorecard.routes.js';
 
 const router = Router();
 
@@ -342,6 +343,18 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
         guest: { select: { id: true, name: true } },
       },
     });
+
+    // Auto-complete scorecard items for photo uploads
+    if (verifiedGuestId) {
+      // Auto-complete "photo" item
+      autoCompleteScorecardItem(verifiedGuestId, partyId, 'photo', photo.id, 'photo_id');
+
+      // If tagged "pizza-selfie", auto-complete that too
+      const photoTags = (tags || []) as string[];
+      if (photoTags.some((t: string) => t.toLowerCase() === 'pizza-selfie' || t.toLowerCase() === 'pizza selfie')) {
+        autoCompleteScorecardItem(verifiedGuestId, partyId, 'pizza_selfie', photo.id, 'photo_id');
+      }
+    }
 
     res.status(201).json({ photo });
   } catch (error) {

@@ -204,6 +204,7 @@ model Party {
   partnerEventNotes     PartnerEventNote[]
   quizQuestions         QuizQuestion[]
   slugAliases           SlugAlias[]
+  scorecardItems        GuestScorecardItem[]
 
   @@map("parties")
 }
@@ -264,6 +265,7 @@ model Guest {
   raffleWins       RaffleWinner[]
   notableAttendees NotableAttendee[]
   quizAnswers      QuizAnswer[]
+  scorecardItems   GuestScorecardItem[]
 
   @@index([email])
   @@map("guests")
@@ -1336,4 +1338,28 @@ model SlugAlias {
   party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   @@map("slug_aliases")
+}
+
+// Guest scorecard items for gamified engagement tracking
+model GuestScorecardItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  guestId     String    @map("guest_id") @db.Uuid
+  guest       Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  itemKey     String    @map("item_key") @db.VarChar
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  proofUrl    String?   @map("proof_url")
+  proofType   String?   @map("proof_type") @db.VarChar
+  metadata    Json      @default("{}")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([guestId, partyId, itemKey])
+  @@index([guestId, partyId])
+  @@index([partyId])
+  @@map("guest_scorecard_items")
 }
