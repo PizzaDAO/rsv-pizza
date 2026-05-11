@@ -13,6 +13,7 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'vouch',
   'pizza_selfie',
   'sign_pizza_box',
+  'join_telegram',
   'follow_pizzadao',
   'signup_pizzadao',
 ];
@@ -20,7 +21,7 @@ const ITEM_ORDER: ScorecardItemKey[] = [
 export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
-  const [totalItems, setTotalItems] = useState(7);
+  const [totalItems, setTotalItems] = useState(8);
   const [loading, setLoading] = useState(true);
   const [completingItem, setCompletingItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
