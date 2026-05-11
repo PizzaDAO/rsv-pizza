@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, ExternalLink, Globe, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CornerLinks } from '../components/CornerLinks';
 import { GPPClouds } from '../components/GPPClouds';
@@ -31,7 +31,9 @@ const C = {
 export function GPPLandingPage() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
-  const { t } = useTranslation('gpp');
+  const { t, i18n } = useTranslation('gpp');
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
@@ -69,6 +71,27 @@ export function GPPLandingPage() {
     swayAmount: number;
     swaySpeed: number;
   }>>([]);
+
+  const LANGUAGES = [
+    { code: 'en', label: 'EN', name: 'English' },
+    { code: 'es', label: 'ES', name: 'Español' },
+    { code: 'fr', label: 'FR', name: 'Français' },
+    { code: 'pt', label: 'PT', name: 'Português' },
+    { code: 'zh', label: '中文', name: '中文' },
+  ];
+  const currentLang = LANGUAGES.find(l => i18n.language?.startsWith(l.code)) || LANGUAGES[0];
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangMenuOpen(false);
+      }
+    }
+    if (langMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [langMenuOpen]);
 
   const handleCitySelected = (data: CityData) => {
     cityDataRef.current = data;
@@ -227,7 +250,7 @@ export function GPPLandingPage() {
           <title>{t('success.pageTitle')}</title>
         </Helmet>
 
-        <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+        <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm relative z-50 overflow-visible">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -238,6 +261,36 @@ export function GPPLandingPage() {
                 RSV.Pizza
               </span>
             </a>
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangMenuOpen(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-all"
+                style={{ color: C.darkText }}
+              >
+                <Globe size={14} />
+                <span className="font-bold">{currentLang.label}</span>
+                <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-1 z-50 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { i18n.changeLanguage(lang.code); setLangMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                        currentLang.code === lang.code
+                          ? 'bg-[#E52828]/10 font-bold'
+                          : 'hover:bg-black/5'
+                      }`}
+                      style={{ color: C.darkText }}
+                    >
+                      <span>{lang.label}</span>
+                      <span className="text-xs opacity-50">{lang.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -364,17 +417,49 @@ export function GPPLandingPage() {
               RSV.Pizza
             </span>
           </a>
-          <a
-            href="/login"
-            className="text-sm font-medium px-4 py-2 rounded-lg border transition-colors"
-            style={{
-              color: C.darkText,
-              borderColor: 'rgba(0,0,0,0.15)',
-              background: 'rgba(255,255,255,0.5)',
-            }}
-          >
-            {t('header.logIn')}
-          </a>
+          <div className="flex items-center gap-3">
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangMenuOpen(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-all"
+                style={{ color: C.darkText }}
+              >
+                <Globe size={14} />
+                <span className="font-bold">{currentLang.label}</span>
+                <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-1 z-50 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { i18n.changeLanguage(lang.code); setLangMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                        currentLang.code === lang.code
+                          ? 'bg-[#E52828]/10 font-bold'
+                          : 'hover:bg-black/5'
+                      }`}
+                      style={{ color: C.darkText }}
+                    >
+                      <span>{lang.label}</span>
+                      <span className="text-xs opacity-50">{lang.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <a
+              href="/login"
+              className="text-sm font-medium px-4 py-2 rounded-lg border transition-colors"
+              style={{
+                color: C.darkText,
+                borderColor: 'rgba(0,0,0,0.15)',
+                background: 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {t('header.logIn')}
+            </a>
+          </div>
         </div>
       </header>
 
