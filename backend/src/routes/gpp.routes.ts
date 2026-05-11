@@ -635,10 +635,15 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventSlug = party.customUrl || party.inviteCode;
 
       for (const p of raw as any[]) {
-        // Strip heavy fields, keep only first photo
+        // Strip heavy fields, keep only first photo reference name
         const { photos, orderingOptions, ...light } = p;
-        const photo = Array.isArray(photos) && photos.length > 0 ? photos[0] : undefined;
-        pizzerias.push({ ...light, photo, eventCity, eventSlug });
+        let photoRef: string | undefined;
+        if (Array.isArray(photos) && photos.length > 0) {
+          // Photos are Google Places API v2 objects with a 'name' field
+          const first = photos[0];
+          photoRef = typeof first === 'string' ? first : first?.name;
+        }
+        pizzerias.push({ ...light, photoRef, eventCity, eventSlug });
       }
     }
 

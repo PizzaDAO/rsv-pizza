@@ -160,10 +160,12 @@ export default function GPPPizzeriasMap({
             linkHtml = `<a href="${pizzeria.url}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">Visit Website &rarr;</a>`;
           }
 
-          // Photo (Google Places photo URL)
+          // Photo from Google Places API
+          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
           let photoHtml = '';
-          if (pizzeria.photo) {
-            photoHtml = `<img src="${pizzeria.photo}" alt="${pizzeria.name}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
+          if (pizzeria.photoRef && apiKey) {
+            const photoUrl = `https://places.googleapis.com/v1/${pizzeria.photoRef}/media?maxWidthPx=400&key=${apiKey}`;
+            photoHtml = `<img src="${photoUrl}" alt="${pizzeria.name}" referrerpolicy="no-referrer" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
           }
 
           const content = `

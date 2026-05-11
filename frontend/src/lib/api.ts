@@ -3167,7 +3167,8 @@ export interface GPPPizzeriaMapItem {
   rating?: number;
   reviewCount?: number;
   description?: string;
-  photo?: string;
+  photoRef?: string;
+  placeId?: string;
   location: { lat: number; lng: number };
   eventCity: string;
   eventSlug: string;
