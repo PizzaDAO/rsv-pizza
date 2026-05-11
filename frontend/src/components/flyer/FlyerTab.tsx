@@ -2,7 +2,7 @@ import React from 'react';
 import { FlyerGenerator } from './FlyerGenerator';
 import { usePizza } from '../../contexts/PizzaContext';
 
-export function FlyerTab() {
+export function FlyerTab({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { party } = usePizza();
 
   if (!party) return null;
@@ -24,7 +24,7 @@ export function FlyerTab() {
           Download a custom flyer with your event details
         </p>
       </div>
-      <FlyerGenerator />
+      <FlyerGenerator sponsorLogoOnly={sponsorLogoOnly} />
     </div>
   );
 }

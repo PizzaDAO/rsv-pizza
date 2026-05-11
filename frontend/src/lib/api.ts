@@ -158,6 +158,7 @@ export interface UpdatePartyData {
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
+  flyerConfig?: Record<string, any> | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   lumaUrl?: string | null;
@@ -251,6 +252,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       pinnedApps: data.pinnedApps,
       region: data.region,
       flyerGeneratedAt: data.flyerGeneratedAt,
+      flyerConfig: data.flyerConfig,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
       lumaUrl: data.lumaUrl,
@@ -1613,6 +1615,17 @@ export function trackLinkClick(slug: string, url: string, linkType: string, link
     keepalive: true,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, linkType, linkLabel: linkLabel || null }),
+  }).catch(() => {});
+}
+
+// Track RSVP funnel step (public, fire-and-forget)
+export function trackRsvpFunnel(slug: string, step: 'rsvp_opened' | 'rsvp_step1_complete'): void {
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+  fetch(`${apiUrl}/api/events/${slug}/funnel`, {
+    method: 'POST',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ step }),
   }).catch(() => {});
 }
 
@@ -3137,6 +3150,36 @@ export async function vouchForGuest(inviteCode: string, targetGuestId: string): 
   });
 }
 
+// ── Post-Event Discount Claim ──
+
+export interface DiscountStatusResponse {
+  guestName: string;
+  isCheckedIn: boolean;
+  hasEnded: boolean;
+  discountClaimedAt: string | null;
+}
+
+export interface DiscountClaimResponse {
+  success: boolean;
+  alreadyClaimed: boolean;
+  claimedAt: string;
+}
+
+/** Get discount eligibility status for a guest (no auth required) */
+export async function getDiscountStatus(inviteCode: string, guestId: string): Promise<DiscountStatusResponse> {
+  return apiRequest<DiscountStatusResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+    requireAuth: false,
+  });
+}
+
+/** Claim post-event discount for a checked-in guest (no auth required) */
+export async function claimDiscount(inviteCode: string, guestId: string): Promise<DiscountClaimResponse> {
+  return apiRequest<DiscountClaimResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+    method: 'POST',
+    requireAuth: false,
+  });
+}
+
 // ── Graphics Admin Management ──
 
 export async function fetchGraphicsAdminList(): Promise<GraphicsAdmin[]> {
@@ -3154,6 +3197,62 @@ export async function addGraphicsAdmin(data: { email: string; name?: string }): 
 
 export async function removeGraphicsAdmin(id: string): Promise<void> {
   await apiRequest(`/api/graphics-admin/${id}`, { method: 'DELETE' });
+}
+
+// GPP Pizzerias Map
+export interface GPPPizzeriaMapItem {
+  id: string;
+  name: string;
+  address: string;
+  url?: string;
+  rating?: number;
+  reviewCount?: number;
+  description?: string;
+  photoRef?: string;
+  placeId?: string;
+  location: { lat: number; lng: number };
+  eventCity: string;
+  eventSlug: string;
+}
+
+export async function fetchGppPizzerias(): Promise<GPPPizzeriaMapItem[]> {
+  return apiRequest<GPPPizzeriaMapItem[]>('/api/gpp/pizzerias', { requireAuth: false });
+}
+
+// RSVP Funnel Stats (Underboss dashboard)
+
+export interface FunnelEventStats {
+  eventId: string;
+  eventName: string;
+  city: string;
+  views: number;
+  opened: number;
+  step1Complete: number;
+  submitted: number;
+}
+
+export interface FunnelStats {
+  events: FunnelEventStats[];
+  totals: {
+    views: number;
+    opened: number;
+    step1Complete: number;
+    submitted: number;
+  };
+}
+
+// Fetch RSVP funnel stats for underboss dashboard
+export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats | null> {
+  try {
+    const params = regions && regions.length > 0 ? `?regions=${regions.join(',')}` : '';
+    return await apiRequest<FunnelStats>(`/api/underboss/funnel-stats${params}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching funnel stats:', error);
+    return null;
+  }
 }
 
 // ── Guest Scorecard ──

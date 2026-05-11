@@ -189,14 +189,6 @@ export function HomePage() {
           <EventForm />
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-theme-text-muted text-sm">
-            Already created a party?{' '}
-            <a href="/parties" className="text-[#ff393a] hover:text-[#ff5a5b] underline">
-              View all test events
-            </a>
-          </p>
-        </div>
       </div>
     </Layout>
   );

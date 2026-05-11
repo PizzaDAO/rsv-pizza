@@ -6,7 +6,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
-import { PartiesListPage } from './pages/PartiesListPage';
 import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
 import { LoginPage } from './pages/LoginPage';
@@ -25,6 +24,7 @@ import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
+import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -34,6 +34,7 @@ function SponsorIntakeRedirect() {
 }
 
 const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
+const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
 
 function App() {
   return (
@@ -46,9 +47,9 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/new" element={<NewEventPage />} />
             <Route path="/gpp" element={<GPPLandingPage />} />
+            <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
-            <Route path="/parties" element={<PartiesListPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
             <Route path="/venue-report/:slug" element={<PublicVenueReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
@@ -66,6 +67,7 @@ function App() {
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
+            <Route path="/graphics/:slug/edit" element={<Suspense fallback={null}><GraphicsFlyerEdit /></Suspense>} />
             <Route path="/post" element={<PostComposerPage />} />
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />

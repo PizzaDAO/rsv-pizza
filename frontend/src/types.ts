@@ -274,6 +274,7 @@ export interface Party {
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
+  flyerConfig?: Record<string, any> | null;
   canEdit?: boolean;
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];
@@ -484,6 +485,7 @@ export interface Sponsor {
   intakeToken: string | null;
   intakeSubmittedAt: string | null;
   sponsorMessage: string | null;
+  addedByUnderboss?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1005,6 +1007,7 @@ export interface UnderbossEventProgress {
 export interface UnderbossEvent {
   id: string;
   name: string;
+  inviteCode: string;
   customUrl: string | null;
   date: string | null;
   address: string | null;
@@ -1034,6 +1037,7 @@ export interface UnderbossEvent {
   telegramGroup?: string | null;
   createdAt: string;
   flyerGeneratedAt: string | null;
+  flyerConfig?: Record<string, any> | null;
   latestSponsorAt: string | null;
   flyerStale: boolean;
 }

@@ -445,6 +445,8 @@ export function UnderbossDashboard() {
           {activeTab === 'partners' && (
             <PartnerManager isAdmin={isAdmin} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
+
+
         </section>
         </div>
       </main>

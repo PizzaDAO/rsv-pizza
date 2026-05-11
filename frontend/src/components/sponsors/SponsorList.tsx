@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
-  Mail, Phone, User, Building2, Calendar
+  Mail, Phone, User, Building2, Calendar, Globe
 } from 'lucide-react';
 import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
@@ -312,6 +312,11 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                           >
                             <Phone size={14} />
                           </a>
+                        )}
+                        {!sponsor.contactEmail && !sponsor.contactPhone && sponsor.addedByUnderboss && (
+                          <span className="text-xs text-purple-400 flex items-center gap-1">
+                            <Globe size={12} /> Global partner
+                          </span>
                         )}
                       </div>
                     </div>

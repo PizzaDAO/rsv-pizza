@@ -8,6 +8,7 @@
  */
 
 import { renderFlyer, uses12Hour, formatFlyerTime } from './renderFlyer';
+import type { FlyerConfig } from './renderFlyer';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../../lib/supabase';
 import { getSponsors } from '../../lib/api';
@@ -28,6 +29,7 @@ export interface FlyerRegenData {
   customUrl: string | null;
   inviteCode?: string | null;
   eventType?: string | null;
+  flyerConfig?: Record<string, any> | null;
 }
 
 // ---- Debounce map (partyId → timer handle) ----
@@ -59,12 +61,16 @@ export function triggerFlyerRegen(
   // Only GPP events get auto-regen
   if (party.eventType !== 'gpp') return;
 
-  // If the host has custom flyer positions, don't overwrite their layout
-  const customKey = `flyer-${party.id}`;
-  try {
-    if (localStorage.getItem(customKey)) return;
-  } catch {
-    // localStorage unavailable — continue with regen
+  // If DB config exists, allow regen WITH customizations (it preserves them).
+  // If only localStorage has custom positions (no DB config), skip regen to
+  // avoid overwriting host layout (backwards compatibility).
+  if (!party.flyerConfig) {
+    const customKey = `flyer-${party.id}`;
+    try {
+      if (localStorage.getItem(customKey)) return;
+    } catch {
+      // localStorage unavailable — continue with regen
+    }
   }
 
   // Cancel any existing pending regen for this party
@@ -112,8 +118,10 @@ async function ensureFonts(): Promise<void> {
 export function triggerFlyerRegenForEvents(
   events: FlyerRegenData[],
 ): void {
-  // Filter out events with custom flyer positions (host-customized layouts)
+  // Filter out events with localStorage-only custom positions (no DB config).
+  // Events WITH DB flyerConfig are eligible — regen will use their saved config.
   const eligible = events.filter((e) => {
+    if (e.flyerConfig) return true; // DB config present — regen with customizations
     try {
       if (localStorage.getItem(`flyer-${e.id}`)) return false;
     } catch {
@@ -164,6 +172,7 @@ async function doRegen(
   );
 
   // 3. Derive flyer text fields from party data
+  const dbConfig = data.flyerConfig as FlyerConfig | null | undefined;
   const city = parseCityFromName(data.name);
   const venueName = data.venueName || 'LOCATION TBA';
   const streetAddress = data.address ? data.address.split(',')[0].trim() : '';
@@ -199,7 +208,17 @@ async function doRegen(
     dateDisplay = `${monthFormatter.format(eventDate).toUpperCase()} ${dayFormatter.format(eventDate)}`;
   }
 
-  // 4. Render to canvas (uses DEFAULT_POSITIONS internally)
+  // 4. Render to canvas (uses DB config layout but always fresh event text).
+  //    Strip text overrides so auto-regen picks up venue/time/city changes.
+  const layoutConfig: FlyerConfig | undefined = dbConfig
+    ? {
+        positions: dbConfig.positions,
+        poppedLogos: dbConfig.poppedLogos as FlyerConfig['poppedLogos'],
+        logoSizes: dbConfig.logoSizes as FlyerConfig['logoSizes'],
+        sponsorBoxSize: dbConfig.sponsorBoxSize as FlyerConfig['sponsorBoxSize'],
+      }
+    : undefined;
+
   const canvas = await renderFlyer({
     city,
     venueName,
@@ -207,7 +226,8 @@ async function doRegen(
     dateDisplay,
     timeDisplay,
     is12h,
-    sponsors: sponsors.map((s) => ({ logoUrl: s.logoUrl! })),
+    sponsors: sponsors.map((s) => ({ id: s.id, logoUrl: s.logoUrl! })),
+    config: layoutConfig,
   });
 
   // 5. Convert canvas to blob

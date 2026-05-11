@@ -193,6 +193,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
   return {
     id: party.id,
     name: party.name,
+    inviteCode: party.inviteCode,
     customUrl: party.customUrl,
     date: party.date,
     address: party.address,
@@ -225,6 +226,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     telegramGroup: party.telegramGroup || null,
     createdAt: party.createdAt,
     flyerGeneratedAt,
+    flyerConfig: party.flyerConfig || null,
     latestSponsorAt: latestSponsorAtStr,
     flyerStale,
   };
@@ -1355,6 +1357,77 @@ router.patch('/admin/assign-region/:partyId', requireAuth, async (req: AuthReque
     });
 
     res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/underboss/funnel-stats — RSVP funnel stats per event
+router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const underboss = req.underboss!;
+    const regionsParam = req.query.regions as string | undefined;
+    const regions = regionsParam ? regionsParam.split(',') : underboss.regions;
+
+    // Build region filter
+    const isAdminUser = underboss.regions.includes('__admin__');
+    const regionFilter = isAdminUser && (!regionsParam || regions.includes('__admin__'))
+      ? {}
+      : { region: { in: regions } };
+
+    // Get events with funnel data — use separate count queries to avoid Prisma issues
+    const events = await prisma.party.findMany({
+      where: regionFilter,
+      select: {
+        id: true,
+        name: true,
+        address: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let totalViews = 0;
+    let totalOpened = 0;
+    let totalStep1 = 0;
+    let totalSubmitted = 0;
+
+    const eventStats = await Promise.all(events.map(async (e) => {
+      const [viewCount, guestCount, funnelEvents] = await Promise.all([
+        prisma.pageView.count({ where: { partyId: e.id } }),
+        prisma.guest.count({ where: { partyId: e.id, status: { not: 'INVITED' } } }),
+        prisma.rsvpFunnelEvent.findMany({ where: { partyId: e.id }, select: { step: true } }),
+      ]);
+
+      const views = viewCount;
+      const opened = funnelEvents.filter((f) => f.step === 'rsvp_opened').length;
+      const step1Complete = funnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
+      const submitted = guestCount;
+
+      totalViews += views;
+      totalOpened += opened;
+      totalStep1 += step1Complete;
+      totalSubmitted += submitted;
+
+      return {
+        eventId: e.id,
+        eventName: e.name,
+        city: e.address || '',
+        views,
+        opened,
+        step1Complete,
+        submitted,
+      };
+    }));
+
+    res.json({
+      events: eventStats,
+      totals: {
+        views: totalViews,
+        opened: totalOpened,
+        step1Complete: totalStep1,
+        submitted: totalSubmitted,
+      },
+    });
   } catch (error) {
     next(error);
   }

@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
+import { FunnelTab } from '../components/underboss/FunnelTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
@@ -548,7 +549,7 @@ export function AdminPage() {
             <button
               onClick={handleExportEventsCsv}
               disabled={exportingCsv}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 text-gray-700 text-sm font-medium hover:bg-white border border-gray-300 disabled:opacity-50"
             >
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Export All Events CSV
@@ -1272,6 +1273,13 @@ export function AdminPage() {
               </div>
             </section>
           )}
+          {/* Analytics — RSVP Funnel */}
+          <section className="mb-10">
+            <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
+              Analytics
+            </h2>
+            <FunnelTab regions={[]} />
+          </section>
         </div>
       </main>
 

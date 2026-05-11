@@ -125,6 +125,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     pinnedApps: (dbParty.pinned_apps as string[]) ?? [],
     region: dbParty.region || null,
     flyerGeneratedAt: dbParty.flyer_generated_at || null,
+    flyerConfig: dbParty.flyer_config || null,
     eventType: dbParty.event_type || null,
     eventTags: dbParty.event_tags || [],
     canEdit: dbParty.can_edit || false,

@@ -26,7 +26,7 @@ function parseCityFromAddress(address: string): string {
 const SPONSOR_BOX_MIN = 100;
 const SPONSOR_BOX_MAX = 1080;
 
-export function FlyerGenerator() {
+export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { party, loadParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -36,16 +36,19 @@ export function FlyerGenerator() {
   const [containerWidth, setContainerWidth] = useState(500);
   const [hoveredElement, setHoveredElement] = useState<keyof FlyerPositions | null>(null);
 
-  // Load saved customizations from localStorage
+  // Load saved customizations: prefer DB (party.flyerConfig) over localStorage
   // NOTE: Must be declared before any useState that references savedState
   const storageKey = party ? `flyer-${party.id}` : null;
   const savedState = React.useMemo(() => {
+    // Prefer DB config if available
+    if (party?.flyerConfig) return party.flyerConfig as Record<string, any>;
+    // Fall back to localStorage
     if (!storageKey) return null;
     try {
       const raw = localStorage.getItem(storageKey);
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
-  }, [storageKey]);
+  }, [storageKey, party?.flyerConfig]);
 
   const [editVenueName, setEditVenueName] = useState<string | null>(savedState?.editVenueName ?? null);
   const [editStreetAddress, setEditStreetAddress] = useState<string | null>(savedState?.editStreetAddress ?? null);
@@ -110,7 +113,11 @@ export function FlyerGenerator() {
     if (storageKey) {
       try { localStorage.removeItem(storageKey); } catch {}
     }
-  }, [storageKey]);
+    // Also clear DB config
+    if (party?.id) {
+      updateParty(party.id, { flyer_config: null }).catch(() => {});
+    }
+  }, [storageKey, party?.id]);
 
   /** Convert a client (screen) coordinate to 1080px canvas coordinate */
   const clientToCanvas = useCallback((clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -366,6 +373,23 @@ export function FlyerGenerator() {
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
+  // One-time backfill: if DB has no flyerConfig but localStorage does, sync to DB
+  const backfillDone = useRef(false);
+  useEffect(() => {
+    if (backfillDone.current || !party?.id || party.flyerConfig) return;
+    backfillDone.current = true;
+    try {
+      const raw = storageKey ? localStorage.getItem(storageKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Only backfill if there's meaningful customization data
+        if (parsed && (parsed.positions || parsed.poppedLogos || parsed.logoSizes || parsed.editCity || parsed.editVenueName || parsed.editStreetAddress || parsed.editTime)) {
+          updateParty(party.id, { flyer_config: parsed }).catch(() => {});
+        }
+      }
+    } catch {}
+  }, [party?.id, party?.flyerConfig, storageKey]);
+
   if (!party) return null;
 
   // Format date and time
@@ -585,9 +609,40 @@ export function FlyerGenerator() {
       const uploadedUrl = await uploadEventImage(file);
       if (!uploadedUrl) throw new Error('Upload failed');
 
+      // Build flyerConfig from current customization state (only save non-default values)
+      const hasCustomizations =
+        Object.keys(poppedLogos).length > 0 ||
+        Object.keys(logoSizes).length > 0 ||
+        editVenueName !== null ||
+        editStreetAddress !== null ||
+        editCity !== null ||
+        editTime !== null ||
+        positions.city.x !== DEFAULT_POSITIONS.city.x ||
+        positions.city.y !== DEFAULT_POSITIONS.city.y ||
+        positions.time.x !== DEFAULT_POSITIONS.time.x ||
+        positions.time.y !== DEFAULT_POSITIONS.time.y ||
+        positions.venue.x !== DEFAULT_POSITIONS.venue.x ||
+        positions.venue.y !== DEFAULT_POSITIONS.venue.y ||
+        positions.sponsors.x !== DEFAULT_POSITIONS.sponsors.x ||
+        positions.sponsors.y !== DEFAULT_POSITIONS.sponsors.y ||
+        sponsorBoxSize.width !== DEFAULT_SPONSOR_BOX.width ||
+        sponsorBoxSize.height !== DEFAULT_SPONSOR_BOX.height;
+
+      const flyerConfigValue = hasCustomizations ? {
+        positions,
+        poppedLogos: Object.keys(poppedLogos).length > 0 ? poppedLogos : undefined,
+        logoSizes: Object.keys(logoSizes).length > 0 ? logoSizes : undefined,
+        sponsorBoxSize: (sponsorBoxSize.width !== DEFAULT_SPONSOR_BOX.width || sponsorBoxSize.height !== DEFAULT_SPONSOR_BOX.height) ? sponsorBoxSize : undefined,
+        editVenueName: editVenueName ?? undefined,
+        editStreetAddress: editStreetAddress ?? undefined,
+        editCity: editCity ?? undefined,
+        editTime: editTime ?? undefined,
+      } : null;
+
       const success = await updateParty(party.id, {
         event_image_url: uploadedUrl,
         flyer_generated_at: new Date().toISOString(),
+        flyer_config: flyerConfigValue,
       });
       if (!success) throw new Error('Failed to update party');
 
@@ -1550,6 +1605,7 @@ export function FlyerGenerator() {
           onSubmit={handleEditSponsor}
           onClose={() => setEditingSponsor(null)}
           isLoading={isSubmitting}
+          logoOnly={sponsorLogoOnly}
         />
       )}
     </div>

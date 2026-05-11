@@ -655,6 +655,7 @@ export interface DbParty {
   event_type?: string | null;
   event_tags?: string[];
   flyer_generated_at?: string | null;
+  flyer_config?: Record<string, any> | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
   hidden_gpp_photos?: string[];
@@ -732,7 +733,8 @@ export const SAFE_PARTY_COLUMNS = `
   quiz_enabled,
   telegram_group,
   turtle_roles_enabled,
-  underboss_status
+  underboss_status,
+  flyer_config
 `;
 
 /**
@@ -1658,6 +1660,7 @@ export async function updateParty(
     pinned_apps?: string[];
     region?: string | null;
     flyer_generated_at?: string | null;
+    flyer_config?: Record<string, any> | null;
     hidden_gpp_photos?: string[];
     extra_gpp_photos?: string[];
     luma_url?: string | null;
@@ -1724,6 +1727,7 @@ export async function updateParty(
         pinnedApps: updates.pinned_apps,
         region: updates.region,
         flyerGeneratedAt: updates.flyer_generated_at,
+        flyerConfig: updates.flyer_config,
         hiddenGppPhotos: updates.hidden_gpp_photos,
         extraGppPhotos: updates.extra_gpp_photos,
         lumaUrl: updates.luma_url,
