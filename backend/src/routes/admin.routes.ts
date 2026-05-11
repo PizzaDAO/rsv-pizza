@@ -672,4 +672,63 @@ router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: 
   }
 });
 
+// GET /api/admin/funnel-stats — RSVP funnel stats (admin only)
+router.get('/funnel-stats', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const events = await prisma.party.findMany({
+      select: { id: true, name: true, address: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let totalViews = 0;
+    let totalOpened = 0;
+    let totalStep1 = 0;
+    let totalSubmitted = 0;
+
+    const eventStats = await Promise.all(events.map(async (e) => {
+      const [viewCount, guestCount, funnelEvents] = await Promise.all([
+        prisma.pageView.count({ where: { partyId: e.id } }),
+        prisma.guest.count({ where: { partyId: e.id, status: { not: 'INVITED' } } }),
+        prisma.rsvpFunnelEvent.findMany({ where: { partyId: e.id }, select: { step: true } }),
+      ]);
+
+      const views = viewCount;
+      const opened = funnelEvents.filter((f) => f.step === 'rsvp_opened').length;
+      const step1Complete = funnelEvents.filter((f) => f.step === 'rsvp_step1_complete').length;
+      const submitted = guestCount;
+
+      totalViews += views;
+      totalOpened += opened;
+      totalStep1 += step1Complete;
+      totalSubmitted += submitted;
+
+      return {
+        eventId: e.id,
+        eventName: e.name,
+        city: e.address || '',
+        views,
+        opened,
+        step1Complete,
+        submitted,
+      };
+    }));
+
+    res.json({
+      events: eventStats,
+      totals: {
+        views: totalViews,
+        opened: totalOpened,
+        step1Complete: totalStep1,
+        submitted: totalSubmitted,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

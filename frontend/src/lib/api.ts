@@ -3241,11 +3241,11 @@ export interface FunnelStats {
   };
 }
 
-// Fetch RSVP funnel stats for underboss dashboard
+// Fetch RSVP funnel stats for admin dashboard
 export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats | null> {
   try {
     const params = regions && regions.length > 0 ? `?regions=${regions.join(',')}` : '';
-    return await apiRequest<FunnelStats>(`/api/underboss/funnel-stats${params}`, {
+    return await apiRequest<FunnelStats>(`/api/admin/funnel-stats${params}`, {
       method: 'GET',
       requireAuth: true,
     });
