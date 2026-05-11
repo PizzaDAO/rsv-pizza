@@ -76,7 +76,13 @@ export function RSVPFlowContent({
     };
 
     return (
-      <div className="card p-8 max-w-md w-full text-center">
+      <div className="card p-8 max-w-md w-full text-center relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+        >
+          <X size={20} />
+        </button>
         <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
           {getSuccessIconComponent()}
         </div>
@@ -212,12 +218,6 @@ export function RSVPFlowContent({
           </div>
         )}
 
-        <button
-          onClick={onClose}
-          className="btn-secondary mt-4 text-sm py-2"
-        >
-          {closeButtonLabel}
-        </button>
       </div>
     );
   }
