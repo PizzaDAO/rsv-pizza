@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Download, RotateCcw } from 'lucide-react';
+import { X, Download, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
-import { loadImg, CITY_COLOR, CITY_FONT } from '../flyer/renderFlyer';
+import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
 import { getCityTier } from '../../utils/sponsorshipPricing';
 
 interface PartnerCitiesFlyerProps {
@@ -15,6 +15,11 @@ const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
 const CITY_BOX = { x: 40, y: 550, width: 500, height: 490 };
 const MAX_VISIBLE = 10;
+const CITY_FONT_SIZE = 36;
+const CITY_LINE_SPACING = 1.25;
+const SUBHEAD_TEXT = 'SUPPORTING THE EVENTS IN';
+const SUBHEAD_FONT_SIZE = 28;
+const SUBHEAD_Y_OFFSET = -40; // above the first city line
 
 async function renderCitiesFlyer(
   cities: string[],
@@ -42,39 +47,39 @@ async function renderCitiesFlyer(
     ctx.drawImage(img, logoPos.x, logoPos.y - h / 2, w, h);
   } catch { /* skip */ }
 
-  // 3) City names
+  // 3) "Supporting the Events in" subheading in blue
   ctx.textBaseline = 'top';
+  ctx.fillStyle = VENUE_COLOR;
+  ctx.font = `${SUBHEAD_FONT_SIZE}px ${TEXT_FONT}`;
+  ctx.fillText(SUBHEAD_TEXT, CITY_BOX.x, CITY_BOX.y + SUBHEAD_Y_OFFSET);
+
+  // 4) City names — fixed font size
   const hasOverflow = cities.length > MAX_VISIBLE;
   const display = hasOverflow ? cities.slice(0, MAX_VISIBLE) : cities;
   const suffix = hasOverflow ? `+ ${cities.length - MAX_VISIBLE} MORE` : null;
-  const lines = display.length + (suffix ? 1 : 0);
-
-  // Auto-size font
-  let fontSize = 48;
-  const spacing = 1.2;
-  const mc = document.createElement('canvas').getContext('2d')!;
-  while (fontSize > 12) {
-    mc.font = `${fontSize}px ${CITY_FONT}`;
-    if (lines * fontSize * spacing > CITY_BOX.height) { fontSize--; continue; }
-    let fits = true;
-    for (const c of display) {
-      if (mc.measureText(c.toUpperCase()).width > CITY_BOX.width) { fits = false; break; }
-    }
-    if (suffix && fits && mc.measureText(suffix).width > CITY_BOX.width) fits = false;
-    if (fits) break;
-    fontSize--;
-  }
 
   ctx.fillStyle = CITY_COLOR;
-  ctx.font = `${fontSize}px ${CITY_FONT}`;
+  ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}`;
   let y = CITY_BOX.y;
   for (const c of display) {
     ctx.fillText(c.toUpperCase(), CITY_BOX.x, y);
-    y += fontSize * spacing;
+    y += CITY_FONT_SIZE * CITY_LINE_SPACING;
   }
-  if (suffix) ctx.fillText(suffix, CITY_BOX.x, y);
+  if (suffix) {
+    ctx.fillText(suffix, CITY_BOX.x, y);
+  }
 
   return canvas;
+}
+
+/** Sort cities by tier (1 first) then alphabetical */
+function sortCitiesByTier(cities: string[]): string[] {
+  return [...cities].sort((a, b) => {
+    const tierA = getCityTier(a);
+    const tierB = getCityTier(b);
+    if (tierA !== tierB) return tierA - tierB;
+    return a.localeCompare(b);
+  });
 }
 
 export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFlyerProps) {
@@ -89,20 +94,21 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 
-  const cities = useMemo(() => {
+  // Derive initial cities from events
+  const defaultCities = useMemo(() => {
     const raw = events
       .filter(e => e.eventTags?.includes(partner.tag))
       .map(e => e.name.replace(/^Global Pizza Party\s*/i, '').trim())
       .filter(Boolean);
-    const unique = [...new Set(raw)];
-    // Sort by tier (1 first) then alphabetical within each tier
-    return unique.sort((a, b) => {
-      const tierA = getCityTier(a);
-      const tierB = getCityTier(b);
-      if (tierA !== tierB) return tierA - tierB;
-      return a.localeCompare(b);
-    });
+    return sortCitiesByTier([...new Set(raw)]);
   }, [events, partner.tag]);
+
+  // Editable city list — initialized from events
+  const [editCities, setEditCities] = useState<string[]>(defaultCities);
+  const [newCity, setNewCity] = useState('');
+
+  // Reset editCities when partner changes
+  useEffect(() => { setEditCities(defaultCities); }, [defaultCities]);
 
   const scale = containerWidth / 1080;
 
@@ -129,7 +135,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
   const renderPreview = useCallback(async () => {
     if (!canvasRef.current || !fontsLoaded || !partner.coHostLogoUrl) return;
     try {
-      const result = await renderCitiesFlyer(cities, partner.coHostLogoUrl, logoPos, logoSize);
+      const result = await renderCitiesFlyer(editCities, partner.coHostLogoUrl, logoPos, logoSize);
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
         canvasRef.current.width = 1080;
@@ -139,7 +145,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
     } catch (err) {
       console.error('Partner flyer preview failed:', err);
     }
-  }, [cities, partner.coHostLogoUrl, logoPos, logoSize, fontsLoaded]);
+  }, [editCities, partner.coHostLogoUrl, logoPos, logoSize, fontsLoaded]);
 
   useEffect(() => { renderPreview(); }, [renderPreview]);
 
@@ -213,7 +219,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
     if (!partner.coHostLogoUrl) return;
     setDownloading(true);
     try {
-      const canvas = await renderCitiesFlyer(cities, partner.coHostLogoUrl, logoPos, logoSize);
+      const canvas = await renderCitiesFlyer(editCities, partner.coHostLogoUrl, logoPos, logoSize);
       const a = document.createElement('a');
       a.download = `gpp-partner-${partner.tag}.png`;
       a.href = canvas.toDataURL('image/png');
@@ -225,11 +231,30 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
     }
   };
 
-  const handleReset = () => { setLogoPos(DEFAULT_LOGO_POS); setLogoSize(DEFAULT_LOGO_SIZE); };
+  const handleReset = () => {
+    setLogoPos(DEFAULT_LOGO_POS);
+    setLogoSize(DEFAULT_LOGO_SIZE);
+    setEditCities(defaultCities);
+  };
+
+  // City editing
+  const handleCityRename = (index: number, value: string) => {
+    setEditCities(prev => prev.map((c, i) => i === index ? value : c));
+  };
+  const handleCityRemove = (index: number) => {
+    setEditCities(prev => prev.filter((_, i) => i !== index));
+  };
+  const handleCityAdd = () => {
+    const trimmed = newCity.trim();
+    if (!trimmed) return;
+    setEditCities(prev => [...prev, trimmed]);
+    setNewCity('');
+  };
+
   const name = partner.coHostName || partner.name || partner.tag;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black" onClick={onClose}>
       <div className="bg-theme-card border border-theme-stroke rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
@@ -238,10 +263,11 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
         </div>
 
         <div className="p-4">
-          {cities.length === 0 ? (
-            <p className="text-sm text-theme-text-faint text-center py-8">No events tagged with "{partner.tag}".</p>
+          {defaultCities.length === 0 ? (
+            <p className="text-sm text-theme-text-faint text-center py-8">No events tagged with &ldquo;{partner.tag}&rdquo;.</p>
           ) : (
             <>
+              {/* Canvas Preview */}
               <div ref={previewRef} className="relative w-full select-none" style={{ aspectRatio: '1 / 1' }}>
                 <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full rounded-lg" />
                 {logoDims && (
@@ -262,13 +288,56 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
                 )}
               </div>
 
+              {/* Controls */}
               <div className="mt-4 space-y-3">
+                {/* Logo size slider */}
                 <div className="flex items-center gap-3">
                   <label className="text-xs text-theme-text-faint whitespace-nowrap w-16">Logo size</label>
                   <input type="range" min={20} max={120} value={logoSize} onChange={e => setLogoSize(Number(e.target.value))} className="flex-1 accent-red-500" />
                   <span className="text-xs text-theme-text-faint w-8 text-right">{logoSize}</span>
                 </div>
-                <p className="text-xs text-theme-text-faint">{cities.length} cit{cities.length === 1 ? 'y' : 'ies'} tagged with "{partner.tag}"</p>
+
+                {/* Editable city list */}
+                <div>
+                  <p className="text-xs text-theme-text-faint mb-1.5">Cities ({editCities.length})</p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {editCities.map((city, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={city}
+                          onChange={e => handleCityRename(i, e.target.value)}
+                          className="flex-1 bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+                        />
+                        <button
+                          onClick={() => handleCityRemove(i)}
+                          className="p-1 text-theme-text-faint hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <input
+                      type="text"
+                      value={newCity}
+                      onChange={e => setNewCity(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleCityAdd()}
+                      placeholder="Add city..."
+                      className="flex-1 bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+                    />
+                    <button
+                      onClick={handleCityAdd}
+                      disabled={!newCity.trim()}
+                      className="p-1 text-theme-text-faint hover:text-green-400 disabled:opacity-30 transition-colors shrink-0"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
                 <div className="flex items-center gap-2">
                   <button onClick={handleDownload} disabled={downloading} className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors">
                     <Download size={14} />{downloading ? 'Generating...' : 'Download PNG'}
