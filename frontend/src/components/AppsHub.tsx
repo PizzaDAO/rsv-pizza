@@ -29,7 +29,7 @@ type AppCategory = 'planning' | 'promotion' | 'day-of' | 'after-party';
 
 const CATEGORY_ORDER: { key: AppCategory; label: string }[] = [
   { key: 'planning', label: 'Planning' },
-  { key: 'promotion', label: 'Promotion' },
+  { key: 'promotion', label: 'Lead-up' },
   { key: 'day-of', label: 'Day-of' },
   { key: 'after-party', label: 'After Party' },
 ];
@@ -49,6 +49,15 @@ interface AppItem {
 const apps: AppItem[] = [
   // Planning
   {
+    id: 'party-kit',
+    name: 'Party Kit',
+    description: 'Event supplies and party kit management',
+    icon: Package,
+    status: 'live',
+    category: 'planning',
+    tab: 'gpp',
+  },
+  {
     id: 'venue',
     name: 'Venue',
     description: 'Venue details and floor plans',
@@ -58,13 +67,13 @@ const apps: AppItem[] = [
     tab: 'venue',
   },
   {
-    id: 'party-kit',
-    name: 'Party Kit',
-    description: 'Event supplies and party kit management',
-    icon: Package,
+    id: 'sponsor-crm',
+    name: 'Partners',
+    description: 'Manage event partners and sponsorships',
+    icon: Handshake,
     status: 'live',
     category: 'planning',
-    tab: 'gpp',
+    tab: 'partners',
   },
   {
     id: 'pizzeria-selection',
@@ -76,15 +85,6 @@ const apps: AppItem[] = [
     tab: 'pizza',
   },
   {
-    id: 'staffing',
-    name: 'Staffing',
-    description: 'Volunteer and staff management',
-    icon: UserCog,
-    status: 'live',
-    category: 'planning',
-    tab: 'staff',
-  },
-  {
     id: 'budget',
     name: 'Budget',
     description: 'Event budget tracking and planning',
@@ -93,17 +93,17 @@ const apps: AppItem[] = [
     category: 'planning',
     tab: 'budget',
   },
-
-  // Promotion
   {
-    id: 'marketing-promo',
-    name: 'Promo',
-    description: 'Promotional materials and marketing tools',
-    icon: Megaphone,
+    id: 'staffing',
+    name: 'Staffing',
+    description: 'Volunteer and staff management',
+    icon: UserCog,
     status: 'live',
-    category: 'promotion',
-    tab: 'promo',
+    category: 'planning',
+    tab: 'staff',
   },
+
+  // Lead-up
   {
     id: 'flyer',
     name: 'Flyer',
@@ -112,6 +112,15 @@ const apps: AppItem[] = [
     status: 'live',
     category: 'promotion',
     tab: 'flyer',
+  },
+  {
+    id: 'marketing-promo',
+    name: 'Promo',
+    description: 'Promotional materials and marketing tools',
+    icon: Megaphone,
+    status: 'live',
+    category: 'promotion',
+    tab: 'promo',
   },
   {
     id: 'print-nametags',
@@ -161,15 +170,6 @@ const apps: AppItem[] = [
     status: 'live',
     category: 'after-party',
     tab: 'report',
-  },
-  {
-    id: 'sponsor-crm',
-    name: 'Partners',
-    description: 'Manage event partners and sponsorships',
-    icon: Handshake,
-    status: 'live',
-    category: 'planning',
-    tab: 'partners',
   },
   {
     id: 'payment-portal',
