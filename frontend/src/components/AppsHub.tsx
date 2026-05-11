@@ -25,6 +25,14 @@ import { usePizza } from '../contexts/PizzaContext';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 
 type AppStatus = 'live' | 'preview' | 'coming-soon';
+type AppCategory = 'planning' | 'promotion' | 'day-of' | 'after-party';
+
+const CATEGORY_ORDER: { key: AppCategory; label: string }[] = [
+  { key: 'planning', label: 'Planning' },
+  { key: 'promotion', label: 'Promotion' },
+  { key: 'day-of', label: 'Day-of' },
+  { key: 'after-party', label: 'After Party' },
+];
 
 interface AppItem {
   id: string;
@@ -32,36 +40,31 @@ interface AppItem {
   description: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   status: AppStatus;
+  category: AppCategory;
   tab?: string;
   externalPath?: string;
   previewUrl?: string;
 }
 
 const apps: AppItem[] = [
-  // Live features
-  {
-    id: 'party-kit',
-    name: 'Party Kit',
-    description: 'Event supplies and party kit management',
-    icon: Package,
-    status: 'live',
-    tab: 'gpp',
-  },
-  {
-    id: 'marketing-promo',
-    name: 'Promo',
-    description: 'Promotional materials and marketing tools',
-    icon: Megaphone,
-    status: 'live',
-    tab: 'promo',
-  },
+  // Planning
   {
     id: 'venue',
     name: 'Venue',
     description: 'Venue details and floor plans',
     icon: MapPin,
     status: 'live',
+    category: 'planning',
     tab: 'venue',
+  },
+  {
+    id: 'party-kit',
+    name: 'Party Kit',
+    description: 'Event supplies and party kit management',
+    icon: Package,
+    status: 'live',
+    category: 'planning',
+    tab: 'gpp',
   },
   {
     id: 'pizzeria-selection',
@@ -69,23 +72,8 @@ const apps: AppItem[] = [
     description: 'Find and select nearby pizzerias for food and drinks',
     icon: Store,
     status: 'live',
+    category: 'planning',
     tab: 'pizza',
-  },
-  {
-    id: 'budget',
-    name: 'Budget',
-    description: 'Event budget tracking and planning',
-    icon: Calculator,
-    status: 'live',
-    tab: 'budget',
-  },
-  {
-    id: 'sponsor-crm',
-    name: 'Partners',
-    description: 'Manage event partners and sponsorships',
-    icon: Handshake,
-    status: 'live',
-    tab: 'partners',
   },
   {
     id: 'staffing',
@@ -93,14 +81,56 @@ const apps: AppItem[] = [
     description: 'Volunteer and staff management',
     icon: UserCog,
     status: 'live',
+    category: 'planning',
     tab: 'staff',
   },
+  {
+    id: 'budget',
+    name: 'Budget',
+    description: 'Event budget tracking and planning',
+    icon: Calculator,
+    status: 'live',
+    category: 'planning',
+    tab: 'budget',
+  },
+
+  // Promotion
+  {
+    id: 'marketing-promo',
+    name: 'Promo',
+    description: 'Promotional materials and marketing tools',
+    icon: Megaphone,
+    status: 'live',
+    category: 'promotion',
+    tab: 'promo',
+  },
+  {
+    id: 'flyer',
+    name: 'Flyer',
+    description: 'Generate event flyers',
+    icon: FileImage,
+    status: 'live',
+    category: 'promotion',
+    tab: 'flyer',
+  },
+  {
+    id: 'print-nametags',
+    name: 'Print / Nametags',
+    description: 'Stickers, flyers, name tags & more',
+    icon: Printer,
+    status: 'live',
+    category: 'promotion',
+    tab: 'print',
+  },
+
+  // Day-of
   {
     id: 'music-dj',
     name: 'Music / DJ',
     description: 'Music playlist and DJ coordination',
     icon: Music,
     status: 'live',
+    category: 'day-of',
     tab: 'music',
   },
   {
@@ -109,6 +139,7 @@ const apps: AppItem[] = [
     description: 'Event display screens and signage',
     icon: Monitor,
     status: 'live',
+    category: 'day-of',
     tab: 'displays',
   },
   {
@@ -117,33 +148,28 @@ const apps: AppItem[] = [
     description: 'Event raffle and prize drawings',
     icon: Ticket,
     status: 'live',
+    category: 'day-of',
     tab: 'raffle',
   },
+
+  // After Party
   {
     id: 'reports',
     name: 'Reports',
     description: 'Event analytics and reports',
     icon: BarChart3,
     status: 'live',
+    category: 'after-party',
     tab: 'report',
   },
-
-  // Coming Soon features
   {
-    id: 'print-nametags',
-    name: 'Print / Nametags',
-    description: 'Stickers, flyers, name tags & more',
-    icon: Printer,
+    id: 'sponsor-crm',
+    name: 'Partners',
+    description: 'Manage event partners and sponsorships',
+    icon: Handshake,
     status: 'live',
-    tab: 'print',
-  },
-  {
-    id: 'flyer',
-    name: 'Flyer',
-    description: 'Generate event flyers',
-    icon: FileImage,
-    status: 'live',
-    tab: 'flyer',
+    category: 'after-party',
+    tab: 'partners',
   },
   {
     id: 'payment-portal',
@@ -151,6 +177,7 @@ const apps: AppItem[] = [
     description: 'Host reimbursements and payments',
     icon: CreditCard,
     status: 'coming-soon',
+    category: 'after-party',
   },
   {
     id: 'merch',
@@ -158,6 +185,7 @@ const apps: AppItem[] = [
     description: 'Sell event merchandise',
     icon: ShoppingBag,
     status: 'coming-soon',
+    category: 'after-party',
   },
 ];
 
@@ -357,10 +385,6 @@ export function AppsHub({
     }
   };
 
-  const liveApps = apps.filter((a) => a.status === 'live');
-  const previewApps = apps.filter((a) => a.status === 'preview');
-  const comingSoonApps = apps.filter((a) => a.status === 'coming-soon');
-
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -370,36 +394,21 @@ export function AppsHub({
           </p>
         </div>
       </div>
-      {liveApps.length > 0 && (
-        <AppSection
-          title="Live"
-          apps={liveApps}
-          inviteCode={inviteCode}
-          navigate={navigate}
-          pinnedApps={pinnedApps}
-          onTogglePin={handleTogglePin}
-        />
-      )}
-      {previewApps.length > 0 && (
-        <AppSection
-          title="Preview"
-          apps={previewApps}
-          inviteCode={inviteCode}
-          navigate={navigate}
-          pinnedApps={pinnedApps}
-          onTogglePin={handleTogglePin}
-        />
-      )}
-      {comingSoonApps.length > 0 && (
-        <AppSection
-          title="Coming Soon"
-          apps={comingSoonApps}
-          inviteCode={inviteCode}
-          navigate={navigate}
-          pinnedApps={pinnedApps}
-          onTogglePin={handleTogglePin}
-        />
-      )}
+      {CATEGORY_ORDER.map(({ key, label }) => {
+        const categoryApps = apps.filter((a) => a.category === key);
+        if (categoryApps.length === 0) return null;
+        return (
+          <AppSection
+            key={key}
+            title={label}
+            apps={categoryApps}
+            inviteCode={inviteCode}
+            navigate={navigate}
+            pinnedApps={pinnedApps}
+            onTogglePin={handleTogglePin}
+          />
+        );
+      })}
     </div>
   );
 }
