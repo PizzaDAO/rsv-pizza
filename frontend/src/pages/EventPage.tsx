@@ -33,6 +33,7 @@ import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
+import { CheckInScanner } from '../components/CheckInScanner';
 import { GuestScorecard } from '../components/scorecard';
 
 export function EventPage() {
@@ -58,6 +59,7 @@ export function EventPage() {
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -1034,7 +1036,20 @@ export function EventPage() {
 
                 {/* Guest Scorecard - shown after check-in on event day */}
                 {isEventDay && existingGuestData?.checkedInAt && (
-                  <GuestScorecard inviteCode={event.customUrl || event.inviteCode} />
+                  <GuestScorecard
+                    inviteCode={event.customUrl || event.inviteCode}
+                    eventName={event.name}
+                    eventImageUrl={event.eventImageUrl}
+                    customUrl={event.customUrl}
+                    telegramUrl={event.telegramGroup || null}
+                    twitterHandles={[
+                      ...(event.hostProfile?.twitter ? [event.hostProfile.twitter] : []),
+                      ...(event.coHosts || []).filter((c: any) => c.twitter).map((c: any) => c.twitter),
+                      ...(event.sponsors || []).filter((s) => s.brandTwitter).map((s) => s.brandTwitter!),
+                    ]}
+                    onOpenPhotos={() => setShowPhotos(true)}
+                    onOpenScanner={() => setShowScanner(true)}
+                  />
                 )}
 
                 {/* Guest Count - Mobile */}
@@ -1347,6 +1362,15 @@ export function EventPage() {
         isOpen={showPizzaDAO}
         onClose={() => setShowPizzaDAO(false)}
       />
+
+      {showScanner && (
+        <CheckInScanner
+          inviteCode={event.customUrl || event.inviteCode}
+          currentGuestId={existingGuestData?.id}
+          onVouchSuccess={() => setShowScanner(false)}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
 
       {ConfettiOverlay}
     </div>

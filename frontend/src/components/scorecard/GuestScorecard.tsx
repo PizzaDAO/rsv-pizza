@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Loader2 } from 'lucide-react';
 import { getScorecard, completeScorecardItem, ScorecardItem as ScorecardItemType } from '../../lib/api';
-import { ScorecardItem, ScorecardItemKey } from './ScorecardItem';
+import { ScorecardItem, ScorecardItemKey, ActionContext } from './ScorecardItem';
 
 interface GuestScorecardProps {
   inviteCode: string;
+  eventName: string;
+  eventImageUrl: string | null;
+  customUrl: string | null;
+  telegramUrl: string | null;
+  twitterHandles: string[];
+  onOpenPhotos: () => void;
+  onOpenScanner: () => void;
 }
 
 const ITEM_ORDER: ScorecardItemKey[] = [
@@ -18,7 +25,7 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'signup_pizzadao',
 ];
 
-export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
+export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl, telegramUrl, twitterHandles, onOpenPhotos, onOpenScanner }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
   const [totalItems, setTotalItems] = useState(8);
@@ -65,6 +72,15 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
     } finally {
       setCompletingItem(null);
     }
+  };
+
+  const actionContext: ActionContext = {
+    eventName,
+    eventUrl: `https://rsv.pizza/${customUrl || inviteCode}`,
+    twitterHandles,
+    telegramUrl,
+    onOpenPhotos,
+    onOpenScanner,
   };
 
   if (loading) {
@@ -124,6 +140,7 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
                 completed={item.completed}
                 loading={completingItem === key}
                 onComplete={handleComplete}
+                actionContext={actionContext}
               />
             </div>
           );
