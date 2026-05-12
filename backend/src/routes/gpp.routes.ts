@@ -30,7 +30,7 @@ function countryCodeToRegion(countryCode: string): string | null {
   if (westernEurope.includes(cc)) return 'western-europe';
 
   // Eastern Europe
-  const easternEurope = ['PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'BA', 'ME', 'MK', 'AL', 'XK', 'UA', 'BY', 'MD', 'LT', 'LV', 'EE', 'GE', 'AM', 'AZ', 'GR', 'CY', 'TR'];
+  const easternEurope = ['PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'BA', 'ME', 'MK', 'AL', 'XK', 'UA', 'BY', 'MD', 'LT', 'LV', 'EE', 'GE', 'AM', 'AZ', 'GR', 'CY', 'TR', 'RU'];
   if (easternEurope.includes(cc)) return 'eastern-europe';
 
   // India
@@ -48,7 +48,7 @@ function countryCodeToRegion(countryCode: string): string | null {
   if (westAfrica.includes(cc)) return 'west-africa';
 
   // East Africa (includes North African countries)
-  const eastAfrica = ['KE', 'ET', 'TZ', 'UG', 'RW', 'MZ', 'MG', 'MW', 'DJ', 'ER', 'SO', 'SD', 'SS', 'CD', 'KM', 'SC', 'MU', 'TN', 'DZ', 'MA', 'LY'];
+  const eastAfrica = ['KE', 'ET', 'TZ', 'UG', 'RW', 'MZ', 'MG', 'MW', 'DJ', 'ER', 'SO', 'SD', 'SS', 'CD', 'KM', 'SC', 'MU', 'TN', 'DZ', 'MA', 'LY', 'BI'];
   if (eastAfrica.includes(cc)) return 'east-africa';
 
   // South Africa
@@ -64,6 +64,70 @@ function countryCodeToRegion(countryCode: string): string | null {
   if (asia.includes(cc)) return 'asia';
 
   return null; // Unknown country
+}
+
+// Fallback: map country NAMES to regions when countryCode is missing
+function countryNameToRegion(country: string): string | null {
+  const name = country.toLowerCase().trim();
+  const map: Record<string, string> = {
+    'united states': 'usa', 'usa': 'usa',
+    'canada': 'canada',
+    'mexico': 'central-america', 'guatemala': 'central-america', 'honduras': 'central-america',
+    'el salvador': 'central-america', 'nicaragua': 'central-america', 'costa rica': 'central-america',
+    'panama': 'central-america', 'cuba': 'central-america', 'jamaica': 'central-america',
+    'haiti': 'central-america', 'dominican republic': 'central-america', 'puerto rico': 'central-america',
+    'trinidad and tobago': 'central-america', 'bahamas': 'central-america',
+    'brazil': 'south-america', 'argentina': 'south-america', 'chile': 'south-america',
+    'colombia': 'south-america', 'peru': 'south-america', 'venezuela': 'south-america',
+    'ecuador': 'south-america', 'bolivia': 'south-america', 'paraguay': 'south-america',
+    'uruguay': 'south-america', 'guyana': 'south-america', 'suriname': 'south-america',
+    'united kingdom': 'western-europe', 'france': 'western-europe', 'germany': 'western-europe',
+    'deutschland': 'western-europe', 'italy': 'western-europe', 'italia': 'western-europe',
+    'spain': 'western-europe', 'portugal': 'western-europe', 'netherlands': 'western-europe',
+    'belgium': 'western-europe', 'luxembourg': 'western-europe', 'ireland': 'western-europe',
+    'austria': 'western-europe', 'switzerland': 'western-europe', 'denmark': 'western-europe',
+    'norway': 'western-europe', 'sweden': 'western-europe', 'finland': 'western-europe',
+    'iceland': 'western-europe', 'malta': 'western-europe', 'monaco': 'western-europe',
+    'russia': 'eastern-europe', 'poland': 'eastern-europe', 'czechia': 'eastern-europe',
+    'czech republic': 'eastern-europe', 'slovakia': 'eastern-europe', 'hungary': 'eastern-europe',
+    'romania': 'eastern-europe', 'bulgaria': 'eastern-europe', 'croatia': 'eastern-europe',
+    'slovenia': 'eastern-europe', 'serbia': 'eastern-europe', 'bosnia and herzegovina': 'eastern-europe',
+    'montenegro': 'eastern-europe', 'north macedonia': 'eastern-europe', 'macedonia': 'eastern-europe',
+    'albania': 'eastern-europe', 'ukraine': 'eastern-europe', 'belarus': 'eastern-europe',
+    'moldova': 'eastern-europe', 'lithuania': 'eastern-europe', 'latvia': 'eastern-europe',
+    'estonia': 'eastern-europe', 'georgia': 'eastern-europe', 'armenia': 'eastern-europe',
+    'azerbaijan': 'eastern-europe', 'greece': 'eastern-europe', 'cyprus': 'eastern-europe',
+    'turkey': 'eastern-europe',
+    'india': 'india',
+    'china': 'china', 'taiwan': 'china', 'hong kong': 'china',
+    'saudi arabia': 'middle-east', 'united arab emirates': 'middle-east', 'uae': 'middle-east',
+    'qatar': 'middle-east', 'kuwait': 'middle-east', 'bahrain': 'middle-east',
+    'oman': 'middle-east', 'yemen': 'middle-east', 'iraq': 'middle-east',
+    'iran': 'middle-east', 'syria': 'middle-east', 'jordan': 'middle-east',
+    'lebanon': 'middle-east', 'israel': 'middle-east', 'egypt': 'middle-east',
+    'nigeria': 'west-africa', 'ghana': 'west-africa', 'senegal': 'west-africa',
+    "côte d'ivoire": 'west-africa', 'ivory coast': 'west-africa', 'cameroon': 'west-africa',
+    'mali': 'west-africa', 'burkina faso': 'west-africa', 'niger': 'west-africa',
+    'benin': 'west-africa', 'togo': 'west-africa', 'sierra leone': 'west-africa',
+    'liberia': 'west-africa', 'guinea': 'west-africa',
+    'kenya': 'east-africa', 'ethiopia': 'east-africa', 'tanzania': 'east-africa',
+    'uganda': 'east-africa', 'rwanda': 'east-africa', 'mozambique': 'east-africa',
+    'madagascar': 'east-africa', 'malawi': 'east-africa', 'burundi': 'east-africa',
+    'somalia': 'east-africa', 'sudan': 'east-africa', 'south sudan': 'east-africa',
+    'drc': 'east-africa', 'congo': 'east-africa', 'tunisia': 'east-africa',
+    'algeria': 'east-africa', 'morocco': 'east-africa', 'libya': 'east-africa',
+    'south africa': 'south-africa', 'zimbabwe': 'south-africa', 'zambia': 'south-africa',
+    'botswana': 'south-africa', 'namibia': 'south-africa', 'angola': 'south-africa',
+    'australia': 'oceania', 'new zealand': 'oceania',
+    'japan': 'asia', 'south korea': 'asia', 'korea': 'asia',
+    'thailand': 'asia', 'vietnam': 'asia', 'philippines': 'asia',
+    'malaysia': 'asia', 'singapore': 'asia', 'indonesia': 'asia',
+    'cambodia': 'asia', 'laos': 'asia', 'myanmar': 'asia',
+    'mongolia': 'asia', 'kazakhstan': 'asia', 'pakistan': 'asia',
+    'bangladesh': 'asia', 'sri lanka': 'asia', 'nepal': 'asia',
+    'afghanistan': 'asia', 'bhutan': 'asia',
+  };
+  return map[name] || null;
 }
 
 // GPP Default values
@@ -286,8 +350,9 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const defaultDate = localToUTC(defaultYear, 4, 22, 18, eventTimezone);    // 6 PM local
     const defaultEndDate = localToUTC(defaultYear, 4, 22, 21, eventTimezone); // 9 PM local
 
-    // Auto-infer region from country code
-    const inferredRegion = countryCode ? countryCodeToRegion(countryCode) : null;
+    // Auto-infer region from country code, falling back to country name
+    const inferredRegion = (countryCode ? countryCodeToRegion(countryCode) : null)
+      || (country ? countryNameToRegion(country) : null);
 
     // Find active underbosses for the inferred region and add as hidden co-hosts
     let underbossCoHosts: any[] = [];

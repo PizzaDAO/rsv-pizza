@@ -141,7 +141,7 @@ router.post('/:partyId/kit', requireAuth, async (req: AuthRequest, res: Response
         city,
         state: state || null,
         postalCode,
-        country: country || 'USA',
+        country: country || null,
         phone: phone || null,
         notes: notes || null,
         status: 'pending',
