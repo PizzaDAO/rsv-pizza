@@ -46,6 +46,9 @@ interface TableRowProps {
   isNotable?: boolean;
   onToggleNotable?: (id: string) => void;
   isTogglingNotable?: boolean;
+  // Bulk selection
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 export const TableRow: React.FC<TableRowProps> = ({
@@ -69,6 +72,8 @@ export const TableRow: React.FC<TableRowProps> = ({
   isNotable = false,
   onToggleNotable,
   isTogglingNotable = false,
+  isSelected = false,
+  onToggleSelect,
 }) => {
   // Pizza variant
   if (variant === 'pizza' && pizzaRec) {
@@ -246,15 +251,24 @@ export const TableRow: React.FC<TableRowProps> = ({
   // Waitlist variant
   if (variant === 'waitlist') {
     return (
-      <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
+      <div className={`flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors ${isSelected ? 'bg-[#ff393a]/5 ring-1 ring-[#ff393a]/20' : ''}`}>
         {/* Position badge */}
         <div className="w-8 h-8 rounded-full bg-[#ffc107]/20 border border-[#ffc107]/30 flex items-center justify-center text-[#ffc107] text-sm font-bold flex-shrink-0">
           #{guest.waitlistPosition || '?'}
         </div>
 
         {/* Avatar */}
-        <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-theme-text text-sm font-medium flex-shrink-0`}>
-          {guest.name.charAt(0).toUpperCase()}
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+            isSelected
+              ? 'bg-[#ff393a] text-white'
+              : onToggleSelect
+                ? `${getAvatarColor(guest.name)} text-theme-text cursor-pointer hover:ring-2 hover:ring-white/30`
+                : `${getAvatarColor(guest.name)} text-theme-text`
+          }`}
+          onClick={onToggleSelect && guest.id ? (e) => { e.stopPropagation(); onToggleSelect(guest.id!); } : undefined}
+        >
+          {isSelected ? <Check size={14} /> : guest.name.charAt(0).toUpperCase()}
         </div>
 
         {/* Content */}
@@ -291,10 +305,19 @@ export const TableRow: React.FC<TableRowProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors">
+    <div className={`flex items-center gap-3 py-3 group hover:bg-theme-surface -mx-2 px-2 rounded-lg transition-colors ${isSelected ? 'bg-[#ff393a]/5 ring-1 ring-[#ff393a]/20' : ''}`}>
       {/* Avatar */}
-      <div className={`w-8 h-8 rounded-full ${getAvatarColor(guest.name)} flex items-center justify-center text-theme-text text-sm font-medium flex-shrink-0`}>
-        {guest.name.charAt(0).toUpperCase()}
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+          isSelected
+            ? 'bg-[#ff393a] text-white'
+            : onToggleSelect
+              ? `${getAvatarColor(guest.name)} text-theme-text cursor-pointer hover:ring-2 hover:ring-white/30`
+              : `${getAvatarColor(guest.name)} text-theme-text`
+        }`}
+        onClick={onToggleSelect && guest.id ? (e) => { e.stopPropagation(); onToggleSelect(guest.id!); } : undefined}
+      >
+        {isSelected ? <Check size={14} /> : guest.name.charAt(0).toUpperCase()}
       </div>
 
       {/* Content - varies by variant */}

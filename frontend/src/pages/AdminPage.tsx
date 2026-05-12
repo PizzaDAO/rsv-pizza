@@ -5,9 +5,10 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
+import { FunnelTab } from '../components/underboss/FunnelTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -17,14 +18,24 @@ import {
   fetchSponsorUsers, createSponsorUser, deleteSponsorUser,
   fetchGppDescription, updateGppDescription,
   fetchUnderbossDashboard,
+  fetchGraphicsAdminList, addGraphicsAdmin, removeGraphicsAdmin,
 } from '../lib/api';
 import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
-import type { AdminUser, UnderbossAdmin, SponsorUser } from '../types';
+import type { AdminUser, UnderbossAdmin, SponsorUser, GraphicsAdmin } from '../types';
 import { fetchSheetCities } from '../lib/cities';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
+  return [...items].sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+}
 
 export function AdminPage() {
   const { t } = useTranslation('admin');
@@ -41,6 +52,13 @@ export function AdminPage() {
   const [newName, setNewName] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Graphics admin list state
+  const [graphicsAdmins, setGraphicsAdmins] = useState<GraphicsAdmin[]>([]);
+  const [gaEmail, setGaEmail] = useState('');
+  const [gaName, setGaName] = useState('');
+  const [addingGa, setAddingGa] = useState(false);
+  const [gaMessage, setGaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Underboss list state
   const [underbosses, setUnderbosses] = useState<UnderbossAdmin[]>([]);
@@ -110,19 +128,21 @@ export function AdminPage() {
         setCurrentEmail(me.email || '');
 
         const isSA = me.role === 'super_admin';
-        const [adminList, ubList, nftSettings, clDefaults, spList, gppDescData] = await Promise.all([
+        const [adminList, ubList, nftSettings, clDefaults, spList, gppDescData, gaList] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
           fetchGppNftSettings(),
           fetchChecklistDefaults(),
           fetchSponsorUsers(),
           isSA ? fetchGppDescription().catch(() => null) : Promise.resolve(null),
+          fetchGraphicsAdminList(),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
+        setGraphicsAdmins(gaList);
         setGppNftEnabled(nftSettings.nftEnabled);
         setGppNftChain(nftSettings.nftChain || 'base');
-        setChecklistItems(clDefaults.items);
+        setChecklistItems(sortByDueDate(clDefaults.items));
         setSponsorUsers(spList.sponsorUsers);
         if (gppDescData) {
           setGppDescription(gppDescData.defaultDescription);
@@ -146,6 +166,13 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [adminMessage]);
+
+  useEffect(() => {
+    if (gaMessage) {
+      const t = setTimeout(() => setGaMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [gaMessage]);
 
   useEffect(() => {
     if (ubMessage) {
@@ -301,7 +328,7 @@ export function AdminPage() {
       setChecklistEdits({});
       // Refresh
       const clDefaults = await fetchChecklistDefaults();
-      setChecklistItems(clDefaults.items);
+      setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to update' });
     } finally {
@@ -320,7 +347,7 @@ export function AdminPage() {
       setNewItemName('');
       setNewItemDate('');
       const clDefaults = await fetchChecklistDefaults();
-      setChecklistItems(clDefaults.items);
+      setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
       setChecklistMessage({ type: 'error', text: err.message || 'Failed to add item' });
     } finally {
@@ -334,7 +361,7 @@ export function AdminPage() {
     if (result) {
       setChecklistMessage({ type: 'success', text: `Removed "${name}" from ${result.totalDeleted} events` });
       const clDefaults = await fetchChecklistDefaults();
-      if (clDefaults) setChecklistItems(clDefaults.items);
+      if (clDefaults) setChecklistItems(sortByDueDate(clDefaults.items));
     } else {
       setChecklistMessage({ type: 'error', text: `Failed to remove "${name}"` });
     }
@@ -379,6 +406,35 @@ export function AdminPage() {
       setAdminMessage({ type: 'success', text: `Removed ${email}` });
     } catch (err: any) {
       setAdminMessage({ type: 'error', text: err.message || 'Failed to remove admin' });
+    }
+  }
+
+  async function handleAddGraphicsAdmin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!gaEmail.trim()) return;
+    setAddingGa(true);
+    setGaMessage(null);
+    try {
+      const ga = await addGraphicsAdmin({ email: gaEmail.trim(), name: gaName.trim() || undefined });
+      setGraphicsAdmins((prev) => [...prev, ga]);
+      setGaEmail('');
+      setGaName('');
+      setGaMessage({ type: 'success', text: `Added ${ga.email} as graphics admin` });
+    } catch (err: any) {
+      setGaMessage({ type: 'error', text: err.message || 'Failed to add graphics admin' });
+    } finally {
+      setAddingGa(false);
+    }
+  }
+
+  async function handleRemoveGraphicsAdmin(id: string, email: string) {
+    if (!confirm(`Remove ${email} as graphics admin?`)) return;
+    try {
+      await removeGraphicsAdmin(id);
+      setGraphicsAdmins((prev) => prev.filter((ga) => ga.id !== id));
+      setGaMessage({ type: 'success', text: `Removed ${email}` });
+    } catch (err: any) {
+      setGaMessage({ type: 'error', text: err.message || 'Failed to remove graphics admin' });
     }
   }
 
@@ -495,7 +551,7 @@ export function AdminPage() {
             <button
               onClick={handleExportEventsCsv}
               disabled={exportingCsv}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 text-gray-700 text-sm font-medium hover:bg-white border border-gray-300 disabled:opacity-50"
             >
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Export All Events CSV
@@ -604,6 +660,98 @@ export function AdminPage() {
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
                         {t('admins.noAdmins')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Graphics Admin Management */}
+          <section className="mb-10">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Palette size={18} className="text-theme-text-secondary" />
+              Graphics Admins ({graphicsAdmins.length})
+            </h2>
+
+            {gaMessage && (
+              <div
+                className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  gaMessage.type === 'success'
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+              >
+                {gaMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleAddGraphicsAdmin} className="bg-theme-surface border border-theme-stroke rounded-xl p-4 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <IconInput
+                    icon={Mail}
+                    type="email"
+                    placeholder="Email address"
+                    value={gaEmail}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <IconInput
+                    icon={User}
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={gaName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaName(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addingGa || !gaEmail.trim()}
+                  className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+                >
+                  {addingGa ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                  Add Graphics Admin
+                </button>
+              </div>
+            </form>
+
+            <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium w-20"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {graphicsAdmins.map((ga) => (
+                    <tr key={ga.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
+                      <td className="px-4 py-3 text-theme-text">{ga.email}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">{ga.name || '-'}</td>
+                      <td className="px-4 py-3 text-theme-text-muted">
+                        {new Date(ga.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleRemoveGraphicsAdmin(ga.id, ga.email)}
+                          className="text-red-400/60 hover:text-red-400 transition-colors p-1"
+                          title="Remove graphics admin"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {graphicsAdmins.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-theme-text-faint">
+                        No graphics admins yet
                       </td>
                     </tr>
                   )}
@@ -1127,6 +1275,13 @@ export function AdminPage() {
               </div>
             </section>
           )}
+          {/* Analytics — RSVP Funnel */}
+          <section className="mb-10">
+            <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
+              Analytics
+            </h2>
+            <FunnelTab regions={[]} />
+          </section>
         </div>
       </main>
 

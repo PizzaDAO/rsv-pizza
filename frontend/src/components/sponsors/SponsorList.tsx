@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
-  Mail, Phone, User, Building2, Calendar
+  Mail, Phone, User, Building2, Calendar, Globe
 } from 'lucide-react';
 import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<SponsorStatus, { labelKey: string; color: string; bg
   yes: { labelKey: 'sponsors.yes', color: 'text-green-300', bgColor: 'bg-green-500' },
   billed: { labelKey: 'sponsors.billed', color: 'text-yellow-300', bgColor: 'bg-yellow-500' },
   paid: { labelKey: 'sponsors.paid', color: 'text-blue-300', bgColor: 'bg-blue-500' },
-  stuck: { labelKey: 'sponsors.stuck', color: 'text-red-300', bgColor: 'bg-red-500' },
+  stuck: { labelKey: 'sponsors.stuck', color: 'text-black', bgColor: 'bg-red-500' },
   alum: { labelKey: 'sponsors.alum', color: 'text-purple-300', bgColor: 'bg-purple-500' },
   skip: { labelKey: 'sponsors.skip', color: 'text-gray-400', bgColor: 'bg-gray-700' },
 };
@@ -314,6 +314,11 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                           >
                             <Phone size={14} />
                           </a>
+                        )}
+                        {!sponsor.contactEmail && !sponsor.contactPhone && sponsor.addedByUnderboss && (
+                          <span className="text-xs text-purple-400 flex items-center gap-1">
+                            <Globe size={12} /> Global partner
+                          </span>
                         )}
                       </div>
                     </div>

@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@googlemaps/markerclusterer": "^2.6.2",
     "@napi-rs/canvas": "^0.1.88",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.6.1",

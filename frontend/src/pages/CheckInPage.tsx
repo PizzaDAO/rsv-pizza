@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
-import { Loader2, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { checkInGuest, CheckInResponse } from '../lib/api';
+import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
+import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 
-type CheckInState = 'loading' | 'success' | 'already-checked-in' | 'unauthorized' | 'error' | 'not-found';
+type CheckInState = 'loading' | 'show-qr' | 'vouching' | 'success' | 'already-checked-in' | 'not-checked-in' | 'unauthorized' | 'error' | 'not-found' | 'discount-available' | 'discount-claimed' | 'discount-ineligible';
 
 export function CheckInPage() {
   const { inviteCode, guestId } = useParams<{ inviteCode: string; guestId: string }>();
@@ -18,60 +19,149 @@ export function CheckInPage() {
   const [guestName, setGuestName] = useState<string>('');
   const [checkedInAt, setCheckedInAt] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [hasAttemptedCheckIn, setHasAttemptedCheckIn] = useState(false);
+  const [hasAttempted, setHasAttempted] = useState(false);
+  const [discountData, setDiscountData] = useState<any>(null);
+  const [discountChecked, setDiscountChecked] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Pre-auth discount check: if event has ended, show discount flow instead of check-in
   useEffect(() => {
-    if (!authLoading && !user) {
-      // Store the current URL to redirect back after login
+    if (!inviteCode || !guestId || discountChecked) return;
+
+    const checkDiscount = async () => {
+      try {
+        const status = await getDiscountStatus(inviteCode, guestId);
+        setDiscountChecked(true);
+
+        if (status.hasEnded) {
+          setDiscountData(status);
+          setGuestName(status.guestName);
+          if (status.isCheckedIn && !status.discountClaimedAt) {
+            setState('discount-available');
+          } else if (status.isCheckedIn && status.discountClaimedAt) {
+            setState('discount-claimed');
+          } else {
+            setState('discount-ineligible');
+          }
+          return;
+        }
+      } catch {
+        // If discount check fails, fall through to normal check-in flow
+      }
+      setDiscountChecked(true);
+    };
+
+    checkDiscount();
+  }, [inviteCode, guestId, discountChecked]);
+
+  // Redirect to login if not authenticated (skip if discount flow is active)
+  useEffect(() => {
+    if (!authLoading && !user && state !== 'discount-available' && state !== 'discount-claimed' && state !== 'discount-ineligible') {
       const currentUrl = `/checkin/${inviteCode}/${guestId}`;
       sessionStorage.setItem('authReturnUrl', currentUrl);
       navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     }
-  }, [authLoading, user, inviteCode, guestId, navigate]);
+  }, [authLoading, user, inviteCode, guestId, navigate, state]);
 
-  // Auto check-in when authenticated
+  // Determine what to show
   useEffect(() => {
-    if (authLoading || !user || hasAttemptedCheckIn || !inviteCode || !guestId) {
-      return;
-    }
+    if (authLoading || !user || hasAttempted || !inviteCode || !guestId) return;
+    // Skip check-in flow if discount state is already resolved
+    if (state === 'discount-available' || state === 'discount-claimed' || state === 'discount-ineligible') return;
 
-    const performCheckIn = async () => {
-      setHasAttemptedCheckIn(true);
+    const determine = async () => {
+      setHasAttempted(true);
       setState('loading');
 
       try {
-        const response: CheckInResponse = await checkInGuest(inviteCode, guestId);
+        const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+        const token = localStorage.getItem('authToken');
 
-        setGuestName(response.guest.name);
+        // Fetch target guest status
+        const resp = await fetch(`${apiUrl}/api/checkin/${inviteCode}/${guestId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
 
-        if (response.alreadyCheckedIn) {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          if (resp.status === 403) {
+            // User is not host, not target guest, and not checked in
+            setState('not-checked-in');
+            return;
+          }
+          if (resp.status === 404) {
+            setState('not-found');
+            setErrorMessage(errData.message || 'Guest or event not found');
+            return;
+          }
+          throw new Error(errData.message || 'Failed to fetch check-in status');
+        }
+
+        const data = await resp.json();
+        setGuestName(data.guest?.name || 'Guest');
+
+        // If the target guest is already checked in
+        if (data.isCheckedIn) {
           setState('already-checked-in');
-          setCheckedInAt(response.guest.checkedInAt);
-        } else {
-          setState('success');
-          setCheckedInAt(response.guest.checkedInAt);
+          setCheckedInAt(data.guest?.checkedInAt);
+          return;
+        }
+
+        // If caller IS the target guest — show QR code
+        if (data.callerIsTarget) {
+          setState('show-qr');
+          return;
+        }
+
+        // If caller is host or checked-in guest — vouch for them
+        if (data.callerIsHost || !data.callerIsTarget) {
+          setState('vouching');
+          try {
+            const result = await vouchForGuest(inviteCode, guestId);
+            if (result.success) {
+              setGuestName(result.guest?.name || guestName);
+              if (result.alreadyCheckedIn) {
+                setState('already-checked-in');
+                setCheckedInAt(result.guest?.checkedInAt || null);
+              } else {
+                setState('success');
+                setCheckedInAt(result.guest?.checkedInAt || null);
+              }
+            } else {
+              setState('error');
+              setErrorMessage(result.message || 'Check-in failed');
+            }
+          } catch (err: any) {
+            if (err.message?.includes('SELF_VOUCH') || err.message?.includes("can't check yourself")) {
+              setState('show-qr');
+            } else if (err.message?.includes('NOT_CHECKED_IN') || err.message?.includes('must be checked in')) {
+              setState('not-checked-in');
+            } else {
+              setState('error');
+              setErrorMessage(err.message || 'Check-in failed');
+            }
+          }
         }
       } catch (error: any) {
-        console.error('Check-in error:', error);
-
-        if (error.message?.includes('not authorized') || error.message?.includes('UNAUTHORIZED')) {
-          setState('unauthorized');
-          setErrorMessage(t('unauthorized.message'));
-        } else if (error.message?.includes('not found') || error.message?.includes('NOT_FOUND')) {
-          setState('not-found');
-          setErrorMessage(error.message || 'Guest or event not found');
-        } else {
-          setState('error');
-          setErrorMessage(error.message || 'An error occurred during check-in');
-        }
+        console.error('Check-in page error:', error);
+        setState('error');
+        setErrorMessage(error.message || 'An error occurred');
       }
     };
 
-    performCheckIn();
-  }, [authLoading, user, inviteCode, guestId, hasAttemptedCheckIn, t]);
+    determine();
+  }, [authLoading, user, inviteCode, guestId, hasAttempted, state]);
 
-  // Format the check-in time
+  const handleClaimDiscount = async () => {
+    try {
+      const result = await claimDiscount(inviteCode!, guestId!);
+      setDiscountData(result);
+      setState('discount-claimed');
+    } catch (err) {
+      setState('error');
+      setErrorMessage('Failed to claim discount');
+    }
+  };
+
   const formatCheckInTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -84,13 +174,82 @@ export function CheckInPage() {
     });
   };
 
-  // Render content based on state
   const renderContent = () => {
-    if (authLoading || state === 'loading') {
+    if (authLoading || state === 'loading' || state === 'vouching') {
       return (
         <div className="flex flex-col items-center justify-center py-12">
           <Loader2 size={48} className="animate-spin text-[#ff393a] mb-4" />
-          <p className="text-theme-text-secondary">{t('loading')}</p>
+          <p className="text-theme-text-secondary">
+            {state === 'vouching' ? t('vouching') : t('loading')}
+          </p>
+        </div>
+      );
+    }
+
+    if (state === 'discount-available') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-6xl mb-4">🍕</div>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Claim Your 10% Pizza Discount</h2>
+          <p className="text-theme-text-secondary mb-6">Thanks for attending! As a verified guest, you earned a discount.</p>
+          <button
+            onClick={handleClaimDiscount}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors"
+          >
+            Claim Discount
+          </button>
+        </div>
+      );
+    }
+
+    if (state === 'discount-claimed') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
+            <CheckCircle2 size={48} className="text-green-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-green-400 mb-2">Discount Claimed!</h2>
+          <p className="text-theme-text-secondary mb-2">Your 10% pizza discount is active.</p>
+          <p className="text-theme-text-muted text-sm">
+            Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
+          </p>
+        </div>
+      );
+    }
+
+    if (state === 'discount-ineligible') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">Discount Unavailable</h2>
+          <p className="text-theme-text-secondary">This discount is for verified attendees only.</p>
+        </div>
+      );
+    }
+
+    if (state === 'show-qr' && inviteCode && guestId) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-[#ff393a]/20 flex items-center justify-center mb-4">
+            <QrCode size={32} className="text-[#ff393a]" />
+          </div>
+          <h2 className="text-xl font-bold text-theme-text mb-2">Show Your QR Code</h2>
+          <p className="text-theme-text-secondary text-sm mb-6 max-w-xs">
+            Show this QR code to a host or checked-in guest to verify your attendance
+          </p>
+          <div className="bg-white rounded-xl p-4 inline-block mb-4">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`https://rsv.pizza/checkin/${inviteCode}/${guestId}`)}`}
+              alt="Check-in QR code"
+              width={250}
+              height={250}
+              className="block"
+            />
+          </div>
+          <p className="text-theme-text-muted text-xs">
+            {guestName && <span className="block text-theme-text-secondary mb-1">{guestName}</span>}
+            A host or checked-in guest needs to scan this to check you in
+          </p>
         </div>
       );
     }
@@ -105,16 +264,9 @@ export function CheckInPage() {
           <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
             <p className="text-theme-text-muted text-sm flex items-center gap-2">
-              <Clock size={14} />
-              {formatCheckInTime(checkedInAt)}
+              <span>{formatCheckInTime(checkedInAt)}</span>
             </p>
           )}
-          <button
-            onClick={() => navigate(`/host/${inviteCode}`)}
-            className="mt-8 btn-secondary"
-          >
-            {t('success.backToDashboard')}
-          </button>
         </div>
       );
     }
@@ -129,34 +281,23 @@ export function CheckInPage() {
           <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
             <p className="text-theme-text-muted text-sm flex items-center gap-2">
-              <Clock size={14} />
-              {t('alreadyCheckedIn.checkedInAt', { time: formatCheckInTime(checkedInAt) })}
+              <span>{t('alreadyCheckedIn.checkedInAt', { time: formatCheckInTime(checkedInAt) })}</span>
             </p>
           )}
-          <button
-            onClick={() => navigate(`/host/${inviteCode}`)}
-            className="mt-8 btn-secondary"
-          >
-            {t('success.backToDashboard')}
-          </button>
         </div>
       );
     }
 
-    if (state === 'unauthorized') {
+    if (state === 'not-checked-in') {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
             <AlertCircle size={48} className="text-yellow-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('unauthorized.title')}</h2>
-          <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 btn-secondary"
-          >
-            {t('unauthorized.goHome')}
-          </button>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('notCheckedIn.title')}</h2>
+          <p className="text-theme-text-secondary mb-4 max-w-md">
+            {t('notCheckedIn.message')}
+          </p>
         </div>
       );
     }
@@ -169,12 +310,20 @@ export function CheckInPage() {
           </div>
           <h2 className="text-2xl font-bold text-theme-text mb-2">{t('notFound.title')}</h2>
           <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 btn-secondary"
-          >
-            {t('notFound.goHome')}
-          </button>
+          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">{t('notFound.goHome')}</button>
+        </div>
+      );
+    }
+
+    if (state === 'unauthorized') {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
+            <AlertCircle size={48} className="text-yellow-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('unauthorized.title')}</h2>
+          <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
+          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">{t('unauthorized.goHome')}</button>
         </div>
       );
     }
@@ -189,20 +338,12 @@ export function CheckInPage() {
         <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
         <div className="flex gap-4 mt-4">
           <button
-            onClick={() => {
-              setHasAttemptedCheckIn(false);
-              setState('loading');
-            }}
+            onClick={() => { setHasAttempted(false); setState('loading'); }}
             className="btn-primary"
           >
             {t('error.tryAgain')}
           </button>
-          <button
-            onClick={() => navigate('/')}
-            className="btn-secondary"
-          >
-            {t('error.goHome')}
-          </button>
+          <button onClick={() => navigate('/')} className="btn-secondary">{t('error.goHome')}</button>
         </div>
       </div>
     );

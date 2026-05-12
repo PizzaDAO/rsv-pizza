@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Loader2, ArrowRight, ExternalLink, Globe, ChevronDown } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, ExternalLink, MapPin, Globe, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CornerLinks } from '../components/CornerLinks';
 import { GPPClouds } from '../components/GPPClouds';
@@ -627,7 +627,7 @@ export function GPPLandingPage() {
             </Suspense>
           </div>
 
-          <div className="text-center mt-6">
+          <div className="text-center mt-6 flex flex-wrap items-center justify-center gap-3">
             <a
               href="https://www.google.com/maps/d/u/0/viewer?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA"
               target="_blank"
@@ -638,6 +638,14 @@ export function GPPLandingPage() {
               {t('map.openFullMap')}
               <ExternalLink size={16} />
             </a>
+            <Link
+              to="/gpp/pizzerias"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5 border-2"
+              style={{ borderColor: C.red, color: C.red }}
+            >
+              View All Pizzerias
+              <MapPin size={16} />
+            </Link>
           </div>
         </div>
       </div>

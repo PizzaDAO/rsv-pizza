@@ -1,7 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { normalizeUrl } from '../lib/utils';
+
+// Avatar with onError fallback for broken image URLs
+const AvatarImg: React.FC<{
+  src: string;
+  alt: string;
+  className: string;
+  fallbackClassName: string;
+  iconClassName: string;
+  style?: React.CSSProperties;
+}> = ({ src, alt, className, fallbackClassName, iconClassName, style }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className={fallbackClassName} style={style}>
+        <User className={iconClassName} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={cdnUrl(src)}
+      alt={alt}
+      className={className}
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 interface CoHost {
   id: string;
@@ -95,10 +125,12 @@ export const HostsList: React.FC<HostsListProps> = ({
         {displayHostName && (
           <div className={`flex items-center ${config.gap}`}>
             {hostProfile?.avatar_url ? (
-              <img
-                src={cdnUrl(hostProfile.avatar_url)}
+              <AvatarImg
+                src={hostProfile.avatar_url}
                 alt={displayHostName}
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
+                fallbackClassName={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}
+                iconClassName={`${config.icon} text-[#ff393a]`}
               />
             ) : (
               <div className={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}>
@@ -183,10 +215,12 @@ export const HostsList: React.FC<HostsListProps> = ({
         {visibleCoHosts.map((coHost) => (
           <div key={coHost.id} className={`flex items-center ${config.gap}`}>
             {coHost.avatar_url ? (
-              <img
-                src={cdnUrl(coHost.avatar_url)}
+              <AvatarImg
+                src={coHost.avatar_url}
                 alt={coHost.name}
                 className={`${config.avatar} rounded-full object-cover flex-shrink-0`}
+                fallbackClassName={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}
+                iconClassName={`${config.icon} text-[#ff393a]`}
               />
             ) : (
               <div className={`${config.avatar} rounded-full bg-[#ff393a]/20 flex items-center justify-center flex-shrink-0`}>
@@ -264,10 +298,12 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
         {/* Primary host avatar */}
         {displayHostName && (
           hostProfile?.avatar_url ? (
-            <img
-              src={cdnUrl(hostProfile.avatar_url)}
+            <AvatarImg
+              src={hostProfile.avatar_url}
               alt={displayHostName}
               className="w-8 min-w-8 h-8 min-h-8 rounded-full object-cover flex-shrink-0 border-2 border-theme-card"
+              fallbackClassName="w-8 min-w-8 h-8 min-h-8 rounded-full bg-[#ff393a] flex items-center justify-center flex-shrink-0 border-2 border-theme-card relative"
+              iconClassName="w-4 h-4 text-theme-text"
               style={{ zIndex: 10, marginLeft: '-8px' }}
             />
           ) : (
@@ -283,10 +319,12 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
         {displayCoHosts.map((coHost, index) => (
           <div key={coHost.id} className="flex-shrink-0" style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
             {coHost.avatar_url ? (
-              <img
-                src={cdnUrl(coHost.avatar_url)}
+              <AvatarImg
+                src={coHost.avatar_url}
                 alt={coHost.name}
                 className="w-8 min-w-8 h-8 min-h-8 rounded-full object-cover border-2 border-theme-card"
+                fallbackClassName="w-8 min-w-8 h-8 min-h-8 rounded-full bg-[#ff393a] flex items-center justify-center border-2 border-theme-card"
+                iconClassName="w-4 h-4 text-theme-text"
               />
             ) : (
               <div className="w-8 min-w-8 h-8 min-h-8 rounded-full bg-[#ff393a] flex items-center justify-center border-2 border-theme-card">

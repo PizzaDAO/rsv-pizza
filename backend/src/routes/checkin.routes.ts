@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { autoCompleteScorecardItem } from './scorecard.routes.js';
 
 const router = Router();
 
@@ -185,6 +186,11 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('You must be an RSVPd guest to vouch for others', 403, 'NOT_A_GUEST');
     }
 
+    // Prevent self-vouch
+    if (voucher.id === targetGuestId) {
+      throw new AppError("You can't check yourself in!", 400, 'SELF_VOUCH');
+    }
+
     // Voucher must be checked in
     if (!voucher.checkedInAt) {
       throw new AppError('You must be checked in to vouch for others', 403, 'NOT_CHECKED_IN');
@@ -225,6 +231,9 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
       },
     });
 
+    // Auto-complete the voucher's "vouch" scorecard item
+    autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
+
     res.status(200).json({
       success: true,
       guest: {
@@ -249,10 +258,33 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    // Verify user can check in guests for this party
-    const canCheck = await canUserCheckIn(party.id, req.userId, req.userEmail);
-    if (!canCheck) {
-      throw new AppError('You are not authorized to view check-in status for this event', 403, 'UNAUTHORIZED');
+    // Allow: hosts/co-hosts, the target guest themselves, or any checked-in guest
+    const isHostOrCohost = await canUserCheckIn(party.id, req.userId, req.userEmail);
+
+    let isTargetGuest = false;
+    let isCheckedInGuest = false;
+
+    if (!isHostOrCohost) {
+      // Check if caller is the target guest
+      const callerGuest = await prisma.guest.findFirst({
+        where: {
+          partyId: party.id,
+          email: req.userEmail?.toLowerCase(),
+        },
+        select: { id: true, checkedInAt: true },
+      });
+
+      if (callerGuest) {
+        if (callerGuest.id === guestId) {
+          isTargetGuest = true;
+        } else if (callerGuest.checkedInAt) {
+          isCheckedInGuest = true;
+        }
+      }
+
+      if (!isTargetGuest && !isCheckedInGuest) {
+        throw new AppError('You are not authorized to view check-in status for this event', 403, 'UNAUTHORIZED');
+      }
     }
 
     // Find the guest
@@ -277,7 +309,129 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
     res.json({
       guest,
       isCheckedIn: !!guest.checkedInAt,
+      callerIsTarget: isTargetGuest,
+      callerIsHost: isHostOrCohost,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/checkin/:inviteCode/:guestId/discount — Get discount claim status (no auth required)
+router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the guest
+    const guest = await prisma.guest.findFirst({
+      where: {
+        id: guestId,
+        partyId: party.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        checkedInAt: true,
+        discountClaimedAt: true,
+        party: {
+          select: {
+            date: true,
+            duration: true,
+          },
+        },
+      },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Compute hasEnded
+    let hasEnded = false;
+    if (guest.party.date) {
+      const eventEnd = new Date(guest.party.date.getTime() + (guest.party.duration || 0) * 60 * 60 * 1000);
+      hasEnded = new Date() > eventEnd;
+    }
+
+    res.json({
+      guestName: guest.name,
+      isCheckedIn: !!guest.checkedInAt,
+      hasEnded,
+      discountClaimedAt: guest.discountClaimedAt,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/checkin/:inviteCode/:guestId/discount — Claim post-event discount (no auth required)
+router.post('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Find the guest
+    const guest = await prisma.guest.findFirst({
+      where: {
+        id: guestId,
+        partyId: party.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        checkedInAt: true,
+        discountClaimedAt: true,
+        party: {
+          select: {
+            date: true,
+            duration: true,
+          },
+        },
+      },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Validate: guest must be checked in
+    if (!guest.checkedInAt) {
+      return res.status(403).json({ error: 'Must be checked in to claim discount' });
+    }
+
+    // Compute hasEnded
+    let hasEnded = false;
+    if (guest.party.date) {
+      const eventEnd = new Date(guest.party.date.getTime() + (guest.party.duration || 0) * 60 * 60 * 1000);
+      hasEnded = new Date() > eventEnd;
+    }
+
+    // Validate: event must have ended
+    if (!hasEnded) {
+      return res.status(400).json({ error: 'Event has not ended yet' });
+    }
+
+    // If already claimed, return existing timestamp
+    if (guest.discountClaimedAt) {
+      return res.json({ success: true, alreadyClaimed: true, claimedAt: guest.discountClaimedAt });
+    }
+
+    // Claim the discount
+    const updated = await prisma.guest.update({
+      where: { id: guestId },
+      data: { discountClaimedAt: new Date() },
+    });
+
+    res.json({ success: true, alreadyClaimed: false, claimedAt: updated.discountClaimedAt });
   } catch (error) {
     next(error);
   }

@@ -1,19 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, AlertCircle, Loader2, Lock, X, ChevronRight, Heart } from 'lucide-react';
+import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
-import { getDonationStats } from '../lib/api';
+import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
-import { RSVPFormStep1 } from '../components/RSVPFormStep1';
-import { RSVPFormStep2 } from '../components/RSVPFormStep2';
 // GPP theme applied conditionally
 import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
-import { ShareRSVP } from '../components/ShareRSVP';
 import { useTranslation } from 'react-i18next';
+import { RSVPFlowContent } from '../components/RSVPFlowContent';
+
+/** Map DbParty (snake_case) to a partial PublicEvent for RSVPFlowContent */
+function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
+  return {
+    id: party.id,
+    name: party.name,
+    inviteCode: party.invite_code || inviteCode,
+    customUrl: party.custom_url,
+    date: party.date,
+    duration: party.duration,
+    timezone: party.timezone,
+    pizzaStyle: party.pizza_style,
+    availableBeverages: party.available_beverages || [],
+    availableToppings: party.available_toppings || [],
+    availableDietaryOptions: party.available_dietary_options || [],
+    address: party.address,
+    latitude: party.latitude,
+    longitude: party.longitude,
+    venueName: party.venue_name,
+    maxGuests: party.max_guests,
+    hideGuests: party.hide_guests,
+    eventImageUrl: party.event_image_url,
+    description: party.description,
+    rsvpClosedAt: party.rsvp_closed_at,
+    coHosts: party.co_hosts || [],
+    hasPassword: !!party.has_password,
+    hostName: party.host_name || null,
+    hostProfile: party.host_profile || null,
+    guestCount: 0,
+    userId: party.user_id,
+    selectedPizzerias: party.selected_pizzerias as any,
+    eventType: party.event_type,
+    eventTags: party.event_tags,
+    donationEnabled: party.donation_enabled,
+    donationRecipient: party.donation_recipient,
+    donationRecipientUrl: party.donation_recipient_url,
+    nftEnabled: party.nft_enabled,
+    nftChain: party.nft_chain,
+    turtleRolesEnabled: party.turtle_roles_enabled,
+  } as PublicEvent;
+}
 
 export function RSVPPage() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -27,7 +66,7 @@ export function RSVPPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [party, setParty] = useState<DbParty | null>(null);
 
-  // Donation state (page-specific)
+  // Donation state (page-specific, for Step 2 slot)
   const [donationsEnabled, setDonationsEnabled] = useState(false);
   const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
   const [showDonationForm, setShowDonationForm] = useState(false);
@@ -107,6 +146,13 @@ export function RSVPPage() {
     loadParty();
   }, [inviteCode, user?.email]);
 
+  // Track RSVP funnel: opened
+  useEffect(() => {
+    if (party && inviteCode) {
+      trackRsvpFunnel(inviteCode, 'rsvp_opened');
+    }
+  }, [party, inviteCode]);
+
   // Create the eventData only when party is loaded
   const eventData = party ? dbPartyToRSVPData(party) : null;
 
@@ -120,6 +166,7 @@ export function RSVPPage() {
       address: null,
       availableBeverages: [],
       availableToppings: [],
+      availableDietaryOptions: [],
     },
     user,
     isOpen: !!party, // Only active when party is loaded
@@ -215,6 +262,18 @@ export function RSVPPage() {
     );
   }
 
+  // ---- Build twitter handles ----
+  const twitterHandles: string[] = [];
+  if (party?.host_profile) {
+    const hp = party.host_profile as any;
+    if (hp.twitter) twitterHandles.push(hp.twitter);
+  }
+  if (party?.co_hosts) {
+    for (const host of party.co_hosts as any[]) {
+      if (host.twitter && host.showOnEvent !== false) twitterHandles.push(host.twitter);
+    }
+  }
+
   // ---- Donation slot for Step 2 ----
   const donationSlot = donationsEnabled && donationStats ? (
     <>
@@ -266,126 +325,24 @@ export function RSVPPage() {
     </>
   ) : undefined;
 
-  // ---- Success screen ----
-  if (form.submitted) {
-    const getSuccessIcon = () => {
-      if (form.alreadyRegistered) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
-      if (form.pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
-      return 'bg-[#39d98a]/20 border-[#39d98a]/30';
-    };
+  // ---- Map party to PublicEvent for RSVPFlowContent ----
+  const publicEvent = party ? dbPartyToPublicEvent(party, inviteCode || '') : null;
 
-    const getSuccessTitle = () => {
-      if (form.alreadyRegistered) return t('success.alreadyRegistered');
-      if (form.pendingApproval) return t('success.rsvpSubmitted');
-      return t('success.seeYou', { eventName: party?.name });
-    };
+  if (!publicEvent) return null;
 
-    return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
-        {isGPP && <GPPClouds />}
-        <div className="card p-8 max-w-md text-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
-            {form.alreadyRegistered ? (
-              <AlertCircle className="w-8 h-8 text-[#ff393a]" />
-            ) : form.pendingApproval ? (
-              <Loader2 className="w-8 h-8 text-[#ffc107]" />
-            ) : (
-              <Check className="w-8 h-8 text-[#39d98a]" />
-            )}
-          </div>
-          <h1 className="text-2xl font-bold text-theme-text mb-2">
-            {getSuccessTitle()}
-          </h1>
-          {form.alreadyRegistered && (
-            <p className="text-theme-text-secondary mb-4">
-              {t('success.alreadyRegisteredDesc')}
-            </p>
-          )}
-          {form.pendingApproval && !form.alreadyRegistered && (
-            <p className="text-theme-text-secondary mb-4">
-              {t('success.pendingApproval')}
-            </p>
-          )}
-          {!form.alreadyRegistered && !form.pendingApproval && (() => {
-            const twitterHandles: string[] = [];
-            if (party?.co_hosts) {
-              for (const host of party.co_hosts as any[]) {
-                if (host.twitter && host.showOnEvent !== false) twitterHandles.push(host.twitter);
-              }
-            }
-            return (
-              <ShareRSVP
-                eventName={party?.name || ''}
-                eventImageUrl={party?.event_image_url || null}
-                customUrl={party?.custom_url || null}
-                inviteCode={inviteCode || ''}
-                twitterHandles={twitterHandles}
-              />
-            );
-          })()}
-          <button
-            onClick={handleClose}
-            className="btn-secondary"
-          >
-            {t('success.backToEvent')}
-          </button>
-        </div>
-        {ConfettiOverlay}
-      </div>
-    );
-  }
-
-  // ---- Step 1 - Personal Info ----
-  if (form.step === 1) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
-        {isGPP && <GPPClouds />}
-        <div className="card p-8 max-w-lg w-full relative">
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
-          >
-            <X size={24} />
-          </button>
-
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text">{t('step1.title', { eventName: party?.name })}</h1>
-            <p className="text-sm text-theme-text-secondary">{t('step1.stepIndicator')}</p>
-          </div>
-
-          <RSVPFormStep1
-            form={form}
-            eventName={party?.name || ''}
-            showWallet={!!(party?.nft_enabled || party?.event_type === 'gpp')}
-            showTurtleRoles={!!party?.turtle_roles_enabled}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Step 2 - Pizza Preferences ----
+  // ---- Unified RSVP flow ----
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 ${gppClass}`} onClick={(e) => { if (isGPP) fireConfetti(e.clientX, e.clientY); }}>
       {isGPP && <GPPClouds />}
-      <div className="card p-8 max-w-2xl w-full relative">
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
-        >
-          <X size={24} />
-        </button>
-
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-theme-text">{t('step2.title')}</h1>
-          <p className="text-sm text-theme-text-secondary">{t('step2.stepIndicator')}</p>
-        </div>
-
-        <RSVPFormStep2
-          form={form}
-          donationSlot={donationSlot}
-        />
-      </div>
+      <RSVPFlowContent
+        event={publicEvent}
+        form={form}
+        eventName={party?.name || ''}
+        closeButtonLabel={t('success.backToEvent')}
+        onClose={handleClose}
+        donationSlot={donationSlot}
+        twitterHandles={twitterHandles}
+      />
       {ConfettiOverlay}
     </div>
   );

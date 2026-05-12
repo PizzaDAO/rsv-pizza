@@ -197,6 +197,7 @@ interface PartnerFormProps {
   onSubmit: (data: PartnerFormData) => Promise<void>;
   onClose?: () => void;
   isLoading?: boolean;
+  logoOnly?: boolean;
   // CRM mode
   sponsor?: Sponsor | null;
   partyId?: string;
@@ -210,7 +211,7 @@ interface PartnerFormProps {
   submitLabel?: string;
   wasPreviouslySubmitted?: boolean;
   defaultStatus?: SponsorStatus;
-  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string }) => void;
+  onAddAsCoHost?: (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => void;
 }
 
 /* ---------- Component ---------- */
@@ -220,6 +221,7 @@ export function PartnerForm({
   onSubmit,
   onClose,
   isLoading,
+  logoOnly,
   sponsor,
   partyId,
   onSponsorUpdate,
@@ -358,6 +360,7 @@ export function PartnerForm({
           twitter: formData.brandTwitter.trim(),
           instagram: formData.brandInstagram.trim(),
           logoUrl,
+          avatarUrl: formData.coHostAvatarUrl.trim() || undefined,
         });
       }
     } catch (err) {
@@ -376,7 +379,7 @@ export function PartnerForm({
       )}
 
       {/* Account — Partner mode only */}
-      {isPartner && (
+      {!logoOnly && isPartner && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Mail size={16} />
@@ -411,7 +414,7 @@ export function PartnerForm({
       )}
 
       {/* Partner / Company Info — All modes */}
-      <div className="space-y-3">
+      {!logoOnly && <div className="space-y-3">
         <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
           <Building2 size={16} />
           {isIntake ? t('sponsors.companyInfo') : t('sponsors.partnerInfo')}
@@ -460,10 +463,10 @@ export function PartnerForm({
             placeholder={t('sponsors.brandDescription')}
           />
         )}
-      </div>
+      </div>}
 
       {/* Also add as co-host — CRM mode, new partners only */}
-      {isCrm && !isEditing && onAddAsCoHost && (
+      {!logoOnly && isCrm && !isEditing && onAddAsCoHost && (
         <Checkbox
           checked={addAsCoHost}
           onChange={() => setAddAsCoHost(!addAsCoHost)}
@@ -472,8 +475,8 @@ export function PartnerForm({
         />
       )}
 
-      {/* Co-Host Profile (avatar) — Partner mode only */}
-      {isPartner && (
+      {/* Co-Host Profile (avatar) — Partner + CRM (when adding as co-host) */}
+      {!logoOnly && (isPartner || (isCrm && addAsCoHost)) && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
@@ -501,7 +504,7 @@ export function PartnerForm({
       )}
 
       {/* Category — Partner mode */}
-      {isPartner && (
+      {!logoOnly && isPartner && (
         <div className="relative">
           <Building2 size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
           <select
@@ -521,12 +524,20 @@ export function PartnerForm({
       )}
 
       {/* Contact Info — CRM + Intake */}
-      {(isCrm || isIntake) && (
+      {!logoOnly && (isCrm || isIntake) && (() => {
+        // Disable contact fields for underboss-added sponsors when backend has stripped the data
+        const contactFieldsDisabled = !!(isCrm && sponsor?.addedByUnderboss && !sponsor?.contactEmail);
+        return (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
             {t('sponsors.contactInfo')}
           </h3>
+          {contactFieldsDisabled && (
+            <p className="text-xs text-purple-400 flex items-center gap-1">
+              <Globe size={12} /> Managed by global partner admin
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {isCrm && (
               <IconInput
@@ -543,6 +554,7 @@ export function PartnerForm({
               value={formData.contactName}
               onChange={e => handleChange('contactName', e.target.value)}
               placeholder="Contact Name"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               icon={Mail}
@@ -550,6 +562,7 @@ export function PartnerForm({
               value={formData.contactEmail}
               onChange={e => handleChange('contactEmail', e.target.value)}
               placeholder="Email"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               icon={Phone}
@@ -557,6 +570,7 @@ export function PartnerForm({
               value={formData.contactPhone}
               onChange={e => handleChange('contactPhone', e.target.value)}
               placeholder="Phone"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
@@ -564,6 +578,7 @@ export function PartnerForm({
               value={formData.contactTwitter}
               onChange={e => handleChange('contactTwitter', e.target.value)}
               placeholder="Contact X Handle"
+              disabled={contactFieldsDisabled}
             />
             <IconInput
               customIcon={<TelegramIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
@@ -574,10 +589,11 @@ export function PartnerForm({
             />
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Pipeline — CRM mode only */}
-      {isCrm && (
+      {!logoOnly && isCrm && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Calendar size={16} />
@@ -628,7 +644,7 @@ export function PartnerForm({
       )}
 
       {/* Fundraising — CRM mode only */}
-      {isCrm && (
+      {!logoOnly && isCrm && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <DollarSign size={16} />
@@ -672,7 +688,7 @@ export function PartnerForm({
       )}
 
       {/* Sponsorship Details — Intake mode only (CRM has it under Fundraising) */}
-      {isIntake && (
+      {!logoOnly && isIntake && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
@@ -707,7 +723,7 @@ export function PartnerForm({
       )}
 
       {/* Sponsor Message (from intake form — CRM read-only) */}
-      {isCrm && sponsor?.sponsorMessage && (
+      {!logoOnly && isCrm && sponsor?.sponsorMessage && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
@@ -771,7 +787,7 @@ export function PartnerForm({
       </div>
 
       {/* Message to Host — Intake mode only (writable) */}
-      {isIntake && (
+      {!logoOnly && isIntake && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <MessageSquare size={16} />
@@ -789,7 +805,7 @@ export function PartnerForm({
       )}
 
       {/* Automation — Partner mode only */}
-      {isPartner && (
+      {!logoOnly && isPartner && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Settings size={16} />
@@ -813,7 +829,7 @@ export function PartnerForm({
       )}
 
       {/* Partner Intake Form — CRM mode, editing only */}
-      {isCrm && sponsor && partyId && onSponsorUpdate && (
+      {!logoOnly && isCrm && sponsor && partyId && onSponsorUpdate && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
@@ -837,7 +853,7 @@ export function PartnerForm({
       )}
 
       {/* Notes — CRM + Partner modes (not intake) */}
-      {(isCrm || isPartner) && (
+      {!logoOnly && (isCrm || isPartner) && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
@@ -855,7 +871,7 @@ export function PartnerForm({
       )}
 
       {/* Sync message — Partner mode only */}
-      {isPartner && syncMessage && (
+      {!logoOnly && isPartner && syncMessage && (
         <p className="text-sm text-green-400 flex items-center gap-1">
           <Check size={14} /> {syncMessage}
         </p>

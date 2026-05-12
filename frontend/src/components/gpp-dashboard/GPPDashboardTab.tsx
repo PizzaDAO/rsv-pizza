@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist, updateUnderbossStatus } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
@@ -41,14 +41,19 @@ export const GPPDashboardTab: React.FC = () => {
     return () => { cancelled = true; };
   }, [party?.id]);
 
-  // Build a name→dueDate map from DB items
-  const dueDateMap = useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const item of dbItems) {
-      map.set(item.name, item.dueDate ? item.dueDate.split('T')[0] : null);
-    }
-    return map;
-  }, [dbItems]);
+  // Map known item names to Lucide icons
+  const ICON_MAP: Record<string, LucideIcon> = {
+    'Create Event': PartyPopper,
+    'Request Party Kit': Package,
+    'Build a Team': Users,
+    'Find a Venue': MapPin,
+    'Set Up Budget': DollarSign,
+    'Find Partners': Handshake,
+    'Select Pizzeria': MapPin,
+    'Prepare for the Party': ClipboardCheck,
+    'Post to Socials': Megaphone,
+    'Throw the Party': Rocket,
+  };
 
   const goToTab = (tab: string) => {
     if (tab === 'details') {
@@ -59,86 +64,26 @@ export const GPPDashboardTab: React.FC = () => {
   };
 
   const checklist = useMemo(() => {
-    if (!party) return [];
-    return [
-      {
-        label: 'Create Event',
-        done: true,
-        tab: null,
-        icon: PartyPopper,
-        dueDate: dueDateMap.get('Create Event') ?? null,
-      },
-      {
-        label: 'Request Party Kit',
-        done: autoStates?.party_kit_submitted ?? false,
-        tab: 'gpp',
-        icon: Package,
-        dueDate: dueDateMap.get('Request Party Kit') ?? null,
-      },
-      {
-        label: 'Build a Team',
-        done: autoStates?.team_built ?? false,
-        tab: null,
-        onClick: () => setHostsExpanded(prev => !prev),
-        icon: Users,
-        dueDate: dueDateMap.get('Build a Team') ?? null,
-      },
-      {
-        label: 'Find a Venue',
-        done: autoStates?.venue_added ?? !!party.venueName,
-        tab: 'venue',
-        icon: MapPin,
-        dueDate: dueDateMap.get('Find a Venue') ?? null,
-      },
-      {
-        label: 'Set Up Budget',
-        done: autoStates?.budget_submitted ?? false,
-        tab: 'budget',
-        icon: DollarSign,
-        dueDate: dueDateMap.get('Set Up Budget') ?? null,
-      },
-      {
-        label: 'Find Partners',
-        done: false,
-        tab: 'partners',
-        icon: Handshake,
-        dueDate: dueDateMap.get('Find Partners') ?? null,
-      },
-      {
-        label: 'Select Pizzeria',
-        done: false,
-        tab: 'pizza',
-        icon: MapPin,
-        dueDate: dueDateMap.get('Select Pizzeria') ?? null,
-      },
-      {
-        label: 'Prepare for the Party',
-        done: false,
-        tab: null,
-        icon: ClipboardCheck,
-        dueDate: dueDateMap.get('Prepare for the Party') ?? null,
-      },
-      {
-        label: 'Post to Socials',
-        done: false,
-        tab: 'promo',
-        icon: Megaphone,
-        dueDate: dueDateMap.get('Post to Socials') ?? null,
-      },
-      {
-        label: 'Throw the Party',
-        done: false,
-        tab: null,
-        icon: Rocket,
-        dueDate: dueDateMap.get('Throw the Party') ?? null,
-      },
-    ].sort((a, b) => {
+    if (!party || dbItems.length === 0) return [];
+    return dbItems.map((item) => {
+      const done = item.isAuto && item.autoRule
+        ? (autoStates?.[item.autoRule as keyof AutoCompleteStates] ?? false)
+        : item.completed;
+      return {
+        label: item.name,
+        done,
+        tab: item.linkTab,
+        onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) : undefined,
+        icon: ICON_MAP[item.name] ?? ClipboardCheck,
+        dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
+      };
+    }).sort((a, b) => {
       if (!a.dueDate && !b.dueDate) return 0;
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
     });
-  }, [party, autoStates, coHostCount, dueDateMap]);
+  }, [party, autoStates, dbItems, coHostCount]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;

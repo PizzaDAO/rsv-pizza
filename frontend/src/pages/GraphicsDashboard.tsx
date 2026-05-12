@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -9,17 +9,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { fetchUnderbossMe, fetchUnderbossDashboard } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import {
-  Loader2, Shield, Image, ExternalLink, Search, AlertTriangle,
+  Loader2, Shield, Image, Pencil, Search, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import type { UnderbossEvent } from '../types';
 import { GPP_REGIONS } from '../types';
-import { renderFlyer, uses12Hour, formatFlyerTime } from '../components/flyer/renderFlyer';
+import { renderFlyer, uses12Hour, formatFlyerTime, type FlyerConfig } from '../components/flyer/renderFlyer';
 import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
 
 export function GraphicsDashboard() {
   const { t } = useTranslation('admin');
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
@@ -33,11 +34,14 @@ export function GraphicsDashboard() {
   const [massGenerating, setMassGenerating] = useState(false);
   const [massProgress, setMassProgress] = useState({ current: 0, total: 0 });
 
+  // Single event regeneration state
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+
   const loadDashboard = useCallback(async () => {
     try {
       const me = await fetchUnderbossMe();
       setMeData(me);
-      if (!me.isUnderboss && !me.isAdmin) {
+      if (!me.isUnderboss && !me.isAdmin && !me.isGraphicsAdmin) {
         setLoading(false);
         return;
       }
@@ -139,6 +143,18 @@ export function GraphicsDashboard() {
           dateDisplay = `${monthStr} ${dayStr}`;
         }
 
+        // Use layout config (positions, logos) but NOT text overrides —
+        // mass gen should always use fresh event data for text.
+        const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+        const layoutConfig: FlyerConfig | undefined = rawCfg
+          ? {
+              positions: rawCfg.positions,
+              poppedLogos: rawCfg.poppedLogos,
+              logoSizes: rawCfg.logoSizes,
+              sponsorBoxSize: rawCfg.sponsorBoxSize,
+            }
+          : undefined;
+
         const canvas = await renderFlyer({
           city,
           venueName,
@@ -147,6 +163,7 @@ export function GraphicsDashboard() {
           timeDisplay,
           is12h,
           sponsors: [],
+          config: layoutConfig,
         });
 
         const blob = await new Promise<Blob | null>(resolve =>
@@ -175,6 +192,95 @@ export function GraphicsDashboard() {
     }
 
     setMassGenerating(false);
+  };
+
+  const handleRegenerate = async (event: UnderbossEvent) => {
+    setRegeneratingId(event.id);
+
+    try {
+      // Load fonts
+      try {
+        const display = new FontFace('Hub 191 Display', 'url(/fonts/Hub-191-Display.otf)');
+        const regular = new FontFace('Hub 191', 'url(/fonts/Hub-191-Regular.otf)');
+        const [disp, reg] = await Promise.all([display.load(), regular.load()]);
+        document.fonts.add(disp);
+        document.fonts.add(reg);
+      } catch {
+        // Continue with fallback fonts
+      }
+
+      const city = event.name.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
+      const venueName = event.venueName || 'LOCATION TBA';
+      const streetAddress = event.address ? event.address.split(',')[0].trim() : '';
+
+      let dateDisplay = '';
+      let timeDisplay = '';
+      let is12h = false;
+      if (event.date) {
+        const tz = event.timezone || 'UTC';
+        is12h = uses12Hour(tz);
+        const start = getDateTimeInTimezone(event.date, tz);
+        const startFormatted = formatFlyerTime(start.timeStr, is12h);
+        timeDisplay = startFormatted;
+        if (event.duration) {
+          const endDate = new Date(new Date(event.date).getTime() + event.duration * 3600000);
+          const end = getDateTimeInTimezone(endDate, tz);
+          const endFormatted = formatFlyerTime(end.timeStr, is12h);
+          timeDisplay = `${startFormatted} - ${endFormatted}`;
+        }
+        const eventDate = new Date(event.date);
+        const monthFormatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short' });
+        const dayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' });
+        const monthStr = monthFormatter.format(eventDate).toUpperCase();
+        const dayStr = dayFormatter.format(eventDate);
+        dateDisplay = `${monthStr} ${dayStr}`;
+      }
+
+      const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+      const layoutConfig: FlyerConfig | undefined = rawCfg
+        ? {
+            positions: rawCfg.positions,
+            poppedLogos: rawCfg.poppedLogos,
+            logoSizes: rawCfg.logoSizes,
+            sponsorBoxSize: rawCfg.sponsorBoxSize,
+          }
+        : undefined;
+
+      const canvas = await renderFlyer({
+        city,
+        venueName,
+        streetAddress,
+        dateDisplay,
+        timeDisplay,
+        is12h,
+        sponsors: [],
+        config: layoutConfig,
+      });
+
+      const blob = await new Promise<Blob | null>(resolve =>
+        canvas.toBlob(b => resolve(b), 'image/png')
+      );
+      if (!blob) { setRegeneratingId(null); return; }
+
+      const file = new File([blob], `gpp-flyer-${event.customUrl || event.id}.png`, { type: 'image/png' });
+      const uploadedUrl = await uploadEventImage(file);
+      if (!uploadedUrl) { setRegeneratingId(null); return; }
+
+      await updateParty(event.id, {
+        event_image_url: uploadedUrl,
+        flyer_generated_at: new Date().toISOString(),
+      });
+
+      setEvents(prev => prev.map(e =>
+        e.id === event.id
+          ? { ...e, eventImageUrl: uploadedUrl, flyerGeneratedAt: new Date().toISOString(), flyerStale: false }
+          : e
+      ));
+    } catch (err) {
+      console.error(`Failed to regenerate flyer for ${event.name}:`, err);
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
   if (authLoading || loading) {
@@ -212,7 +318,7 @@ export function GraphicsDashboard() {
     );
   }
 
-  if (error || (!meData?.isUnderboss && !meData?.isAdmin)) {
+  if (error || (!meData?.isUnderboss && !meData?.isAdmin && !meData?.isGraphicsAdmin)) {
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
         <Header />
@@ -311,7 +417,8 @@ export function GraphicsDashboard() {
             {filtered.map(event => (
               <div
                 key={event.id}
-                className="group bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/15 transition-colors"
+                className="group bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/15 transition-colors cursor-pointer"
+                onClick={() => navigate(`/graphics/${event.customUrl || event.inviteCode}/edit`)}
               >
                 {/* Flyer image */}
                 <div className="aspect-square relative overflow-hidden bg-black/40">
@@ -333,17 +440,20 @@ export function GraphicsDashboard() {
                       {t('graphics.newPartners')}
                     </div>
                   )}
+                  {/* Regenerate button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRegenerate(event); }}
+                    disabled={regeneratingId === event.id}
+                    className="absolute top-2 left-2 p-1.5 bg-black/60 rounded-full text-white/70 hover:text-white hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-100"
+                    title="Regenerate flyer"
+                  >
+                    <RefreshCw size={14} className={regeneratingId === event.id ? 'animate-spin' : ''} />
+                  </button>
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <a
-                      href={`/${event.customUrl || event.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                      title="View event"
-                    >
-                      <ExternalLink size={16} className="text-white" />
-                    </a>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                    <div className="p-2 bg-white/20 rounded-full">
+                      <Pencil size={16} className="text-white" />
+                    </div>
                   </div>
                 </div>
 

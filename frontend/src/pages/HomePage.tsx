@@ -191,14 +191,6 @@ export function HomePage() {
           <EventForm />
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-theme-text-muted text-sm">
-            {t('home.alreadyCreated')}{' '}
-            <a href="/parties" className="text-[#ff393a] hover:text-[#ff5a5b] underline">
-              {t('home.viewAllTest')}
-            </a>
-          </p>
-        </div>
       </div>
     </Layout>
   );

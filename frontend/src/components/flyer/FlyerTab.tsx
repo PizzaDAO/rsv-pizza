@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FlyerGenerator } from './FlyerGenerator';
 import { usePizza } from '../../contexts/PizzaContext';
 
-export function FlyerTab() {
+export function FlyerTab({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { t } = useTranslation('host');
   const { party } = usePizza();
 
@@ -26,7 +26,7 @@ export function FlyerTab() {
           {t('flyer.downloadCustomFlyer')}
         </p>
       </div>
-      <FlyerGenerator />
+      <FlyerGenerator sponsorLogoOnly={sponsorLogoOnly} />
     </div>
   );
 }

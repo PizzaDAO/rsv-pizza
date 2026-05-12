@@ -933,71 +933,77 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-1.5">
-              <Users size={14} className="text-theme-text-muted" />
-              <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
-              <span className="text-xs text-theme-text-muted">RSVPs</span>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Users size={14} className="text-theme-text-muted" />
+                <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
+                <span className="text-xs text-theme-text-muted">RSVPs</span>
+              </div>
+              {event.invitedCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg font-bold text-blue-400">{event.invitedCount}</span>
+                  <span className="text-xs text-theme-text-muted">Invited</span>
+                </div>
+              )}
+              {(event.photoCount + gppCount > 0) && (
+                <button
+                  onClick={togglePhotos}
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-theme-stroke hover:border-theme-stroke-hover text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
+                >
+                  <Camera size={14} />
+                  <span className="text-sm font-medium">{event.photoCount + gppCount}</span>
+                  <span className="text-xs">Photos</span>
+                </button>
+              )}
+              {event.expectedGuests != null && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-theme-text-faint">/</span>
+                  <span className="text-lg font-bold text-theme-text">{event.expectedGuests}</span>
+                  <span className="text-xs text-theme-text-muted">expected</span>
+                </div>
+              )}
             </div>
-            {event.invitedCount > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-blue-400">{event.invitedCount}</span>
-                <span className="text-xs text-theme-text-muted">Invited</span>
-              </div>
-            )}
-            {(event.photoCount + gppCount > 0) && (
-              <button
-                onClick={togglePhotos}
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-theme-stroke hover:border-theme-stroke-hover text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
-              >
-                <Camera size={14} />
-                <span className="text-sm font-medium">{event.photoCount + gppCount}</span>
-                <span className="text-xs">Photos</span>
-              </button>
-            )}
-            {event.expectedGuests != null && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-theme-text-faint">/</span>
-                <span className="text-lg font-bold text-theme-text">{event.expectedGuests}</span>
-                <span className="text-xs text-theme-text-muted">expected</span>
-              </div>
-            )}
-            {event.impressions && event.impressions.totalViews > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted">
-                <Eye size={12} />
-                <span>{event.impressions.totalViews.toLocaleString()} views</span>
-                <span className="text-theme-text-muted/50">({event.impressions.uniqueVisitors.toLocaleString()} unique)</span>
-              </div>
-            )}
-            {event.clickStats && event.clickStats.totalClicks > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-theme-text-muted flex-wrap">
-                <MousePointerClick size={12} />
-                <span>{event.clickStats.totalClicks} clicks</span>
-                {event.clickStats.uniqueClickers > 0 && (
-                  <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+            {((event.impressions && event.impressions.totalViews > 0) || (event.clickStats && event.clickStats.totalClicks > 0)) && (
+              <div className="flex items-center gap-3 text-xs text-theme-text-muted">
+                {event.impressions && event.impressions.totalViews > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Eye size={12} />
+                    <span>{event.impressions.totalViews.toLocaleString()} views</span>
+                    <span className="text-theme-text-muted/50">({event.impressions.uniqueVisitors.toLocaleString()} unique)</span>
+                  </div>
                 )}
-                {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
-                  <span className="flex items-center gap-1.5 flex-wrap">
-                    {(() => {
-                      const platformCounts: Record<string, number> = {};
-                      for (const link of event.clickStats.byLink!) {
-                        const p = detectPlatform(link.url);
-                        platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
-                      }
-                      return Object.entries(platformCounts)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([platform, clicks]) => (
-                          <span
-                            key={platform}
-                            className="inline-flex items-center gap-0.5 text-theme-text-muted"
-                            title={`${platform}: ${clicks}`}
-                          >
-                            <PlatformIcon platform={platform} size={11} />
-                            <span className="font-semibold text-[10px]">{clicks}</span>
-                          </span>
-                        ));
-                    })()}
-                  </span>
+                {event.clickStats && event.clickStats.totalClicks > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <MousePointerClick size={12} />
+                    <span>{event.clickStats.totalClicks} clicks</span>
+                    {event.clickStats.uniqueClickers > 0 && (
+                      <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+                    )}
+                    {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        {(() => {
+                          const platformCounts: Record<string, number> = {};
+                          for (const link of event.clickStats.byLink!) {
+                            const p = detectPlatform(link.url);
+                            platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
+                          }
+                          return Object.entries(platformCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([platform, clicks]) => (
+                              <span
+                                key={platform}
+                                className="inline-flex items-center gap-0.5 text-theme-text-muted"
+                                title={`${platform}: ${clicks}`}
+                              >
+                                <PlatformIcon platform={platform} size={11} />
+                                <span className="font-semibold text-[10px]">{clicks}</span>
+                              </span>
+                            ));
+                        })()}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             )}

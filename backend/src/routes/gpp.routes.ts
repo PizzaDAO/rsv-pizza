@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
@@ -600,6 +601,57 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     });
   } catch (error) {
     next(error);
+  }
+});
+
+// GET /api/gpp/pizzerias - All GPP pizzerias (flattened across events)
+router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const where: any = {
+      eventType: 'gpp',
+      selectedPizzerias: { not: Prisma.DbNull },
+      underbossStatus: { notIn: ['rejected', 'hidden'] },
+    };
+
+    const parties = await prisma.party.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        customUrl: true,
+        inviteCode: true,
+        address: true,
+        selectedPizzerias: true,
+      },
+    });
+
+    // Flatten: for each event, for each pizzeria, emit { ...pizzeria, eventCity, eventSlug }
+    const pizzerias: any[] = [];
+    for (const party of parties) {
+      const raw = party.selectedPizzerias;
+      if (!Array.isArray(raw)) continue;
+      // Extract city from party name (GPP events are named like "Global Pizza Party CityName")
+      const eventCity = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || 'Unknown';
+      const eventSlug = party.customUrl || party.inviteCode;
+
+      for (const p of raw as any[]) {
+        // Strip heavy fields, keep only first photo reference name
+        const { photos, orderingOptions, ...light } = p;
+        let photoRef: string | undefined;
+        if (Array.isArray(photos) && photos.length > 0) {
+          // Photos are Google Places API v2 objects with a 'name' field
+          const first = photos[0];
+          photoRef = typeof first === 'string' ? first : first?.name;
+        }
+        pizzerias.push({ ...light, photoRef, eventCity, eventSlug });
+      }
+    }
+
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json(pizzerias);
+  } catch (err) {
+    console.error('Error fetching GPP pizzerias:', err);
+    res.status(500).json({ error: 'Failed to fetch pizzerias' });
   }
 });
 

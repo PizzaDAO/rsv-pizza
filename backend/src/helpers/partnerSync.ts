@@ -43,7 +43,7 @@ function buildPartnerCoHost(sponsorUser: SponsorUserLike): Record<string, any> {
     website: sponsorUser.coHostWebsite || undefined,
     twitter: sponsorUser.coHostTwitter || undefined,
     instagram: sponsorUser.coHostInstagram || undefined,
-    avatar_url: sponsorUser.coHostAvatarUrl || undefined,
+    avatar_url: sponsorUser.coHostAvatarUrl || sponsorUser.coHostLogoUrl || undefined,
     showOnEvent: sponsorUser.coHostShowOnEvent !== false,
     canEdit: !!sponsorUser.coHostCanEdit,
     isPartner: true,
@@ -139,6 +139,7 @@ export async function addPartnerToParty(
           contactEmail: sponsorUser.email,
           status: 'yes',
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+          addedByUnderboss: true,
         },
       });
       sponsorId = created.id;
@@ -300,6 +301,7 @@ export async function syncAutoSponsorsToAllEvents(
           contactEmail: sponsorUser.email,
           status: 'yes',
           notes: `Auto-created from partner tag "${sponsorUser.tag}"`,
+          addedByUnderboss: true,
         },
       });
       sponsorId = created.id;
