@@ -7,16 +7,128 @@ import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchUnderbossMe, fetchUnderbossDashboard } from '../lib/api';
+import { fetchUnderbossMe, fetchUnderbossDashboard, bulkUpdateEventTags } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import {
-  Loader2, Shield, Image, Pencil, Search, AlertTriangle, RefreshCw,
+  Loader2, Shield, Image, Pencil, Search, AlertTriangle, RefreshCw, Plus, X,
 } from 'lucide-react';
 import type { UnderbossEvent } from '../types';
 import { GPP_REGIONS } from '../types';
 import { renderFlyer, uses12Hour, formatFlyerTime, type FlyerConfig } from '../components/flyer/renderFlyer';
 import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
+import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
+
+function colorForTag(tag: string): string {
+  if (tag === 'review') return 'bg-red-500/20 text-red-400 border-red-500/30';
+  if (tag === 'swc') return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+  if (tag === 'global pizza party') return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+  return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+}
+
+const PRESET_TAGS = ['review', 'swc'];
+
+function TagPills({
+  tags,
+  eventId,
+  event,
+  onUpdate,
+}: {
+  tags: string[];
+  eventId: string;
+  event: UnderbossEvent;
+  onUpdate: (tags: string[]) => void;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTag, setNewTag] = useState('');
+
+  async function addTag(tag: string) {
+    const cleaned = tag.trim().toLowerCase();
+    if (!cleaned || tags.includes(cleaned)) return;
+    const newTags = [...tags, cleaned];
+    onUpdate(newTags);
+    setNewTag('');
+    setIsAdding(false);
+    try {
+      await bulkUpdateEventTags([eventId], [cleaned], 'add');
+      triggerFlyerRegenForEvents([event]);
+    } catch {
+      onUpdate(tags);
+    }
+  }
+
+  async function removeTag(tag: string) {
+    const newTags = tags.filter((t) => t !== tag);
+    onUpdate(newTags);
+    try {
+      await bulkUpdateEventTags([eventId], [tag], 'remove');
+      triggerFlyerRegenForEvents([event]);
+    } catch {
+      onUpdate(tags);
+    }
+  }
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1 mt-0.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {tags.map((tag) => (
+        <button
+          key={tag}
+          onClick={() => removeTag(tag)}
+          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors hover:opacity-70 inline-flex items-center gap-0.5 ${colorForTag(tag)}`}
+          title={`Click to remove "${tag}"`}
+        >
+          {tag}
+        </button>
+      ))}
+      {isAdding ? (
+        <div className="flex items-center gap-1">
+          {PRESET_TAGS.filter((t) => !tags.includes(t)).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => addTag(preset)}
+              className="text-[10px] px-1.5 py-0.5 rounded-md border border-dashed border-white/20 text-white/40 hover:text-white/60 transition-colors"
+            >
+              {preset}
+            </button>
+          ))}
+          <input
+            type="text"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addTag(newTag);
+              if (e.key === 'Escape') { setIsAdding(false); setNewTag(''); }
+            }}
+            onBlur={() => {
+              if (newTag.trim()) addTag(newTag);
+              else { setIsAdding(false); setNewTag(''); }
+            }}
+            autoFocus
+            placeholder="tag..."
+            className="w-16 bg-transparent border-b border-white/20 text-[10px] text-white focus:outline-none"
+          />
+          <button
+            onClick={() => { setIsAdding(false); setNewTag(''); }}
+            className="text-white/40 hover:text-white/60"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsAdding(true)}
+          className="text-white/40 hover:text-white/60 transition-colors"
+          title="Add tag"
+        >
+          <Plus size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function GraphicsDashboard() {
   const { t } = useTranslation('admin');
@@ -30,6 +142,7 @@ export function GraphicsDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [staleFilter, setStaleFilter] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string>('all');
 
   // Mass generation state
   const [massGenerating, setMassGenerating] = useState(false);
@@ -61,6 +174,17 @@ export function GraphicsDashboard() {
     loadDashboard();
   }, [user, authLoading, loadDashboard]);
 
+  const availableTags = useMemo(() =>
+    Array.from(new Set(events.flatMap(e => e.eventTags ?? []))).sort(),
+    [events]
+  );
+
+  useEffect(() => {
+    if (tagFilter !== 'all' && !availableTags.includes(tagFilter)) {
+      setTagFilter('all');
+    }
+  }, [availableTags, tagFilter]);
+
   const filtered = useMemo(() => {
     let list = events;
 
@@ -77,6 +201,10 @@ export function GraphicsDashboard() {
       list = list.filter(e => e.region === regionFilter);
     }
 
+    if (tagFilter !== 'all') {
+      list = list.filter(e => e.eventTags?.includes(tagFilter));
+    }
+
     if (staleFilter) {
       list = list.filter(e => e.flyerStale);
     }
@@ -86,7 +214,7 @@ export function GraphicsDashboard() {
       if (!b.date) return -1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [events, searchQuery, regionFilter, staleFilter]);
+  }, [events, searchQuery, regionFilter, tagFilter, staleFilter]);
 
   const missingFlyerCount = useMemo(() => {
     return filtered.filter(e => !e.eventImageUrl).length;
@@ -385,6 +513,19 @@ export function GraphicsDashboard() {
             ))}
           </select>
 
+          {availableTags.length > 0 && (
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className="bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/20"
+            >
+              <option value="all">{t('graphics.tagAll')}</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          )}
+
           <button
             onClick={() => setStaleFilter(prev => !prev)}
             className={`px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -458,7 +599,7 @@ export function GraphicsDashboard() {
                   </div>
                 </div>
 
-                {/* Title */}
+                {/* Title + Tags */}
                 <div className="px-3 py-2">
                   <p className="text-sm text-white font-medium truncate" title={event.name}>
                     {event.name}
@@ -466,6 +607,16 @@ export function GraphicsDashboard() {
                   {event.host.name && (
                     <p className="text-xs text-white/40 truncate">{event.host.name}</p>
                   )}
+                  <TagPills
+                    tags={event.eventTags ?? []}
+                    eventId={event.id}
+                    event={event}
+                    onUpdate={(newTags) =>
+                      setEvents(prev => prev.map(e =>
+                        e.id === event.id ? { ...e, eventTags: newTags } : e
+                      ))
+                    }
+                  />
                 </div>
               </div>
             ))}

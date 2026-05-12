@@ -116,6 +116,7 @@
     "showing": "{{count}}件表示中",
     "searchPlaceholder": "イベント、主催者を検索...",
     "regionAll": "地域：すべて",
+    "tagAll": "タグ：すべて",
     "staleFlyers": "古いフライヤー",
     "generateMissing": "未生成を作成（{{count}}）",
     "generating": "{{current}}/{{total}}を生成中...",

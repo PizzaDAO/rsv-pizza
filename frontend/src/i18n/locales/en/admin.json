@@ -116,6 +116,7 @@
     "showing": "showing {{count}}",
     "searchPlaceholder": "Search events, hosts...",
     "regionAll": "Region: All",
+    "tagAll": "Tag: All",
     "staleFlyers": "Stale flyers",
     "generateMissing": "Generate Missing ({{count}})",
     "generating": "Generating {{current}}/{{total}}...",
