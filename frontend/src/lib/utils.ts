@@ -12,6 +12,22 @@ export function uuid(): string {
 }
 
 /**
+ * Extract a social media handle from a URL or @-prefixed string.
+ * Handles formats like:
+ *   https://twitter.com/handle, https://x.com/handle,
+ *   https://instagram.com/handle, @handle, handle
+ */
+export function stripToHandle(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  // Strip URL — match twitter.com, x.com, instagram.com paths
+  const urlMatch = trimmed.match(/(?:twitter\.com|x\.com|instagram\.com)\/(?:@)?([A-Za-z0-9_.]+)/i);
+  if (urlMatch) return urlMatch[1];
+  // Strip leading @
+  return trimmed.replace(/^@/, '');
+}
+
+/**
  * Normalise a URL by prepending `https://` if no protocol is present.
  * Applied on blur so it doesn't interfere with typing.
  */

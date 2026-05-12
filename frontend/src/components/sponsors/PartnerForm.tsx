@@ -6,7 +6,7 @@ import { CreateSponsorData, PartnerIntakeResponse } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { uploadSponsorLogo } from '../../lib/supabase';
-import { normalizeUrl } from '../../lib/utils';
+import { normalizeUrl, stripToHandle } from '../../lib/utils';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
 
 // X (Twitter) icon component
@@ -474,6 +474,7 @@ export function PartnerForm({
             type="text"
             value={formData.brandTwitter}
             onChange={e => handleChange('brandTwitter', e.target.value)}
+            onBlur={() => handleChange('brandTwitter', stripToHandle(formData.brandTwitter))}
             placeholder={isPartner ? 'Twitter (no @)' : 'Brand X Handle'}
           />
           {(isPartner || isCrm || isIntake) && (
@@ -482,6 +483,7 @@ export function PartnerForm({
               type="text"
               value={formData.brandInstagram}
               onChange={e => handleChange('brandInstagram', e.target.value)}
+              onBlur={() => handleChange('brandInstagram', stripToHandle(formData.brandInstagram))}
               placeholder={isPartner ? 'Instagram (no @)' : 'Brand Instagram Handle'}
             />
           )}
@@ -636,6 +638,7 @@ export function PartnerForm({
               type="text"
               value={formData.contactTwitter}
               onChange={e => handleChange('contactTwitter', e.target.value)}
+              onBlur={() => handleChange('contactTwitter', stripToHandle(formData.contactTwitter))}
               placeholder="Contact X Handle"
               disabled={contactFieldsDisabled}
             />

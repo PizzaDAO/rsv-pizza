@@ -5,7 +5,7 @@ import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { updateParty, addGuestByHost, proxyAvatarToStorage } from '../lib/supabase';
 import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
-import { uuid, normalizeUrl } from '../lib/utils';
+import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 
 interface HostsManagerProps {
@@ -490,6 +490,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                       if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
                     }
                   }}
+                  onBlur={() => setEditHostTwitter(stripToHandle(editHostTwitter))}
                   placeholder="Twitter (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -497,6 +498,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   type="text"
                   value={editHostInstagram}
                   onChange={(e) => setEditHostInstagram(e.target.value)}
+                  onBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
                   placeholder="Instagram (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -591,6 +593,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                       if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
                     }
                   }}
+                  onBlur={() => setNewCoHostTwitter(stripToHandle(newCoHostTwitter))}
                   placeholder="Twitter (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -598,6 +601,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   type="text"
                   value={newCoHostInstagram}
                   onChange={(e) => setNewCoHostInstagram(e.target.value)}
+                  onBlur={() => setNewCoHostInstagram(stripToHandle(newCoHostInstagram))}
                   placeholder="Instagram (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
