@@ -680,6 +680,7 @@ router.get('/funnel-stats', requireAuth, async (req: AuthRequest, res: Response,
     }
 
     const events = await prisma.party.findMany({
+      where: { eventType: 'gpp' },
       select: { id: true, name: true, address: true },
       orderBy: { createdAt: 'desc' },
     });
