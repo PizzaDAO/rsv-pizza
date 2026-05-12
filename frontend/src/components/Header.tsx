@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
             >
               <Globe size={14} />
-              <span className="font-bold text-theme-text">{currentLang.label}</span>
+              <span className="font-bold">{currentLang.label}</span>
               <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {langMenuOpen && (
