@@ -490,6 +490,7 @@ export const EventDetailsTab: React.FC = () => {
         endTime,
         timezone,
       }));
+      if (party?.inviteCode) await loadParty(party.inviteCode);
       if (party) triggerFlyerRegen(party, loadParty);
     }
   };
