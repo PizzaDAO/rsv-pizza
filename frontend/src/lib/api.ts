@@ -3208,15 +3208,24 @@ export interface GPPPizzeriaMapItem {
   rating?: number;
   reviewCount?: number;
   description?: string;
-  photoRef?: string;
+  photoUrl?: string;
   placeId?: string;
   location: { lat: number; lng: number };
   eventCity: string;
   eventSlug: string;
+  eventId: string;
 }
 
 export async function fetchGppPizzerias(): Promise<GPPPizzeriaMapItem[]> {
   return apiRequest<GPPPizzeriaMapItem[]>('/api/gpp/pizzerias', { requireAuth: false });
+}
+
+export async function saveGppPizzeriaPhoto(eventId: string, placeId: string, photoUrl: string): Promise<void> {
+  await apiRequest(`/api/gpp/pizzerias/${eventId}/photo`, {
+    method: 'PATCH',
+    body: { placeId, photoUrl },
+    requireAuth: false,
+  });
 }
 
 // RSVP Funnel Stats (Underboss dashboard)

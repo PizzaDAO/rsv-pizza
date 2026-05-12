@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot, Pencil } from 'lucide-react';
+import { MapPin, Star, Plus, X, Phone, Link as LinkIcon, Loader2, Store, Users, Trophy, Bot, Pencil, Info } from 'lucide-react';
+import { Checkbox } from './Checkbox';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty } from '../lib/supabase';
 import { searchPizzerias, geocodeAddress, calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
@@ -53,6 +54,9 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
   const [showAddPizzeriaModal, setShowAddPizzeriaModal] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
+
+  // Discount info modal
+  const [showDiscountInfoModal, setShowDiscountInfoModal] = useState(false);
 
   // Modal state
   const [selectedPlace, setSelectedPlace] = useState<Partial<Pizzeria> | null>(null);
@@ -215,6 +219,14 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
 
   const savePizzerias = async (pizzeriasToSave: Pizzeria[]) => {
     await saveField('pizzerias', { selected_pizzerias: pizzeriasToSave });
+  };
+
+  const toggleDiscount = async (pizzeriaId: string) => {
+    const updated = selectedPizzerias.map(p =>
+      p.id === pizzeriaId ? { ...p, offersDiscount: !p.offersDiscount } : p
+    );
+    setSelectedPizzerias(updated);
+    await savePizzerias(updated);
   };
 
   // Borda count scoring for pizzeria rankings
@@ -424,6 +436,22 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                         )}
                       </div>
                     )}
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <Checkbox
+                        checked={!!pizzeria.offersDiscount}
+                        onChange={() => toggleDiscount(pizzeria.id)}
+                        label="Offering guests 10% discount"
+                        size={14}
+                        labelClassName="text-xs text-theme-text-muted"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setShowDiscountInfoModal(true); }}
+                        className="text-theme-text-muted hover:text-theme-text-secondary transition-colors p-0.5"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -738,6 +766,49 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 </div>
               </div>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Discount Info Modal */}
+      {showDiscountInfoModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowDiscountInfoModal(false)}>
+          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-theme-text">How to Ask Your Pizzeria for a Discount</h2>
+              <button onClick={() => setShowDiscountInfoModal(false)} className="text-theme-text-muted hover:text-theme-text transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4 text-sm text-theme-text-secondary">
+              <p>
+                If you make an agreement with the pizzeria, guests who checked in can scan their QR code to reveal a 10% discount at the pizzeria after the event.
+              </p>
+              <div>
+                <p className="font-medium text-theme-text mb-2">Here's how to set it up:</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-theme-text-muted">
+                  <li>Talk to the pizzeria owner or manager before the event</li>
+                  <li>Explain that you're serving their pizza at the local Global Pizza Party and would like to send guests their way afterward</li>
+                  <li>Ask if they'd offer a 10% discount to verified attendees. They'll show the discount page on their phone</li>
+                  <li>If they agree, check the "Offering 10% discount" box for that pizzeria so guests know</li>
+                </ol>
+              </div>
+              <div>
+                <p className="font-medium text-theme-text mb-2">Talking points:</p>
+                <ul className="list-disc list-inside space-y-1.5 text-theme-text-muted">
+                  <li>This is one of more than 500 parties worldwide, you can see it at <a href="https://globalpizza.party" target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:underline">globalpizza.party</a></li>
+                  <li>It's a one-time use discount per guest, shown on their phone</li>
+                  <li>It's a great way to turn party guests into customers</li>
+                </ul>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDiscountInfoModal(false)}
+              className="w-full mt-5 bg-theme-surface-hover hover:bg-theme-surface text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              Got it
+            </button>
           </div>
         </div>,
         document.body

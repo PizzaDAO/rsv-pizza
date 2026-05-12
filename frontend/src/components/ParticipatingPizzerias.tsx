@@ -57,6 +57,11 @@ export function ParticipatingPizzerias({
               {pizzeria.description && (
                 <p className="text-theme-text-muted text-xs mt-0.5">{pizzeria.description}</p>
               )}
+              {pizzeria.offersDiscount && (
+                <span className="inline-block text-xs text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded mt-1">
+                  10% discount for attendees
+                </span>
+              )}
             </div>
           </div>
         ))}

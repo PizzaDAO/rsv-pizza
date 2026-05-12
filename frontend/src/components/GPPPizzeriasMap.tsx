@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
-import { GPPPizzeriaMapItem } from '../lib/api';
+import { GPPPizzeriaMapItem, saveGppPizzeriaPhoto } from '../lib/api';
 
 interface GPPPizzeriasMapProps {
   pizzerias: GPPPizzeriaMapItem[];
@@ -104,6 +104,60 @@ export default function GPPPizzeriasMap({
       }
       const infoWindow = infoWindowRef.current;
 
+      // PlacesService for fetching photos on demand
+      const placesService = new google.maps.places.PlacesService(map);
+
+      // In-memory cache of photo URLs fetched this session
+      const photoCache: Record<string, string> = {};
+
+      function buildInfoContent(pizzeria: GPPPizzeriaMapItem, photoUrl?: string) {
+        let photoHtml = '';
+        if (photoUrl) {
+          photoHtml = `<img src="${photoUrl}" alt="${pizzeria.name}" referrerpolicy="no-referrer" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
+        }
+
+        let ratingHtml = '';
+        if (pizzeria.rating) {
+          const fullStars = Math.floor(pizzeria.rating);
+          const halfStar = pizzeria.rating - fullStars >= 0.5;
+          let stars = '';
+          for (let i = 0; i < fullStars; i++) stars += '\u2605';
+          if (halfStar) stars += '\u00BD';
+          const reviewText = pizzeria.reviewCount
+            ? ` (${pizzeria.reviewCount})`
+            : '';
+          ratingHtml = `<div style="color:#f59e0b;font-size:14px;margin:2px 0">${stars} <span style="color:#666;font-size:12px">${pizzeria.rating}${reviewText}</span></div>`;
+        }
+
+        let descHtml = '';
+        if (pizzeria.description) {
+          const truncated =
+            pizzeria.description.length > 120
+              ? pizzeria.description.slice(0, 120) + '...'
+              : pizzeria.description;
+          descHtml = `<p style="color:#555;font-size:12px;margin:4px 0;line-height:1.4">${truncated}</p>`;
+        }
+
+        let linkHtml = '';
+        if (pizzeria.url) {
+          linkHtml = `<a href="${pizzeria.url}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">Visit Website &rarr;</a>`;
+        }
+
+        return `
+          <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
+            ${photoHtml}
+            <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${pizzeria.name}</h3>
+            ${ratingHtml}
+            <p style="color:#888;font-size:12px;margin:2px 0">${pizzeria.address || ''}</p>
+            ${descHtml}
+            <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+              ${linkHtml}
+              <span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${pizzeria.eventCity}</span>
+            </div>
+          </div>
+        `;
+      }
+
       // Build markers
       const markers: google.maps.Marker[] = [];
 
@@ -130,60 +184,32 @@ export default function GPPPizzeriasMap({
         });
 
         marker.addListener('click', () => {
-          // Build star rating display
-          let ratingHtml = '';
-          if (pizzeria.rating) {
-            const fullStars = Math.floor(pizzeria.rating);
-            const halfStar = pizzeria.rating - fullStars >= 0.5;
-            let stars = '';
-            for (let i = 0; i < fullStars; i++) stars += '\u2605';
-            if (halfStar) stars += '\u00BD';
-            const reviewText = pizzeria.reviewCount
-              ? ` (${pizzeria.reviewCount})`
-              : '';
-            ratingHtml = `<div style="color:#f59e0b;font-size:14px;margin:2px 0">${stars} <span style="color:#666;font-size:12px">${pizzeria.rating}${reviewText}</span></div>`;
-          }
-
-          // Truncate description
-          let descHtml = '';
-          if (pizzeria.description) {
-            const truncated =
-              pizzeria.description.length > 120
-                ? pizzeria.description.slice(0, 120) + '...'
-                : pizzeria.description;
-            descHtml = `<p style="color:#555;font-size:12px;margin:4px 0;line-height:1.4">${truncated}</p>`;
-          }
-
-          // Website link
-          let linkHtml = '';
-          if (pizzeria.url) {
-            linkHtml = `<a href="${pizzeria.url}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">Visit Website &rarr;</a>`;
-          }
-
-          // Photo from Google Places API
-          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-          let photoHtml = '';
-          if (pizzeria.photoRef && apiKey) {
-            const photoUrl = `https://places.googleapis.com/v1/${pizzeria.photoRef}/media?maxWidthPx=400&key=${apiKey}`;
-            photoHtml = `<img src="${photoUrl}" alt="${pizzeria.name}" referrerpolicy="no-referrer" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
-          }
-
-          const content = `
-            <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
-              ${photoHtml}
-              <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${pizzeria.name}</h3>
-              ${ratingHtml}
-              <p style="color:#888;font-size:12px;margin:2px 0">${pizzeria.address || ''}</p>
-              ${descHtml}
-              <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
-                ${linkHtml}
-                <span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${pizzeria.eventCity}</span>
-              </div>
-            </div>
-          `;
-
-          infoWindow.setContent(content);
+          // If we already have a cached photo URL (from DB or session), show immediately
+          const cachedUrl = pizzeria.photoUrl || photoCache[pizzeria.placeId || ''];
+          infoWindow.setContent(buildInfoContent(pizzeria, cachedUrl));
           infoWindow.open(map, marker);
+
+          // If no photo yet and we have a placeId, fetch from Places API
+          if (!cachedUrl && pizzeria.placeId) {
+            placesService.getDetails(
+              { placeId: pizzeria.placeId, fields: ['photos'] },
+              (place, status) => {
+                if (
+                  status === google.maps.places.PlacesServiceStatus.OK &&
+                  place?.photos &&
+                  place.photos.length > 0
+                ) {
+                  const photoUrl = place.photos[0].getUrl({ maxWidth: 400 });
+                  // Cache in memory for this session
+                  photoCache[pizzeria.placeId!] = photoUrl;
+                  // Update InfoWindow with photo
+                  infoWindow.setContent(buildInfoContent(pizzeria, photoUrl));
+                  // Fire-and-forget save to backend
+                  saveGppPizzeriaPhoto(pizzeria.eventId, pizzeria.placeId!, photoUrl).catch(() => {});
+                }
+              }
+            );
+          }
         });
 
         markers.push(marker);

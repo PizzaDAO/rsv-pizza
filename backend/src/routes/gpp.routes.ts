@@ -700,15 +700,9 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventSlug = party.customUrl || party.inviteCode;
 
       for (const p of raw as any[]) {
-        // Strip heavy fields, keep only first photo reference name
+        // Strip heavy fields, keep photoUrl if previously cached
         const { photos, orderingOptions, ...light } = p;
-        let photoRef: string | undefined;
-        if (Array.isArray(photos) && photos.length > 0) {
-          // Photos are Google Places API v2 objects with a 'name' field
-          const first = photos[0];
-          photoRef = typeof first === 'string' ? first : first?.name;
-        }
-        pizzerias.push({ ...light, photoRef, eventCity, eventSlug });
+        pizzerias.push({ ...light, eventId: party.id, eventCity, eventSlug });
       }
     }
 
@@ -717,6 +711,56 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
   } catch (err) {
     console.error('Error fetching GPP pizzerias:', err);
     res.status(500).json({ error: 'Failed to fetch pizzerias' });
+  }
+});
+
+// PATCH /api/gpp/pizzerias/:partyId/photo - Cache a pizzeria photo URL
+router.patch('/pizzerias/:partyId/photo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { placeId, photoUrl } = req.body;
+
+    if (!placeId || !photoUrl) {
+      return res.status(400).json({ error: 'placeId and photoUrl required' });
+    }
+
+    // Only accept Google Maps photo URLs
+    if (!photoUrl.startsWith('https://lh3.googleusercontent.com/') && !photoUrl.startsWith('https://maps.googleapis.com/')) {
+      return res.status(400).json({ error: 'Invalid photo URL' });
+    }
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { selectedPizzerias: true },
+    });
+
+    if (!party || !Array.isArray(party.selectedPizzerias)) {
+      return res.status(404).json({ error: 'Party not found' });
+    }
+
+    const pizzerias = party.selectedPizzerias as any[];
+    let updated = false;
+    for (let i = 0; i < pizzerias.length; i++) {
+      if (pizzerias[i].placeId === placeId && !pizzerias[i].photoUrl) {
+        pizzerias[i].photoUrl = photoUrl;
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) {
+      return res.json({ ok: true, cached: false });
+    }
+
+    await prisma.party.update({
+      where: { id: partyId },
+      data: { selectedPizzerias: pizzerias },
+    });
+
+    res.json({ ok: true, cached: true });
+  } catch (err) {
+    console.error('Error caching pizzeria photo:', err);
+    res.status(500).json({ error: 'Failed to cache photo' });
   }
 });
 
