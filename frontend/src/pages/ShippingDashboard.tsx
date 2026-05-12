@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check, Printer } from 'lucide-react';
 import { Header } from '../components/Header';
@@ -20,6 +21,7 @@ import { GPP_REGIONS } from '../types';
 import type { ShippingKit, ShippingKitStats, ShippingMeResponse } from '../types';
 
 export function ShippingDashboard() {
+  const { t } = useTranslation('admin');
   const { user, loading: authLoading } = useAuth();
   const themeClass = 'gpp-theme';
   const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -73,10 +75,10 @@ export function ShippingDashboard() {
   // Region label for header
   const regionLabel = useMemo(() => {
     if (!selectedRegion || selectedRegion === '') {
-      return 'All Regions';
+      return t('shipping.allRegions');
     }
     return GPP_REGIONS.find((r) => r.id === selectedRegion)?.label || selectedRegion;
-  }, [selectedRegion]);
+  }, [selectedRegion, t]);
 
   // Load kits and stats
   const loadData = useCallback(async () => {
@@ -276,16 +278,16 @@ export function ShippingDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Shipping Dashboard</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('shipping.title')}</h1>
           <p className="text-theme-text-muted mb-6">
-            Please log in to access the shipping dashboard.
+            {t('shipping.loginPrompt')}
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
           >
             <LogIn size={18} />
-            Log In
+            {t('shipping.logIn')}
           </button>
         </div>
         <Footer />
@@ -301,7 +303,7 @@ export function ShippingDashboard() {
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-theme-text-muted mb-4" />
-          <p className="text-theme-text-muted text-sm">Loading shipping dashboard...</p>
+          <p className="text-theme-text-muted text-sm">{t('shipping.loading')}</p>
         </div>
         <Footer />
       </div>
@@ -315,7 +317,7 @@ export function ShippingDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('shipping.accessDenied')}</h1>
           <p className="text-theme-text-muted">{error}</p>
         </div>
         <Footer />
@@ -370,7 +372,7 @@ export function ShippingDashboard() {
                             }`}>
                               {selectedRegion === '' && <Check size={12} className="text-white" />}
                             </div>
-                            All Regions
+                            {t('shipping.allRegions')}
                           </button>
                           <div className="border-b border-theme-stroke my-1" />
                           {filteredGppRegions.map((r) => (
@@ -397,7 +399,7 @@ export function ShippingDashboard() {
                   <h1 className="text-2xl font-bold text-theme-text">{regionLabel}</h1>
                 )}
                 <p className="text-sm text-theme-text-muted">
-                  Global Pizza Party &middot; Shipping Dashboard
+                  {t('shipping.subtitle')}
                 </p>
               </div>
             </div>
@@ -405,8 +407,8 @@ export function ShippingDashboard() {
               <Shield size={14} />
               <span>
                 {meData?.role === 'admin'
-                  ? `Signed in as Admin (${meData.email})`
-                  : `Signed in as ${meData?.name || meData?.email}`}
+                  ? t('shipping.signedInAdmin', { email: meData.email })
+                  : t('shipping.signedInAs', { name: meData?.name || meData?.email })}
               </span>
             </div>
           </div>

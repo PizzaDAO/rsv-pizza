@@ -1,0 +1,30 @@
+{
+  "header": {
+    "logIn": "ログイン / 新規登録"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "fr": "FR",
+    "pt": "PT",
+    "zh": "中文",
+    "ja": "JA"
+  },
+  "buttons": {
+    "close": "閉じる",
+    "back": "戻る",
+    "next": "次へ",
+    "continue": "続行",
+    "submit": "送信",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "clear": "クリア",
+    "connect": "接続"
+  },
+  "errors": {
+    "partyNotFound": "パーティーが見つかりません",
+    "partyNotFoundDesc": "パーティーが見つかりません。招待リンクが無効か期限切れの可能性があります。",
+    "incorrectPassword": "パスワードが正しくありません。もう一度お試しください。",
+    "invalidWallet": "有効なアドレス（0x...）またはENS名（.eth）を入力してください"
+  }
+}

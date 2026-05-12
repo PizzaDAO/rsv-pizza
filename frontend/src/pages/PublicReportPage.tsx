@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, FileText, Lock } from 'lucide-react';
 import { EventReport } from '../types';
@@ -8,6 +9,7 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 
 export function PublicReportPage() {
+  const { t } = useTranslation('event');
   const { slug } = useParams<{ slug: string }>();
   const [report, setReport] = useState<EventReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,8 +98,8 @@ export function PublicReportPage() {
             {error === 'Report not found' ? (
               <>
                 <FileText className="w-16 h-16 text-theme-text-faint mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-theme-text mb-2">Report Not Found</h2>
-                <p className="text-theme-text-secondary">This report may have been unpublished or the link is invalid.</p>
+                <h2 className="text-xl font-semibold text-theme-text mb-2">{t('report.notFound')}</h2>
+                <p className="text-theme-text-secondary">{t('report.notFoundDesc')}</p>
               </>
             ) : (
               <div className="flex items-center justify-center gap-3 text-red-400">
@@ -117,16 +119,16 @@ export function PublicReportPage() {
         <div className="max-w-4xl mx-auto py-12 px-4">
           <div className="card p-8 max-w-md mx-auto text-center">
             <Lock className="w-12 h-12 text-theme-text-faint mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-theme-text mb-2">Password Protected</h2>
+            <h2 className="text-xl font-semibold text-theme-text mb-2">{t('report.passwordProtected')}</h2>
             {eventName && (
               <p className="text-theme-text-secondary mb-4">{eventName}</p>
             )}
-            <p className="text-theme-text-muted text-sm mb-6">Enter the password to view this report.</p>
+            <p className="text-theme-text-muted text-sm mb-6">{t('report.enterPassword')}</p>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <IconInput
                 icon={Lock}
                 type="password"
-                placeholder="Enter password"
+                placeholder={t('report.enterPasswordPlaceholder')}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -134,7 +136,7 @@ export function PublicReportPage() {
                 }}
               />
               {passwordError && (
-                <p className="text-red-400 text-sm">Incorrect password</p>
+                <p className="text-red-400 text-sm">{t('report.incorrectPassword')}</p>
               )}
               <button
                 type="submit"
@@ -144,7 +146,7 @@ export function PublicReportPage() {
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                 ) : (
-                  'View Report'
+                  t('report.viewReport')
                 )}
               </button>
             </form>

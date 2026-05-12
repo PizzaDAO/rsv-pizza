@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink, X, MousePointerClick, FileText, Download, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EventReport, PageViewStats, NotableAttendee, Photo } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
@@ -12,6 +13,7 @@ interface ReportPreviewProps {
 }
 
 export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewProps) {
+  const { t } = useTranslation('host');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const config = report.reportStatsConfig || {};
   const socialPostViews = report.socialPosts.reduce((sum, p) => sum + (p.views || 0), 0);
@@ -31,17 +33,17 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
   const statsDefs: { key: string; label: string; autoValue: number | null | undefined; icon: React.ElementType; color: string; url?: string; onAction?: () => void; actionIcon?: React.ElementType }[] = [
     ...(pageViewStats ? [
-      { key: 'pageViews', label: 'Page Views', autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
-      { key: 'uniqueVisitors', label: 'Unique Visitors', autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
+      { key: 'pageViews', label: t('report.pageViews'), autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
+      { key: 'uniqueVisitors', label: t('report.uniqueVisitors'), autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
     ] : []),
-    { key: 'socialPostViews', label: 'Social Post Views', autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
-    { key: 'socialPosts', label: 'Social Posts', autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
-    { key: 'totalRsvps', label: 'Total RSVPs', autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
-    { key: 'attendees', label: 'Attendees', autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
-    { key: 'newsletterSignups', label: 'Newsletter Sign-ups', autoValue: report.stats.mailingListSignups, icon: Mail, color: 'text-orange-400' },
-    { key: 'walletAddresses', label: 'Wallet Addresses', autoValue: report.stats.walletAddresses, icon: Wallet, color: 'text-cyan-400', onAction: downloadWallets, actionIcon: Download },
-    { key: 'poapMints', label: 'POAP Mints', autoValue: report.poapMints, icon: Award, color: 'text-yellow-400', url: report.poapEventId ? `https://poap.gallery/event/${report.poapEventId}` : undefined },
-    { key: 'poapMoments', label: 'POAP Moments', autoValue: report.poapMoments, icon: Video, color: 'text-yellow-400' },
+    { key: 'socialPostViews', label: t('report.socialPostViews'), autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
+    { key: 'socialPosts', label: t('report.socialPosts'), autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
+    { key: 'totalRsvps', label: t('report.totalRsvps'), autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
+    { key: 'attendees', label: t('report.attendees'), autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
+    { key: 'newsletterSignups', label: t('report.newsletterSignups'), autoValue: report.stats.mailingListSignups, icon: Mail, color: 'text-orange-400' },
+    { key: 'walletAddresses', label: t('report.walletAddresses'), autoValue: report.stats.walletAddresses, icon: Wallet, color: 'text-cyan-400', onAction: downloadWallets, actionIcon: Download },
+    { key: 'poapMints', label: t('report.poapMints'), autoValue: report.poapMints, icon: Award, color: 'text-yellow-400', url: report.poapEventId ? `https://poap.gallery/event/${report.poapEventId}` : undefined },
+    { key: 'poapMoments', label: t('report.poapMoments'), autoValue: report.poapMoments, icon: Video, color: 'text-yellow-400' },
   ];
 
   const visibleStats = statsDefs
@@ -104,7 +106,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
             {report.flyerArtist && (
               <p className="text-theme-text-muted text-xs mt-2">
-                Flyer by{' '}
+                {t('report.flyerBy')}{' '}
                 {report.flyerArtistUrl ? (
                   <a href={report.flyerArtistUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-secondary hover:text-theme-text underline">
                     {report.flyerArtist}
@@ -117,7 +119,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
 
             {(report.host?.name || (report.coHosts && report.coHosts.length > 0)) && (
               <p className="text-theme-text-muted text-xs mt-1">
-                Hosted by{' '}
+                {t('report.hostedBy')}{' '}
                 {[
                   ...(report.host?.name ? [{ name: report.host.name }] : []),
                   ...(report.coHosts || []).filter(c => c.showOnEvent !== false),
@@ -146,7 +148,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {/* Recap */}
       {report.reportRecap && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-3">Event Recap</h2>
+          <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.eventRecap')}</h2>
           <p className="text-theme-text text-sm leading-relaxed whitespace-pre-wrap">{report.reportRecap}</p>
         </div>
       )}
@@ -154,7 +156,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {/* Media */}
       {(report.reportPhotosUrl || report.featuredPhotos.length > 0) && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-4">Media</h2>
+          <h2 className="text-lg font-semibold text-theme-text mb-4">{t('report.media')}</h2>
           {report.featuredPhotos.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
               {report.featuredPhotos.map((photo, i) => (
@@ -180,7 +182,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
               className="inline-flex items-center gap-2 px-4 py-2 bg-theme-surface-hover rounded-lg hover:bg-theme-surface-hover transition-colors text-theme-text text-sm"
             >
               <Eye size={16} />
-              Raw Photos / Video
+              {t('report.rawPhotosVideo')}
               <ExternalLink size={14} className="text-theme-text-muted" />
             </a>
           )}
@@ -200,7 +202,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {/* Stats */}
       {hasKPIs && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-4">Stats</h2>
+          <h2 className="text-lg font-semibold text-theme-text mb-4">{t('report.stats')}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {visibleStats.map((stat) => (
               <KPICard
@@ -221,7 +223,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
       {/* Industry RSVPs */}
       {report.notableAttendees.length > 0 && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-3">Industry RSVPs</h2>
+          <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
           <div className="flex flex-wrap gap-2">
             {groupAttendeesByOrg(report.notableAttendees).map((group) => (
               <ReportOrgCard key={group.domain || '_independent'} group={group} />
@@ -284,7 +286,7 @@ function KPICard({ label, value, icon: Icon, color, url, onAction, actionIcon: A
       </div>
       {url && (
         <span className="text-xs text-theme-text-muted hover:text-theme-text-secondary underline mt-1 block truncate">
-          View post
+          {t('report.viewPost')}
         </span>
       )}
     </div>

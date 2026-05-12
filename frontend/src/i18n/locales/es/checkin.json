@@ -1,0 +1,26 @@
+{
+  "title": "Check-In de Invitado",
+  "loading": "Registrando invitado...",
+  "success": {
+    "title": "¡Registrado!",
+    "backToDashboard": "Volver al Panel del Evento"
+  },
+  "alreadyCheckedIn": {
+    "title": "Ya Registrado",
+    "checkedInAt": "Registrado a las {{time}}"
+  },
+  "unauthorized": {
+    "title": "No Autorizado",
+    "message": "No tienes autorización para registrar invitados en este evento. Solo los anfitriones y co-anfitriones pueden hacerlo.",
+    "goHome": "Ir al Inicio"
+  },
+  "notFound": {
+    "title": "No Encontrado",
+    "goHome": "Ir al Inicio"
+  },
+  "error": {
+    "title": "Error en el Check-in",
+    "tryAgain": "Intentar de Nuevo",
+    "goHome": "Ir al Inicio"
+  }
+}

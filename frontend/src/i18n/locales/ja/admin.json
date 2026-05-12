@@ -1,0 +1,146 @@
+{
+  "title": "管理パネル",
+  "subtitle": "管理者とアンダーボスを管理",
+  "accessDenied": "アクセス拒否",
+  "accessDeniedDesc": "管理者権限がありません。管理者アカウントでログインしてください。",
+  "admins": {
+    "title": "管理者",
+    "emailPlaceholder": "メールアドレス",
+    "namePlaceholder": "名前（任意）",
+    "addAdmin": "管理者を追加",
+    "noAdmins": "管理者が見つかりません",
+    "superAdmin": "スーパー管理者",
+    "admin": "管理者",
+    "removeAdmin": "管理者を削除",
+    "tableHeaders": {
+      "email": "メール",
+      "name": "名前",
+      "role": "役割",
+      "added": "追加日"
+    }
+  },
+  "underboss": {
+    "title": "アンダーボス",
+    "namePlaceholder": "名前",
+    "emailPlaceholder": "メール",
+    "regions": "地域",
+    "addUnderboss": "アンダーボスを追加",
+    "noUnderbosses": "アンダーボスはまだいません",
+    "active": "アクティブ",
+    "inactive": "非アクティブ",
+    "deactivate": "無効化",
+    "tableHeaders": {
+      "name": "名前",
+      "email": "メール",
+      "regions": "地域",
+      "status": "ステータス",
+      "actions": "操作"
+    }
+  },
+  "partners": {
+    "title": "パートナー",
+    "emailPlaceholder": "メールアドレス",
+    "tagPlaceholder": "パートナータグ（例：swc）",
+    "namePlaceholder": "名前（任意）",
+    "addPartner": "パートナーを追加",
+    "noPartners": "パートナーはまだいません",
+    "active": "アクティブ",
+    "inactive": "非アクティブ",
+    "deactivatePartner": "パートナーを無効化",
+    "tableHeaders": {
+      "email": "メール",
+      "name": "名前",
+      "tag": "タグ",
+      "status": "ステータス",
+      "added": "追加日"
+    }
+  },
+  "checklist": {
+    "title": "イベント準備チェックリスト",
+    "auto": "（自動）",
+    "noItems": "チェックリスト項目が見つかりません。項目はGPP主催者が最初にチェックリストを表示した時に作成されます。",
+    "saving": "保存中...",
+    "saveChecklistDates": "チェックリストの日付を保存",
+    "newItemPlaceholder": "新しいチェックリスト項目...",
+    "adding": "追加中...",
+    "addItem": "項目を追加"
+  },
+  "gppDescription": {
+    "title": "GPPデフォルト説明文",
+    "statsText": "{{totalEvents}}件中{{defaultCount}}件のイベントがデフォルトを使用",
+    "placeholder": "新しいGPPイベントのデフォルト説明文...",
+    "saving": "保存中...",
+    "saveAndApply": "保存してデフォルトイベントに適用",
+    "customDescriptions": "{{count}}件のイベントがカスタム説明文を使用",
+    "customDescriptions_plural": "{{count}}件のイベントがカスタム説明文を使用"
+  },
+  "nft": {
+    "title": "GPP NFT設定",
+    "enableNft": "すべてのGPPイベントでNFTミントを有効にする",
+    "saving": "保存中...",
+    "saveSettings": "GPP NFT設定を保存"
+  },
+  "underbossDashboard": {
+    "title": "アンダーボスダッシュボード",
+    "loginPrompt": "アンダーボスダッシュボードにアクセスするにはログインしてください。",
+    "logIn": "ログイン",
+    "loadingDashboard": "ダッシュボードを読み込み中...",
+    "error": "エラー",
+    "notAuthorized": "アンダーボスダッシュボードにアクセスする権限がありません。",
+    "gppSubtitle": "グローバルピザパーティー",
+    "underbossSubtitle": "アンダーボスダッシュボード",
+    "signedInAdmin": "管理者としてログイン中（{{email}}）",
+    "signedInAs": "{{name}}としてログイン中",
+    "addUnderboss": "アンダーボスを追加",
+    "noRegions": "地域なし",
+    "allRegions": "すべての地域",
+    "regionsCount": "{{count}}地域",
+    "selectAll": "すべての地域",
+    "underbossCreated": "アンダーボスを作成しました！",
+    "creating": "作成中...",
+    "createUnderboss": "アンダーボスを作成",
+    "tabs": {
+      "events": "イベント",
+      "cities": "都市",
+      "partners": "パートナー"
+    }
+  },
+  "graphics": {
+    "title": "グラフィックスダッシュボード",
+    "loginPrompt": "イベントフライヤーを確認するにはログインしてください。",
+    "logIn": "ログイン",
+    "error": "エラー",
+    "accessDenied": "アクセス拒否",
+    "accessDeniedDesc": "このページを表示するにはアンダーボスまたは管理者権限が必要です。",
+    "events": "{{count}}件のイベント",
+    "showing": "{{count}}件表示中",
+    "searchPlaceholder": "イベント、主催者を検索...",
+    "regionAll": "地域：すべて",
+    "staleFlyers": "古いフライヤー",
+    "generateMissing": "未生成を作成（{{count}}）",
+    "generating": "{{current}}/{{total}}を生成中...",
+    "noEventsMatch": "フィルターに一致するイベントはありません。",
+    "newPartners": "新しいパートナー",
+    "viewEvent": "イベントを表示"
+  },
+  "postComposer": {
+    "title": "投稿コンポーザー",
+    "accessDenied": "アクセス拒否",
+    "accessDeniedDesc": "管理者権限がありません。管理者アカウントでログインしてください。",
+    "searchEvents": "イベントを検索...",
+    "copyToClipboard": "クリップボードにコピー",
+    "copied": "コピーしました！"
+  },
+  "shipping": {
+    "title": "配送ダッシュボード",
+    "loginPrompt": "配送ダッシュボードにアクセスするにはログインしてください。",
+    "logIn": "ログイン",
+    "loading": "配送ダッシュボードを読み込み中...",
+    "accessDenied": "アクセス拒否",
+    "allRegions": "すべての地域",
+    "subtitle": "グローバルピザパーティー · 配送ダッシュボード",
+    "signedInAdmin": "管理者としてログイン中（{{email}}）",
+    "signedInAs": "{{name}}としてログイン中",
+    "kitRequests": "キットリクエスト（{{count}}）"
+  }
+}

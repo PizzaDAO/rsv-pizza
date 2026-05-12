@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Users, Mail, Wallet, Award, Video, MousePointerClick, FileText } from 'lucide-react';
 import { EventReport, PageViewStats } from '../../types';
 
@@ -22,21 +23,22 @@ interface StatItem {
 }
 
 export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount }: ReportKPIsProps) {
+  const { t } = useTranslation('host');
   const config: StatsConfig = report.reportStatsConfig || {};
 
   const allStats: StatItem[] = [
     ...(pageViewStats ? [
-      { key: 'pageViews', label: 'Page Views', autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
-      { key: 'uniqueVisitors', label: 'Unique Visitors', autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
+      { key: 'pageViews', label: t('report.pageViews'), autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
+      { key: 'uniqueVisitors', label: t('report.uniqueVisitors'), autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
     ] : []),
-    { key: 'socialPostViews', label: 'Social Post Views', autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
-    { key: 'socialPosts', label: 'Social Posts', autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
-    { key: 'totalRsvps', label: 'Total RSVPs', autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
-    { key: 'attendees', label: 'Attendees', autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
-    { key: 'newsletterSignups', label: 'Newsletter Sign-ups', autoValue: report.stats.mailingListSignups, icon: Mail, color: 'text-orange-400' },
-    { key: 'walletAddresses', label: 'Wallet Addresses', autoValue: report.stats.walletAddresses, icon: Wallet, color: 'text-cyan-400' },
-    { key: 'poapMints', label: 'POAP Mints', autoValue: report.poapMints, icon: Award, color: 'text-yellow-400' },
-    { key: 'poapMoments', label: 'POAP Moments', autoValue: report.poapMoments, icon: Video, color: 'text-yellow-400' },
+    { key: 'socialPostViews', label: t('report.socialPostViews'), autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
+    { key: 'socialPosts', label: t('report.socialPosts'), autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
+    { key: 'totalRsvps', label: t('report.totalRsvps'), autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
+    { key: 'attendees', label: t('report.attendees'), autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
+    { key: 'newsletterSignups', label: t('report.newsletterSignups'), autoValue: report.stats.mailingListSignups, icon: Mail, color: 'text-orange-400' },
+    { key: 'walletAddresses', label: t('report.walletAddresses'), autoValue: report.stats.walletAddresses, icon: Wallet, color: 'text-cyan-400' },
+    { key: 'poapMints', label: t('report.poapMints'), autoValue: report.poapMints, icon: Award, color: 'text-yellow-400' },
+    { key: 'poapMoments', label: t('report.poapMoments'), autoValue: report.poapMoments, icon: Video, color: 'text-yellow-400' },
   ];
 
   function getDisplayValue(stat: StatItem): number | null {
@@ -67,7 +69,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-theme-text">Stats</h3>
+        <h3 className="text-lg font-semibold text-theme-text">{t('report.stats')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visibleStats.map((stat) => {
             const value = getDisplayValue(stat);
@@ -117,7 +119,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
                 <button
                   onClick={() => updateConfig(stat.key, { hidden: !hidden })}
                   className="text-theme-text-faint hover:text-theme-text-secondary transition-colors flex-shrink-0 ml-1"
-                  title={hidden ? 'Show in report' : 'Hide from report'}
+                  title={hidden ? t('report.showInReport') : t('report.hideFromReport')}
                 >
                   {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -141,7 +143,7 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
                   onClick={() => updateConfig(stat.key, { override: null })}
                   className="text-[10px] text-theme-text-faint hover:text-theme-text-muted mt-1"
                 >
-                  reset to {stat.autoValue?.toLocaleString() ?? '0'}
+                  {t('report.resetTo', { value: stat.autoValue?.toLocaleString() ?? '0' })}
                 </button>
               )}
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, ExternalLink, Loader2, Eye, Link, Type } from 'lucide-react';
 import { SocialPost } from '../../types';
 import { IconInput } from '../IconInput';
@@ -109,6 +110,7 @@ function LinkPreview({ url, platform }: { url: string; platform: string }) {
 }
 
 export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: SocialPostsListProps) {
+  const { t } = useTranslation('host');
   const [isAdding, setIsAdding] = useState(false);
   const [newPlatform, setNewPlatform] = useState<string>('twitter');
   const [newUrl, setNewUrl] = useState('');
@@ -175,11 +177,11 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-theme-text">Social Posts</h3>
+          <h3 className="text-lg font-semibold text-theme-text">{t('report.socialPostsTitle')}</h3>
           {totalViews > 0 && (
             <div className="flex items-center gap-1.5 text-theme-text-secondary text-sm">
               <Eye size={14} />
-              <span>{totalViews.toLocaleString()} total views</span>
+              <span>{totalViews.toLocaleString()} {t('report.totalViewsLabel')}</span>
             </div>
           )}
         </div>
@@ -237,10 +239,10 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-theme-text">Social Posts</h3>
+          <h3 className="text-lg font-semibold text-theme-text">{t('report.socialPostsTitle')}</h3>
           {totalViews > 0 && (
             <p className="text-xs text-theme-text-muted mt-0.5">
-              {totalViews.toLocaleString()} total views across {posts.length} post{posts.length !== 1 ? 's' : ''}
+              {t('report.totalViewsAcross', { views: totalViews.toLocaleString(), count: posts.length })}
             </p>
           )}
         </div>
@@ -250,7 +252,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
             className="flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <Plus size={16} />
-            Add Post
+            {t('report.addPost')}
           </button>
         )}
       </div>
@@ -281,21 +283,21 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               setNewUrl(e.target.value);
               detectPlatform(e.target.value);
             }}
-            placeholder="Post URL"
+            placeholder={t('report.postUrl')}
           />
           <IconInput
             icon={Type}
             type="text"
             value={newTitle}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTitle(e.target.value)}
-            placeholder="Title (what the post is about)"
+            placeholder={t('report.titlePlaceholder')}
           />
           <IconInput
             icon={Eye}
             type="number"
             value={newViews}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewViews(e.target.value)}
-            placeholder="Views (optional)"
+            placeholder={t('report.viewsOptional')}
           />
           <div className="flex gap-2">
             <button
@@ -304,7 +306,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Add
+              {t('report.add')}
             </button>
             <button
               onClick={() => {
@@ -315,7 +317,7 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
               }}
               className="btn-secondary text-sm py-2"
             >
-              Cancel
+              {t('report.cancel')}
             </button>
           </div>
         </div>
@@ -389,8 +391,8 @@ export function SocialPostsList({ posts, onAdd, onDelete, editable = true }: Soc
       ) : (
         !isAdding && (
           <div className="bg-theme-surface rounded-xl p-6 border border-theme-stroke text-center">
-            <p className="text-theme-text-muted text-sm">No social posts added yet</p>
-            <p className="text-theme-text-faint text-xs mt-1">Add links to posts about your event</p>
+            <p className="text-theme-text-muted text-sm">{t('report.noSocialPostsYet')}</p>
+            <p className="text-theme-text-faint text-xs mt-1">{t('report.addLinksHint')}</p>
           </div>
         )
       )}

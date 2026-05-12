@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, Upload, FileText, DollarSign, User, Link, StickyNote } from 'lucide-react';
 import { BudgetItem, BudgetCategory, BudgetStatus, BUDGET_CATEGORIES } from '../../types';
 import { IconInput } from '../IconInput';
@@ -27,6 +28,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
   onClose,
   saving = false,
 }) => {
+  const { t } = useTranslation('host');
   const [name, setName] = useState('');
   const [category, setCategory] = useState<BudgetCategory>('other');
   const [cost, setCost] = useState('');
@@ -65,12 +67,12 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      setError('Please select an image (JPEG, PNG, WebP) or PDF file');
+      setError(t('budget.fileTypeError'));
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setError('File must be less than 10MB');
+      setError(t('budget.fileSizeError'));
       return;
     }
 
@@ -99,13 +101,13 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
     setError(null);
 
     if (!name.trim()) {
-      setError('Name is required');
+      setError(t('budget.nameRequired'));
       return;
     }
 
     const costValue = parseFloat(cost);
     if (isNaN(costValue) || costValue < 0) {
-      setError('Please enter a valid cost');
+      setError(t('budget.invalidCost'));
       return;
     }
 
@@ -119,7 +121,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
         if (uploadedUrl) {
           finalReceiptUrl = uploadedUrl;
         } else {
-          setError('Failed to upload receipt. Please try again.');
+          setError(t('budget.uploadFailed'));
           setUploadingReceipt(false);
           return;
         }
@@ -145,7 +147,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-theme-text">
-            {item ? 'Edit Expense' : 'Add Expense'}
+            {item ? t('budget.editExpense') : t('budget.addExpense')}
           </h2>
           <button
             onClick={onClose}
@@ -162,7 +164,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Description (e.g., Pizza from Joe's)"
+            placeholder={t('budget.descriptionPlaceholder')}
             required
             autoFocus
           />
@@ -189,7 +191,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               min="0"
               value={cost}
               onChange={(e) => setCost(e.target.value)}
-              placeholder="Cost"
+              placeholder={t('budget.costPlaceholder')}
               required
             />
           </div>
@@ -206,7 +208,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                     : 'bg-theme-surface text-theme-text-secondary border border-theme-stroke hover:bg-theme-surface-hover'
                 }`}
               >
-                Pending
+                {t('budget.statusPending')}
               </button>
               <button
                 type="button"
@@ -217,7 +219,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                     : 'bg-theme-surface text-theme-text-secondary border border-theme-stroke hover:bg-theme-surface-hover'
                 }`}
               >
-                Paid
+                {t('budget.statusPaid')}
               </button>
             </div>
           </div>
@@ -228,7 +230,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
             type="text"
             value={pointPerson}
             onChange={(e) => setPointPerson(e.target.value)}
-            placeholder="Point person (who's handling this?)"
+            placeholder={t('budget.pointPersonPlaceholder')}
           />
 
           {/* Notes */}
@@ -238,12 +240,12 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Additional details..."
+            placeholder={t('budget.notesPlaceholder')}
           />
 
           {/* Receipt Upload */}
           <div className="space-y-2">
-            <p className="text-xs text-theme-text-muted">Receipt</p>
+            <p className="text-xs text-theme-text-muted">{t('budget.receipt')}</p>
             {receiptPreview ? (
               <div className="flex items-center gap-3 p-3 bg-theme-surface rounded-lg border border-theme-stroke">
                 {receiptPreview === 'pdf' ? (
@@ -253,7 +255,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 ) : (
                   <img
                     src={receiptPreview}
-                    alt="Receipt preview"
+                    alt={t('budget.receiptPreview')}
                     className="w-12 h-12 object-cover rounded-lg border border-theme-stroke"
                   />
                 )}
@@ -267,7 +269,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                       rel="noopener noreferrer"
                       className="text-sm text-blue-400 hover:text-blue-300 truncate block"
                     >
-                      View receipt
+                      {t('budget.viewReceipt')}
                     </a>
                   ) : null}
                 </div>
@@ -294,7 +296,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                   className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
                 >
                   <Upload size={16} />
-                  Upload
+                  {t('budget.upload')}
                 </button>
                 <div className="flex-1">
                   <IconInput
@@ -309,7 +311,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                         }
                       }
                     }}
-                    placeholder="Or paste URL"
+                    placeholder={t('budget.orPasteUrl')}
                   />
                 </div>
               </div>
@@ -329,7 +331,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               disabled={saving || uploadingReceipt}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Cancel
+              {t('budget.cancel')}
             </button>
             <button
               type="submit"
@@ -339,12 +341,12 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
               {saving || uploadingReceipt ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  {uploadingReceipt ? 'Uploading...' : 'Saving...'}
+                  {uploadingReceipt ? t('budget.uploading') : t('budget.saving')}
                 </>
               ) : item ? (
-                'Save Changes'
+                t('budget.saveChanges')
               ) : (
-                'Add Expense'
+                t('budget.addExpense')
               )}
             </button>
           </div>

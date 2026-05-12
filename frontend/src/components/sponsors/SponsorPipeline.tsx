@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Edit2, Target, Check, Loader2 } from 'lucide-react';
 import { SponsorStats, SponsorStatus } from '../../types';
 
@@ -8,15 +9,15 @@ interface SponsorPipelineProps {
   isLoading?: boolean;
 }
 
-const STATUS_CONFIG: Record<SponsorStatus, { label: string; color: string; bgColor: string }> = {
-  todo: { label: 'To Do', color: 'text-gray-400', bgColor: 'bg-gray-500' },
-  asked: { label: 'Asked', color: 'text-orange-400', bgColor: 'bg-orange-500' },
-  yes: { label: 'Confirmed', color: 'text-green-400', bgColor: 'bg-green-500' },
-  billed: { label: 'Billed', color: 'text-yellow-400', bgColor: 'bg-yellow-500' },
-  paid: { label: 'Paid', color: 'text-blue-400', bgColor: 'bg-blue-500' },
-  stuck: { label: 'Stuck', color: 'text-red-400', bgColor: 'bg-red-500' },
-  alum: { label: 'Alum', color: 'text-purple-400', bgColor: 'bg-purple-500' },
-  skip: { label: 'Skip', color: 'text-gray-500', bgColor: 'bg-gray-700' },
+const STATUS_CONFIG: Record<SponsorStatus, { labelKey: string; color: string; bgColor: string }> = {
+  todo: { labelKey: 'sponsors.toDo', color: 'text-gray-400', bgColor: 'bg-gray-500' },
+  asked: { labelKey: 'sponsors.asked', color: 'text-orange-400', bgColor: 'bg-orange-500' },
+  yes: { labelKey: 'sponsors.yes', color: 'text-green-400', bgColor: 'bg-green-500' },
+  billed: { labelKey: 'sponsors.billed', color: 'text-yellow-400', bgColor: 'bg-yellow-500' },
+  paid: { labelKey: 'sponsors.paid', color: 'text-blue-400', bgColor: 'bg-blue-500' },
+  stuck: { labelKey: 'sponsors.stuck', color: 'text-red-400', bgColor: 'bg-red-500' },
+  alum: { labelKey: 'sponsors.alum', color: 'text-purple-400', bgColor: 'bg-purple-500' },
+  skip: { labelKey: 'sponsors.skip', color: 'text-gray-500', bgColor: 'bg-gray-700' },
 };
 
 // Main pipeline flow
@@ -25,6 +26,7 @@ const PIPELINE_STATUSES: SponsorStatus[] = ['todo', 'asked', 'yes', 'billed', 'p
 const SECONDARY_STATUSES: SponsorStatus[] = ['stuck', 'skip', 'alum'];
 
 export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipelineProps) {
+  const { t } = useTranslation('host');
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -111,7 +113,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Target size={18} className="text-[#ff393a]" />
-            <span className="text-sm font-medium text-theme-text">Fundraising</span>
+            <span className="text-sm font-medium text-theme-text">{t('sponsors.fundraising')}</span>
           </div>
           {isEditingGoal ? (
             <div className="flex items-center gap-2">
@@ -136,7 +138,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
                   className="flex items-center gap-1 px-2 py-1 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white text-xs rounded transition-colors"
                 >
                   <Check size={14} />
-                  Set
+                  {t('sponsors.set')}
                 </button>
               )}
             </div>
@@ -145,7 +147,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
               onClick={handleEditGoal}
               className="flex items-center gap-1 text-theme-text-secondary hover:text-theme-text text-sm transition-colors"
             >
-              {goal > 0 ? formatCurrency(goal) : 'Set Goal'}
+              {goal > 0 ? formatCurrency(goal) : t('sponsors.setGoal')}
               <Edit2 size={14} />
             </button>
           )}
@@ -183,7 +185,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
               <React.Fragment key={status}>
                 <div className="flex flex-col items-center">
                   <span className={`text-lg font-bold ${config.color}`}>{count}</span>
-                  <span className="text-[10px] text-theme-text-muted">{config.label}</span>
+                  <span className="text-[10px] text-theme-text-muted">{t(config.labelKey)}</span>
                 </div>
                 {index < PIPELINE_STATUSES.length - 1 && (
                   <span className="text-theme-text-faint text-lg">→</span>
@@ -201,7 +203,7 @@ export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipel
             return (
               <div key={status} className="flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${config.bgColor}`} />
-                <span className="text-xs text-theme-text-muted">{config.label}</span>
+                <span className="text-xs text-theme-text-muted">{t(config.labelKey)}</span>
                 <span className={`text-xs font-medium ${config.color}`}>({count})</span>
               </div>
             );

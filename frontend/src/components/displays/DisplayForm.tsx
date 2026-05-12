@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link, Grid3X3, RefreshCw, Timer, Palette } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -30,12 +31,12 @@ export interface DisplayFormData {
   showEventName: boolean;
 }
 
-const contentTypes: { value: DisplayContentType; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: 'slideshow', label: 'Slideshow', icon: <Image size={20} />, description: 'Google Slides presentation' },
-  { value: 'qr_code', label: 'QR Code', icon: <QrCode size={20} />, description: 'RSVP link QR code' },
-  { value: 'event_info', label: 'Event Info', icon: <Info size={20} />, description: 'Event details display' },
-  { value: 'photos', label: 'Photo Wall', icon: <Camera size={20} />, description: 'Live photo gallery' },
-  { value: 'upload', label: 'Upload', icon: <Upload size={20} />, description: 'Image or video upload' },
+const contentTypes: { value: DisplayContentType; labelKey: string; icon: React.ReactNode; descriptionKey: string }[] = [
+  { value: 'slideshow', labelKey: 'displays.slideshow', icon: <Image size={20} />, descriptionKey: 'displays.slideshowDesc' },
+  { value: 'qr_code', labelKey: 'displays.qrCode', icon: <QrCode size={20} />, descriptionKey: 'displays.qrCodeDesc' },
+  { value: 'event_info', labelKey: 'displays.eventInfo', icon: <Info size={20} />, descriptionKey: 'displays.eventInfoDesc' },
+  { value: 'photos', labelKey: 'displays.photoWall', icon: <Camera size={20} />, descriptionKey: 'displays.photoWallDesc' },
+  { value: 'upload', labelKey: 'displays.upload', icon: <Upload size={20} />, descriptionKey: 'displays.uploadDesc' },
 ];
 
 const RESOLUTION_PRESETS = [
@@ -47,6 +48,7 @@ const RESOLUTION_PRESETS = [
 ];
 
 export function DisplayForm({ display, onSave, onClose, isLoading, error }: DisplayFormProps) {
+  const { t } = useTranslation('host');
   const [name, setName] = useState(display?.name || '');
   const [contentType, setContentType] = useState<DisplayContentType>(display?.contentType || 'qr_code');
   const [rotationInterval, setRotationInterval] = useState(display?.rotationInterval || 10);
@@ -191,7 +193,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
       <div className="bg-theme-header rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-theme-header border-b border-theme-stroke p-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-theme-text">
-            {display ? 'Edit Display' : 'Create Display'}
+            {display ? t('displays.editDisplay') : t('displays.createDisplay')}
           </h2>
           <button onClick={onClose} className="text-theme-text-muted hover:text-theme-text">
             <X size={24} />
@@ -205,7 +207,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Display name (e.g., Main Screen)"
+            placeholder={t('displays.displayName')}
             required
           />
 
@@ -216,14 +218,14 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               type="text"
               value={physicalWidth}
               onChange={(e) => setPhysicalWidth(e.target.value)}
-              placeholder="Width (in)"
+              placeholder={t('displays.widthIn')}
             />
             <IconInput
               icon={Ruler}
               type="text"
               value={physicalHeight}
               onChange={(e) => setPhysicalHeight(e.target.value)}
-              placeholder="Height (in)"
+              placeholder={t('displays.heightIn')}
             />
             <div>
               <select
@@ -231,7 +233,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                 onChange={(e) => setResolutionPreset(e.target.value)}
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text h-[42px]"
               >
-                <option value="">Resolution</option>
+                <option value="">{t('displays.resolution')}</option>
                 {RESOLUTION_PRESETS.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
@@ -244,13 +246,13 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               type="text"
               value={customResolution}
               onChange={(e) => setCustomResolution(e.target.value)}
-              placeholder="Custom resolution (e.g., 2560x1440)"
+              placeholder={t('displays.customResolution')}
             />
           )}
 
           {/* Content Type */}
           <div>
-            <p className="text-sm font-medium text-theme-text-secondary mb-2">Content Type</p>
+            <p className="text-sm font-medium text-theme-text-secondary mb-2">{t('displays.contentType')}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {contentTypes.map((type) => (
                 <button
@@ -266,8 +268,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   <div className={`mb-1 ${contentType === type.value ? 'text-[#ff393a]' : 'text-theme-text-muted'}`}>
                     {type.icon}
                   </div>
-                  <div className="text-sm font-medium text-theme-text">{type.label}</div>
-                  <div className="text-xs text-theme-text-muted">{type.description}</div>
+                  <div className="text-sm font-medium text-theme-text">{t(type.labelKey)}</div>
+                  <div className="text-xs text-theme-text-muted">{t(type.descriptionKey)}</div>
                 </button>
               ))}
             </div>
@@ -275,7 +277,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
           {/* Content Type Specific Options */}
           <div className="border border-theme-stroke rounded-lg p-4 space-y-4">
-            <h3 className="font-medium text-theme-text">Content Settings</h3>
+            <h3 className="font-medium text-theme-text">{t('displays.contentSettings')}</h3>
 
             {contentType === 'slideshow' && (
               <div className="space-y-2">
@@ -284,9 +286,9 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   type="url"
                   value={googleSlidesUrl}
                   onChange={(e) => setGoogleSlidesUrl(e.target.value)}
-                  placeholder="Google Slides URL"
+                  placeholder={t('displays.googleSlidesUrl')}
                 />
-                <p className="text-xs text-theme-text-muted pl-1">Paste the share link from Google Slides</p>
+                <p className="text-xs text-theme-text-muted pl-1">{t('displays.googleSlidesHint')}</p>
               </div>
             )}
 
@@ -298,9 +300,9 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     onChange={(e) => setQrSize(e.target.value as 'small' | 'medium' | 'large')}
                     className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
+                    <option value="small">{t('displays.small')}</option>
+                    <option value="medium">{t('displays.medium')}</option>
+                    <option value="large">{t('displays.large')}</option>
                   </select>
                 </div>
                 <IconInput
@@ -308,12 +310,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   type="text"
                   value={qrMessage}
                   onChange={(e) => setQrMessage(e.target.value)}
-                  placeholder="Message (e.g., Scan to RSVP!)"
+                  placeholder={t('displays.messagePlaceholder')}
                 />
                 <Checkbox
                   checked={qrShowEventInfo}
                   onChange={() => setQrShowEventInfo(!qrShowEventInfo)}
-                  label="Show event info below QR"
+                  label={t('displays.showEventInfoBelow')}
                 />
               </div>
             )}
@@ -326,8 +328,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     onChange={(e) => setPhotosFilter(e.target.value as 'all' | 'starred')}
                     className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
-                    <option value="all">All Photos</option>
-                    <option value="starred">Starred Only</option>
+                    <option value="all">{t('displays.allPhotos')}</option>
+                    <option value="starred">{t('displays.starredOnly')}</option>
                   </select>
                 </div>
                 <div>
@@ -336,8 +338,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     onChange={(e) => setPhotosLayout(e.target.value as 'grid' | 'slideshow')}
                     className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
-                    <option value="grid">Grid</option>
-                    <option value="slideshow">Slideshow</option>
+                    <option value="grid">{t('displays.grid')}</option>
+                    <option value="slideshow">{t('displays.slideshowLayout')}</option>
                   </select>
                 </div>
                 {photosLayout === 'grid' && (
@@ -348,7 +350,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     max={6}
                     value={photosColumns}
                     onChange={(e) => setPhotosColumns(parseInt(e.target.value) || 3)}
-                    placeholder="Columns (1-6)"
+                    placeholder={t('displays.columnsPlaceholder')}
                   />
                 )}
                 <IconInput
@@ -358,7 +360,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   max={300}
                   value={photosAutoRefresh}
                   onChange={(e) => setPhotosAutoRefresh(parseInt(e.target.value) || 30)}
-                  placeholder="Auto-refresh interval (seconds)"
+                  placeholder={t('displays.autoRefreshInterval')}
                 />
               </div>
             )}
@@ -368,17 +370,17 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                 <Checkbox
                   checked={eventShowCountdown}
                   onChange={() => setEventShowCountdown(!eventShowCountdown)}
-                  label="Show countdown timer"
+                  label={t('displays.showCountdownTimer')}
                 />
                 <Checkbox
                   checked={eventShowGuestCount}
                   onChange={() => setEventShowGuestCount(!eventShowGuestCount)}
-                  label="Show guest count"
+                  label={t('displays.showGuestCount')}
                 />
                 <Checkbox
                   checked={eventShowLocation}
                   onChange={() => setEventShowLocation(!eventShowLocation)}
-                  label="Show location"
+                  label={t('displays.showLocation')}
                 />
               </div>
             )}
@@ -391,8 +393,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                     onChange={(e) => setUploadMediaType(e.target.value as 'image' | 'video')}
                     className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   >
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
+                    <option value="image">{t('displays.image')}</option>
+                    <option value="video">{t('displays.video')}</option>
                   </select>
                 </div>
                 <IconInput
@@ -400,10 +402,10 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   type="url"
                   value={uploadMediaUrl}
                   onChange={(e) => setUploadMediaUrl(e.target.value)}
-                  placeholder="Media URL (image or video link)"
+                  placeholder={t('displays.mediaUrl')}
                 />
                 <p className="text-xs text-theme-text-muted pl-1">
-                  Paste a direct link to an image or video file
+                  {t('displays.mediaUrlHint')}
                 </p>
                 {uploadMediaUrl && uploadMediaType === 'image' && (
                   <div className="rounded-lg overflow-hidden border border-theme-stroke">
@@ -421,7 +423,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
 
           {/* Display Settings */}
           <div className="border border-theme-stroke rounded-lg p-4 space-y-4">
-            <h3 className="font-medium text-theme-text">Display Settings</h3>
+            <h3 className="font-medium text-theme-text">{t('displays.displaySettings')}</h3>
 
             {(contentType === 'slideshow' || contentType === 'photos') && (
               <IconInput
@@ -431,7 +433,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                 max={120}
                 value={rotationInterval}
                 onChange={(e) => setRotationInterval(parseInt(e.target.value) || 10)}
-                placeholder="Rotation interval (seconds)"
+                placeholder={t('displays.rotationInterval')}
               />
             )}
 
@@ -448,7 +450,7 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                   type="text"
                   value={backgroundColor}
                   onChange={(e) => setBackgroundColor(e.target.value)}
-                  placeholder="Background color"
+                  placeholder={t('displays.backgroundColor')}
                   className="font-mono"
                 />
               </div>
@@ -458,12 +460,12 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               <Checkbox
                 checked={showClock}
                 onChange={() => setShowClock(!showClock)}
-                label="Show clock overlay"
+                label={t('displays.showClockOverlay')}
               />
               <Checkbox
                 checked={showEventName}
                 onChange={() => setShowEventName(!showEventName)}
-                label="Show event name"
+                label={t('displays.showEventName')}
               />
             </div>
           </div>
@@ -482,14 +484,14 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
               onClick={onClose}
               className="flex-1 px-4 py-2 rounded-lg border border-theme-stroke text-theme-text-secondary hover:bg-theme-surface transition-colors"
             >
-              Cancel
+              {t('displays.cancel')}
             </button>
             <button
               type="submit"
               disabled={isLoading || !name}
               className="flex-1 px-4 py-2 rounded-lg bg-[#ff393a] text-white font-medium hover:bg-[#ff393a]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Saving...' : display ? 'Save Changes' : 'Create Display'}
+              {isLoading ? t('displays.saving') : display ? t('displays.saveChanges') : t('displays.createDisplay')}
             </button>
           </div>
         </form>

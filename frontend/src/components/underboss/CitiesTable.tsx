@@ -41,9 +41,30 @@ const STATUS_ORDER: Record<CityStatusValue, number> = { created: 0, todo: 1, ski
 
 // Map sheet region names to GPP region IDs they belong to
 const SHEET_REGION_TO_GPP: Record<string, string[]> = {
-  'north-america': ['usa', 'canada'],
   'africa': ['west-africa', 'east-africa', 'south-africa'],
 };
+
+// For "North America" sheet region, determine GPP region from city's country field
+function sheetCityToGppRegion(city: { region: string; country: string }): string[] {
+  const sheetRegion = city.region.toLowerCase().replace(/\s+/g, '-');
+
+  if (sheetRegion === 'north-america') {
+    const c = city.country.toLowerCase().trim();
+    if (c.startsWith('usa') || c === 'united states' || c === 'iowa') return ['usa'];
+    if (c.startsWith('canada')) return ['canada'];
+    if (c === 'mexico') return ['central-america'];
+    if (c === 'bahamas') return ['central-america'];
+    // Fallback: show in both usa and canada
+    return ['usa', 'canada'];
+  }
+
+  // Check umbrella mappings
+  const mapped = SHEET_REGION_TO_GPP[sheetRegion];
+  if (mapped) return mapped;
+
+  // Direct match (e.g., "western-europe" === "western-europe")
+  return [sheetRegion];
+}
 
 interface CitiesTableProps {
   events: UnderbossEvent[];
@@ -91,26 +112,53 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     load();
   }, []);
 
-  // Build a map of city names to their matching GPP events
-  const eventCityMap = useMemo(() => {
-    const map: Record<string, UnderbossEvent[]> = {};
+  // Normalize: strip diacritics, lowercase, collapse whitespace
+  const normalize = useCallback((s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' '), []);
+
+  // Build list of GPP events with their extracted + normalized city names
+  const gppEvents = useMemo(() => {
+    const list: { event: UnderbossEvent; raw: string; norm: string }[] = [];
     for (const event of events) {
       const match = event.name.match(/Global Pizza Party\s+(.+)/i);
       if (match) {
-        const cityName = match[1].trim().toLowerCase();
-        if (!map[cityName]) map[cityName] = [];
-        map[cityName].push(event);
+        const raw = match[1].trim().toLowerCase();
+        list.push({ event, raw, norm: normalize(raw) });
       }
     }
-    return map;
-  }, [events]);
+    return list;
+  }, [events, normalize]);
+
+  // Find matching events for a sheet city (exact then fuzzy)
+  const findMatchingEvents = useCallback((sheetCity: string): UnderbossEvent[] => {
+    const key = sheetCity.toLowerCase().trim();
+    const norm = normalize(sheetCity);
+
+    // 1. Exact match on raw lowercase
+    const exact = gppEvents.filter(e => e.raw === key);
+    if (exact.length > 0) return exact.map(e => e.event);
+
+    // 2. Exact match on normalized (strips diacritics)
+    const normExact = gppEvents.filter(e => e.norm === norm);
+    if (normExact.length > 0) return normExact.map(e => e.event);
+
+    // 3. Containment match (one contains the other, min 4 chars to avoid false positives)
+    if (norm.length >= 4) {
+      const contained = gppEvents.filter(e =>
+        e.norm.length >= 4 && (e.norm.includes(norm) || norm.includes(e.norm))
+      );
+      if (contained.length > 0) return contained.map(e => e.event);
+    }
+
+    return [];
+  }, [gppEvents, normalize]);
 
   // Merge sheet cities with statuses and event matching
   const mergedCities = useMemo<MergedCity[]>(() => {
     return sheetCities.map((sc) => {
       const key = sc.city.toLowerCase().trim();
       const dbStatus = cityStatuses[key];
-      const matchedEvents = eventCityMap[key] || [];
+      const matchedEvents = findMatchingEvents(sc.city);
       const matchedEvent = matchedEvents.length > 0 ? (matchedEvents[0].customUrl || matchedEvents[0].id) : null;
 
       let status: CityStatusValue;
@@ -143,7 +191,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         matchedEventIds: matchedEvents.map(e => e.id),
       };
     });
-  }, [sheetCities, cityStatuses, eventCityMap, gppCounts]);
+  }, [sheetCities, cityStatuses, findMatchingEvents, gppCounts]);
 
   // Apply filters + sorting
   const filteredCities = useMemo(() => {
@@ -154,11 +202,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const myRegions = meData.regions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
-        if (myRegions.includes(sheetRegion)) return true;
-        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
-        if (mappedGppIds) return mappedGppIds.some((id) => myRegions.includes(id));
-        return false;
+        const cityGppRegions = sheetCityToGppRegion(c);
+        return cityGppRegions.some((id) => myRegions.includes(id));
       });
     }
 
@@ -167,15 +212,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const normalizedRegions = selectedRegions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
-        // Direct match (e.g. "western-europe" === "western-europe")
-        if (normalizedRegions.includes(sheetRegion)) return true;
-        // Sheet uses umbrella regions (e.g. "North America" covers usa + canada)
-        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
-        if (mappedGppIds) {
-          return mappedGppIds.some((id) => normalizedRegions.includes(id));
-        }
-        return false;
+        const cityGppRegions = sheetCityToGppRegion(c);
+        return cityGppRegions.some((id) => normalizedRegions.includes(id));
       });
     }
 

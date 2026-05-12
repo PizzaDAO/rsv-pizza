@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Building2, User, Mail, Phone, DollarSign, FileText, Calendar, Globe, Upload, Image, Instagram, Settings, Check, MessageSquare, Loader2 } from 'lucide-react';
 import { Sponsor, SponsorStatus, SponsorshipType, SponsorCategory, SPONSOR_CATEGORIES, SponsorUser } from '../../types';
 import { CreateSponsorData, PartnerIntakeResponse } from '../../lib/api';
@@ -87,24 +88,24 @@ export function extractSponsorData(data: PartnerFormData): CreateSponsorData {
 
 /* ---------- Constants ---------- */
 
-const STATUS_OPTIONS: { value: SponsorStatus; label: string; color: string }[] = [
-  { value: 'todo', label: 'To Do', color: 'bg-gray-500' },
-  { value: 'asked', label: 'Asked', color: 'bg-orange-500' },
-  { value: 'yes', label: 'Confirmed', color: 'bg-green-500' },
-  { value: 'billed', label: 'Billed', color: 'bg-yellow-500' },
-  { value: 'paid', label: 'Paid', color: 'bg-blue-500' },
-  { value: 'stuck', label: 'Stuck', color: 'bg-red-500' },
-  { value: 'alum', label: 'Alum', color: 'bg-purple-500' },
-  { value: 'skip', label: 'Skip', color: 'bg-gray-700' },
+const STATUS_OPTIONS: { value: SponsorStatus; labelKey: string; color: string }[] = [
+  { value: 'todo', labelKey: 'sponsors.toDo', color: 'bg-gray-500' },
+  { value: 'asked', labelKey: 'sponsors.asked', color: 'bg-orange-500' },
+  { value: 'yes', labelKey: 'sponsors.yes', color: 'bg-green-500' },
+  { value: 'billed', labelKey: 'sponsors.billed', color: 'bg-yellow-500' },
+  { value: 'paid', labelKey: 'sponsors.paid', color: 'bg-blue-500' },
+  { value: 'stuck', labelKey: 'sponsors.stuck', color: 'bg-red-500' },
+  { value: 'alum', labelKey: 'sponsors.alum', color: 'bg-purple-500' },
+  { value: 'skip', labelKey: 'sponsors.skip', color: 'bg-gray-700' },
 ];
 
-const TYPE_OPTIONS: { value: SponsorshipType; label: string }[] = [
-  { value: 'cash', label: 'Funds' },
-  { value: 'in-kind', label: 'In-Kind' },
-  { value: 'venue', label: 'Venue' },
-  { value: 'pizza', label: 'Pizza' },
-  { value: 'drinks', label: 'Drinks' },
-  { value: 'other', label: 'Other' },
+const TYPE_OPTIONS: { value: SponsorshipType; labelKey: string }[] = [
+  { value: 'cash', labelKey: 'sponsors.funds' },
+  { value: 'in-kind', labelKey: 'sponsors.inKind' },
+  { value: 'venue', labelKey: 'sponsors.venueType' },
+  { value: 'pizza', labelKey: 'sponsors.pizzaType' },
+  { value: 'drinks', labelKey: 'sponsors.drinksType' },
+  { value: 'other', labelKey: 'sponsors.otherType' },
 ];
 
 /* ---------- Helpers ---------- */
@@ -232,6 +233,7 @@ export function PartnerForm({
   defaultStatus,
   onAddAsCoHost,
 }: PartnerFormProps) {
+  const { t } = useTranslation('host');
   const isCrm = mode === 'crm';
   const isPartner = mode === 'partner';
   const isIntake = mode === 'intake';
@@ -318,11 +320,11 @@ export function PartnerForm({
     setError(null);
 
     if ((isCrm || isIntake) && !formData.name.trim()) {
-      setError(isIntake ? 'Company/brand name is required' : 'Partner name is required');
+      setError(isIntake ? t('sponsors.companyNameRequired') : t('sponsors.partnerNameRequired'));
       return;
     }
     if (isPartner && (!formData.email || !formData.tag)) {
-      setError('Email and tag are required');
+      setError(t('sponsors.emailTagRequired'));
       return;
     }
 
@@ -381,7 +383,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Mail size={16} />
-            Account
+            {t('sponsors.account')}
           </h3>
           <IconInput
             icon={Mail}
@@ -415,7 +417,7 @@ export function PartnerForm({
       {!logoOnly && <div className="space-y-3">
         <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
           <Building2 size={16} />
-          {isIntake ? 'Company Info' : 'Partner Info'}
+          {isIntake ? t('sponsors.companyInfo') : t('sponsors.partnerInfo')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <IconInput
@@ -458,7 +460,7 @@ export function PartnerForm({
             rows={2}
             value={formData.brandDescription}
             onChange={e => handleChange('brandDescription', (e.target as HTMLTextAreaElement).value)}
-            placeholder="1-2 sentence brand description (shown on event page)"
+            placeholder={t('sponsors.brandDescription')}
           />
         )}
       </div>}
@@ -478,7 +480,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
-            Co-Host Profile
+            {t('sponsors.coHostProfile')}
           </h3>
           <IconInput
             icon={Image}
@@ -495,7 +497,7 @@ export function PartnerForm({
                 className="w-8 h-8 rounded-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-              <span className="text-xs text-theme-text-muted">Avatar preview</span>
+              <span className="text-xs text-theme-text-muted">{t('sponsors.avatarPreview')}</span>
             </div>
           )}
         </div>
@@ -529,7 +531,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <User size={16} />
-            Contact Info
+            {t('sponsors.contactInfo')}
           </h3>
           {contactFieldsDisabled && (
             <p className="text-xs text-purple-400 flex items-center gap-1">
@@ -595,7 +597,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Calendar size={16} />
-            Pipeline
+            {t('sponsors.pipeline')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="relative">
@@ -608,7 +610,7 @@ export function PartnerForm({
               >
                 {STATUS_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </option>
                 ))}
               </select>
@@ -646,7 +648,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <DollarSign size={16} />
-            Fundraising
+            {t('sponsors.fundraisingSection')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <IconInput
@@ -656,7 +658,7 @@ export function PartnerForm({
               step="0.01"
               value={formData.amount ?? ''}
               onChange={e => handleChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
-              placeholder="Amount"
+              placeholder={t('sponsors.amount')}
             />
             <div className="relative">
               <DollarSign size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />
@@ -666,10 +668,10 @@ export function PartnerForm({
                 className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
-                <option value="" className="bg-theme-header text-theme-text-muted">Contribution Type</option>
+                <option value="" className="bg-theme-header text-theme-text-muted">{t('sponsors.contributionType')}</option>
                 {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </option>
                 ))}
               </select>
@@ -679,7 +681,7 @@ export function PartnerForm({
               type="text"
               value={formData.productService}
               onChange={e => handleChange('productService', e.target.value)}
-              placeholder="Product/Service (if non-monetary)"
+              placeholder={t('sponsors.productService')}
             />
           </div>
         </div>
@@ -690,7 +692,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
-            Sponsorship Details
+            {t('sponsors.sponsorshipDetails')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="relative">
@@ -701,10 +703,10 @@ export function PartnerForm({
                 className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
-                <option value="" className="bg-theme-header text-theme-text-muted">Contribution Type</option>
+                <option value="" className="bg-theme-header text-theme-text-muted">{t('sponsors.contributionType')}</option>
                 {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </option>
                 ))}
               </select>
@@ -725,7 +727,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
-            Message from Sponsor
+            {t('sponsors.messageFromSponsor')}
           </h3>
           <div className="p-3 bg-theme-surface rounded-lg border border-theme-stroke text-theme-text-secondary text-sm whitespace-pre-wrap">
             {sponsor.sponsorMessage}
@@ -737,7 +739,7 @@ export function PartnerForm({
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
           <Image size={16} />
-          Logo
+          {t('sponsors.logo')}
         </h3>
         {logoPreview ? (
           <div className="flex items-center gap-4">
@@ -751,7 +753,7 @@ export function PartnerForm({
               onClick={removeLogo}
               className="text-sm text-red-400 hover:text-red-300 transition-colors"
             >
-              Remove
+              {t('sponsors.remove')}
             </button>
           </div>
         ) : (
@@ -769,7 +771,7 @@ export function PartnerForm({
               className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
             >
               <Upload size={16} />
-              Upload Logo
+              {t('sponsors.uploadLogo')}
             </button>
             <div className="flex-1">
               <IconInput
@@ -777,7 +779,7 @@ export function PartnerForm({
                 type="url"
                 value={formData.logoUrl}
                 onChange={e => handleChange('logoUrl', e.target.value)}
-                placeholder="Or paste logo URL"
+                placeholder={t('sponsors.orPasteLogoUrl')}
               />
             </div>
           </div>
@@ -789,7 +791,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <MessageSquare size={16} />
-            Message to Host
+            {t('sponsors.messageToHost')}
           </h3>
           <IconInput
             icon={MessageSquare}
@@ -797,7 +799,7 @@ export function PartnerForm({
             rows={3}
             value={formData.sponsorMessage}
             onChange={e => handleChange('sponsorMessage', (e.target as HTMLTextAreaElement).value)}
-            placeholder="Any notes or special requests for the event organizer..."
+            placeholder={t('sponsors.messageToHostPlaceholder')}
           />
         </div>
       )}
@@ -807,19 +809,19 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <Settings size={16} />
-            Automation
+            {t('sponsors.automation')}
           </h3>
           <div className="space-y-2">
             <Checkbox
               checked={formData.autoCoHost}
               onChange={() => handleChange('autoCoHost', !formData.autoCoHost)}
-              label="Auto co-host: Add as co-host to all events with this tag"
+              label={t('sponsors.autoCoHost')}
               labelClassName="text-sm text-theme-text-secondary"
             />
             <Checkbox
               checked={formData.autoSponsor}
               onChange={() => handleChange('autoSponsor', !formData.autoSponsor)}
-              label="Auto sponsor: Create sponsor record on tagged events"
+              label={t('sponsors.autoSponsor')}
               labelClassName="text-sm text-theme-text-secondary"
             />
           </div>
@@ -831,7 +833,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
-            Partner Intake Form
+            {t('sponsors.partnerIntakeForm')}
           </h3>
           <div className="flex items-center gap-3 p-3 bg-theme-surface rounded-lg border border-theme-stroke">
             <PartnerIntakeButton
@@ -842,9 +844,9 @@ export function PartnerForm({
             <span className="text-xs text-theme-text-muted">
               {sponsor.intakeToken
                 ? sponsor.intakeSubmittedAt
-                  ? 'Partner has submitted their intake form'
-                  : 'Waiting for partner to fill out intake form'
-                : 'Generate a link for the partner to fill out their details'}
+                  ? t('sponsors.partnerSubmitted')
+                  : t('sponsors.waitingForPartner')
+                : t('sponsors.generateLink')}
             </span>
           </div>
         </div>
@@ -855,7 +857,7 @@ export function PartnerForm({
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
-            Notes
+            {t('sponsors.notesSection')}
           </h3>
           <IconInput
             icon={FileText}
@@ -863,7 +865,7 @@ export function PartnerForm({
             rows={3}
             value={formData.notes}
             onChange={e => handleChange('notes', (e.target as HTMLTextAreaElement).value)}
-            placeholder="Communication history, meeting notes, etc."
+            placeholder={t('sponsors.notesPlaceholder')}
           />
         </div>
       )}
@@ -886,10 +888,10 @@ export function PartnerForm({
             {isLoading || uploadingLogo ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                {uploadingLogo ? 'Uploading Logo...' : 'Submitting...'}
+                {uploadingLogo ? t('sponsors.uploadingLogo') : t('sponsors.submitting')}
               </>
             ) : (
-              submitLabel ?? (wasPreviouslySubmitted ? 'Update Information' : 'Submit Information')
+              submitLabel ?? (wasPreviouslySubmitted ? t('sponsors.updateInformation') : t('sponsors.submitInformation'))
             )}
           </button>
         </div>
@@ -901,7 +903,7 @@ export function PartnerForm({
               onClick={onClose}
               className="flex-1 bg-theme-surface hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Cancel
+              {t('sponsors.cancel')}
             </button>
           )}
           <button
@@ -910,10 +912,10 @@ export function PartnerForm({
             className={`${isPartner ? 'flex-1' : ''} px-4 py-2.5 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white ${isPartner ? 'font-medium text-sm' : ''} rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {isLoading || uploadingLogo
-              ? 'Saving...'
+              ? t('sponsors.savingEllipsis')
               : isEditing
-                ? (isPartner ? 'Save Changes' : 'Update Partner')
-                : (isPartner ? 'Create Partner' : 'Add Partner')
+                ? (isPartner ? t('sponsors.saveChanges') : t('sponsors.updatePartner'))
+                : (isPartner ? t('sponsors.createPartner') : t('sponsors.addPartner'))
             }
           </button>
         </div>
@@ -942,7 +944,7 @@ export function PartnerForm({
       >
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <h2 className="text-lg font-semibold text-theme-text">
-            {isEditing ? 'Edit Partner' : 'Add Partner'}
+            {isEditing ? t('sponsors.editPartner') : t('sponsors.addPartner')}
           </h2>
           <button
             onClick={onClose}

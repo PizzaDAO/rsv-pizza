@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "Make a Donation",
+    "buyPizzaFor": "Buy Pizza for {{recipient}}",
+    "buyPizzaForEvent": "Buy Pizza for {{eventName}}",
+    "donateTitle": "Donate",
+    "supportingRecipient": "Supporting {{recipient}}",
+    "supportingEvent": "Supporting {{eventName}}",
+    "defaultMessage": "Would you like to make a donation to help make this event possible?",
+    "donorCount_one": "{{count}} person has donated",
+    "donorCount_other": "{{count}} people have donated",
+    "raised": "{{amount}} raised",
+    "goal": "Goal: ${{amount}}",
+    "recentSupporters": "Recent supporters:",
+    "anonymous": "Anonymous",
+    "makeADonation": "Make a Donation",
+    "back": "Back"
+  },
+  "form": {
+    "payWithCard": "Pay with Card or Wallet",
+    "cardSubtitle": "Credit/debit card, Apple Pay, Google Pay & more",
+    "crypto": "Crypto",
+    "cryptoSubtitle": "ETH, USDC, or other tokens",
+    "cancel": "Cancel",
+    "backToPaymentOptions": "Back to payment options",
+    "customAmount": "Custom amount",
+    "minimumDonation": "Minimum donation is $0.50",
+    "donate": "Donate",
+    "donateAmount": "Donate ${{amount}}",
+    "loading": "Loading...",
+    "processing": "Processing...",
+    "paymentFailed": "Payment failed",
+    "unexpectedError": "An unexpected error occurred",
+    "failedToInitialize": "Failed to initialize payment. Please try again.",
+    "thankYou": "Thank You!",
+    "donationReceived": "Your donation of ${{amount}} has been received.",
+    "back": "Back"
+  },
+  "calendar": {
+    "addToCalendar": "Add to Calendar",
+    "googleCalendar": "Google Calendar",
+    "appleCalendar": "Apple Calendar",
+    "outlook": "Outlook"
+  }
+}

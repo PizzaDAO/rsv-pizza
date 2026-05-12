@@ -1,0 +1,30 @@
+{
+  "header": {
+    "logIn": "Log In / Sign Up"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "fr": "FR",
+    "pt": "PT",
+    "zh": "中文",
+    "ja": "JA"
+  },
+  "buttons": {
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "continue": "Continue",
+    "submit": "Submit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "clear": "Clear",
+    "connect": "Connect"
+  },
+  "errors": {
+    "partyNotFound": "Party Not Found",
+    "partyNotFoundDesc": "Party not found. The invite link may be invalid or expired.",
+    "incorrectPassword": "Incorrect password. Please try again.",
+    "invalidWallet": "Enter a valid address (0x...) or ENS name (.eth)"
+  }
+}

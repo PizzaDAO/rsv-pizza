@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Check, Mail, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
 import { Layout } from '../components/Layout';
@@ -10,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 export function AuthVerifyPage() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
+  const { t } = useTranslation('auth');
   const [status, setStatus] = useState<'idle' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -155,8 +157,8 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <Mail className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Enter Your Code</h1>
-            <p className="text-theme-text-secondary mb-6">We sent a 6-digit code to your email</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.title')}</h1>
+            <p className="text-theme-text-secondary mb-6">{t('verifyPage.subtitle')}</p>
 
             <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
               {code.map((digit, index) => (
@@ -178,12 +180,12 @@ export function AuthVerifyPage() {
             </div>
 
             <p className="text-theme-text-muted text-sm">
-              Didn't receive a code?{' '}
+              {t('verifyPage.didntReceive')}{' '}
               <button
                 onClick={() => navigate('/login')}
                 className="text-[#ff393a] hover:underline"
               >
-                Request a new code
+                {t('verifyPage.requestNew')}
               </button>
             </p>
           </>
@@ -192,8 +194,8 @@ export function AuthVerifyPage() {
         {status === 'verifying' && (
           <>
             <Loader2 className="w-16 h-16 animate-spin text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Verifying...</h1>
-            <p className="text-theme-text-secondary">Please wait while we sign you in</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.verifying')}</h1>
+            <p className="text-theme-text-secondary">{t('verifyPage.pleaseWait')}</p>
           </>
         )}
 
@@ -202,8 +204,8 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
               <User className="w-8 h-8 text-[#ff393a]" />
             </div>
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Complete Your Profile</h1>
-            <p className="text-theme-text-secondary mb-6">What should we call you?</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.completeProfile')}</h1>
+            <p className="text-theme-text-secondary mb-6">{t('verifyPage.whatToCallYou')}</p>
             <div className="mb-4">
               <IconInput
                 ref={nameInputRef}
@@ -211,7 +213,7 @@ export function AuthVerifyPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
+                placeholder={t('verifyPage.namePlaceholder')}
                 disabled={status === 'saving_name'}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && name.trim()) {
@@ -225,7 +227,7 @@ export function AuthVerifyPage() {
               disabled={!name.trim() || status === 'saving_name'}
               className="btn-primary w-full"
             >
-              {status === 'saving_name' ? 'Saving...' : 'Continue'}
+              {status === 'saving_name' ? t('verifyPage.saving') : t('verifyPage.continue')}
             </button>
           </>
         )}
@@ -235,28 +237,28 @@ export function AuthVerifyPage() {
             <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
               <Check className="w-8 h-8 text-[#39d98a]" />
             </div>
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Welcome back!</h1>
-            <p className="text-theme-text-secondary">Redirecting you to the app...</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.welcomeBack')}</h1>
+            <p className="text-theme-text-secondary">{t('verifyPage.redirecting')}</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Verification Failed</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.verificationFailed')}</h1>
             <p className="text-theme-text-secondary mb-6">{error}</p>
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleEnterNewCode}
                 className="btn-primary"
               >
-                Enter Different Code
+                {t('verifyPage.enterDifferentCode')}
               </button>
               <button
                 onClick={() => navigate('/login')}
                 className="btn-secondary"
               >
-                Request New Code
+                {t('verifyPage.requestNewCode')}
               </button>
             </div>
           </>

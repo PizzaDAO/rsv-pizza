@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Gift, Trash2, Edit2, Play, Trophy, CheckCircle, Circle, Plus, Users, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Raffle, RafflePrize, RaffleStatus } from '../../types';
 
@@ -15,11 +16,11 @@ interface RaffleCardProps {
   isLoading?: boolean;
 }
 
-const statusColors: Record<RaffleStatus, { bg: string; text: string; label: string }> = {
-  draft: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: 'Draft' },
-  open: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Open' },
-  closed: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'Closed' },
-  drawn: { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Drawn' },
+const statusColors: Record<RaffleStatus, { bg: string; text: string; labelKey: string }> = {
+  draft: { bg: 'bg-gray-500/20', text: 'text-gray-400', labelKey: 'raffle.statusDraft' },
+  open: { bg: 'bg-green-500/20', text: 'text-green-400', labelKey: 'raffle.statusOpen' },
+  closed: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', labelKey: 'raffle.statusClosed' },
+  drawn: { bg: 'bg-purple-500/20', text: 'text-purple-400', labelKey: 'raffle.statusDrawn' },
 };
 
 export function RaffleCard({
@@ -34,6 +35,7 @@ export function RaffleCard({
   onToggleClaimed,
   isLoading,
 }: RaffleCardProps) {
+  const { t } = useTranslation('host');
   const [expanded, setExpanded] = React.useState(true);
   const statusConfig = statusColors[raffle.status as RaffleStatus] || statusColors.draft;
   const entryCount = raffle._count?.entries ?? raffle.entries.length;
@@ -54,7 +56,7 @@ export function RaffleCard({
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-theme-text truncate">{raffle.name}</h3>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-                {statusConfig.label}
+                {t(statusConfig.labelKey)}
               </span>
             </div>
             {raffle.description && (
@@ -82,14 +84,14 @@ export function RaffleCard({
               <button
                 onClick={onEdit}
                 className="p-2 hover:bg-theme-surface-hover rounded-lg transition-colors text-theme-text-secondary hover:text-theme-text"
-                title="Edit raffle"
+                title={t('raffle.editRaffle')}
               >
                 <Edit2 size={16} />
               </button>
               <button
                 onClick={onDelete}
                 className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-theme-text-secondary hover:text-red-400"
-                title="Delete raffle"
+                title={t('raffle.deleteRaffle')}
               >
                 <Trash2 size={16} />
               </button>
@@ -104,7 +106,7 @@ export function RaffleCard({
           {/* Status Controls */}
           {raffle.status !== 'drawn' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-theme-text-secondary mr-2">Status:</span>
+              <span className="text-sm text-theme-text-secondary mr-2">{t('raffle.statusLabel')}</span>
               {(['draft', 'open', 'closed'] as RaffleStatus[]).map((status) => (
                 <button
                   key={status}
@@ -116,7 +118,7 @@ export function RaffleCard({
                       : 'bg-theme-surface text-theme-text-secondary hover:bg-theme-surface-hover'
                   }`}
                 >
-                  {statusColors[status].label}
+                  {t(statusColors[status].labelKey)}
                 </button>
               ))}
 
@@ -132,7 +134,7 @@ export function RaffleCard({
                   ) : (
                     <Play size={16} />
                   )}
-                  Draw Winners
+                  {t('raffle.drawWinners')}
                 </button>
               )}
             </div>
@@ -141,20 +143,20 @@ export function RaffleCard({
           {/* Prizes Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-theme-text">Prizes</h4>
+              <h4 className="text-sm font-medium text-theme-text">{t('raffle.prizes')}</h4>
               {raffle.status !== 'drawn' && (
                 <button
                   onClick={onAddPrize}
                   className="text-xs text-[#ff393a] hover:text-[#ff5a5b] flex items-center gap-1"
                 >
                   <Plus size={14} />
-                  Add Prize
+                  {t('raffle.addPrize')}
                 </button>
               )}
             </div>
 
             {raffle.prizes.length === 0 ? (
-              <p className="text-sm text-theme-text-muted italic">No prizes added yet</p>
+              <p className="text-sm text-theme-text-muted italic">{t('raffle.noPrizesYet')}</p>
             ) : (
               <div className="space-y-2">
                 {raffle.prizes.map((prize) => (
@@ -208,10 +210,10 @@ export function RaffleCard({
           {(raffle.status === 'open' || raffle.entries.length > 0) && raffle.status !== 'drawn' && (
             <div>
               <h4 className="text-sm font-medium text-theme-text mb-2">
-                Entries ({entryCount})
+                {t('raffle.entries', { count: entryCount })}
               </h4>
               {raffle.entries.length === 0 ? (
-                <p className="text-sm text-theme-text-muted italic">No entries yet</p>
+                <p className="text-sm text-theme-text-muted italic">{t('raffle.noEntriesYet')}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {raffle.entries.map((entry) => (
@@ -232,7 +234,7 @@ export function RaffleCard({
             <div>
               <h4 className="text-sm font-medium text-theme-text mb-2 flex items-center gap-2">
                 <Trophy size={16} className="text-yellow-500" />
-                Winners
+                {t('raffle.winners')}
               </h4>
               <div className="space-y-2">
                 {raffle.winners.map((winner) => (
@@ -247,7 +249,7 @@ export function RaffleCard({
                           ? 'text-green-400 hover:text-green-300'
                           : 'text-theme-text-muted hover:text-theme-text-secondary'
                       }`}
-                      title={winner.claimedAt ? 'Mark as unclaimed' : 'Mark as claimed'}
+                      title={winner.claimedAt ? t('raffle.markAsUnclaimed') : t('raffle.markAsClaimed')}
                     >
                       {winner.claimedAt ? (
                         <CheckCircle size={20} />
@@ -257,11 +259,11 @@ export function RaffleCard({
                     </button>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-theme-text">{winner.guest?.name || 'Guest'}</p>
-                      <p className="text-xs text-theme-text-secondary">Won: {winner.prize?.name || 'Prize'}</p>
+                      <p className="text-xs text-theme-text-secondary">{t('raffle.won', { prize: winner.prize?.name || 'Prize' })}</p>
                     </div>
                     {winner.claimedAt && (
                       <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
-                        Claimed
+                        {t('raffle.claimed')}
                       </span>
                     )}
                   </div>

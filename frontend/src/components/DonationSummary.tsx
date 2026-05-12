@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DollarSign, Users, Target, Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { getDonations } from '../lib/api';
@@ -6,6 +7,7 @@ import { Donation } from '../types';
 import { getExplorerTxUrl, getChainName } from '../lib/tokens';
 
 export const DonationSummary: React.FC = () => {
+  const { t } = useTranslation('host');
   const { party } = usePizza();
   const [loading, setLoading] = useState(true);
   const [donations, setDonations] = useState<Donation[]>([]);
@@ -66,14 +68,14 @@ export const DonationSummary: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-theme-text flex items-center gap-2">
           <DollarSign size={20} className="text-[#ff393a]" />
-          Donations
+          {t('donations.donations')}
         </h3>
         {donations.length > 0 && (
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-theme-text-secondary hover:text-theme-text flex items-center gap-1 text-sm"
           >
-            {expanded ? 'Hide' : 'Show'} Details
+            {expanded ? t('donations.hideDetails') : t('donations.showDetails')}
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         )}
@@ -84,7 +86,7 @@ export const DonationSummary: React.FC = () => {
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-1">
             <DollarSign size={14} />
-            Total Raised
+            {t('donations.totalRaised')}
           </div>
           <div className="text-2xl font-bold text-[#39d98a]">
             {summary ? formatAmount(summary.totalAmount) : '$0.00'}
@@ -93,7 +95,7 @@ export const DonationSummary: React.FC = () => {
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           <div className="flex items-center gap-2 text-theme-text-secondary text-sm mb-1">
             <Users size={14} />
-            Donors
+            {t('donations.donors')}
           </div>
           <div className="text-2xl font-bold text-theme-text">
             {summary?.totalCount || 0}
@@ -107,7 +109,7 @@ export const DonationSummary: React.FC = () => {
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-theme-text-secondary flex items-center gap-1">
               <Target size={14} />
-              Goal Progress
+              {t('donations.goalProgress')}
             </span>
             <span className="text-theme-text font-medium">
               {summary ? formatAmount(summary.totalAmount) : '$0'} / ${party.donationGoal}
@@ -120,7 +122,7 @@ export const DonationSummary: React.FC = () => {
             />
           </div>
           <div className="text-right text-xs text-theme-text-muted mt-1">
-            {goalProgress.toFixed(0)}% of goal
+            {t('donations.ofGoal', { percent: goalProgress.toFixed(0) })}
           </div>
         </div>
       )}
@@ -137,7 +139,7 @@ export const DonationSummary: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-theme-text font-medium truncate">
-                      {donation.isAnonymous ? 'Anonymous' : donation.donorName || 'Guest'}
+                      {donation.isAnonymous ? t('donations.anonymous') : donation.donorName || t('donations.guest')}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       donation.status === 'succeeded'
@@ -191,8 +193,8 @@ export const DonationSummary: React.FC = () => {
       {donations.length === 0 && (
         <div className="text-center py-6 text-theme-text-muted">
           <DollarSign size={32} className="mx-auto mb-2 opacity-50" />
-          <p>No donations yet</p>
-          <p className="text-sm">Share your event link to start receiving donations</p>
+          <p>{t('donations.noDonationsYet')}</p>
+          <p className="text-sm">{t('donations.shareLinkForDonations')}</p>
         </div>
       )}
     </div>

@@ -1,0 +1,146 @@
+{
+  "title": "Admin Panel",
+  "subtitle": "Manage admins and underbosses",
+  "accessDenied": "Access Denied",
+  "accessDeniedDesc": "You do not have admin access. Please log in with an admin account.",
+  "admins": {
+    "title": "Admins",
+    "emailPlaceholder": "Email address",
+    "namePlaceholder": "Name (optional)",
+    "addAdmin": "Add Admin",
+    "noAdmins": "No admins found",
+    "superAdmin": "Super Admin",
+    "admin": "Admin",
+    "removeAdmin": "Remove admin",
+    "tableHeaders": {
+      "email": "Email",
+      "name": "Name",
+      "role": "Role",
+      "added": "Added"
+    }
+  },
+  "underboss": {
+    "title": "Underbosses",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Email",
+    "regions": "Regions",
+    "addUnderboss": "Add Underboss",
+    "noUnderbosses": "No underbosses yet",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deactivate": "Deactivate",
+    "tableHeaders": {
+      "name": "Name",
+      "email": "Email",
+      "regions": "Regions",
+      "status": "Status",
+      "actions": "Actions"
+    }
+  },
+  "partners": {
+    "title": "Partners",
+    "emailPlaceholder": "Email address",
+    "tagPlaceholder": "Partner tag (e.g. swc)",
+    "namePlaceholder": "Name (optional)",
+    "addPartner": "Add Partner",
+    "noPartners": "No partners yet",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deactivatePartner": "Deactivate partner",
+    "tableHeaders": {
+      "email": "Email",
+      "name": "Name",
+      "tag": "Tag",
+      "status": "Status",
+      "added": "Added"
+    }
+  },
+  "checklist": {
+    "title": "Event Setup Checklist",
+    "auto": "(auto)",
+    "noItems": "No checklist items found. Items are created when a GPP host first views their checklist.",
+    "saving": "Saving...",
+    "saveChecklistDates": "Save Checklist Dates",
+    "newItemPlaceholder": "New checklist item...",
+    "adding": "Adding...",
+    "addItem": "Add Item"
+  },
+  "gppDescription": {
+    "title": "GPP Default Description",
+    "statsText": "{{defaultCount}} of {{totalEvents}} events use the default",
+    "placeholder": "Default description for new GPP events...",
+    "saving": "Saving...",
+    "saveAndApply": "Save & Apply to Default Events",
+    "customDescriptions": "{{count}} event with custom descriptions",
+    "customDescriptions_plural": "{{count}} events with custom descriptions"
+  },
+  "nft": {
+    "title": "GPP NFT Settings",
+    "enableNft": "Enable NFT minting for all GPP events",
+    "saving": "Saving...",
+    "saveSettings": "Save GPP NFT Settings"
+  },
+  "underbossDashboard": {
+    "title": "Underboss Dashboard",
+    "loginPrompt": "Please log in to access the underboss dashboard.",
+    "logIn": "Log In",
+    "loadingDashboard": "Loading dashboard...",
+    "error": "Error",
+    "notAuthorized": "You are not authorized to access the underboss dashboard.",
+    "gppSubtitle": "Global Pizza Party",
+    "underbossSubtitle": "Underboss Dashboard",
+    "signedInAdmin": "Signed in as Admin ({{email}})",
+    "signedInAs": "Signed in as {{name}}",
+    "addUnderboss": "Add Underboss",
+    "noRegions": "No Regions",
+    "allRegions": "All Regions",
+    "regionsCount": "{{count}} Regions",
+    "selectAll": "All Regions",
+    "underbossCreated": "Underboss created!",
+    "creating": "Creating...",
+    "createUnderboss": "Create Underboss",
+    "tabs": {
+      "events": "Events",
+      "cities": "Cities",
+      "partners": "Partners"
+    }
+  },
+  "graphics": {
+    "title": "Graphics Dashboard",
+    "loginPrompt": "Log in to review event flyers.",
+    "logIn": "Log In",
+    "error": "Error",
+    "accessDenied": "Access Denied",
+    "accessDeniedDesc": "You need underboss or admin access to view this page.",
+    "events": "{{count}} events",
+    "showing": "showing {{count}}",
+    "searchPlaceholder": "Search events, hosts...",
+    "regionAll": "Region: All",
+    "staleFlyers": "Stale flyers",
+    "generateMissing": "Generate Missing ({{count}})",
+    "generating": "Generating {{current}}/{{total}}...",
+    "noEventsMatch": "No events match your filters.",
+    "newPartners": "New partners",
+    "viewEvent": "View event"
+  },
+  "postComposer": {
+    "title": "Post Composer",
+    "accessDenied": "Access Denied",
+    "accessDeniedDesc": "You do not have admin access. Please log in with an admin account.",
+    "searchEvents": "Search events...",
+    "copyToClipboard": "Copy to Clipboard",
+    "copied": "Copied!"
+  },
+  "shipping": {
+    "title": "Shipping Dashboard",
+    "loginPrompt": "Please log in to access the shipping dashboard.",
+    "logIn": "Log In",
+    "loading": "Loading shipping dashboard...",
+    "accessDenied": "Access Denied",
+    "allRegions": "All Regions",
+    "subtitle": "Global Pizza Party · Shipping Dashboard",
+    "signedInAdmin": "Signed in as Admin ({{email}})",
+    "signedInAs": "Signed in as {{name}}",
+    "kitRequests": "Kit Requests ({{count}})"
+  }
+}

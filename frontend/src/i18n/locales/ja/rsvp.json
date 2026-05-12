@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "{{eventName}}にRSVP",
+    "editTitle": "RSVPを編集",
+    "stepIndicator": "ステップ1/2",
+    "namePlaceholder": "名前",
+    "emailPlaceholder": "メール",
+    "walletPlaceholder": "ウォレットアドレスまたはENS（例：vitalik.eth）",
+    "roleQuestion": "あなたはどの忍者タートルに似ていますか？",
+    "mailingList": "PizzaDAOのメーリングリストに参加",
+    "swcJoin": "Stand with Cryptoに参加",
+    "swcNotify": "今後のStand With Cryptoイベントについて通知を受け取る。",
+    "ethconfDiscount": "ETHConf割引を送ってほしい",
+    "next": "次へ"
+  },
+  "step2": {
+    "title": "ピザリクエスト",
+    "editTitle": "ピザの好みを編集",
+    "stepIndicator": "ステップ2/2",
+    "diet": "食事制限",
+    "toppings": "トッピング",
+    "drinkPreferences": "ドリンクの好み",
+    "favoritePizzerias": "お気に入りのピッツェリア",
+    "clickToRank": "（クリックして1〜3位をランキング）",
+    "suggestPizzeria": "ピッツェリアを提案",
+    "suggestPizzeriaPrompt": "ピッツェリアを提案",
+    "searchPizzeria": "ピッツェリアを検索...",
+    "saveToProfile": "プロフィールに保存",
+    "saveToProfileDesc": "今後のイベントのために好みを記憶する",
+    "back": "戻る",
+    "submit": "RSVP",
+    "editSubmit": "RSVPを編集",
+    "submitting": "送信中...",
+    "saving": "保存中..."
+  },
+  "success": {
+    "seeYou": "{{eventName}}でお会いしましょう！",
+    "alreadyRegistered": "登録済みです！",
+    "alreadyRegisteredDesc": "このメールアドレスはすでにこのイベントのRSVPに使用されています。",
+    "rsvpSubmitted": "RSVPが送信されました！",
+    "pendingApproval": "RSVPは主催者の承認待ちです。承認されると、チェックインQRコード付きのメールが届きます。",
+    "rsvpUpdated": "RSVPが更新されました",
+    "preferenceSaved": "設定が保存されました。",
+    "waitlisted": "キャンセル待ちに登録されました！",
+    "waitlistedDesc": "このイベントは現在定員に達していますが、キャンセル待ち{{position}}番目です！空きが出たらお知らせします。",
+    "backToEvent": "イベントに戻る"
+  },
+  "password": {
+    "title": "パスワードが必要です",
+    "subtitle": "このイベントはパスワードで保護されています",
+    "placeholder": "イベントパスワード",
+    "continue": "続行"
+  },
+  "donation": {
+    "donate": "寄付する",
+    "defaultMessage": "このイベントの実現を支援するために寄付をしましょう",
+    "makeADonation": "寄付する",
+    "buyPizzaFor": "{{recipient}}にピザを贈る",
+    "buyPizzaForEvent": "このイベントにピザを贈る",
+    "buyPizzaForEventName": "{{eventName}}にピザを贈る",
+    "thanksForSupport": "ご支援ありがとうございます！"
+  },
+  "nft": {
+    "minting": "NFTをミント中...",
+    "minted": "NFTがミントされました！",
+    "alreadyClaimed": "NFTはすでに取得済みです！",
+    "viewOnOpenSea": "OpenSeaで表示",
+    "viewTransaction": "トランザクションを表示",
+    "mintFailed": "NFTのミントに失敗しました"
+  },
+  "share": {
+    "tellFriends": "パーティーのことを友達に教えましょう！",
+    "shareOnX": "Xで共有",
+    "x": "X",
+    "download": "ダウンロード",
+    "save": "保存",
+    "copyLink": "リンクをコピー",
+    "link": "リンク",
+    "copied": "コピーしました！"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "チェックボックスをオンにすることで、暗号通貨の消費者、開発者、支持者が声を上げることを支援する草の根運動であるStand with Crypto Alliance, Inc.の会員になることに同意します。チェックボックスをオンにして会員になることに同意することで、SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWCプライバシーポリシー",
+    "termsConditions": "利用規約"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Canada",
+    "description": "チェックボックスをオンにすることで、カナダでの今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWC Canadaプライバシーポリシー",
+    "termsOfService": "利用規約"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Australia",
+    "description": "チェックボックスをオンにすることで、オーストラリアでの今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWC Australiaプライバシーポリシー",
+    "termsOfService": "利用規約"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto EU",
+    "description": "チェックボックスをオンにすることで、ヨーロッパでの今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWC EUプライバシーポリシー",
+    "termsOfService": "利用規約"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto UK",
+    "description": "チェックボックスをオンにすることで、英国での今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWC UKプライバシーポリシー",
+    "termsOfService": "利用規約"
+  },
+  "roles": {
+    "Organizer": "オーガナイザー",
+    "Builder": "ビルダー",
+    "Creative": "クリエイティブ",
+    "Connector": "コネクター",
+    "Storyteller": "ストーリーテラー",
+    "Counsel": "カウンセル",
+    "Ground Support": "グラウンドサポート"
+  },
+  "dietary": {
+    "Vegetarian": "ベジタリアン",
+    "Vegan": "ヴィーガン",
+    "Gluten-Free": "グルテンフリー",
+    "Dairy-Free": "乳製品フリー"
+  }
+}

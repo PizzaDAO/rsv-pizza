@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
@@ -20,6 +21,7 @@ import {
 } from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
+  const { t } = useTranslation('host');
   const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations, updatePizzaQuantity, removePizza } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
@@ -366,7 +368,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
           className="w-full flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-theme-text">Recommended Order</h2>
+            <h2 className="text-xl font-bold text-theme-text">{t('pizza.recommendedOrder')}</h2>
             {summaryText && !isExpanded && (
               <span className="text-sm text-theme-text-secondary">: {summaryText}</span>
             )}
@@ -381,9 +383,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
         {isExpanded && recommendations.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-theme-surface rounded-xl border border-dashed border-theme-stroke-hover mt-4">
             <ClipboardList size={48} className="text-theme-text-faint mb-4" />
-            <h3 className="text-lg font-medium text-theme-text">No Recommendations Yet</h3>
+            <h3 className="text-lg font-medium text-theme-text">{t('pizza.noRecommendationsYet')}</h3>
             <p className="text-theme-text-muted mt-2 text-sm">
-              Add guests and generate recommendations to see your optimized pizza order here.
+              {t('pizza.noRecommendationsHint')}
             </p>
           </div>
         )}
@@ -407,7 +409,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
               {!hasSearched || pizzerias.length === 0 ? (
                 // Show search form if no results yet
                 <div className="space-y-3">
-                  <h3 className="font-medium text-theme-text text-sm mb-3">1. Select a Pizzeria</h3>
+                  <h3 className="font-medium text-theme-text text-sm mb-3">{t('pizza.selectPizzeria')}</h3>
 
                   <button
                     onClick={handleUseCurrentLocation}
@@ -419,12 +421,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     ) : (
                       <Navigation size={16} />
                     )}
-                    Use My Location
+                    {t('pizza.useMyLocation')}
                   </button>
 
                   <div className="flex items-center gap-2 text-theme-text-muted">
                     <div className="flex-1 h-px bg-theme-surface-hover" />
-                    <span className="text-xs">or</span>
+                    <span className="text-xs">{t('pizza.or')}</span>
                     <div className="flex-1 h-px bg-theme-surface-hover" />
                   </div>
 
@@ -433,7 +435,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       <LocationAutocomplete
                         value={searchAddress}
                         onChange={setSearchAddress}
-                        placeholder="Enter delivery address..."
+                        placeholder={t('pizza.enterDeliveryAddress')}
                       />
                     </div>
                     <button
@@ -453,12 +455,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 // Show top pizzerias
                 <div className="space-y-2">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-theme-text text-sm">1. Select a Pizzeria</h3>
+                    <h3 className="font-medium text-theme-text text-sm">{t('pizza.selectPizzeria')}</h3>
                     <button
                       onClick={() => setShowPizzeriaSearch(true)}
                       className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
                     >
-                      View all
+                      {t('pizza.viewAll')}
                     </button>
                   </div>
 
@@ -489,7 +491,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                               )}
                               {pizzeria.isOpen !== undefined && (
                                 <span className={pizzeria.isOpen ? 'text-[#39d98a]' : 'text-[#ff393a]'}>
-                                  {pizzeria.isOpen ? 'Open' : 'Closed'}
+                                  {pizzeria.isOpen ? t('pizza.open') : t('pizza.closed')}
                                 </span>
                               )}
                             </div>
@@ -538,25 +540,25 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                       className="flex items-center gap-2 text-xs text-theme-text-muted hover:text-theme-text-secondary"
                     >
                       <Phone size={12} />
-                      Test AI Call with Custom Number
+                      {t('pizza.testAiCall')}
                       {showTestMode ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     </button>
 
                     {showTestMode && (
                       <div className="mt-3 space-y-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                        <p className="text-xs text-purple-300">Enter any phone number to test the AI calling feature:</p>
+                        <p className="text-xs text-purple-300">{t('pizza.testAiCallHint')}</p>
                         <input
                           type="text"
                           value={testPizzeriaName}
                           onChange={(e) => setTestPizzeriaName(e.target.value)}
-                          placeholder="Pizzeria name (optional)"
+                          placeholder={t('pizza.pizzeriaName')}
                           className="w-full px-3 py-2 bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text placeholder-white/30"
                         />
                         <input
                           type="tel"
                           value={testPhone}
                           onChange={(e) => setTestPhone(e.target.value)}
-                          placeholder="Phone number (e.g., +1-555-123-4567)"
+                          placeholder={t('pizza.phoneNumber')}
                           className="w-full px-3 py-2 bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text placeholder-white/30"
                         />
                         <button
@@ -564,7 +566,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                           disabled={!testPhone.trim()}
                           className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-theme-text text-sm font-medium rounded transition-colors"
                         >
-                          Start Test AI Call
+                          {t('pizza.startTestCall')}
                         </button>
                       </div>
                     )}
@@ -576,7 +578,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             {/* Order Summary */}
             <div className="mb-4 p-4 bg-[#ffb347]/10 border border-[#ffb347]/30 rounded-xl">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-[#ffb347]">2. Review Your Order</h3>
+                <h3 className="font-medium text-[#ffb347]">{t('pizza.reviewYourOrder')}</h3>
                 <button
                   onClick={() => setIsEditMode(!isEditMode)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
@@ -584,12 +586,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   }`}
                 >
                   <Pencil size={12} />
-                  {isEditMode ? 'Done Editing' : 'Edit Order'}
+                  {isEditMode ? t('pizza.doneEditing') : t('pizza.editOrder')}
                 </button>
               </div>
               <div className="space-y-2 text-sm">
                 <p className="text-theme-text">
-                  <span className="text-theme-text-secondary">Total pizzas:</span>{' '}
+                  <span className="text-theme-text-secondary">{t('pizza.totalPizzas')}</span>{' '}
                   <span className="font-semibold text-theme-text text-base">{totalPizzas}</span>
                 </p>
                 {waveRecommendations.length > 1 && (
@@ -606,7 +608,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 {beverageRecommendations.length > 0 && (
                   <>
                     <p className="text-theme-text pt-1 border-t border-theme-stroke mt-2">
-                      <span className="text-theme-text-secondary">Total drinks:</span>{' '}
+                      <span className="text-theme-text-secondary">{t('pizza.totalDrinks')}</span>{' '}
                       <span className="font-semibold text-theme-text text-base">
                         {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                       </span>
@@ -647,7 +649,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                         className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
                       >
                         <Share2 size={14} />
-                        Copy Wave
+                        {t('pizza.copyWave')}
                       </button>
                     </div>
 
@@ -667,11 +669,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                     <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
                       <Beer size={16} />
-                      Beverage Order (Order Once)
+                      {t('pizza.beverageOrderOnce')}
                     </h3>
                     <div className="space-y-1 text-sm mb-3">
                       <p className="text-theme-text">
-                        <span className="text-theme-text-secondary">Total beverages:</span>{' '}
+                        <span className="text-theme-text-secondary">{t('pizza.totalBeverages')}</span>{' '}
                         <span className="font-semibold text-theme-text text-base">
                           {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                         </span>
@@ -691,7 +693,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   className="w-full btn-secondary flex items-center justify-center gap-2 mt-4"
                 >
                   <Share2 size={16} />
-                  Copy All Waves
+                  {t('pizza.copyAllWaves')}
                 </button>
               </div>
             ) : (
@@ -710,11 +712,11 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                     <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
                       <Beer size={16} />
-                      Beverage Order
+                      {t('pizza.beverageOrder')}
                     </h3>
                     <div className="space-y-1 text-sm mb-3">
                       <p className="text-theme-text">
-                        <span className="text-theme-text-secondary">Total beverages:</span>{' '}
+                        <span className="text-theme-text-secondary">{t('pizza.totalBeverages')}</span>{' '}
                         <span className="font-semibold text-theme-text text-base">
                           {beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0)}
                         </span>
@@ -743,12 +745,12 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 {isCopied ? (
                   <>
                     <Check size={16} />
-                    <span>Copied!</span>
+                    <span>{t('pizza.copied')}</span>
                   </>
                 ) : (
                   <>
                     <Share2 size={16} />
-                    <span>Copy Order</span>
+                    <span>{t('pizza.copyOrder')}</span>
                   </>
                 )}
               </button>
@@ -758,7 +760,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-medium text-sm btn-secondary"
               >
                 <Phone size={16} />
-                <span>Call Script</span>
+                <span>{t('pizza.callScript')}</span>
                 {showCallScript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
             </div>
@@ -767,7 +769,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             {showCallScript && (
               <div className="mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-theme-text text-sm">Phone Order Script</h3>
+                  <h3 className="font-medium text-theme-text text-sm">{t('pizza.phoneOrderScript')}</h3>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generateCallScript());
@@ -776,7 +778,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     }}
                     className="text-xs text-[#ff393a] hover:text-[#ff5a5b]"
                   >
-                    Copy script
+                    {t('pizza.copyScript')}
                   </button>
                 </div>
                 <pre className="text-xs text-theme-text-secondary whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-lg">
@@ -839,9 +841,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   <div className="w-16 h-16 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center mx-auto mb-4">
                     <Phone size={32} className="text-[#8b5cf6]" />
                   </div>
-                  <h2 className="text-2xl font-bold text-theme-text mb-1">AI Call Placed</h2>
+                  <h2 className="text-2xl font-bold text-theme-text mb-1">{t('pizza.aiCallPlaced')}</h2>
                   <p className="text-theme-text-secondary text-sm">
-                    {orderComplete.pizzeriaName ? `Calling ${orderComplete.pizzeriaName}` : 'Your order call is in progress'}
+                    {orderComplete.pizzeriaName ? t('pizza.callingPizzeria', { name: orderComplete.pizzeriaName }) : t('pizza.orderCallInProgress')}
                   </p>
                 </div>
 
@@ -854,7 +856,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   onClick={() => setOrderComplete(null)}
                   className="w-full btn-secondary mt-4"
                 >
-                  Close
+                  {t('pizza.close')}
                 </button>
               </>
             ) : (
@@ -862,9 +864,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 <div className="w-16 h-16 rounded-full bg-[#39d98a]/20 flex items-center justify-center mx-auto mb-4">
                   <Check size={32} className="text-[#39d98a]" />
                 </div>
-                <h2 className="text-2xl font-bold text-theme-text mb-2">Order Created!</h2>
+                <h2 className="text-2xl font-bold text-theme-text mb-2">{t('pizza.orderCreated')}</h2>
                 <p className="text-theme-text-secondary mb-6">
-                  Your order has been submitted successfully.
+                  {t('pizza.orderSubmitted')}
                 </p>
 
                 {orderComplete.checkoutUrl ? (
@@ -875,7 +877,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     className="w-full btn-primary flex items-center justify-center gap-2 mb-3"
                   >
                     <ExternalLink size={18} />
-                    Complete Payment
+                    {t('pizza.completePayment')}
                   </a>
                 ) : (
                   <p className="text-sm text-theme-text-muted mb-4">
@@ -887,7 +889,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                   onClick={() => setOrderComplete(null)}
                   className="w-full btn-secondary"
                 >
-                  Done
+                  {t('pizza.done')}
                 </button>
               </div>
             )}

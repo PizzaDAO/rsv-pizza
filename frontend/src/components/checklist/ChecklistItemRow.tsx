@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2, ExternalLink, AlertCircle } from 'lucide-react';
 import { ChecklistItem, AutoCompleteStates } from '../../types';
 import { Checkbox } from '../Checkbox';
@@ -41,6 +42,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
   onDelete,
   onNavigate,
 }) => {
+  const { t } = useTranslation('host');
   const completed = isItemCompleted(item, autoStates);
   const overdue = isOverdue(item.dueDate, completed);
   const dueDateStr = formatDueDate(item.dueDate);
@@ -86,7 +88,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
           )}
           {item.isAuto && (
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#5c7cfa]/15 text-[#5c7cfa] flex-shrink-0">
-              Auto
+              {t('checklist.auto')}
             </span>
           )}
         </div>
@@ -96,7 +98,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
           <div className="flex items-center gap-1 mt-0.5">
             {overdue && <AlertCircle size={10} className="text-red-400" />}
             <span className={`text-xs ${overdue ? 'text-red-400 font-medium' : 'text-theme-text-muted'}`}>
-              Due {dueDateStr}
+              {t('checklist.due', { date: dueDateStr })}
             </span>
           </div>
         )}
@@ -107,7 +109,7 @@ export const ChecklistItemRow: React.FC<ChecklistItemRowProps> = ({
         <button
           onClick={() => onDelete(item.id)}
           className="p-1.5 rounded-lg text-theme-text-faint hover:text-red-400 hover:bg-theme-surface-hover transition-all opacity-0 group-hover:opacity-100"
-          title="Delete task"
+          title={t('checklist.deleteTaskTitle')}
         >
           <Trash2 size={14} />
         </button>

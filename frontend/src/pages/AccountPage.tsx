@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza, Handshake, ExternalLink, Calendar } from 'lucide-react';
@@ -12,6 +13,7 @@ import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation('account');
 
   // Form state
   const [name, setName] = useState('');
@@ -174,12 +176,12 @@ export function AccountPage() {
     setUploadError(null);
 
     if (!file.type.startsWith('image/')) {
-      setUploadError('Please select an image file (JPEG, PNG, WebP, or GIF)');
+      setUploadError(t('profile.uploadError'));
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setUploadError('Image must be under 2 MB');
+      setUploadError(t('profile.uploadSizeError'));
       return;
     }
 
@@ -245,7 +247,7 @@ export function AccountPage() {
         if (uploadedUrl) {
           newProfilePictureUrl = uploadedUrl;
         } else {
-          setUploadError('Failed to upload photo. Try a smaller image (under 2 MB).');
+          setUploadError(t('profile.uploadFailed'));
         }
       } else if (
         profilePicture &&
@@ -352,8 +354,8 @@ export function AccountPage() {
           </button>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Your Profile</h1>
-            <p className="text-theme-text-secondary">Choose how you are displayed as a host or guest.</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('profile.title')}</h1>
+            <p className="text-theme-text-secondary">{t('profile.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
@@ -366,7 +368,7 @@ export function AccountPage() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder={t('profile.namePlaceholder')}
                 />
 
                 {/* Email */}
@@ -374,7 +376,7 @@ export function AccountPage() {
                   icon={Mail}
                   type="email"
                   value={email}
-                  placeholder="Your email"
+                  placeholder={t('profile.emailPlaceholder')}
                   disabled
                 />
               </div>
@@ -422,7 +424,7 @@ export function AccountPage() {
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Bio - Tell us about yourself..."
+              placeholder={t('profile.bioPlaceholder')}
               className="w-full"
               rows={3}
             />
@@ -535,13 +537,13 @@ export function AccountPage() {
             <div className="pt-6 border-t border-theme-stroke">
               <div className="flex items-center gap-3 mb-6">
                 <Pizza className="w-6 h-6 text-[#ff393a]" />
-                <h2 className="text-lg font-semibold text-theme-text">Pizza Preferences</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('profile.pizzaPreferences')}</h2>
               </div>
 
               {/* Dietary Restrictions */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-theme-text mb-3">
-                  Diet
+                  {t('profile.diet')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {DIETARY_OPTIONS.map((option) => (
@@ -563,7 +565,7 @@ export function AccountPage() {
               {/* Toppings */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-theme-text mb-3">
-                  Toppings
+                  {t('profile.toppings')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {TOPPINGS.map((topping) => {
@@ -617,7 +619,7 @@ export function AccountPage() {
               {/* Drinks */}
               <div>
                 <label className="block text-sm font-medium text-theme-text mb-3">
-                  Drink Preferences
+                  {t('profile.drinkPreferences')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {DRINKS.map((drink) => {
@@ -669,7 +671,7 @@ export function AccountPage() {
               <div className="pt-6 border-t border-theme-stroke">
                 <div className="flex items-center gap-3 mb-6">
                   <Handshake className="w-6 h-6 text-[#ff393a]" />
-                  <h2 className="text-lg font-semibold text-theme-text">Your Sponsorships</h2>
+                  <h2 className="text-lg font-semibold text-theme-text">{t('profile.sponsorships')}</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -746,7 +748,7 @@ export function AccountPage() {
                             {/* Submission date */}
                             <div className="flex items-center gap-1.5 mt-2 text-xs text-theme-text-faint">
                               <Calendar size={11} />
-                              Submitted {new Date(s.intakeSubmittedAt).toLocaleDateString()}
+                              {t('profile.submitted', { date: new Date(s.intakeSubmittedAt).toLocaleDateString() })}
                             </div>
                           </div>
                         </div>
@@ -768,14 +770,14 @@ export function AccountPage() {
                   {saving ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Saving...
+                      {t('profile.saving')}
                     </>
                   ) : saved ? (
-                    'Saved!'
+                    t('profile.saved')
                   ) : (
                     <>
                       <Save size={18} />
-                      Save
+                      {t('profile.save')}
                     </>
                   )}
                 </button>
@@ -790,7 +792,7 @@ export function AccountPage() {
               className="flex items-center gap-2 text-theme-text-secondary hover:text-theme-text transition-colors"
             >
               <LogOut size={18} />
-              Log Out
+              {t('profile.logOut')}
             </button>
 
             <button
@@ -798,7 +800,7 @@ export function AccountPage() {
               className="flex items-center gap-2 text-[#ff393a]/60 hover:text-[#ff393a] transition-colors"
             >
               <Trash2 size={18} />
-              Delete Account
+              {t('profile.deleteAccount')}
             </button>
           </div>
         </div>
@@ -812,13 +814,13 @@ export function AccountPage() {
                   <AlertTriangle size={24} className="text-[#ff393a]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-theme-text">Delete Account</h2>
-                  <p className="text-theme-text-secondary text-sm">This action cannot be undone</p>
+                  <h2 className="text-xl font-bold text-theme-text">{t('profile.deleteConfirmTitle')}</h2>
+                  <p className="text-theme-text-secondary text-sm">{t('profile.deleteConfirmSubtitle')}</p>
                 </div>
               </div>
 
               <p className="text-theme-text-secondary mb-6">
-                Are you sure you want to delete your account? All your data, including hosted parties and RSVP history, will be permanently removed.
+                {t('profile.deleteConfirmMessage')}
               </p>
 
               <div className="flex gap-3">
@@ -827,7 +829,7 @@ export function AccountPage() {
                   className="flex-1 btn-secondary"
                   disabled={deleting}
                 >
-                  Cancel
+                  {t('profile.cancel')}
                 </button>
                 <button
                   onClick={handleDeleteAccount}
@@ -837,12 +839,12 @@ export function AccountPage() {
                   {deleting ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Deleting...
+                      {t('profile.deleting')}
                     </>
                   ) : (
                     <>
                       <Trash2 size={18} />
-                      Delete Account
+                      {t('profile.deleteAccount')}
                     </>
                   )}
                 </button>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, ListChecks, Calendar } from 'lucide-react';
 import { IconInput } from '../IconInput';
 
@@ -13,6 +14,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
   onClose,
   saving = false,
 }) => {
+  const { t } = useTranslation('host');
   const [name, setName] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
     setError(null);
 
     if (!name.trim()) {
-      setError('Task name is required');
+      setError(t('checklist.taskNameRequired'));
       return;
     }
 
@@ -36,7 +38,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
     <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 p-4 z-50" onClick={onClose}>
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-theme-text">Add Task</h2>
+          <h2 className="text-lg font-semibold text-theme-text">{t('checklist.addTask')}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
@@ -51,7 +53,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
             icon={ListChecks}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Task name"
+            placeholder={t('checklist.taskNamePlaceholder')}
             required
             autoFocus
           />
@@ -63,10 +65,10 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              placeholder="Due date"
+              placeholder={t('checklist.dueDatePlaceholder')}
               style={{ colorScheme: 'dark' }}
             />
-            <p className="text-xs text-theme-text-muted mt-1">Optional due date</p>
+            <p className="text-xs text-theme-text-muted mt-1">{t('checklist.optionalDueDate')}</p>
           </div>
 
           {/* Error */}
@@ -82,7 +84,7 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
               disabled={saving}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Cancel
+              {t('checklist.cancel')}
             </button>
             <button
               type="submit"
@@ -92,10 +94,10 @@ export const ChecklistItemForm: React.FC<ChecklistItemFormProps> = ({
               {saving ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Adding...
+                  {t('checklist.adding')}
                 </>
               ) : (
-                'Add Task'
+                t('checklist.addTask')
               )}
             </button>
           </div>

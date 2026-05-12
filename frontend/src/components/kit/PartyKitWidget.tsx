@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Package, Gift, Loader2, AlertCircle } from 'lucide-react';
 import { PartyKit } from '../../types';
 import { getPartyKit, submitKitRequest, updateKitRequest, cancelKitRequest, KitRequestData } from '../../lib/api';
@@ -10,6 +11,7 @@ interface PartyKitWidgetProps {
 }
 
 export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
+  const { t } = useTranslation('host');
   const [loading, setLoading] = useState(true);
   const [kit, setKit] = useState<PartyKit | null>(null);
   const [kitDeadline, setKitDeadline] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
       }
     } catch (err) {
       console.error('Error loading kit:', err);
-      setError('Failed to load kit status');
+      setError(t('kit.failedToLoadKit'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +57,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
   };
 
   const handleCancelRequest = async () => {
-    if (!confirm('Are you sure you want to cancel your kit request?')) return;
+    if (!confirm(t('kit.cancelConfirm'))) return;
 
     setCanceling(true);
     try {
@@ -64,7 +66,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
         setKit(null);
       }
     } catch (err) {
-      setError('Failed to cancel request');
+      setError(t('kit.failedToCancel'));
     } finally {
       setCanceling(false);
     }
@@ -80,7 +82,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
       <div className="card p-6">
         <div className="flex items-center justify-center gap-2 text-theme-text-secondary">
           <Loader2 size={20} className="animate-spin" />
-          <span>Loading kit status...</span>
+          <span>{t('kit.loadingKitStatus')}</span>
         </div>
       </div>
     );
@@ -132,7 +134,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
             <div className="p-2 bg-theme-surface-hover rounded-lg">
               <Package size={20} className="text-theme-text-secondary" />
             </div>
-            <span className="font-medium text-theme-text">Party Kit</span>
+            <span className="font-medium text-theme-text">{t('kit.partyKit')}</span>
           </div>
         </div>
 
@@ -144,17 +146,17 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-theme-text mb-1">
-                Get Your Free Party Kit
+                {t('kit.getYourFreeKit')}
               </h3>
               <p className="text-sm text-theme-text-secondary mb-4">
-                Request a party kit with stickers, tablecloths, flyers, and more to make your pizza party amazing!
+                {t('kit.kitDescription')}
               </p>
 
               {kitDeadline && (
                 <p className={`text-xs mb-3 ${isDeadlinePassed ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {isDeadlinePassed
-                    ? 'Deadline has passed'
-                    : `Request by ${new Date(kitDeadline).toLocaleDateString()}`
+                    ? t('kit.deadlineHasPassed')
+                    : t('kit.requestBy', { date: new Date(kitDeadline).toLocaleDateString() })
                   }
                 </p>
               )}
@@ -165,7 +167,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
                 className="bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm flex items-center gap-2"
               >
                 <Gift size={16} />
-                Request Kit
+                {t('kit.requestKit')}
               </button>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { getPartnerIntake, submitPartnerIntake, PartnerIntakeData, PartnerIntakeResponse } from '../lib/api';
@@ -25,6 +26,7 @@ function partnerFormDataToIntakeData(data: PartnerFormData): PartnerIntakeData {
 }
 
 export function PartnerIntakePage() {
+  const { t } = useTranslation('partner');
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -89,9 +91,9 @@ export function PartnerIntakePage() {
       <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Link Not Found</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('intake.linkNotFound')}</h1>
           <p className="text-white/60">
-            This partner intake link is invalid, has expired, or has been revoked. Please contact the event host for a new link.
+            {t('intake.linkNotFoundDesc')}
           </p>
         </div>
       </div>
@@ -104,12 +106,12 @@ export function PartnerIntakePage() {
       <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center">
           <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Thank You!</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('intake.thankYou')}</h1>
           <p className="text-white/60 mb-4">
             Your partner information for <span className="text-white font-medium">{eventName}</span> has been submitted successfully.
           </p>
           <p className="text-white/40 text-sm">
-            You can revisit this link anytime to update your information.
+            {t('intake.revisitLink')}
           </p>
         </div>
       </div>
@@ -122,12 +124,12 @@ export function PartnerIntakePage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Thanks for partnering with {eventName}!
+            {t('intake.headerTitle', { eventName })}
           </h1>
           <p className="text-white/60">
             {previouslySubmitted
-              ? 'Update your partner information below.'
-              : 'Please fill out the form below so we can feature your brand at the event.'}
+              ? t('intake.headerDescUpdate')
+              : t('intake.headerDescNew')}
           </p>
         </div>
 

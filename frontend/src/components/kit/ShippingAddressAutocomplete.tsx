@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin } from 'lucide-react';
 
 export interface AddressComponents {
@@ -32,10 +33,11 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
   value,
   onChange,
   onAddressSelected,
-  placeholder = 'Search for address...',
+  placeholder,
   className = '',
   disabled = false,
 }) => {
+  const { t } = useTranslation('host');
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -213,7 +215,7 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder || t('kit.searchForAddress')}
         disabled={disabled}
         className={`w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-50 !pl-9 ${className}`}
       />

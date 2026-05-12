@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { EventForm } from '../components/EventForm';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +10,7 @@ import { fetchMyEvents } from '../lib/api';
 
 export function HomePage() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation('account');
 
   const [eventFilter, setEventFilter] = useState<'upcoming' | 'past'>('upcoming');
 
@@ -22,7 +24,7 @@ export function HomePage() {
 
   // Format party date for display
   const formatPartyDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Date TBD';
+    if (!dateStr) return t('home.dateTbd');
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
@@ -49,12 +51,12 @@ export function HomePage() {
     return (
       <Layout>
         <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-          Planning a Global Pizza Party? Create it at rsv.pizza/gpp
+          {t('home.gppBanner')}
         </Link>
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Your Events</h1>
-            <p className="text-theme-text-secondary">Events you're hosting or attending</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('home.yourEvents')}</h1>
+            <p className="text-theme-text-secondary">{t('home.eventsSubtitle')}</p>
           </div>
 
           {/* Upcoming/Past Toggle + Create Party Button */}
@@ -69,7 +71,7 @@ export function HomePage() {
                     : 'text-theme-text-secondary hover:text-theme-text'
                 }`}
               >
-                Upcoming
+                {t('home.upcoming')}
               </button>
               <button
                 type="button"
@@ -80,7 +82,7 @@ export function HomePage() {
                     : 'text-theme-text-secondary hover:text-theme-text'
                 }`}
               >
-                Past
+                {t('home.past')}
               </button>
             </div>
             <Link
@@ -88,7 +90,7 @@ export function HomePage() {
               className="btn-primary flex items-center gap-2"
             >
               <Plus size={18} />
-              Create Party
+              {t('home.createParty')}
             </Link>
           </div>
 
@@ -112,7 +114,7 @@ export function HomePage() {
                 if (filteredParties.length === 0) {
                   return (
                     <div className="text-center py-8 text-theme-text-muted">
-                      No {eventFilter} events
+                      {t('home.noEvents', { filter: eventFilter === 'upcoming' ? t('home.upcoming').toLowerCase() : t('home.past').toLowerCase() })}
                     </div>
                   );
                 }
@@ -143,7 +145,7 @@ export function HomePage() {
                         {party.role === 'host' && (
                           <span className="flex items-center gap-1 px-2 py-0.5 bg-[#ff393a]/20 border border-[#ff393a]/30 rounded-full text-xs text-[#ff393a] flex-shrink-0">
                             <Crown size={10} />
-                            Host
+                            {t('home.host')}
                           </span>
                         )}
                       </div>
@@ -162,7 +164,7 @@ export function HomePage() {
                         {party.guestCount !== undefined && (
                           <span className="flex items-center gap-1">
                             <Users size={12} />
-                            {party.guestCount} guest{party.guestCount !== 1 ? 's' : ''}
+                            {t('home.guest', { count: party.guestCount })}
                           </span>
                         )}
                       </div>

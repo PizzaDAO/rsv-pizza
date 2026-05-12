@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Monitor, Eye, Clock, ExternalLink, Copy, Edit2, Trash2, Power, PowerOff } from 'lucide-react';
 import { Display, DisplayContentType } from '../../types';
 
@@ -29,6 +30,7 @@ const contentTypeIcons: Record<DisplayContentType, string> = {
 };
 
 export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive }: DisplayCardProps) {
+  const { t } = useTranslation('host');
   const displayUrl = `${window.location.origin}/display/${partyId}/${display.slug}`;
 
   const copyUrl = () => {
@@ -48,7 +50,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'Just now';
+    if (diffMins < 1) return t('displays.justNow');
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
@@ -93,7 +95,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
             <h3 className="font-medium text-theme-text flex items-center gap-2">
               {display.name}
               {!display.isActive && (
-                <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">Inactive</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">{t('displays.inactive')}</span>
               )}
             </h3>
             <p className="text-sm text-theme-text-muted">
@@ -117,14 +119,14 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
         <button
           onClick={copyUrl}
           className="text-theme-text-muted hover:text-theme-text transition-colors"
-          title="Copy URL"
+          title={t('displays.copyUrl')}
         >
           <Copy size={14} />
         </button>
         <button
           onClick={openPreview}
           className="text-theme-text-muted hover:text-theme-text transition-colors"
-          title="Open Preview"
+          title={t('displays.openPreview')}
         >
           <ExternalLink size={14} />
         </button>
@@ -134,7 +136,7 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
       <div className="flex items-center gap-4 text-sm text-theme-text-muted mb-4">
         <div className="flex items-center gap-1">
           <Eye size={14} />
-          <span>{display.viewCount} views</span>
+          <span>{t('displays.views', { count: display.viewCount })}</span>
         </div>
         <div className="flex items-center gap-1">
           <Clock size={14} />
@@ -153,21 +155,21 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
           }`}
         >
           {display.isActive ? <PowerOff size={14} /> : <Power size={14} />}
-          {display.isActive ? 'Deactivate' : 'Activate'}
+          {display.isActive ? t('displays.deactivate') : t('displays.activate')}
         </button>
         <button
           onClick={() => onEdit(display)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-theme-surface hover:bg-theme-surface-hover text-theme-text-secondary transition-colors"
         >
           <Edit2 size={14} />
-          Edit
+          {t('displays.edit')}
         </button>
         <button
           onClick={() => onDelete(display)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
         >
           <Trash2 size={14} />
-          Delete
+          {t('displays.delete')}
         </button>
       </div>
     </div>

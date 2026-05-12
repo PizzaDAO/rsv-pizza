@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { Beer, Plus, X } from 'lucide-react';
 import { Checkbox } from './Checkbox';
 import { IconInput } from './IconInput';
 
 export const BeverageSettings: React.FC = () => {
+  const { t } = useTranslation('host');
   const { party, availableBeverages, updatePartyBeverages } = usePizza();
   const [selectedBeverages, setSelectedBeverages] = useState<string[]>(
     // Filter out old opaque custom-{timestamp} IDs on load — their names are lost
@@ -51,7 +53,7 @@ export const BeverageSettings: React.FC = () => {
     <div className="card p-6">
       <div className="flex items-center gap-2 mb-4">
         <Beer size={20} className="text-[#ff393a]" />
-        <h2 className="text-xl font-bold text-theme-text">Drinks</h2>
+        <h2 className="text-xl font-bold text-theme-text">{t('beverages.drinks')}</h2>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
@@ -94,7 +96,7 @@ export const BeverageSettings: React.FC = () => {
               addCustomBeverage();
             }
           }}
-          placeholder="Add custom drink"
+          placeholder={t('beverages.addCustomDrink')}
           className="flex-1"
         />
         <button
@@ -103,7 +105,7 @@ export const BeverageSettings: React.FC = () => {
           className="btn-secondary flex items-center gap-2 px-4"
         >
           <Plus size={18} />
-          Add
+          {t('beverages.add')}
         </button>
       </div>
     </div>

@@ -11,7 +11,8 @@ const SCORECARD_ITEMS = [
   'photo',
   'vouch',
   'pizza_selfie',
-  'sticker',
+  'sign_pizza_box',
+  'join_telegram',
   'follow_pizzadao',
   'signup_pizzadao',
 ] as const;
@@ -67,17 +68,32 @@ async function seedScorecardItems(guestId: string, partyId: string) {
     where: { guestId, partyId },
   });
 
-  if (existingItems.length > 0) return existingItems;
-
-  const items = SCORECARD_ITEMS.map((key) => ({
-    guestId,
-    partyId,
-    itemKey: key,
-    completed: false,
-    metadata: {},
-  }));
-
-  await prisma.guestScorecardItem.createMany({ data: items });
+  if (existingItems.length === 0) {
+    // First time: seed all items
+    const items = SCORECARD_ITEMS.map((key) => ({
+      guestId,
+      partyId,
+      itemKey: key,
+      completed: false,
+      metadata: {},
+    }));
+    await prisma.guestScorecardItem.createMany({ data: items });
+  } else {
+    // Backfill any missing items (e.g. new items added after initial seed)
+    const existingKeys = new Set(existingItems.map((i) => i.itemKey));
+    const missing = SCORECARD_ITEMS.filter((key) => !existingKeys.has(key));
+    if (missing.length > 0) {
+      await prisma.guestScorecardItem.createMany({
+        data: missing.map((key) => ({
+          guestId,
+          partyId,
+          itemKey: key,
+          completed: false,
+          metadata: {},
+        })),
+      });
+    }
+  }
 
   return prisma.guestScorecardItem.findMany({
     where: { guestId, partyId },

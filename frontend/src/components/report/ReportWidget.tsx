@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, FileText, AlertCircle, Save, Eye, EyeOff, Link2, Check, Copy, FileText as FileIcon, Lock, Palette, Link as LinkIcon, Camera } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { EventReport, Guest, PageViewStats as PageViewStatsType, LinkClickStats as LinkClickStatsType } from '../../types';
@@ -81,6 +82,7 @@ function buildFallbackReport(party: any, guests: Guest[]): EventReport {
 }
 
 export function ReportWidget({ partyId }: ReportWidgetProps) {
+  const { t } = useTranslation('host');
   const { party, guests } = usePizza();
   const [report, setReport] = useState<EventReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -352,8 +354,8 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       <div className="card p-8">
         <div className="text-center">
           <FileText className="w-16 h-16 text-theme-text-faint mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-theme-text mb-2">Event Report</h2>
-          <p className="text-theme-text-secondary">No event data available</p>
+          <h2 className="text-xl font-semibold text-theme-text mb-2">{t('report.eventReport')}</h2>
+          <p className="text-theme-text-secondary">{t('report.noEventData')}</p>
         </div>
       </div>
     );
@@ -364,12 +366,12 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-theme-text">Report Preview</h2>
+          <h2 className="text-xl font-semibold text-theme-text">{t('report.reportPreview')}</h2>
           <button
             onClick={() => setShowPreview(false)}
             className="btn-secondary text-sm py-2 px-4"
           >
-            Back to Editor
+            {t('report.backToEditor')}
           </button>
         </div>
         <ReportPreview report={report} pageViewStats={viewStats} />
@@ -383,22 +385,22 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-theme-text">Event Report</h2>
+            <h2 className="text-xl font-semibold text-theme-text">{t('report.eventReport')}</h2>
             <p className="text-theme-text-secondary text-sm mt-1">
-              Track engagement metrics and collect attendee social posts
+              {t('report.trackEngagement')}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {saving && (
               <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
                 <Loader2 size={14} className="animate-spin" />
-                Saving...
+                {t('report.saving')}
               </div>
             )}
             {saveSuccess && !saving && (
               <div className="flex items-center gap-2 text-green-400 text-sm">
                 <Check size={14} />
-                Saved
+                {t('report.saved')}
               </div>
             )}
             {error && (
@@ -414,14 +416,14 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               title="Save changes now"
             >
               <Save size={14} />
-              Save
+              {t('report.save')}
             </button>
             <button
               onClick={() => setShowPreview(true)}
               className="btn-primary text-sm py-2 px-3 flex items-center gap-1.5"
             >
               <FileIcon size={14} />
-              Preview Report
+              {t('report.previewReport')}
             </button>
           </div>
         </div>
@@ -447,7 +449,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
       {/* Event Details Section */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-theme-text mb-4">Event Details</h3>
+        <h3 className="text-lg font-semibold text-theme-text mb-4">{t('report.eventDetails')}</h3>
         <div className="space-y-4">
           {/* Recap */}
           <div>
@@ -457,9 +459,9 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               rows={4}
               value={report.reportRecap || ''}
               onChange={(e) => handleChange('reportRecap', (e.target as HTMLTextAreaElement).value || null)}
-              placeholder="Write a recap of your event..."
+              placeholder={t('report.writeRecap')}
             />
-            <p className="text-xs text-theme-text-faint mt-1">A summary of the event for the report</p>
+            <p className="text-xs text-theme-text-faint mt-1">{t('report.recapHint')}</p>
           </div>
 
           {/* Flyer Artist & URLs */}
@@ -469,14 +471,14 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               type="text"
               value={report.flyerArtist || ''}
               onChange={(e) => handleChange('flyerArtist', e.target.value || null)}
-              placeholder="Flyer artist credit"
+              placeholder={t('report.flyerArtistCredit')}
             />
             <IconInput
               icon={LinkIcon}
               type="url"
               value={report.flyerArtistUrl || ''}
               onChange={(e) => handleChange('flyerArtistUrl', e.target.value || null)}
-              placeholder="Flyer artist link"
+              placeholder={t('report.flyerArtistLink')}
             />
           </div>
 
@@ -485,7 +487,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
             type="url"
             value={report.reportPhotosUrl || ''}
             onChange={(e) => handleChange('reportPhotosUrl', e.target.value || null)}
-            placeholder="Raw photos / video drive link"
+            placeholder={t('report.rawPhotosDriveLink')}
           />
         </div>
       </div>
@@ -549,8 +551,8 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       {/* Featured Photos */}
       {report.featuredPhotos.length > 0 && (
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-theme-text mb-4">Featured Photos</h3>
-          <p className="text-theme-text-muted text-xs mb-3">Starred photos from the Photos tab appear here</p>
+          <h3 className="text-lg font-semibold text-theme-text mb-4">{t('report.featuredPhotos')}</h3>
+          <p className="text-theme-text-muted text-xs mb-3">{t('report.starredPhotosHint')}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {report.featuredPhotos.map((photo) => (
               <img
@@ -566,17 +568,17 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
       {/* Publish Section */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-theme-text mb-4">Publish Report</h3>
+        <h3 className="text-lg font-semibold text-theme-text mb-4">{t('report.publishReport')}</h3>
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
           {report.reportPublished ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-400">
                 <Eye size={16} />
-                <span className="text-sm font-medium">Report is published</span>
+                <span className="text-sm font-medium">{t('report.reportPublished')}</span>
                 {report.reportPassword && (
                   <span className="flex items-center gap-1 text-xs text-theme-text-muted bg-theme-surface px-2 py-0.5 rounded">
                     <Lock size={10} />
-                    Password protected
+                    {t('report.passwordProtected')}
                   </span>
                 )}
               </div>
@@ -592,12 +594,12 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                     {copiedLink ? (
                       <>
                         <Check size={14} />
-                        Copied
+                        {t('report.copied')}
                       </>
                     ) : (
                       <>
                         <Copy size={14} />
-                        Copy
+                        {t('report.copy')}
                       </>
                     )}
                   </button>
@@ -609,7 +611,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                   type="text"
                   value={reportPassword}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
-                  placeholder="Password (optional)"
+                  placeholder={t('report.passwordOptional')}
                 />
                 <button
                   onClick={async () => {
@@ -618,7 +620,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                   }}
                   className="btn-secondary text-sm py-2 px-3 whitespace-nowrap"
                 >
-                  Update
+                  {t('report.update')}
                 </button>
               </div>
               <button
@@ -631,20 +633,20 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                 ) : (
                   <EyeOff size={14} />
                 )}
-                Unpublish Report
+                {t('report.unpublishReport')}
               </button>
             </div>
           ) : (
             <div className="space-y-3">
               <p className="text-theme-text-secondary text-sm">
-                Publish your report to share it with a public link.
+                {t('report.publishDescription')}
               </p>
               <IconInput
                 icon={Lock}
                 type="text"
                 value={reportPassword}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
-                placeholder="Password (optional — leave empty for public access)"
+                placeholder={t('report.passwordPlaceholder')}
               />
               <button
                 onClick={handlePublish}
@@ -656,7 +658,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                 ) : (
                   <Link2 size={14} />
                 )}
-                Publish Report
+                {t('report.publishReport')}
               </button>
             </div>
           )}

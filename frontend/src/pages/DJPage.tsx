@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Music, Calendar, MapPin, Mic2, Disc3, ListMusic, ExternalLink, Clock, Instagram } from 'lucide-react';
 import { getEventBySlug, PublicEvent, getPerformers } from '../lib/api';
 import { Performer, Song, Playlist, MusicPlatform, PerformerType } from '../types';
@@ -53,6 +54,7 @@ function formatDuration(minutes: number | null): string {
 }
 
 export function DJPage() {
+  const { t } = useTranslation('partner');
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
 
@@ -139,10 +141,10 @@ export function DJPage() {
       <div className={`min-h-screen flex items-center justify-center p-4 ${themeClass}`} style={backgroundStyle}>
         <div className="card p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Page Not Found</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('dj.pageNotFound')}</h1>
           <p className="text-theme-text-secondary mb-6">{error}</p>
           <Link to="/" className="btn-primary inline-block">
-            Go to Home
+            {t('dj.goHome')}
           </Link>
         </div>
       </div>
@@ -197,7 +199,7 @@ export function DJPage() {
           <div className="flex items-center gap-3 mb-4">
             <Music size={24} className="text-[#ff393a]" />
             <div>
-              <p className="text-sm text-theme-text-muted uppercase tracking-wider font-medium">DJ / Music Info</p>
+              <p className="text-sm text-theme-text-muted uppercase tracking-wider font-medium">{t('dj.musicInfo')}</p>
               <h1 className="text-2xl font-bold text-theme-text" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
             </div>
           </div>
@@ -233,8 +235,8 @@ export function DJPage() {
         {!hasContent && (
           <div className="card p-8 text-center">
             <Music size={48} className="mx-auto mb-4 text-theme-text-faint" />
-            <p className="text-theme-text-muted text-lg">No music information available yet</p>
-            <p className="text-theme-text-faint text-sm mt-2">The host hasn't added any performers, songs, or playlists</p>
+            <p className="text-theme-text-muted text-lg">{t('dj.noMusicYet')}</p>
+            <p className="text-theme-text-faint text-sm mt-2">{t('dj.noMusicDesc')}</p>
           </div>
         )}
 
@@ -243,7 +245,7 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Mic2 size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-theme-text">Lineup</h2>
+              <h2 className="text-lg font-semibold text-theme-text">{t('dj.lineup')}</h2>
             </div>
 
             <div className="space-y-3">
@@ -283,12 +285,12 @@ export function DJPage() {
                       {/* Equipment */}
                       {performer.equipmentNotes && (
                         <div className="mt-2 text-sm text-yellow-400/80 bg-yellow-400/10 border border-yellow-400/20 rounded-lg px-3 py-2">
-                          Equipment: {performer.equipmentNotes}
+                          {t('dj.equipment')}: {performer.equipmentNotes}
                         </div>
                       )}
                       {performer.equipmentProvided && !performer.equipmentNotes && (
                         <div className="mt-2 text-sm text-green-400/80">
-                          Bringing own equipment
+                          {t('dj.bringingOwn')}
                         </div>
                       )}
 
@@ -339,7 +341,7 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Disc3 size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-theme-text">Requested Songs</h2>
+              <h2 className="text-lg font-semibold text-theme-text">{t('dj.requestedSongs')}</h2>
             </div>
 
             <div className="space-y-2">
@@ -377,7 +379,7 @@ export function DJPage() {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <ListMusic size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-theme-text">Playlists</h2>
+              <h2 className="text-lg font-semibold text-theme-text">{t('dj.playlists')}</h2>
             </div>
 
             <div className="space-y-2">
@@ -414,7 +416,7 @@ export function DJPage() {
             to={`/${event.customUrl || event.inviteCode}`}
             className="text-theme-text-muted hover:text-theme-text-secondary text-sm transition-colors"
           >
-            View Event Page
+            {t('dj.viewEventPage')}
           </Link>
         </div>
 

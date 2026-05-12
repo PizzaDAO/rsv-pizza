@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, MapPin, Wallet, BarChart3, TrendingUp, Mail } from 'lucide-react';
 import type { UnderbossStats } from '../../types';
 
@@ -49,21 +50,22 @@ function CompletionBar({ label, percent }: { label: string; percent: number }) {
 }
 
 export function RegionStats({ stats }: RegionStatsProps) {
+  const { t } = useTranslation('partner');
   return (
     <div className="space-y-4">
       {/* Top stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard
           icon={BarChart3}
-          label="Events"
+          label={t('regionStats.events')}
           value={stats.totalEvents}
           color="bg-blue-500/20 text-blue-400"
         />
         <StatCard
           icon={Users}
-          label="Total RSVPs"
+          label={t('regionStats.totalRsvps')}
           value={stats.totalRsvps}
-          subValue={`~${stats.avgRsvpsPerEvent} per event`}
+          subValue={t('regionStats.perEvent', { avg: stats.avgRsvpsPerEvent })}
           color="bg-purple-500/20 text-purple-400"
         />
         <StatCard
@@ -74,19 +76,19 @@ export function RegionStats({ stats }: RegionStatsProps) {
         />
         <StatCard
           icon={Users}
-          label="Approved"
+          label={t('regionStats.approved')}
           value={stats.totalApproved}
           color="bg-green-500/20 text-green-400"
         />
         <StatCard
           icon={MapPin}
-          label="With Venue"
+          label={t('regionStats.withVenue')}
           value={stats.eventsWithVenue}
           color="bg-orange-500/20 text-orange-400"
         />
         <StatCard
           icon={Wallet}
-          label="With Budget"
+          label={t('regionStats.withBudget')}
           value={stats.eventsWithBudget}
           color="bg-yellow-500/20 text-yellow-400"
         />
@@ -96,11 +98,11 @@ export function RegionStats({ stats }: RegionStatsProps) {
       <div className="card p-4">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={14} className="text-theme-text-muted" />
-          <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion Rates</span>
+          <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('regionStats.completionRates')}</span>
         </div>
         <div className="space-y-3">
-          <CompletionBar label="Venue" percent={stats.completionRate.venue} />
-          <CompletionBar label="Budget" percent={stats.completionRate.budget} />
+          <CompletionBar label={t('regionStats.venue')} percent={stats.completionRate.venue} />
+          <CompletionBar label={t('regionStats.budget')} percent={stats.completionRate.budget} />
         </div>
       </div>
     </div>

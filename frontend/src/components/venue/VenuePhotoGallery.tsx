@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { VenuePhoto } from '../../types';
 import { deleteVenuePhoto } from '../../lib/api';
@@ -18,6 +19,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
   onPhotoDeleted,
   readOnly = false,
 }) => {
+  const { t } = useTranslation('host');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -156,7 +158,7 @@ export const VenuePhotoGallery: React.FC<VenuePhotoGalleryProps> = ({
               <p className="text-theme-text text-sm mt-3 text-center">{photos[lightboxIndex].caption}</p>
             )}
             <p className="text-theme-text-muted text-xs mt-1">
-              {lightboxIndex + 1} of {photos.length}
+              {lightboxIndex + 1} {t('venue.of')} {photos.length}
             </p>
           </div>
         </div>

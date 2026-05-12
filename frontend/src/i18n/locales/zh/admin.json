@@ -1,0 +1,146 @@
+{
+  "title": "管理面板",
+  "subtitle": "管理管理员和 underboss",
+  "accessDenied": "访问被拒绝",
+  "accessDeniedDesc": "您没有管理员权限。请使用管理员账户登录。",
+  "admins": {
+    "title": "管理员",
+    "emailPlaceholder": "邮箱地址",
+    "namePlaceholder": "姓名（可选）",
+    "addAdmin": "添加管理员",
+    "noAdmins": "未找到管理员",
+    "superAdmin": "超级管理员",
+    "admin": "管理员",
+    "removeAdmin": "移除管理员",
+    "tableHeaders": {
+      "email": "邮箱",
+      "name": "姓名",
+      "role": "角色",
+      "added": "添加时间"
+    }
+  },
+  "underboss": {
+    "title": "Underboss",
+    "namePlaceholder": "姓名",
+    "emailPlaceholder": "邮箱",
+    "regions": "区域",
+    "addUnderboss": "添加 Underboss",
+    "noUnderbosses": "暂无 underboss",
+    "active": "活跃",
+    "inactive": "未激活",
+    "deactivate": "停用",
+    "tableHeaders": {
+      "name": "姓名",
+      "email": "邮箱",
+      "regions": "区域",
+      "status": "状态",
+      "actions": "操作"
+    }
+  },
+  "partners": {
+    "title": "合作伙伴",
+    "emailPlaceholder": "邮箱地址",
+    "tagPlaceholder": "合作伙伴标签（例如：swc）",
+    "namePlaceholder": "姓名（可选）",
+    "addPartner": "添加合作伙伴",
+    "noPartners": "暂无合作伙伴",
+    "active": "活跃",
+    "inactive": "未激活",
+    "deactivatePartner": "停用合作伙伴",
+    "tableHeaders": {
+      "email": "邮箱",
+      "name": "姓名",
+      "tag": "标签",
+      "status": "状态",
+      "added": "添加时间"
+    }
+  },
+  "checklist": {
+    "title": "活动设置清单",
+    "auto": "（自动）",
+    "noItems": "未找到清单项目。项目在 GPP 主办方首次查看清单时创建。",
+    "saving": "保存中...",
+    "saveChecklistDates": "保存清单日期",
+    "newItemPlaceholder": "新清单项目...",
+    "adding": "添加中...",
+    "addItem": "添加项目"
+  },
+  "gppDescription": {
+    "title": "GPP 默认描述",
+    "statsText": "{{totalEvents}} 个活动中有 {{defaultCount}} 个使用默认描述",
+    "placeholder": "新 GPP 活动的默认描述...",
+    "saving": "保存中...",
+    "saveAndApply": "保存并应用到默认活动",
+    "customDescriptions": "{{count}} 个活动有自定义描述",
+    "customDescriptions_plural": "{{count}} 个活动有自定义描述"
+  },
+  "nft": {
+    "title": "GPP NFT 设置",
+    "enableNft": "为所有 GPP 活动启用 NFT 铸造",
+    "saving": "保存中...",
+    "saveSettings": "保存 GPP NFT 设置"
+  },
+  "underbossDashboard": {
+    "title": "Underboss 仪表盘",
+    "loginPrompt": "请登录以访问 underboss 仪表盘。",
+    "logIn": "登录",
+    "loadingDashboard": "正在加载仪表盘...",
+    "error": "错误",
+    "notAuthorized": "您无权访问 underboss 仪表盘。",
+    "gppSubtitle": "Global Pizza Party",
+    "underbossSubtitle": "Underboss 仪表盘",
+    "signedInAdmin": "以管理员身份登录（{{email}}）",
+    "signedInAs": "以 {{name}} 身份登录",
+    "addUnderboss": "添加 Underboss",
+    "noRegions": "无区域",
+    "allRegions": "所有区域",
+    "regionsCount": "{{count}} 个区域",
+    "selectAll": "所有区域",
+    "underbossCreated": "Underboss 已创建！",
+    "creating": "创建中...",
+    "createUnderboss": "创建 Underboss",
+    "tabs": {
+      "events": "活动",
+      "cities": "城市",
+      "partners": "合作伙伴"
+    }
+  },
+  "graphics": {
+    "title": "设计仪表盘",
+    "loginPrompt": "登录以审核活动传单。",
+    "logIn": "登录",
+    "error": "错误",
+    "accessDenied": "访问被拒绝",
+    "accessDeniedDesc": "您需要 underboss 或管理员权限才能查看此页面。",
+    "events": "{{count}} 个活动",
+    "showing": "显示 {{count}} 个",
+    "searchPlaceholder": "搜索活动、主办方...",
+    "regionAll": "区域：全部",
+    "staleFlyers": "过期传单",
+    "generateMissing": "生成缺失（{{count}}）",
+    "generating": "正在生成 {{current}}/{{total}}...",
+    "noEventsMatch": "没有匹配您筛选条件的活动。",
+    "newPartners": "新合作伙伴",
+    "viewEvent": "查看活动"
+  },
+  "postComposer": {
+    "title": "帖子编辑器",
+    "accessDenied": "访问被拒绝",
+    "accessDeniedDesc": "您没有管理员权限。请使用管理员账户登录。",
+    "searchEvents": "搜索活动...",
+    "copyToClipboard": "复制到剪贴板",
+    "copied": "已复制！"
+  },
+  "shipping": {
+    "title": "物流仪表盘",
+    "loginPrompt": "请登录以访问物流仪表盘。",
+    "logIn": "登录",
+    "loading": "正在加载物流仪表盘...",
+    "accessDenied": "访问被拒绝",
+    "allRegions": "所有区域",
+    "subtitle": "Global Pizza Party · 物流仪表盘",
+    "signedInAdmin": "以管理员身份登录（{{email}}）",
+    "signedInAs": "以 {{name}} 身份登录",
+    "kitRequests": "套装申请（{{count}}）"
+  }
+}

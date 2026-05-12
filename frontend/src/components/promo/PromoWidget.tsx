@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share2, Globe, Mail, UserPlus } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { SocialComposer } from './SocialComposer';
@@ -18,38 +19,39 @@ interface SectionConfig {
 const SECTIONS: SectionConfig[] = [
   {
     id: 'social',
-    label: 'Social Media',
-    description: 'Share on X, Instagram, Facebook, LinkedIn',
+    label: 'promo.socialMedia',
+    description: 'promo.socialMediaDesc',
     icon: Share2,
   },
   {
     id: 'publish',
-    label: 'Publish Event',
-    description: 'Create listings on Luma, Meetup, Eventbrite',
+    label: 'promo.publishEvent',
+    description: 'promo.publishEventDesc',
     icon: Globe,
   },
   {
     id: 'email',
-    label: 'Email Guests',
-    description: 'Send updates to your guest list',
+    label: 'promo.emailGuests',
+    description: 'promo.emailGuestsDesc',
     icon: Mail,
   },
   {
     id: 'invite',
-    label: 'Invite Guests',
-    description: 'Upload a CSV to send bulk invites',
+    label: 'promo.inviteGuests',
+    description: 'promo.inviteGuestsDesc',
     icon: UserPlus,
   },
 ];
 
 export const PromoWidget: React.FC = () => {
+  const { t } = useTranslation('host');
   const { party, guests } = usePizza();
   const [expandedSection, setExpandedSection] = useState<PromoSection | null>('social');
 
   if (!party) {
     return (
       <div className="card p-6 text-theme-text-secondary">
-        No party loaded
+        {t('promo.noPartyLoaded')}
       </div>
     );
   }
@@ -77,8 +79,8 @@ export const PromoWidget: React.FC = () => {
                   <Icon size={20} className="text-[#ff393a]" />
                 </div>
                 <div className="text-left">
-                  <p className="text-theme-text font-medium">{section.label}</p>
-                  <p className="text-theme-text-muted text-xs">{section.description}</p>
+                  <p className="text-theme-text font-medium">{t(section.label)}</p>
+                  <p className="text-theme-text-muted text-xs">{t(section.description)}</p>
                 </div>
               </div>
               <svg

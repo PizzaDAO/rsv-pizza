@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "Organize uma Festa Global de Pizza | RSV.Pizza",
+    "description": "Junte-se à celebração mundial da pizza! Organize uma Festa Global de Pizza na sua cidade e conecte-se com amantes de pizza ao redor do mundo."
+  },
+  "header": {
+    "logIn": "Entrar / Cadastrar"
+  },
+  "form": {
+    "title": "Crie Seu Evento",
+    "subtitle": "Preencha seus dados para começar",
+    "cityPlaceholder": "Em qual cidade você está organizando?",
+    "namePlaceholder": "Qual é o seu nome?",
+    "telegramPlaceholder": "Usuário do Telegram",
+    "telegramHint": "Para que possamos adicioná-lo ao grupo de organizadores",
+    "emailPlaceholder": "Endereço de email",
+    "emailHint": "Enviaremos um código de login para gerenciar seu evento",
+    "submit": "Criar Seu Evento",
+    "submitting": "Criando Seu Evento...",
+    "selectCity": "Por favor, selecione uma cidade das sugestões."
+  },
+  "map": {
+    "title": "Festa Global de Pizza do Ano Passado",
+    "subtitle": "Veja onde comunidades ao redor do mundo se reuniram pela pizza",
+    "openFullMap": "Abrir Mapa Completo"
+  },
+  "success": {
+    "pageTitle": "Evento Criado! | Festa Global de Pizza",
+    "signedIn": "Você está logado!",
+    "redirecting": "Redirecionando para seu painel de organizador...",
+    "title": "Sua Festa Global de Pizza está no Ar!",
+    "created": "{{eventName}} foi criado.",
+    "otpPrompt": "Insira o código de 6 dígitos que enviamos para {{email}}",
+    "verifying": "Verificando...",
+    "returnHome": "Voltar ao Início",
+    "checkSpam": "Não recebeu o código? Verifique sua pasta de spam."
+  }
+}

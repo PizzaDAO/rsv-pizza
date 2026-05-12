@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -46,6 +47,7 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
 }
 
 export function UnderbossDashboard() {
+  const { t } = useTranslation('admin');
   const { user, loading: authLoading } = useAuth();
   const themeClass = 'gpp-theme';
   const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -102,13 +104,13 @@ export function UnderbossDashboard() {
 
   // Derive the region label for the header
   const regionLabel = useMemo(() => {
-    if (selectedRegions.length === 0) return 'No Regions';
-    if (selectedRegions.length === availableRegions.length) return 'All Regions';
+    if (selectedRegions.length === 0) return t('underbossDashboard.noRegions');
+    if (selectedRegions.length === availableRegions.length) return t('underbossDashboard.allRegions');
     if (selectedRegions.length === 1) {
       return GPP_REGIONS.find((r) => r.id === selectedRegions[0])?.label || selectedRegions[0];
     }
-    return `${selectedRegions.length} Regions`;
-  }, [selectedRegions, availableRegions.length]);
+    return t('underbossDashboard.regionsCount', { count: selectedRegions.length });
+  }, [selectedRegions, availableRegions.length, t]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -222,16 +224,16 @@ export function UnderbossDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-500/60" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Underboss Dashboard</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('underbossDashboard.title')}</h1>
           <p className="text-theme-text-muted mb-6">
-            Please log in to access the underboss dashboard.
+            {t('underbossDashboard.loginPrompt')}
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
           >
             <LogIn size={18} />
-            Log In
+            {t('underbossDashboard.logIn')}
           </button>
         </div>
         <Footer />
@@ -247,7 +249,7 @@ export function UnderbossDashboard() {
         <Header />
         <div className="flex flex-col items-center justify-center py-32">
           <Loader2 size={32} className="animate-spin text-theme-text-muted mb-4" />
-          <p className="text-theme-text-muted text-sm">Loading dashboard...</p>
+          <p className="text-theme-text-muted text-sm">{t('underbossDashboard.loadingDashboard')}</p>
         </div>
         <Footer />
       </div>
@@ -261,7 +263,7 @@ export function UnderbossDashboard() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400/60" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Error</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('underbossDashboard.error')}</h1>
           <p className="text-theme-text-muted">{error}</p>
         </div>
         <Footer />
@@ -330,7 +332,7 @@ export function UnderbossDashboard() {
                           }`}>
                             {selectedRegions.length === availableRegions.length && <Check size={12} className="text-theme-text" />}
                           </div>
-                          All Regions
+                          {t('underbossDashboard.selectAll')}
                         </button>
                         <div className="border-b border-theme-stroke my-1" />
                         {filteredGppRegions.map((r) => (
@@ -360,7 +362,7 @@ export function UnderbossDashboard() {
                 <h1 className="text-2xl font-bold text-theme-text">{regionLabel}</h1>
               )}
               <p className="text-sm text-theme-text-muted">
-                Global Pizza Party &middot; Underboss Dashboard
+                {t('underbossDashboard.gppSubtitle')} &middot; {t('underbossDashboard.underbossSubtitle')}
               </p>
             </div>
           </div>
@@ -369,8 +371,8 @@ export function UnderbossDashboard() {
               <Shield size={14} />
               <span>
                 {isAdmin
-                  ? `Signed in as Admin (${filteredData.underboss.email})`
-                  : `Signed in as ${filteredData.underboss.name}`}
+                  ? t('underbossDashboard.signedInAdmin', { email: filteredData.underboss.email })
+                  : t('underbossDashboard.signedInAs', { name: filteredData.underboss.name })}
               </span>
             </div>
             {isAdmin && (
@@ -379,7 +381,7 @@ export function UnderbossDashboard() {
                 className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
               >
                 <UserPlus size={14} />
-                Add Underboss
+                {t('underbossDashboard.addUnderboss')}
               </button>
             )}
           </div>
@@ -401,7 +403,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              Events ({filteredData.events.length})
+              {t('underbossDashboard.tabs.events')} ({filteredData.events.length})
               {activeTab === 'events' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -414,7 +416,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              Cities
+              {t('underbossDashboard.tabs.cities')}
               {activeTab === 'cities' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -427,7 +429,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              Partners
+              {t('underbossDashboard.tabs.partners')}
               {activeTab === 'partners' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -443,7 +445,7 @@ export function UnderbossDashboard() {
           )}
 
           {activeTab === 'partners' && (
-            <PartnerManager isAdmin={isAdmin} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
 
 
@@ -461,7 +463,7 @@ export function UnderbossDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUnderboss(false)}>
           <div className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-theme-text">Add Underboss</h3>
+              <h3 className="text-lg font-semibold text-theme-text">{t('underbossDashboard.addUnderboss')}</h3>
               <button onClick={() => setShowAddUnderboss(false)} className="text-theme-text-faint hover:text-theme-text-secondary">
                 <X size={20} />
               </button>
@@ -469,7 +471,7 @@ export function UnderbossDashboard() {
 
             {addUbSuccess ? (
               <div className="text-center py-6">
-                <p className="text-green-400 font-medium mb-2">Underboss created!</p>
+                <p className="text-green-400 font-medium mb-2">{t('underbossDashboard.underbossCreated')}</p>
                 <button
                   onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); }}
                   className="text-sm text-theme-text-muted hover:text-theme-text-secondary"
@@ -540,7 +542,7 @@ export function UnderbossDashboard() {
                   disabled={addUbLoading || newUbRegions.length === 0}
                   className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {addUbLoading ? 'Creating...' : 'Create Underboss'}
+                  {addUbLoading ? t('underbossDashboard.creating') : t('underbossDashboard.createUnderboss')}
                 </button>
               </form>
             )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Gift, Trophy, Loader2, CheckCircle, Users } from 'lucide-react';
 import { Raffle, RaffleStatus } from '../../types';
 import { getRaffles, enterRaffle } from '../../lib/api';
@@ -10,6 +11,7 @@ interface RaffleEntryProps {
 }
 
 export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
+  const { t } = useTranslation('host');
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [loading, setLoading] = useState(true);
   const [enteringRaffle, setEnteringRaffle] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
 
   const handleEnterRaffle = async (raffleId: string) => {
     if (!guestId) {
-      setError('You must RSVP to enter the raffle');
+      setError(t('raffle.mustRsvp'));
       return;
     }
 
@@ -46,7 +48,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
     try {
       const result = await enterRaffle(partyId, raffleId, guestId);
       if (result) {
-        setSuccessMessage('You have been entered into the raffle!');
+        setSuccessMessage(t('raffle.enteredSuccess'));
         await loadRaffles(); // Refresh to show updated entry count
       }
     } catch (err: any) {
@@ -86,7 +88,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
     <div className="border-t border-theme-stroke pt-6 mt-6 space-y-4">
       <div className="flex items-center gap-3 mb-4">
         <Gift className="w-6 h-6 text-[#ff393a]" />
-        <h2 className="text-xl font-semibold text-theme-text">Raffles</h2>
+        <h2 className="text-xl font-semibold text-theme-text">{t('raffle.raffles')}</h2>
       </div>
 
       {error && (
@@ -124,7 +126,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
                     <h3 className="font-semibold text-theme-text">{raffle.name}</h3>
                     {raffle.status === 'drawn' && (
                       <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full">
-                        Drawn
+                        {t('raffle.drawn')}
                       </span>
                     )}
                   </div>
@@ -136,7 +138,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
                 {/* Entry count */}
                 <div className="flex items-center gap-1 text-sm text-theme-text-secondary">
                   <Users size={14} />
-                  <span>{entryCount} entries</span>
+                  <span>{t('raffle.entryCount', { count: entryCount })}</span>
                 </div>
               </div>
 
@@ -171,7 +173,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
                 <div className="mt-4 p-3 bg-yellow-500/20 rounded-lg flex items-center gap-3">
                   <Trophy className="w-6 h-6 text-yellow-500" />
                   <div>
-                    <p className="font-semibold text-yellow-400">Congratulations, you won!</p>
+                    <p className="font-semibold text-yellow-400">{t('raffle.congratulations')}</p>
                     <p className="text-sm text-yellow-400/80">
                       {winnerStatus.prizes.join(', ')}
                     </p>
@@ -185,7 +187,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
                   {entered ? (
                     <div className="flex items-center gap-2 text-green-400">
                       <CheckCircle size={18} />
-                      <span className="text-sm font-medium">You're in the raffle!</span>
+                      <span className="text-sm font-medium">{t('raffle.youreInRaffle')}</span>
                     </div>
                   ) : (
                     <button
@@ -196,19 +198,19 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
                       {enteringRaffle === raffle.id ? (
                         <>
                           <Loader2 size={18} className="animate-spin" />
-                          Entering...
+                          {t('raffle.entering')}
                         </>
                       ) : (
                         <>
                           <Gift size={18} />
-                          Enter Raffle
+                          {t('raffle.enterRaffle')}
                         </>
                       )}
                     </button>
                   )}
                   {!guestId && (
                     <p className="text-xs text-theme-text-muted text-center mt-2">
-                      RSVP to this event to enter the raffle
+                      {t('raffle.rsvpToEnter')}
                     </p>
                   )}
                 </div>
@@ -217,7 +219,7 @@ export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
               {/* Show all winners if drawn */}
               {raffle.status === 'drawn' && raffle.winners.length > 0 && !winnerStatus.won && (
                 <div className="mt-4 pt-3 border-t border-theme-stroke">
-                  <p className="text-sm font-medium text-theme-text mb-2">Winners:</p>
+                  <p className="text-sm font-medium text-theme-text mb-2">{t('raffle.winnersLabel')}</p>
                   <div className="flex flex-wrap gap-2">
                     {raffle.winners.map((winner) => (
                       <div

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, AlertCircle, MapPin, Info, Gift, Package, Star, Check, User, Home, Building, Hash, Globe, Phone, StickyNote } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { KIT_TIERS, PartyKit } from '../../types';
@@ -57,13 +58,14 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
   existingKit,
   kitDeadline,
 }) => {
+  const { t } = useTranslation('host');
   const [recipientName, setRecipientName] = useState(existingKit?.recipientName || '');
   const [addressLine1, setAddressLine1] = useState(existingKit?.addressLine1 || '');
   const [addressLine2, setAddressLine2] = useState(existingKit?.addressLine2 || '');
   const [city, setCity] = useState(existingKit?.city || '');
   const [state, setState] = useState(existingKit?.state || '');
   const [postalCode, setPostalCode] = useState(existingKit?.postalCode || '');
-  const [country, setCountry] = useState(existingKit?.country || 'USA');
+  const [country, setCountry] = useState(existingKit?.country || '');
   const [phone, setPhone] = useState(existingKit?.phone || '');
   const [notes, setNotes] = useState(existingKit?.notes || '');
   const [submitting, setSubmitting] = useState(false);
@@ -101,7 +103,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
 
     // Validate required fields
     if (!recipientName.trim() || !addressLine1.trim() || !city.trim() || !postalCode.trim() || !country.trim()) {
-      setError('Please fill in all required fields');
+      setError(t('kit.requiredFieldsError'));
       return;
     }
 
@@ -134,7 +136,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <h2 className="text-lg font-semibold text-theme-text">
-            {isEditing ? 'Edit Kit Request' : 'Request Party Kit'}
+            {isEditing ? t('kit.editKitRequest') : t('kit.requestPartyKit')}
           </h2>
           <button
             onClick={onClose}
@@ -151,9 +153,9 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
               <AlertCircle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm text-yellow-400 font-medium">Deadline</p>
+                <p className="text-sm text-yellow-400 font-medium">{t('kit.deadline')}</p>
                 <p className="text-xs text-theme-text-secondary">
-                  Kit requests must be submitted by {new Date(kitDeadline).toLocaleDateString()}
+                  {t('kit.deadlineDesc', { date: new Date(kitDeadline).toLocaleDateString() })}
                 </p>
               </div>
             </div>
@@ -163,9 +165,9 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
               <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm text-red-400 font-medium">Deadline Passed</p>
+                <p className="text-sm text-red-400 font-medium">{t('kit.deadlinePassed')}</p>
                 <p className="text-xs text-theme-text-secondary">
-                  The deadline for requesting a kit has passed.
+                  {t('kit.deadlinePassedDesc')}
                 </p>
               </div>
             </div>
@@ -176,9 +178,9 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             <div className="flex items-start gap-3 mb-3">
               <Info size={18} className="text-[#ff393a] flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm text-theme-text font-medium">Party Kit Request</p>
+                <p className="text-sm text-theme-text font-medium">{t('kit.partyKitRequest')}</p>
                 <p className="text-xs text-theme-text-secondary mt-1">
-                  PizzaDAO will review your event and assign the appropriate kit tier based on your party size and requirements.
+                  {t('kit.partyKitRequestDesc')}
                 </p>
               </div>
             </div>
@@ -210,7 +212,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
             <div className="flex items-center gap-2 mb-3">
               <MapPin size={16} className="text-theme-text-secondary" />
               <label className="text-sm font-medium text-theme-text">
-                Shipping Address
+                {t('kit.shippingAddress')}
               </label>
             </div>
 
@@ -220,7 +222,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 type="text"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="Recipient Name"
+                placeholder={t('kit.recipientNamePlaceholder')}
                 required
                 disabled={isDeadlinePassed}
               />
@@ -229,7 +231,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 value={addressLine1}
                 onChange={setAddressLine1}
                 onAddressSelected={handleAddressSelected}
-                placeholder="Address Line 1 *"
+                placeholder={t('kit.addressLine1Placeholder')}
                 disabled={isDeadlinePassed}
               />
 
@@ -238,7 +240,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 type="text"
                 value={addressLine2}
                 onChange={(e) => setAddressLine2(e.target.value)}
-                placeholder="Address Line 2 (Apt, Suite, etc.)"
+                placeholder={t('kit.addressLine2Placeholder')}
                 disabled={isDeadlinePassed}
               />
 
@@ -248,7 +250,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="City"
+                  placeholder={t('kit.cityPlaceholder')}
                   required
                   disabled={isDeadlinePassed}
                 />
@@ -257,7 +259,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                   type="text"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  placeholder="State/Province"
+                  placeholder={t('kit.statePlaceholder')}
                   disabled={isDeadlinePassed}
                 />
               </div>
@@ -268,7 +270,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                   type="text"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="Postal Code"
+                  placeholder={t('kit.postalCodePlaceholder')}
                   required
                   disabled={isDeadlinePassed}
                 />
@@ -279,7 +281,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                     list="country-list"
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
-                    placeholder="Country"
+                    placeholder={t('kit.countryPlaceholder')}
                     required
                     disabled={isDeadlinePassed}
                   />
@@ -301,7 +303,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Phone (optional)"
+                placeholder={t('kit.phonePlaceholder')}
                 disabled={isDeadlinePassed}
               />
             </div>
@@ -315,7 +317,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Special requests or notes (optional)"
+              placeholder={t('kit.notesPlaceholder')}
               disabled={isDeadlinePassed}
             />
           </div>
@@ -334,7 +336,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
               onClick={onClose}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Cancel
+              {t('kit.cancel')}
             </button>
             <button
               type="submit"
@@ -344,10 +346,10 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
               {submitting ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  {isEditing ? 'Updating...' : 'Submitting...'}
+                  {isEditing ? t('kit.updating') : t('kit.submitting')}
                 </>
               ) : (
-                isEditing ? 'Update Request' : 'Submit Request'
+                isEditing ? t('kit.updateRequest') : t('kit.submitRequest')
               )}
             </button>
           </div>

@@ -1,0 +1,26 @@
+{
+  "title": "Enregistrement des invités",
+  "loading": "Enregistrement de l'invité...",
+  "success": {
+    "title": "Enregistré !",
+    "backToDashboard": "Retour au tableau de bord"
+  },
+  "alreadyCheckedIn": {
+    "title": "Déjà enregistré",
+    "checkedInAt": "Enregistré à {{time}}"
+  },
+  "unauthorized": {
+    "title": "Non autorisé",
+    "message": "Vous n'êtes pas autorisé à enregistrer les invités de cet événement. Seuls les hôtes et co-hôtes peuvent enregistrer les invités.",
+    "goHome": "Accueil"
+  },
+  "notFound": {
+    "title": "Introuvable",
+    "goHome": "Accueil"
+  },
+  "error": {
+    "title": "Échec de l'enregistrement",
+    "tryAgain": "Réessayer",
+    "goHome": "Accueil"
+  }
+}

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isAdmin } from '../middleware/auth.js';
 import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
@@ -362,6 +363,12 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
         isHost = true;
         canEdit = true;
       }
+    }
+
+    // Admin/superadmin bypass password on all events
+    if (!isHost && await isAdmin(email)) {
+      isHost = true;
+      canEdit = true;
     }
 
     res.json({ isHost, canEdit });

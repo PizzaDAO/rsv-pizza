@@ -1,0 +1,26 @@
+{
+  "title": "Guest Check-In",
+  "loading": "Checking in guest...",
+  "success": {
+    "title": "Checked In!",
+    "backToDashboard": "Back to Event Dashboard"
+  },
+  "alreadyCheckedIn": {
+    "title": "Already Checked In",
+    "checkedInAt": "Checked in at {{time}}"
+  },
+  "unauthorized": {
+    "title": "Unauthorized",
+    "message": "You are not authorized to check in guests for this event. Only hosts and co-hosts can check in guests.",
+    "goHome": "Go Home"
+  },
+  "notFound": {
+    "title": "Not Found",
+    "goHome": "Go Home"
+  },
+  "error": {
+    "title": "Check-in Failed",
+    "tryAgain": "Try Again",
+    "goHome": "Go Home"
+  }
+}

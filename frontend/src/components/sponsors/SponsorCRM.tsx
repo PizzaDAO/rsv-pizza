@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, RefreshCw, GripVertical, FileText, Globe } from 'lucide-react';
 import { Sponsor, SponsorStats, SponsorStatus, UnifiedPartner } from '../../types';
 import {
@@ -26,6 +27,7 @@ interface SponsorCRMProps {
 }
 
 export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
+  const { t } = useTranslation('host');
   const { party, loadParty } = usePizza();
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
@@ -299,7 +301,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
               onClick={() => loadData()}
               className="btn-secondary"
             >
-              Try Again
+              {t('sponsors.tryAgain')}
             </button>
           </div>
         </div>
@@ -311,13 +313,13 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-theme-text">Partners</h2>
+        <h2 className="text-lg font-semibold text-theme-text">{t('sponsors.partners')}</h2>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-3 py-2 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white rounded-lg transition-colors"
         >
           <Plus size={18} />
-          Add Partner
+          {t('sponsors.addPartner')}
         </button>
       </div>
 
@@ -345,8 +347,8 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         <div className="card bg-theme-header border-theme-stroke p-4">
           <div className="flex items-center gap-2 mb-3">
             <FileText size={16} className="text-theme-text-muted" />
-            <h3 className="text-sm font-semibold text-theme-text">Brand Description Order</h3>
-            <span className="text-xs text-theme-text-faint">(drag to reorder on event page)</span>
+            <h3 className="text-sm font-semibold text-theme-text">{t('sponsors.brandDescriptionOrder')}</h3>
+            <span className="text-xs text-theme-text-faint">{t('sponsors.dragToReorder')}</span>
             {isSavingOrder && (
               <RefreshCw size={12} className="animate-spin text-theme-text-muted ml-auto" />
             )}
@@ -373,7 +375,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
                 {partner.source === 'underboss' && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md border bg-purple-500/20 text-purple-400 border-purple-500/30 shrink-0 flex items-center gap-1">
                     <Globe size={10} />
-                    Global
+                    {t('sponsors.global')}
                   </span>
                 )}
                 <span className="text-xs text-theme-text-faint truncate ml-auto max-w-[50%]">

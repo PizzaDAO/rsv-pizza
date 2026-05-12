@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Search, Loader2, Check } from 'lucide-react';
 import { Guest } from '../../types';
 import { IconInput } from '../IconInput';
@@ -45,6 +46,7 @@ function DomainFavicon({ domain, size = 20 }: { domain: string; size?: number })
 }
 
 export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged }: BrowseGuestsModalProps) {
+  const { t } = useTranslation('host');
   const [searchQuery, setSearchQuery] = useState('');
   const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
   const [togglingDomain, setTogglingDomain] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
       <div className="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
-          <h2 className="text-lg font-bold text-theme-text">Browse Organizations</h2>
+          <h2 className="text-lg font-bold text-theme-text">{t('report.browseOrganizations')}</h2>
           <button
             onClick={onClose}
             className="p-1.5 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
@@ -169,7 +171,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
           <IconInput
             icon={Search}
             type="text"
-            placeholder="Search by domain or guest name..."
+            placeholder={t('report.searchByDomainOrGuest')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -185,7 +187,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Search size={36} className="text-theme-text-faint mb-3" />
               <p className="text-theme-text-muted text-sm">
-                {searchQuery.trim() ? `No domains match "${searchQuery}"` : 'No organization domains found'}
+                {searchQuery.trim() ? t('report.noDomainsMatch', { query: searchQuery }) : t('report.noOrgDomainsFound')}
               </p>
             </div>
           ) : (
@@ -208,7 +210,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-theme-text">{group.domain}</span>
                     <span className="text-xs text-theme-text-muted ml-2">
-                      {group.guests.length} {group.guests.length === 1 ? 'RSVP' : 'RSVPs'}
+                      {t('report.rsvp', { count: group.guests.length })}
                     </span>
                   </div>
 
@@ -235,7 +237,7 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
         {/* Footer counter */}
         <div className="px-4 py-3 border-t border-theme-stroke text-center">
           <span className="text-sm text-theme-text-muted">
-            {selectedCount} {selectedCount === 1 ? 'organization' : 'organizations'} selected
+            {t('report.organization', { count: selectedCount })}
           </span>
         </div>
       </div>

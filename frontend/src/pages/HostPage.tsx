@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -47,6 +48,7 @@ type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos'
 const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'apps'];
 
 function HostPageContent() {
+  const { t } = useTranslation('host');
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -107,7 +109,7 @@ function HostPageContent() {
         const success = await loadParty(inviteCode);
         setLoadedCode(inviteCode);
         if (!success) {
-          setError('Party not found. The link may be invalid or expired.');
+          setError(t('errors.partyNotFoundDesc'));
         }
       }
     }
@@ -156,11 +158,11 @@ function HostPageContent() {
   // All hooks must be called before any conditional returns (React Rules of Hooks)
   const tabs = useMemo(() => {
     const coreTabs = [
-      ...(isGPP ? [{ id: 'dashboard' as TabType, label: 'Dashboard', icon: Home }] : []),
-      { id: 'details' as TabType, label: 'Settings', icon: Settings },
-      { id: 'guests' as TabType, label: 'Guests', icon: Users },
-      { id: 'pizza' as TabType, label: 'Pizza & Drinks', icon: Pizza },
-      { id: 'photos' as TabType, label: 'Photos', icon: Camera },
+      ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
+      { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
+      { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
+      { id: 'pizza' as TabType, label: t('tabs.pizzaAndDrinks'), icon: Pizza },
+      { id: 'photos' as TabType, label: t('tabs.photos'), icon: Camera },
     ];
 
     // Build pinned tabs from party.pinnedApps
@@ -170,7 +172,7 @@ function HostPageContent() {
       return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
     }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
 
-    const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: 'Apps', icon: LayoutGrid }];
+    const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: t('tabs.apps'), icon: LayoutGrid }];
 
     // Filter tabs based on co-host permissions
     // 'apps' tab is always visible so co-hosts can see the hub
@@ -207,10 +209,10 @@ function HostPageContent() {
         <div className="min-h-[60vh] flex items-center justify-center p-4">
           <div className="card p-8 max-w-md text-center">
             <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Party Not Found</h1>
-            <p className="text-theme-text-secondary mb-6">{error || 'Unable to load party.'}</p>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('errors.partyNotFound')}</h1>
+            <p className="text-theme-text-secondary mb-6">{error || t('errors.unableToLoad')}</p>
             <button onClick={() => navigate('/')} className="btn-primary">
-              Go to Home
+              {t('errors.goHome')}
             </button>
           </div>
         </div>
@@ -275,8 +277,8 @@ function HostPageContent() {
                   <div className="card p-4 bg-theme-header border-theme-stroke">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <span className="text-sm font-medium text-theme-text">Expected Guests</span>
-                        <p className="text-xs text-theme-text-muted mt-0.5">Adjust for non-respondents</p>
+                        <span className="text-sm font-medium text-theme-text">{t('pizza.expectedGuests')}</span>
+                        <p className="text-xs text-theme-text-muted mt-0.5">{t('pizza.adjustForNonRespondents')}</p>
                       </div>
                       <input
                         type="number"
@@ -308,7 +310,7 @@ function HostPageContent() {
                               style={{ left: `${requestsPercent}%`, transform: 'translateX(-50%)' }}
                             >
                               <span className="text-[10px] text-[#ff393a] font-medium whitespace-nowrap">
-                                {guestsWithRequests} requests
+                                {t('pizza.requests', { count: guestsWithRequests })}
                               </span>
                               <div className="w-0.5 h-2 bg-[#ff393a]/50 mt-0.5" />
                             </div>
@@ -319,7 +321,7 @@ function HostPageContent() {
                               style={{ left: `${rsvpsPercent}%`, transform: 'translateX(-50%)' }}
                             >
                               <span className="text-[10px] text-theme-text-secondary font-medium whitespace-nowrap">
-                                {guests.length} RSVPs
+                                {t('pizza.rsvps', { count: guests.length })}
                               </span>
                               <div className="w-0.5 h-2 bg-theme-surface-hover mt-0.5" />
                             </div>
@@ -476,9 +478,9 @@ function HostPageContent() {
               {activeTab === 'gpp' && party && (
                 <div className="space-y-4">
                   <div className="mb-4">
-                    <h2 className="text-xl font-semibold text-theme-text">Global Pizza Party</h2>
+                    <h2 className="text-xl font-semibold text-theme-text">{t('gpp.title')}</h2>
                     <p className="text-theme-text-secondary text-sm mt-1">
-                      Request party kits and access GPP-specific features for your event.
+                      {t('gpp.description')}
                     </p>
                   </div>
                   <PartyKitWidget partyId={party.id} />

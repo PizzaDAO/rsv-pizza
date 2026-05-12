@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { GPPClouds } from '../components/GPPClouds';
@@ -37,6 +38,7 @@ function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
 }
 
 export function AdminPage() {
+  const { t } = useTranslation('admin');
   const [loading, setLoading] = useState(true);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [currentRole, setCurrentRole] = useState('');
@@ -512,9 +514,9 @@ export function AdminPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-red-400/60 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('accessDenied')}</h1>
           <p className="text-theme-text-muted text-center max-w-md">
-            {error || 'You do not have admin access. Please log in with an admin account.'}
+            {error || t('accessDeniedDesc')}
           </p>
         </div>
         <Footer />
@@ -539,8 +541,8 @@ export function AdminPage() {
               <ShieldCheck size={20} className="text-red-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Admin Panel</h1>
-              <p className="text-sm text-theme-text-muted">Manage admins and underbosses</p>
+              <h1 className="text-2xl font-bold">{t('title')}</h1>
+              <p className="text-sm text-theme-text-muted">{t('subtitle')}</p>
             </div>
           </div>
 
@@ -560,7 +562,7 @@ export function AdminPage() {
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Shield size={18} className="text-theme-text-secondary" />
-              Admins ({admins.length})
+              {t('admins.title')} ({admins.length})
             </h2>
 
             {adminMessage && (
@@ -603,7 +605,7 @@ export function AdminPage() {
                     className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     {addingAdmin ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                    Add Admin
+                    {t('admins.addAdmin')}
                   </button>
                 </div>
               </form>
@@ -633,7 +635,7 @@ export function AdminPage() {
                               : 'bg-blue-100 text-blue-700 border border-blue-300'
                           }`}
                         >
-                          {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                          {admin.role === 'super_admin' ? t('admins.superAdmin') : t('admins.admin')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-theme-text-muted">
@@ -657,7 +659,7 @@ export function AdminPage() {
                   {admins.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
-                        No admins found
+                        {t('admins.noAdmins')}
                       </td>
                     </tr>
                   )}
@@ -762,7 +764,7 @@ export function AdminPage() {
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Globe size={18} className="text-theme-text-secondary" />
-              Underbosses ({underbosses.length})
+              {t('underboss.title')} ({underbosses.length})
             </h2>
 
             {ubMessage && (
@@ -828,7 +830,7 @@ export function AdminPage() {
                 className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
               >
                 {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                Add Underboss
+                {t('underboss.addUnderboss')}
               </button>
             </form>
 
@@ -906,7 +908,7 @@ export function AdminPage() {
                               : 'bg-red-100 text-red-700 border border-red-300'
                           }`}
                         >
-                          {ub.isActive ? 'Active' : 'Inactive'}
+                          {ub.isActive ? t('underboss.active') : t('underboss.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -927,7 +929,7 @@ export function AdminPage() {
                   {underbosses.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-theme-text-faint">
-                        No underbosses yet
+                        {t('underboss.noUnderbosses')}
                       </td>
                     </tr>
                   )}
@@ -940,7 +942,7 @@ export function AdminPage() {
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Tag size={18} className="text-theme-text-secondary" />
-              Partners ({sponsorUsers.length})
+              {t('partners.title')} ({sponsorUsers.length})
             </h2>
 
             {sponsorMessage && (
@@ -993,7 +995,7 @@ export function AdminPage() {
                     className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     {addingSponsor ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                    Add Partner
+                    {t('partners.addPartner')}
                   </button>
                 </div>
               </form>
@@ -1029,7 +1031,7 @@ export function AdminPage() {
                               : 'bg-red-100 text-red-700 border border-red-300'
                           }`}
                         >
-                          {sp.isActive ? 'Active' : 'Inactive'}
+                          {sp.isActive ? t('partners.active') : t('partners.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-theme-text-muted">
@@ -1053,7 +1055,7 @@ export function AdminPage() {
                   {sponsorUsers.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-theme-text-faint">
-                        No partners yet
+                        {t('partners.noPartners')}
                       </td>
                     </tr>
                   )}
@@ -1067,7 +1069,7 @@ export function AdminPage() {
             <section className="card p-6 mt-6">
               <div className="flex items-center gap-2 mb-4">
                 <ListChecks size={20} className="text-theme-text-secondary" />
-                <h2 className="text-lg font-semibold text-theme-text">Event Setup Checklist</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('checklist.title')}</h2>
               </div>
 
               {checklistMessage && (
@@ -1114,7 +1116,7 @@ export function AdminPage() {
                   disabled={savingChecklist}
                   className="mt-4 px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
                 >
-                  {savingChecklist ? 'Saving...' : 'Save Checklist Dates'}
+                  {savingChecklist ? t('checklist.saving') : t('checklist.saveChecklistDates')}
                 </button>
               )}
 
@@ -1139,7 +1141,7 @@ export function AdminPage() {
                   disabled={addingItem || !newItemName.trim()}
                   className="px-4 py-2 bg-[#E52828] text-white rounded-lg text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
-                  {addingItem ? 'Adding...' : 'Add Item'}
+                  {addingItem ? t('checklist.adding') : t('checklist.addItem')}
                 </button>
               </form>
             </section>
@@ -1150,7 +1152,7 @@ export function AdminPage() {
             <section className="card p-6 mt-6">
               <div className="flex items-center gap-2 mb-4">
                 <FileText size={20} className="text-theme-text-secondary" />
-                <h2 className="text-lg font-semibold text-theme-text">GPP Default Description</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('gppDescription.title')}</h2>
               </div>
 
               <p className="text-sm text-theme-text-muted mb-4">
@@ -1179,7 +1181,7 @@ export function AdminPage() {
                 disabled={gppDescription === gppDescOriginal || savingDesc}
                 className="mt-4 px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
               >
-                {savingDesc ? 'Saving...' : 'Save & Apply to Default Events'}
+                {savingDesc ? t('gppDescription.saving') : t('gppDescription.saveAndApply')}
               </button>
 
               {gppCustomEvents.length > 0 && (
@@ -1222,7 +1224,7 @@ export function AdminPage() {
             <section className="card p-6 mt-6">
               <div className="flex items-center gap-2 mb-4">
                 <Shield size={20} className="text-theme-text-secondary" />
-                <h2 className="text-lg font-semibold text-theme-text">GPP NFT Settings</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('nft.title')}</h2>
               </div>
 
               {nftMessage && (
@@ -1241,7 +1243,7 @@ export function AdminPage() {
                     onChange={(e) => setGppNftEnabled(e.target.checked)}
                     className="w-4 h-4 rounded accent-[#E52828]"
                   />
-                  <span className="text-sm text-theme-text">Enable NFT minting for all GPP events</span>
+                  <span className="text-sm text-theme-text">{t('nft.enableNft')}</span>
                 </label>
 
                 {gppNftEnabled && (
@@ -1268,7 +1270,7 @@ export function AdminPage() {
                   disabled={savingNft}
                   className="px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
                 >
-                  {savingNft ? 'Saving...' : 'Save GPP NFT Settings'}
+                  {savingNft ? t('nft.saving') : t('nft.saveSettings')}
                 </button>
               </div>
             </section>

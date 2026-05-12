@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -165,6 +166,7 @@ function resolveCityChat(eventName: string, chats: Map<string, string>): string 
 }
 
 export function PartnerDashboardPage() {
+  const { t } = useTranslation('partner');
   const { user, loading: authLoading } = useAuth();
 
   // Set body class for elements outside React tree (modals, portals)
@@ -377,15 +379,15 @@ export function PartnerDashboardPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-theme-text-faint mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Partner Dashboard</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('title')}</h1>
           <p className="text-theme-text-muted text-center max-w-md mb-6">
-            Log in to access your partner dashboard.
+            {t('loginPrompt')}
           </p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors"
           >
-            Log In
+            {t('logIn')}
           </button>
         </div>
         <Footer />
@@ -401,7 +403,7 @@ export function PartnerDashboardPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-red-400/60 mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Error</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('error')}</h1>
           <p className="text-theme-text-muted text-center max-w-md">{error}</p>
         </div>
         <Footer />
@@ -416,9 +418,9 @@ export function PartnerDashboardPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-theme-text-faint mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('accessDenied')}</h1>
           <p className="text-theme-text-muted text-center max-w-md">
-            You do not have partner access. Contact an admin to get set up.
+            {t('accessDeniedDesc')}
           </p>
         </div>
         <Footer />
@@ -440,7 +442,7 @@ export function PartnerDashboardPage() {
         <div className="mb-8">
           <div className="mb-2">
             <h1 className="text-2xl font-bold text-theme-text">
-              {dashboardData?.isAdmin ? 'Partner Dashboard' : `${sponsor?.name || 'Partner'} Dashboard`}
+              {dashboardData?.isAdmin ? t('title') : `${sponsor?.name || t('title')}`}
             </h1>
             <p className="text-sm text-theme-text-muted">
               Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
@@ -459,7 +461,7 @@ export function PartnerDashboardPage() {
                       : 'border-theme-stroke text-theme-text-muted hover:text-theme-text-secondary'
                   }`}
                 >
-                  All tags
+                  {t('allTags')}
                 </button>
               )}
               {availableTags.map(tag => (
@@ -652,13 +654,13 @@ export function PartnerDashboardPage() {
                 </select>
               )}
 
-              {/* Clear filters */}
+              {/* {t('filters.clearFilters')} */}
               {hasActiveFilters && (
                 <button
                   onClick={clearAllFilters}
                   className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
                 >
-                  Clear filters
+                  {t('filters.clearFilters')}
                 </button>
               )}
             </div>
@@ -671,16 +673,16 @@ export function PartnerDashboardPage() {
             <Tag size={48} className="text-theme-text-faint mx-auto mb-4" />
             {hasActiveFilters ? (
               <>
-                <p className="text-theme-text-muted mb-3">No events match your filters.</p>
+                <p className="text-theme-text-muted mb-3">{t('empty.noEventsFiltered')}</p>
                 <button
                   onClick={clearAllFilters}
                   className="px-4 py-2 text-sm text-theme-text-secondary hover:text-theme-text border border-theme-stroke hover:border-theme-stroke-hover rounded-xl transition-colors"
                 >
-                  Clear all filters
+                  {t('filters.clearAllFilters')}
                 </button>
               </>
             ) : (
-              <p className="text-theme-text-muted">No events found with your partner tag.</p>
+              <p className="text-theme-text-muted">{t('empty.noEventsTag')}</p>
             )}
           </div>
         ) : (
@@ -857,7 +859,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               </a>
             </h2>
             {event.hostName && (
-              <p className="text-xs text-theme-text-muted">Hosted by {event.hostName}</p>
+              <p className="text-xs text-theme-text-muted">{t('eventCard.hostedBy', { name: event.hostName })}</p>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1038,7 +1040,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
           {savingNotes ? (
             <Loader2 size={12} className="animate-spin flex-shrink-0" />
           ) : (
-            <span className="truncate">{notes || 'Private notes for this event...'}</span>
+            <span className="truncate">{notes || t('eventCard.privateNotes')}</span>
           )}
         </button>
 
@@ -1121,7 +1123,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               icon={StickyNote}
               multiline
               rows={5}
-              placeholder="Private notes for this event..."
+              placeholder="{t('eventCard.privateNotes')}"
               value={notes}
               onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
               autoFocus

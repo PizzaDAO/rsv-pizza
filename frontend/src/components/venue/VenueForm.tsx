@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { X, Loader2, MapPin, Users, DollarSign, User, Phone, Mail, Globe, FileText, Building2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Venue, VenueStatus } from '../../types';
@@ -13,14 +14,14 @@ interface VenueFormProps {
   initialStatus?: VenueStatus;
 }
 
-const venueStatusOptions: { value: VenueStatus; label: string }[] = [
-  { value: 'researching', label: 'Researching' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'negotiating', label: 'Negotiating' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'deposit_paid', label: 'Deposit Paid' },
-  { value: 'paid_in_full', label: 'Paid in Full' },
-  { value: 'declined', label: 'Declined' },
+const venueStatusOptions: { value: VenueStatus; labelKey: string }[] = [
+  { value: 'researching', labelKey: 'venue.researching' },
+  { value: 'contacted', labelKey: 'venue.contacted' },
+  { value: 'negotiating', labelKey: 'venue.negotiating' },
+  { value: 'confirmed', labelKey: 'venue.confirmedStatus' },
+  { value: 'deposit_paid', labelKey: 'venue.depositPaid' },
+  { value: 'paid_in_full', labelKey: 'venue.paidInFull' },
+  { value: 'declined', labelKey: 'venue.declinedStatus' },
 ];
 
 /** Fetch place details (website, phone) from a place_id */
@@ -55,6 +56,7 @@ function fetchPlaceDetails(placeId: string): Promise<google.maps.places.PlaceRes
 // the venue and closes the modal.
 
 const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: VenueFormProps['onClose']; initialStatus?: VenueStatus }> = ({ onSave, onClose, initialStatus }) => {
+  const { t } = useTranslation('host');
   const [searchValue, setSearchValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +134,7 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
         <div className="flex items-center justify-between p-5 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-theme-text">Add Venue Option</h2>
+            <h2 className="text-lg font-semibold text-theme-text">{t('venue.addVenueOption')}</h2>
           </div>
           <button
             type="button"
@@ -148,12 +150,12 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
           {saving ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <Loader2 size={24} className="animate-spin text-[#ff393a]" />
-              <p className="text-sm text-theme-text-secondary">Adding venue...</p>
+              <p className="text-sm text-theme-text-secondary">{t('venue.addingVenue')}</p>
             </div>
           ) : (
             <>
               <p className="text-sm text-theme-text-secondary">
-                Search for a venue to add it to your options list.
+                {t('venue.searchVenueHint')}
               </p>
               <LocationAutocomplete
                 value={searchValue}
@@ -164,7 +166,7 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
                 }}
                 types={['establishment']}
                 fields={['formatted_address', 'name', 'place_id', 'geometry', 'website']}
-                placeholder="Search for a venue..."
+                placeholder={t('venue.searchForVenue')}
               />
             </>
           )}
@@ -184,6 +186,7 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
 // ─── Full edit form (existing venues) ────────────────────────────────────────
 
 const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => {
+  const { t } = useTranslation('host');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -207,7 +210,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
     e.preventDefault();
 
     if (!name.trim()) {
-      setError('Venue name is required');
+      setError(t('venue.venueNameError'));
       return;
     }
 
@@ -249,7 +252,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
         <div className="flex items-center justify-between p-5 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-[#ff393a]" />
-            <h2 className="text-lg font-semibold text-theme-text">Edit Venue</h2>
+            <h2 className="text-lg font-semibold text-theme-text">{t('venue.editVenue')}</h2>
           </div>
           <button
             type="button"
@@ -263,7 +266,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {/* Venue Info Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text-secondary">Venue Details</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">{t('venue.venueDetails')}</h3>
 
             <IconInput
               icon={MapPin}
@@ -271,7 +274,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Venue Name *"
+              placeholder={t('venue.venueNameRequired')}
               autoFocus
             />
 
@@ -281,7 +284,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Address"
+              placeholder={t('venue.address')}
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -291,7 +294,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 type="url"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
-                placeholder="Website / Map Link"
+                placeholder={t('venue.websiteMapLink')}
               />
               <IconInput
                 icon={Users}
@@ -300,7 +303,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 min={0}
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
-                placeholder="Capacity"
+                placeholder={t('venue.capacity')}
               />
             </div>
 
@@ -310,13 +313,13 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               type="text"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
-              placeholder="Organization / Company"
+              placeholder={t('venue.organizationCompany')}
             />
           </div>
 
           {/* Status & Cost Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text-secondary">Status & Cost</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">{t('venue.statusAndCost')}</h3>
 
             <div className="grid grid-cols-2 gap-3">
               <select
@@ -327,7 +330,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               >
                 {venueStatusOptions.map((option) => (
                   <option key={option.value} value={option.value} className="bg-theme-header">
-                    {option.label}
+                    {t(option.labelKey)}
                   </option>
                 ))}
               </select>
@@ -340,7 +343,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 step={0.01}
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
-                placeholder="Cost"
+                placeholder={t('venue.cost')}
               />
             </div>
 
@@ -350,13 +353,13 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               type="text"
               value={pointPerson}
               onChange={(e) => setPointPerson(e.target.value)}
-              placeholder="Point Person (your team)"
+              placeholder={t('venue.pointPersonTeam')}
             />
           </div>
 
           {/* Contact Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text-secondary">Venue Contact</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">{t('venue.venueContactSection')}</h3>
 
             <IconInput
               icon={User}
@@ -364,7 +367,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               type="text"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
-              placeholder="Contact Name"
+              placeholder={t('venue.contactName')}
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -374,7 +377,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="Contact Email"
+                placeholder={t('venue.contactEmail')}
               />
               <IconInput
                 icon={Phone}
@@ -382,14 +385,14 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 type="tel"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="Contact Phone"
+                placeholder={t('venue.contactPhone')}
               />
             </div>
           </div>
 
           {/* Pros & Cons Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text-secondary">Pros & Cons</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">{t('venue.prosAndCons')}</h3>
             <IconInput
               icon={ThumbsUp}
               iconSize={16}
@@ -397,7 +400,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               rows={2}
               value={pros}
               onChange={(e) => setPros(e.target.value)}
-              placeholder="Pros (e.g., great location, good price, flexible hours...)"
+              placeholder={t('venue.prosPlaceholder')}
             />
             <IconInput
               icon={ThumbsDown}
@@ -406,13 +409,13 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               rows={2}
               value={cons}
               onChange={(e) => setCons(e.target.value)}
-              placeholder="Cons (e.g., limited parking, no kitchen, noise restrictions...)"
+              placeholder={t('venue.consPlaceholder')}
             />
           </div>
 
           {/* Notes Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-theme-text-secondary">Notes</h3>
+            <h3 className="text-sm font-medium text-theme-text-secondary">{t('venue.notesSection')}</h3>
             <IconInput
               icon={FileText}
               iconSize={16}
@@ -420,7 +423,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes about this venue option..."
+              placeholder={t('venue.notesPlaceholder')}
             />
           </div>
 
@@ -438,7 +441,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               onClick={onClose}
               className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
-              Cancel
+              {t('venue.cancel')}
             </button>
             <button
               type="submit"
@@ -448,10 +451,10 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
               {saving ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Saving...
+                  {t('venue.saving')}
                 </>
               ) : (
-                'Save Changes'
+                t('venue.saveChanges')
               )}
             </button>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Loader2, ArrowRight, ExternalLink, MapPin } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, ExternalLink, MapPin, Globe, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { CornerLinks } from '../components/CornerLinks';
 import { GPPClouds } from '../components/GPPClouds';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
@@ -30,6 +31,9 @@ const C = {
 export function GPPLandingPage() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
+  const { t, i18n } = useTranslation('gpp');
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
@@ -67,6 +71,28 @@ export function GPPLandingPage() {
     swayAmount: number;
     swaySpeed: number;
   }>>([]);
+
+  const LANGUAGES = [
+    { code: 'en', label: 'EN', name: 'English' },
+    { code: 'es', label: 'ES', name: 'Español' },
+    { code: 'fr', label: 'FR', name: 'Français' },
+    { code: 'ja', label: 'JA', name: '日本語' },
+    { code: 'pt', label: 'PT', name: 'Português' },
+    { code: 'zh', label: '中文', name: '中文' },
+  ];
+  const currentLang = LANGUAGES.find(l => i18n.language?.startsWith(l.code)) || LANGUAGES[0];
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangMenuOpen(false);
+      }
+    }
+    if (langMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [langMenuOpen]);
 
   const handleCitySelected = (data: CityData) => {
     cityDataRef.current = data;
@@ -133,7 +159,7 @@ export function GPPLandingPage() {
     setError(null);
 
     if (!cityDataRef.current) {
-      setError('Please select a city from the dropdown suggestions.');
+      setError(t('form.selectCity'));
       return;
     }
 
@@ -222,10 +248,10 @@ export function GPPLandingPage() {
       >
         {ConfettiOverlay}
         <Helmet>
-          <title>Event Created! | Global Pizza Party</title>
+          <title>{t('success.pageTitle')}</title>
         </Helmet>
 
-        <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+        <header className="border-b border-black/10 relative z-50 overflow-visible" style={{ background: 'rgba(255,255,255,0.95)' }}>
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -236,6 +262,36 @@ export function GPPLandingPage() {
                 RSV.Pizza
               </span>
             </a>
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangMenuOpen(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-all"
+                style={{ color: C.darkText }}
+              >
+                <Globe size={14} />
+                <span className="font-bold">{currentLang.label}</span>
+                <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { i18n.changeLanguage(lang.code); setLangMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                        currentLang.code === lang.code
+                          ? 'bg-[#E52828]/10 font-bold'
+                          : 'hover:bg-black/5'
+                      }`}
+                      style={{ color: C.darkText }}
+                    >
+                      <span>{lang.label}</span>
+                      <span className="text-xs opacity-50">{lang.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -246,8 +302,8 @@ export function GPPLandingPage() {
                 <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `${C.green}22` }}>
                   <CheckCircle className="w-10 h-10" style={{ color: C.green }} />
                 </div>
-                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>You're signed in!</h1>
-                <p className="text-lg" style={{ color: C.mutedText }}>Redirecting to your host dashboard...</p>
+                <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>{t('success.signedIn')}</h1>
+                <p className="text-lg" style={{ color: C.mutedText }}>{t('success.redirecting')}</p>
               </>
             ) : (
               <>
@@ -256,17 +312,17 @@ export function GPPLandingPage() {
                 </div>
 
                 <h1 className="text-3xl font-bold mb-4" style={{ color: C.darkText }}>
-                  Your Global Pizza Party is Live!
+                  {t('success.title')}
                 </h1>
 
                 <p className="text-lg mb-8" style={{ color: C.mutedText }}>
-                  <span className="font-medium" style={{ color: C.darkText }}>{success.eventName}</span> has been created.
+                  {t('success.created', { eventName: success.eventName })}
                 </p>
 
                 {/* OTP Input */}
                 <div className="p-6 rounded-2xl border mb-6" style={{ background: C.cardBg, borderColor: C.cardBorder }}>
                   <p className="text-sm mb-4" style={{ color: C.mutedText }}>
-                    Enter the 6-digit code we sent to <span className="font-medium" style={{ color: C.darkText }}>{success.email}</span>
+                    {t('success.otpPrompt', { email: success.email })}
                   </p>
 
                   <div className="flex justify-center gap-2 mb-4" onPaste={handleOtpPaste}>
@@ -297,7 +353,7 @@ export function GPPLandingPage() {
                   {otpStatus === 'verifying' && (
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" style={{ color: C.red }} />
-                      <span className="text-sm" style={{ color: C.mutedText }}>Verifying...</span>
+                      <span className="text-sm" style={{ color: C.mutedText }}>{t('success.verifying')}</span>
                     </div>
                   )}
 
@@ -315,11 +371,11 @@ export function GPPLandingPage() {
                     color: C.darkText,
                   }}
                 >
-                  Return Home
+                  {t('success.returnHome')}
                 </button>
 
                 <p className="text-sm mt-6" style={{ color: C.mutedText }}>
-                  Didn't receive a code? Check your spam folder.
+                  {t('success.checkSpam')}
                 </p>
               </>
             )}
@@ -343,15 +399,15 @@ export function GPPLandingPage() {
       <GPPClouds />
 
       <Helmet>
-        <title>Host a Global Pizza Party | RSV.Pizza</title>
+        <title>{t('meta.title')}</title>
         <meta
           name="description"
-          content="Join the worldwide celebration of pizza! Host a Global Pizza Party in your city and connect with pizza lovers around the world."
+          content={t('meta.description')}
         />
       </Helmet>
 
       {/* ─── LIGHT HEADER ─── */}
-      <header className="border-b border-black/10 bg-theme-surface-hover backdrop-blur-sm">
+      <header className="border-b border-black/10 relative z-50 overflow-visible" style={{ background: 'rgba(255,255,255,0.95)' }}>
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="RSV.Pizza" className="h-8 sm:h-10" />
@@ -362,17 +418,38 @@ export function GPPLandingPage() {
               RSV.Pizza
             </span>
           </a>
-          <a
-            href="/login"
-            className="text-sm font-medium px-4 py-2 rounded-lg border transition-colors"
-            style={{
-              color: C.darkText,
-              borderColor: 'rgba(0,0,0,0.15)',
-              background: 'rgba(255,255,255,0.5)',
-            }}
-          >
-            Log In / Sign Up
-          </a>
+          <div className="flex items-center gap-3">
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangMenuOpen(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-all"
+                style={{ color: C.darkText }}
+              >
+                <Globe size={14} />
+                <span className="font-bold">{currentLang.label}</span>
+                <ChevronDown size={12} className={`transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-1 rounded-xl border shadow-lg overflow-hidden min-w-[120px]" style={{ zIndex: 9999, background: '#ffffff', borderColor: 'rgba(0,0,0,0.1)' }}>
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { i18n.changeLanguage(lang.code); setLangMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                        currentLang.code === lang.code
+                          ? 'bg-[#E52828]/10 font-bold'
+                          : 'hover:bg-black/5'
+                      }`}
+                      style={{ color: C.darkText }}
+                    >
+                      <span>{lang.label}</span>
+                      <span className="text-xs opacity-50">{lang.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -398,10 +475,10 @@ export function GPPLandingPage() {
               }}
             >
               <h2 className="text-2xl font-bold mb-1" style={{ color: C.darkText }}>
-                Create Your Event
+                {t('form.title')}
               </h2>
               <p className="text-sm mb-6" style={{ color: C.mutedText }}>
-                Fill in your details to get started
+                {t('form.subtitle')}
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -443,7 +520,7 @@ export function GPPLandingPage() {
                       onTimezoneChange={setTimezone}
                       onCitySelected={handleCitySelected}
                       types={['(cities)']}
-                      placeholder="What city are you hosting in?"
+                      placeholder={t('form.cityPlaceholder')}
                       disabled={isSubmitting}
                       className="gpp-input"
                     />
@@ -456,7 +533,7 @@ export function GPPLandingPage() {
                     type="text"
                     value={hostName}
                     onChange={(e) => setHostName(e.target.value)}
-                    placeholder="What's your name?"
+                    placeholder={t('form.namePlaceholder')}
                     className="gpp-input w-full"
                     required
                     disabled={isSubmitting}
@@ -469,13 +546,13 @@ export function GPPLandingPage() {
                     type="text"
                     value={telegram}
                     onChange={(e) => setTelegram(e.target.value)}
-                    placeholder="Telegram username"
+                    placeholder={t('form.telegramPlaceholder')}
                     className="gpp-input w-full"
                     required
                     disabled={isSubmitting}
                   />
                   <p className="text-xs mt-1.5" style={{ color: C.mutedText }}>
-                    So we can add you to the host group chat
+                    {t('form.telegramHint')}
                   </p>
                 </div>
 
@@ -485,13 +562,13 @@ export function GPPLandingPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email address"
+                    placeholder={t('form.emailPlaceholder')}
                     className="gpp-input w-full"
                     required
                     disabled={isSubmitting}
                   />
                   <p className="text-xs mt-2" style={{ color: C.mutedText }}>
-                    We'll send you a login code to manage your event
+                    {t('form.emailHint')}
                   </p>
                 </div>
 
@@ -507,11 +584,11 @@ export function GPPLandingPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Creating Your Event...
+                      {t('form.submitting')}
                     </>
                   ) : (
                     <>
-                      Create Your Event
+                      {t('form.submit')}
                       <ArrowRight size={20} />
                     </>
                   )}
@@ -527,10 +604,10 @@ export function GPPLandingPage() {
       <div className="relative border-t" style={{ borderColor: 'rgba(0,0,0,0.08)', zIndex: 1 }}>
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-bold text-center mb-3" style={{ color: C.darkText }}>
-            Last Year's Global Pizza Party
+            {t('map.title')}
           </h2>
           <p className="text-center text-sm mb-8" style={{ color: C.mutedText }}>
-            See where communities around the world came together for pizza
+            {t('map.subtitle')}
           </p>
 
           <div className="rounded-2xl border shadow-lg" style={{ borderColor: C.cardBorder }}>
@@ -547,7 +624,7 @@ export function GPPLandingPage() {
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5"
               style={{ background: C.red, color: '#fff' }}
             >
-              Open Full Map
+              {t('map.openFullMap')}
               <ExternalLink size={16} />
             </a>
             <Link

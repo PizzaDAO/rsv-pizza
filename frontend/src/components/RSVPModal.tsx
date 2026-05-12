@@ -9,6 +9,7 @@ import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/u
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { useAccount } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
+import { useTranslation } from 'react-i18next';
 import { RSVPFlowContent } from './RSVPFlowContent';
 
 interface RSVPModalProps {
@@ -21,6 +22,8 @@ interface RSVPModalProps {
 
 export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess }: RSVPModalProps) {
   const { user } = useAuth();
+  const { t } = useTranslation('rsvp');
+  const { t: tCommon } = useTranslation('common');
 
   // NFT minting state
   const [mintStatus, setMintStatus] = useState<MintStatus>('idle');
@@ -163,7 +166,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               form.setEthereumAddress(e.target.value);
               form.validateWalletAddress(e.target.value);
             }}
-            placeholder="Wallet Address or ENS (e.g. vitalik.eth)"
+            placeholder={t('step1.walletPlaceholder')}
             className={
               form.walletValidation === 'valid'
                 ? 'border-[#39d98a]/50'
@@ -183,7 +186,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
             className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
           >
             <X size={14} />
-            <span className="hidden sm:inline">Clear</span>
+            <span className="hidden sm:inline">{tCommon('buttons.clear')}</span>
           </button>
         ) : (
           <ConnectKitButton.Custom>
@@ -194,14 +197,14 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
                 className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
               >
                 <Wallet size={14} />
-                <span className="hidden sm:inline">Connect</span>
+                <span className="hidden sm:inline">{tCommon('buttons.connect')}</span>
               </button>
             )}
           </ConnectKitButton.Custom>
         )}
       </div>
       {form.walletValidation === 'invalid' && form.ethereumAddress.trim() && (
-        <span className="text-xs text-[#ff393a] mt-1 block">Enter a valid address (0x...) or ENS name (.eth)</span>
+        <span className="text-xs text-[#ff393a] mt-1 block">{tCommon('errors.invalidWallet')}</span>
       )}
     </div>
   );

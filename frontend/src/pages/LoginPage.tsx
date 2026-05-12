@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +10,7 @@ export function LoginPage() {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState(searchParams.get('email') || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function LoginPage() {
       // Navigate directly to code entry
       navigate('/auth/verify');
     } catch (err: any) {
-      setError(err.message || 'Failed to send login code');
+      setError(err.message || t('loginModal.failedToSend'));
       setLoading(false);
     }
   };
@@ -56,9 +58,9 @@ export function LoginPage() {
       <div className="max-w-md mx-auto px-4 py-12">
         <div className="card p-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Log In or Sign Up</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('loginPage.title')}</h1>
             <p className="text-theme-text-secondary text-sm">
-              Enter your email to receive a login code.
+              {t('loginPage.subtitle')}
             </p>
           </div>
 
@@ -68,7 +70,7 @@ export function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder={t('loginPage.emailPlaceholder')}
               required
               autoFocus
               data-testid="login-email"
@@ -89,10 +91,10 @@ export function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Sending...
+                  {t('loginPage.sending')}
                 </>
               ) : (
-                'Continue'
+                t('loginPage.continue')
               )}
             </button>
           </form>

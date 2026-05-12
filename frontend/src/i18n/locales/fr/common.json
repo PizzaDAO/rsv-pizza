@@ -1,0 +1,30 @@
+{
+  "header": {
+    "logIn": "Connexion / Inscription"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "fr": "FR",
+    "pt": "PT",
+    "zh": "中文",
+    "ja": "JA"
+  },
+  "buttons": {
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "continue": "Continuer",
+    "submit": "Envoyer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "clear": "Effacer",
+    "connect": "Connecter"
+  },
+  "errors": {
+    "partyNotFound": "Événement introuvable",
+    "partyNotFoundDesc": "Événement introuvable. Le lien d'invitation est peut-être invalide ou expiré.",
+    "incorrectPassword": "Mot de passe incorrect. Veuillez réessayer.",
+    "invalidWallet": "Entrez une adresse valide (0x...) ou un nom ENS (.eth)"
+  }
+}

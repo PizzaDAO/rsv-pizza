@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle } from 'lucide-react';
@@ -17,6 +18,7 @@ import { DescriptionEditor } from './DescriptionEditor';
 import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
 
 export const EventDetailsTab: React.FC = () => {
+  const { t } = useTranslation('host');
   const { party, loadParty } = usePizza();
   const navigate = useNavigate();
 
@@ -945,7 +947,7 @@ export const EventDetailsTab: React.FC = () => {
           className="w-full bg-[#ff393a]/10 hover:bg-[#ff393a]/20 border border-[#ff393a]/30 text-[#ff393a] hover:text-[#ff5a5b] font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
         >
           <Trash2 size={18} />
-          Cancel Event
+          {t('eventDetails.deleteEvent')}
         </button>
       </div>
 
@@ -953,9 +955,9 @@ export const EventDetailsTab: React.FC = () => {
       {showDeleteConfirm && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-theme-text mb-3">Cancel Event?</h2>
+            <h2 className="text-xl font-bold text-theme-text mb-3">{t('eventDetails.deleteConfirmTitle')}</h2>
             <p className="text-theme-text-secondary mb-6">
-              This will permanently delete this event and all guest responses. This action cannot be undone.
+              {t('eventDetails.deleteConfirmMessage')}
             </p>
             <div className="flex gap-3">
               <button
@@ -963,7 +965,7 @@ export const EventDetailsTab: React.FC = () => {
                 disabled={deleting}
                 className="flex-1 btn-secondary"
               >
-                Keep Event
+                {t('eventDetails.cancel')}
               </button>
               <button
                 onClick={handleDelete}
@@ -978,7 +980,7 @@ export const EventDetailsTab: React.FC = () => {
                 ) : (
                   <>
                     <Trash2 size={18} />
-                    Delete Event
+                    {t('eventDetails.deleteConfirmButton')}
                   </>
                 )}
               </button>

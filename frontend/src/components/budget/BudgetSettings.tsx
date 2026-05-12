@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DollarSign, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 
@@ -13,6 +14,7 @@ export const BudgetSettings: React.FC<BudgetSettingsProps> = ({
   budgetTotal,
   onUpdate,
 }) => {
+  const { t } = useTranslation('host');
   const [localBudgetTotal, setLocalBudgetTotal] = useState(budgetTotal?.toString() || '');
   const [saving, setSaving] = useState(false);
 
@@ -31,7 +33,7 @@ export const BudgetSettings: React.FC<BudgetSettingsProps> = ({
 
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-medium text-theme-text mb-3">Budget Settings</h3>
+      <h3 className="text-sm font-medium text-theme-text mb-3">{t('budget.budgetSettings')}</h3>
 
       <div className="space-y-3">
         {/* Budget Total */}
@@ -45,7 +47,7 @@ export const BudgetSettings: React.FC<BudgetSettingsProps> = ({
               value={localBudgetTotal}
               onChange={(e) => setLocalBudgetTotal(e.target.value)}
               onBlur={handleBudgetTotalBlur}
-              placeholder="Total budget (leave empty for no limit)"
+              placeholder={t('budget.totalBudgetPlaceholder')}
             />
             {saving && (
               <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin" />

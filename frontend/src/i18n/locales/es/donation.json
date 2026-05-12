@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "Hacer una Donación",
+    "buyPizzaFor": "Comprar Pizza para {{recipient}}",
+    "buyPizzaForEvent": "Comprar Pizza para {{eventName}}",
+    "donateTitle": "Donar",
+    "supportingRecipient": "Apoyando a {{recipient}}",
+    "supportingEvent": "Apoyando a {{eventName}}",
+    "defaultMessage": "¿Te gustaría hacer una donación para ayudar a que este evento sea posible?",
+    "donorCount_one": "{{count}} persona ha donado",
+    "donorCount_other": "{{count}} personas han donado",
+    "raised": "{{amount}} recaudados",
+    "goal": "Meta: ${{amount}}",
+    "recentSupporters": "Apoyos recientes:",
+    "anonymous": "Anónimo",
+    "makeADonation": "Hacer una Donación",
+    "back": "Volver"
+  },
+  "form": {
+    "payWithCard": "Pagar con Tarjeta o Wallet",
+    "cardSubtitle": "Tarjeta de crédito/débito, Apple Pay, Google Pay y más",
+    "crypto": "Cripto",
+    "cryptoSubtitle": "ETH, USDC u otros tokens",
+    "cancel": "Cancelar",
+    "backToPaymentOptions": "Volver a opciones de pago",
+    "customAmount": "Monto personalizado",
+    "minimumDonation": "La donación mínima es $0.50",
+    "donate": "Donar",
+    "donateAmount": "Donar ${{amount}}",
+    "loading": "Cargando...",
+    "processing": "Procesando...",
+    "paymentFailed": "El pago falló",
+    "unexpectedError": "Ocurrió un error inesperado",
+    "failedToInitialize": "No se pudo iniciar el pago. Inténtalo de nuevo.",
+    "thankYou": "¡Gracias!",
+    "donationReceived": "Tu donación de ${{amount}} ha sido recibida.",
+    "back": "Volver"
+  },
+  "calendar": {
+    "addToCalendar": "Agregar al Calendario",
+    "googleCalendar": "Google Calendar",
+    "appleCalendar": "Apple Calendar",
+    "outlook": "Outlook"
+  }
+}

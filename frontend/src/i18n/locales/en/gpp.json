@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "Host a Global Pizza Party | RSV.Pizza",
+    "description": "Join the worldwide celebration of pizza! Host a Global Pizza Party in your city and connect with pizza lovers around the world."
+  },
+  "header": {
+    "logIn": "Log In / Sign Up"
+  },
+  "form": {
+    "title": "Create Your Event",
+    "subtitle": "Fill in your details to get started",
+    "cityPlaceholder": "What city are you hosting in?",
+    "namePlaceholder": "What's your name?",
+    "telegramPlaceholder": "Telegram username",
+    "telegramHint": "So we can add you to the host group chat",
+    "emailPlaceholder": "Email address",
+    "emailHint": "We'll send you a login code to manage your event",
+    "submit": "Create Your Event",
+    "submitting": "Creating Your Event...",
+    "selectCity": "Please select a city from the dropdown suggestions."
+  },
+  "map": {
+    "title": "Last Year's Global Pizza Party",
+    "subtitle": "See where communities around the world came together for pizza",
+    "openFullMap": "Open Full Map"
+  },
+  "success": {
+    "pageTitle": "Event Created! | Global Pizza Party",
+    "signedIn": "You're signed in!",
+    "redirecting": "Redirecting to your host dashboard...",
+    "title": "Your Global Pizza Party is Live!",
+    "created": "{{eventName}} has been created.",
+    "otpPrompt": "Enter the 6-digit code we sent to {{email}}",
+    "verifying": "Verifying...",
+    "returnHome": "Return Home",
+    "checkSpam": "Didn't receive a code? Check your spam folder."
+  }
+}

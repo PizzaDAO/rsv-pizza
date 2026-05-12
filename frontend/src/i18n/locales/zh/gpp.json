@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "举办全球披萨派对 | RSV.Pizza",
+    "description": "加入全球披萨庆典！在您的城市举办全球披萨派对，与世界各地的披萨爱好者联系。"
+  },
+  "header": {
+    "logIn": "登录 / 注册"
+  },
+  "form": {
+    "title": "创建您的活动",
+    "subtitle": "填写您的信息以开始",
+    "cityPlaceholder": "您在哪个城市举办？",
+    "namePlaceholder": "您叫什么名字？",
+    "telegramPlaceholder": "Telegram 用户名",
+    "telegramHint": "以便我们将您添加到主办方群聊",
+    "emailPlaceholder": "电子邮箱地址",
+    "emailHint": "我们将发送登录代码以管理您的活动",
+    "submit": "创建您的活动",
+    "submitting": "正在创建您的活动...",
+    "selectCity": "请从下拉建议中选择一个城市。"
+  },
+  "map": {
+    "title": "去年的全球披萨派对",
+    "subtitle": "看看世界各地的社区如何为披萨相聚",
+    "openFullMap": "打开完整地图"
+  },
+  "success": {
+    "pageTitle": "活动已创建！| 全球披萨派对",
+    "signedIn": "您已登录！",
+    "redirecting": "正在跳转到您的主办方面板...",
+    "title": "您的全球披萨派对已上线！",
+    "created": "{{eventName}} 已创建。",
+    "otpPrompt": "输入我们发送到 {{email}} 的 6 位验证码",
+    "verifying": "验证中...",
+    "returnHome": "返回首页",
+    "checkSpam": "没收到验证码？请检查您的垃圾邮件文件夹。"
+  }
+}

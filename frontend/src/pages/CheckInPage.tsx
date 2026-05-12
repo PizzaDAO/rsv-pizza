@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +37,7 @@ export function CheckInPage() {
   const { inviteCode, guestId } = useParams<{ inviteCode: string; guestId: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation('checkin');
 
   const [state, setState] = useState<CheckInState>('loading');
   const [guestName, setGuestName] = useState<string>('');
@@ -203,7 +205,7 @@ export function CheckInPage() {
         <div className="flex flex-col items-center justify-center py-12">
           <Loader2 size={48} className="animate-spin text-[#ff393a] mb-4" />
           <p className="text-theme-text-secondary">
-            {state === 'vouching' ? 'Checking in guest...' : 'Loading...'}
+            {state === 'vouching' ? t('vouching') : t('loading')}
           </p>
         </div>
       );
@@ -283,7 +285,7 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
             <CheckCircle2 size={48} className="text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Checked In!</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('success.title')}</h2>
           <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
             <p className="text-theme-text-muted text-sm flex items-center gap-2">
@@ -300,11 +302,11 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-6">
             <CheckCircle2 size={48} className="text-blue-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Already Checked In</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('alreadyCheckedIn.title')}</h2>
           <p className="text-xl text-theme-text mb-4">{guestName}</p>
           {checkedInAt && (
             <p className="text-theme-text-muted text-sm flex items-center gap-2">
-              <span>Checked in at {formatCheckInTime(checkedInAt)}</span>
+              <span>{t('alreadyCheckedIn.checkedInAt', { time: formatCheckInTime(checkedInAt) })}</span>
             </p>
           )}
         </div>
@@ -317,9 +319,9 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
             <AlertCircle size={48} className="text-yellow-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Not Checked In Yet</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('notCheckedIn.title')}</h2>
           <p className="text-theme-text-secondary mb-4 max-w-md">
-            You must be checked in first before you can check in other guests.
+            {t('notCheckedIn.message')}
           </p>
         </div>
       );
@@ -331,9 +333,9 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-gray-500/20 flex items-center justify-center mb-6">
             <XCircle size={48} className="text-gray-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Not Found</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('notFound.title')}</h2>
           <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
-          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">Go Home</button>
+          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">{t('notFound.goHome')}</button>
         </div>
       );
     }
@@ -344,9 +346,9 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
             <AlertCircle size={48} className="text-yellow-500" />
           </div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Unauthorized</h2>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('unauthorized.title')}</h2>
           <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
-          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">Go Home</button>
+          <button onClick={() => navigate('/')} className="mt-4 btn-secondary">{t('unauthorized.goHome')}</button>
         </div>
       );
     }
@@ -357,16 +359,16 @@ export function CheckInPage() {
         <div className="w-20 h-20 rounded-full bg-[#ff393a]/20 flex items-center justify-center mb-6">
           <XCircle size={48} className="text-[#ff393a]" />
         </div>
-        <h2 className="text-2xl font-bold text-theme-text mb-2">Check-in Failed</h2>
+        <h2 className="text-2xl font-bold text-theme-text mb-2">{t('error.title')}</h2>
         <p className="text-theme-text-secondary mb-4 max-w-md">{errorMessage}</p>
         <div className="flex gap-4 mt-4">
           <button
             onClick={() => { setHasAttempted(false); setState('loading'); }}
             className="btn-primary"
           >
-            Try Again
+            {t('error.tryAgain')}
           </button>
-          <button onClick={() => navigate('/')} className="btn-secondary">Go Home</button>
+          <button onClick={() => navigate('/')} className="btn-secondary">{t('error.goHome')}</button>
         </div>
       </div>
     );
@@ -489,7 +491,7 @@ export function CheckInPage() {
       <div className="max-w-md mx-auto px-4 py-12">
         <div className="card p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold text-theme-text mb-2">Guest Check-In</h1>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('title')}</h1>
           </div>
           {renderContent()}
         </div>

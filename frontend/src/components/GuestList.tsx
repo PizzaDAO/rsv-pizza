@@ -1,16 +1,66 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
-import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail } from 'lucide-react';
+import { Guest } from '../types';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2 } from 'lucide-react';
 import { IconInput } from './IconInput';
+import { Checkbox } from './Checkbox';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
+  const { t } = useTranslation('host');
   const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
   const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllInSection = useCallback((sectionGuests: Guest[]) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      sectionGuests.forEach(g => { if (g.id) next.add(g.id); });
+      return next;
+    });
+  }, []);
+
+  const deselectAllInSection = useCallback((sectionGuests: Guest[]) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      sectionGuests.forEach(g => { if (g.id) next.delete(g.id); });
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const allInSectionSelected = useCallback((sectionGuests: Guest[]) => {
+    if (sectionGuests.length === 0) return false;
+    return sectionGuests.every(g => g.id && selectedIds.has(g.id));
+  }, [selectedIds]);
+
+  // Prune stale selections when guests change
+  useEffect(() => {
+    const guestIdSet = new Set(guests.map(g => g.id).filter(Boolean));
+    setSelectedIds(prev => {
+      const pruned = new Set([...prev].filter(id => guestIdSet.has(id)));
+      if (pruned.size !== prev.size) return pruned;
+      return prev;
+    });
+  }, [guests]);
 
   // Fetch notable guest IDs on mount and when party changes
   const fetchNotableIds = useCallback(async () => {
@@ -90,9 +140,9 @@ export const GuestList: React.FC = () => {
     return (
       <div className="card p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
         <UserRoundX size={48} className="text-theme-text-faint mb-4" />
-        <h3 className="text-xl font-medium text-theme-text">No Guests Yet</h3>
+        <h3 className="text-xl font-medium text-theme-text">{t('guests.noGuestsYet')}</h3>
         <p className="text-theme-text-muted mt-2">
-          Share your event link to start receiving RSVPs.
+          {t('guests.shareLink')}
         </p>
       </div>
     );
@@ -149,6 +199,84 @@ export const GuestList: React.FC = () => {
   const waitlistedGuests = filteredGuests.filter(g => g.status === 'WAITLISTED')
     .sort((a, b) => (a.waitlistPosition || 0) - (b.waitlistPosition || 0));
 
+  // Compute available bulk actions based on selected guests
+  const bulkActions = useMemo(() => {
+    if (selectedIds.size === 0) return null;
+    const selected = guests.filter(g => g.id && selectedIds.has(g.id));
+    return {
+      canCheckIn: selected.some(g => (g.status === 'CONFIRMED' || g.status === 'INVITED') && !g.checkedInAt),
+      canApprove: requireApproval && selected.some(g => g.approved === null),
+      canDecline: requireApproval && selected.some(g => g.approved === null),
+      canPromote: selected.some(g => g.status === 'WAITLISTED'),
+    };
+  }, [selectedIds, guests, requireApproval]);
+
+  const handleBulkCheckIn = async () => {
+    if (!party?.inviteCode) return;
+    setBulkActionInProgress(true);
+    try {
+      const ids = [...selectedIds];
+      const eligible = guests.filter(g => g.id && ids.includes(g.id) && (g.status === 'CONFIRMED' || g.status === 'INVITED') && !g.checkedInAt);
+      for (const g of eligible) {
+        if (g.id) await checkInGuest(party.inviteCode, g.id);
+      }
+      await loadParty(party.inviteCode);
+    } catch (e) {
+      console.error('Bulk check-in failed:', e);
+    } finally {
+      clearSelection();
+      setBulkActionInProgress(false);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    setBulkActionInProgress(true);
+    try {
+      const ids = [...selectedIds];
+      const eligible = guests.filter(g => g.id && ids.includes(g.id) && g.approved === null);
+      for (const g of eligible) {
+        if (g.id) await approveGuest(g.id);
+      }
+    } catch (e) {
+      console.error('Bulk approve failed:', e);
+    } finally {
+      clearSelection();
+      setBulkActionInProgress(false);
+    }
+  };
+
+  const handleBulkDecline = async () => {
+    setBulkActionInProgress(true);
+    try {
+      const ids = [...selectedIds];
+      const eligible = guests.filter(g => g.id && ids.includes(g.id) && g.approved === null);
+      for (const g of eligible) {
+        if (g.id) await declineGuest(g.id);
+      }
+    } catch (e) {
+      console.error('Bulk decline failed:', e);
+    } finally {
+      clearSelection();
+      setBulkActionInProgress(false);
+    }
+  };
+
+  const handleBulkPromote = async () => {
+    setBulkActionInProgress(true);
+    try {
+      const ids = [...selectedIds];
+      const eligible = guests.filter(g => g.id && ids.includes(g.id) && g.status === 'WAITLISTED');
+      for (const g of eligible) {
+        if (g.id) await promoteGuest(g.id);
+      }
+    } catch (e) {
+      console.error('Bulk promote failed:', e);
+    } finally {
+      clearSelection();
+      setBulkActionInProgress(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Confirmed Guests Section */}
@@ -156,7 +284,7 @@ export const GuestList: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-theme-text-secondary" />
-            <h2 className="text-xl font-bold text-theme-text">Guests</h2>
+            <h2 className="text-xl font-bold text-theme-text">{t('guests.title')}</h2>
             <span className="bg-[#39d98a]/20 text-[#39d98a] text-sm font-medium px-3 py-1 rounded-full border border-[#39d98a]/30">
               {confirmedGuests.length}
               {party?.maxGuests && ` / ${party.maxGuests}`}
@@ -170,7 +298,7 @@ export const GuestList: React.FC = () => {
             {checkedInCount > 0 && (
               <span className="bg-green-500/20 text-green-400 text-sm font-medium px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
                 <CheckCircle2 size={14} />
-                {checkedInCount} checked in
+                {t('guests.checkedIn', { count: checkedInCount })}
               </span>
             )}
           </div>
@@ -179,7 +307,7 @@ export const GuestList: React.FC = () => {
             className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
           >
             <Download size={14} />
-            Export CSV
+            {t('guests.exportCsv')}
           </button>
         </div>
 
@@ -187,7 +315,7 @@ export const GuestList: React.FC = () => {
           <IconInput
             icon={Search}
             type="text"
-            placeholder="Search guests by name or email..."
+            placeholder={t('guests.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             data-testid="guest-search"
@@ -196,7 +324,7 @@ export const GuestList: React.FC = () => {
 
         {searchQuery.trim() && (
           <p className="text-sm text-theme-text-muted mb-3">
-            Showing {filteredGuests.length} of {guests.length} guests
+            {t('guests.showingOf', { filtered: filteredGuests.length, total: guests.length })}
           </p>
         )}
 
@@ -204,30 +332,43 @@ export const GuestList: React.FC = () => {
           searchQuery.trim() ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Search size={36} className="text-theme-text-faint mb-3" />
-              <p className="text-theme-text-muted">No guests match "{searchQuery}"</p>
+              <p className="text-theme-text-muted">{t('guests.noMatch', { query: searchQuery })}</p>
             </div>
           ) : (
-            <p className="text-theme-text-muted text-sm py-4">No confirmed guests yet.</p>
+            <p className="text-theme-text-muted text-sm py-4">{t('guests.noConfirmed')}</p>
           )
         ) : (
-          <div className="divide-y divide-theme-stroke">
-            {confirmedGuests.map(guest => (
-              <TableRow
-                key={guest.id}
-                guest={guest}
-                variant="basic"
-                requireApproval={requireApproval}
-                onApprove={approveGuest}
-                onDecline={declineGuest}
-                onRemove={removeGuest}
-                onCheckIn={handleCheckIn}
-                isCheckingIn={checkingInId === guest.id}
-                isNotable={guest.id ? notableGuestIds.has(guest.id) : false}
-                onToggleNotable={handleToggleNotable}
-                isTogglingNotable={togglingNotableId === guest.id}
+          <>
+            <div className="flex items-center py-2 -mx-2 px-2">
+              <Checkbox
+                checked={allInSectionSelected(confirmedGuests)}
+                onChange={() => allInSectionSelected(confirmedGuests) ? deselectAllInSection(confirmedGuests) : selectAllInSection(confirmedGuests)}
+                label={`Select all (${confirmedGuests.length})`}
+                size={16}
+                labelClassName="text-xs text-theme-text-muted"
               />
-            ))}
-          </div>
+            </div>
+            <div className="divide-y divide-theme-stroke">
+              {confirmedGuests.map(guest => (
+                <TableRow
+                  key={guest.id}
+                  guest={guest}
+                  variant="basic"
+                  requireApproval={requireApproval}
+                  onApprove={approveGuest}
+                  onDecline={declineGuest}
+                  onRemove={removeGuest}
+                  onCheckIn={handleCheckIn}
+                  isCheckingIn={checkingInId === guest.id}
+                  isNotable={guest.id ? notableGuestIds.has(guest.id) : false}
+                  onToggleNotable={handleToggleNotable}
+                  isTogglingNotable={togglingNotableId === guest.id}
+                  isSelected={guest.id ? selectedIds.has(guest.id) : false}
+                  onToggleSelect={toggleSelect}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -243,6 +384,15 @@ export const GuestList: React.FC = () => {
               </span>
             </div>
           </div>
+          <div className="flex items-center py-2 -mx-2 px-2">
+            <Checkbox
+              checked={allInSectionSelected(invitedGuests)}
+              onChange={() => allInSectionSelected(invitedGuests) ? deselectAllInSection(invitedGuests) : selectAllInSection(invitedGuests)}
+              label={`Select all (${invitedGuests.length})`}
+              size={16}
+              labelClassName="text-xs text-theme-text-muted"
+            />
+          </div>
           <div className="divide-y divide-theme-stroke">
             {invitedGuests.map(guest => (
               <TableRow
@@ -250,6 +400,8 @@ export const GuestList: React.FC = () => {
                 guest={guest}
                 variant="basic"
                 onRemove={removeGuest}
+                isSelected={guest.id ? selectedIds.has(guest.id) : false}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -262,13 +414,22 @@ export const GuestList: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
               <Clock size={20} className="text-theme-text-secondary" />
-              <h2 className="text-xl font-bold text-theme-text">Waitlist</h2>
+              <h2 className="text-xl font-bold text-theme-text">{t('guests.waitlist')}</h2>
               <span className="bg-[#ffc107]/20 text-[#ffc107] text-sm font-medium px-3 py-1 rounded-full border border-[#ffc107]/30">
                 {waitlistedGuests.length}
               </span>
             </div>
           </div>
 
+          <div className="flex items-center py-2 -mx-2 px-2">
+            <Checkbox
+              checked={allInSectionSelected(waitlistedGuests)}
+              onChange={() => allInSectionSelected(waitlistedGuests) ? deselectAllInSection(waitlistedGuests) : selectAllInSection(waitlistedGuests)}
+              label={`Select all (${waitlistedGuests.length})`}
+              size={16}
+              labelClassName="text-xs text-theme-text-muted"
+            />
+          </div>
           <div className="divide-y divide-theme-stroke">
             {waitlistedGuests.map(guest => (
               <TableRow
@@ -277,9 +438,74 @@ export const GuestList: React.FC = () => {
                 variant="waitlist"
                 onPromote={promoteGuest}
                 onRemove={removeGuest}
+                isSelected={guest.id ? selectedIds.has(guest.id) : false}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar */}
+      {bulkActions && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-theme-card border border-theme-stroke rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3">
+          <span className="text-sm font-semibold text-theme-text whitespace-nowrap">
+            {selectedIds.size} selected
+          </span>
+
+          <div className="w-px h-6 bg-theme-stroke" />
+
+          {bulkActionInProgress ? (
+            <Loader2 size={18} className="animate-spin text-theme-text-muted" />
+          ) : (
+            <>
+              {bulkActions.canCheckIn && (
+                <button
+                  onClick={handleBulkCheckIn}
+                  className="flex items-center gap-1.5 text-green-400 hover:bg-green-500/10 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                >
+                  <CheckCircle2 size={15} />
+                  Check in
+                </button>
+              )}
+              {bulkActions.canApprove && (
+                <button
+                  onClick={handleBulkApprove}
+                  className="flex items-center gap-1.5 text-[#39d98a] hover:bg-[#39d98a]/10 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                >
+                  <Check size={15} />
+                  Approve
+                </button>
+              )}
+              {bulkActions.canDecline && (
+                <button
+                  onClick={handleBulkDecline}
+                  className="flex items-center gap-1.5 text-[#ff393a] hover:bg-[#ff393a]/10 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                >
+                  <X size={15} />
+                  Decline
+                </button>
+              )}
+              {bulkActions.canPromote && (
+                <button
+                  onClick={handleBulkPromote}
+                  className="flex items-center gap-1.5 text-[#39d98a] hover:bg-[#39d98a]/10 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                >
+                  <ArrowUpCircle size={15} />
+                  Promote
+                </button>
+              )}
+            </>
+          )}
+
+          <div className="w-px h-6 bg-theme-stroke" />
+
+          <button
+            onClick={clearSelection}
+            className="text-theme-text-muted hover:text-theme-text text-sm transition-colors whitespace-nowrap"
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>

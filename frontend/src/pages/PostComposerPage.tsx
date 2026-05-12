@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Shield, FileText, Search, Copy, Check } from 'lucide-react';
 import { Header } from '../components/Header';
@@ -78,6 +79,7 @@ const POST_TEMPLATES: PostTemplate[] = [
 /* ------------------------------------------------------------------ */
 
 export function PostComposerPage() {
+  const { t } = useTranslation('admin');
   // Admin gate state
   const [loading, setLoading] = useState(true);
   const [isAdminUser, setIsAdminUser] = useState(false);
@@ -172,9 +174,9 @@ export function PostComposerPage() {
         <Header />
         <div className="flex flex-col items-center justify-center px-4 py-32">
           <Shield size={48} className="text-red-400/60 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('postComposer.accessDenied')}</h1>
           <p className="text-theme-text-muted text-center max-w-md">
-            {error || 'You do not have admin access. Please log in with an admin account.'}
+            {error || t('postComposer.accessDeniedDesc')}
           </p>
         </div>
         <Footer />
@@ -194,7 +196,7 @@ export function PostComposerPage() {
       <div className="max-w-xl mx-auto px-4 py-12 space-y-6">
         <div className="flex items-center gap-3 mb-2">
           <FileText size={28} className="text-theme-text-muted" />
-          <h1 className="text-2xl font-bold">Post Composer</h1>
+          <h1 className="text-2xl font-bold">{t('postComposer.title')}</h1>
         </div>
 
         {/* Template selector */}
@@ -215,7 +217,7 @@ export function PostComposerPage() {
         {/* Event search */}
         <IconInput
           icon={Search}
-          placeholder="Search events..."
+          placeholder={t('postComposer.searchEvents')}
           value={eventSearch}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEventSearch(e.target.value)}
         />
@@ -259,12 +261,12 @@ export function PostComposerPage() {
           {copied ? (
             <>
               <Check size={18} />
-              Copied!
+              {t('postComposer.copied')}
             </>
           ) : (
             <>
               <Copy size={18} />
-              Copy to Clipboard
+              {t('postComposer.copyToClipboard')}
             </>
           )}
         </button>

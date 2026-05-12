@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserPlus, Loader2, Check, Clock, X, LogIn } from 'lucide-react';
 import { Staff, StaffStatus, StaffStats } from '../../types';
 import { getPartyStaff, getStaffStats, createStaff, updateStaff, deleteStaff } from '../../lib/api';
@@ -11,15 +12,16 @@ interface StaffingWidgetProps {
 
 type FilterOption = 'all' | StaffStatus;
 
-const FILTER_OPTIONS: { value: FilterOption; label: string; icon?: React.ReactNode }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'invited', label: 'Invited', icon: <Clock size={14} /> },
-  { value: 'confirmed', label: 'Confirmed', icon: <Check size={14} /> },
-  { value: 'declined', label: 'Declined', icon: <X size={14} /> },
-  { value: 'checked_in', label: 'Checked In', icon: <LogIn size={14} /> },
+const FILTER_OPTIONS: { value: FilterOption; labelKey: string; icon?: React.ReactNode }[] = [
+  { value: 'all', labelKey: 'staffing.all' },
+  { value: 'invited', labelKey: 'staffing.invited', icon: <Clock size={14} /> },
+  { value: 'confirmed', labelKey: 'staffing.confirmedStatus', icon: <Check size={14} /> },
+  { value: 'declined', labelKey: 'staffing.declined', icon: <X size={14} /> },
+  { value: 'checked_in', labelKey: 'staffing.checkedIn', icon: <LogIn size={14} /> },
 ];
 
 export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
+  const { t } = useTranslation('host');
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [stats, setStats] = useState<StaffStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
   };
 
   const handleDelete = async (staffId: string) => {
-    if (!confirm('Are you sure you want to remove this staff member?')) return;
+    if (!confirm(t('staffing.removeStaffConfirm'))) return;
 
     const success = await deleteStaff(partyId, staffId);
     if (success) {
@@ -145,7 +147,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
             onClick={loadStaff}
             className="mt-4 text-[#ff393a] hover:text-[#ff5a5b] font-medium"
           >
-            Try Again
+            {t('staffing.tryAgain')}
           </button>
         </div>
       </div>
@@ -160,7 +162,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold text-theme-text flex items-center gap-2">
               <UserPlus size={20} className="text-[#ff393a]" />
-              Staff
+              {t('staffing.staff')}
               {stats && stats.totalStaff > 0 && (
                 <span className="text-theme-text-muted font-normal text-sm">
                   ({stats.totalStaff})
@@ -171,7 +173,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
             {stats && stats.byStatus.confirmed > 0 && (
               <div className="flex items-center gap-1 text-green-400 text-sm">
                 <Check size={14} />
-                <span>{stats.byStatus.confirmed} confirmed</span>
+                <span>{stats.byStatus.confirmed} {t('staffing.confirmed')}</span>
               </div>
             )}
           </div>
@@ -191,7 +193,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
                     }`}
                   >
                     {option.icon}
-                    {option.label}
+                    {t(option.labelKey)}
                   </button>
                 ))}
               </div>
@@ -203,7 +205,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
               className="flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <UserPlus size={16} />
-              <span className="hidden sm:inline">Add Staff</span>
+              <span className="hidden sm:inline">{t('staffing.addStaff')}</span>
             </button>
           </div>
         </div>
@@ -213,19 +215,19 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
           <div className="grid grid-cols-4 gap-2 bg-theme-surface rounded-xl p-3">
             <div className="text-center">
               <div className="text-gray-400 text-lg font-semibold">{stats.byStatus.invited}</div>
-              <div className="text-theme-text-muted text-xs">Invited</div>
+              <div className="text-theme-text-muted text-xs">{t('staffing.invited')}</div>
             </div>
             <div className="text-center">
               <div className="text-green-400 text-lg font-semibold">{stats.byStatus.confirmed}</div>
-              <div className="text-theme-text-muted text-xs">Confirmed</div>
+              <div className="text-theme-text-muted text-xs">{t('staffing.confirmedStatus')}</div>
             </div>
             <div className="text-center">
               <div className="text-red-400 text-lg font-semibold">{stats.byStatus.declined}</div>
-              <div className="text-theme-text-muted text-xs">Declined</div>
+              <div className="text-theme-text-muted text-xs">{t('staffing.declined')}</div>
             </div>
             <div className="text-center">
               <div className="text-blue-400 text-lg font-semibold">{stats.byStatus.checked_in}</div>
-              <div className="text-theme-text-muted text-xs">Checked In</div>
+              <div className="text-theme-text-muted text-xs">{t('staffing.checkedIn')}</div>
             </div>
           </div>
         )}
@@ -235,7 +237,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
           <div className="text-center py-12 bg-theme-surface rounded-xl">
             <UserPlus className="w-12 h-12 text-theme-text-faint mx-auto mb-3" />
             <p className="text-theme-text-secondary mb-4">
-              {filter === 'all' ? 'No staff members yet' : `No ${filter.replace('_', ' ')} staff`}
+              {filter === 'all' ? t('staffing.noStaffYet') : t('staffing.noFilteredStaff', { status: t(`staffing.${filter === 'checked_in' ? 'checkedIn' : filter}`) })}
             </p>
             {filter === 'all' && (
               <button
@@ -243,7 +245,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
                 className="inline-flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 <UserPlus size={16} />
-                Add First Staff Member
+                {t('staffing.addFirstStaff')}
               </button>
             )}
           </div>

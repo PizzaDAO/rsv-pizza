@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -39,6 +40,7 @@ function buildShareText(base: string, handles: string[], maxLen: number): string
 }
 
 export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [], calendarSlot }: ShareRSVPProps) {
+  const { t } = useTranslation('rsvp');
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
   const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
   const baseText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
@@ -64,7 +66,6 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
 
   return (
     <div className="mt-6 pt-6 border-t border-theme-stroke">
-      <p className="text-theme-text font-medium text-center mb-3">Tell your friends about the party!</p>
       {eventImageUrl && (
         <div className="rounded-xl overflow-hidden mb-3">
           <img
@@ -74,6 +75,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
           />
         </div>
       )}
+      <p className="text-theme-text font-medium text-center mb-3">{t('share.tellFriends')}</p>
 
       <div className="flex gap-2">
         {calendarSlot}
@@ -82,8 +84,8 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text"
         >
           <XIcon size={14} />
-          <span className="hidden sm:inline">Share on X</span>
-          <span className="sm:hidden">X</span>
+          <span className="hidden sm:inline">{t('share.shareOnX')}</span>
+          <span className="sm:hidden">{t('share.x')}</span>
         </button>
       </div>
     </div>

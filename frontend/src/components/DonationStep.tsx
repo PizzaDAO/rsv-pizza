@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, DollarSign, Target, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getDonationStats } from '../lib/api';
 import { DonationForm } from './DonationForm';
 import { DonationPublicStats } from '../types';
@@ -23,6 +24,7 @@ export const DonationStep: React.FC<DonationStepProps> = ({
   onComplete,
   onSkip,
 }) => {
+  const { t } = useTranslation('donation');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DonationPublicStats | null>(null);
   const [showForm, setShowForm] = useState(true);
@@ -73,11 +75,11 @@ export const DonationStep: React.FC<DonationStepProps> = ({
             <Heart className="w-6 h-6 text-[#ff393a]" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-theme-text">Make a Donation</h2>
+            <h2 className="text-xl font-bold text-theme-text">{t('step.title')}</h2>
             <p className="text-sm text-theme-text-secondary">
               {stats.recipient ? (
-                <>Buy Pizza for {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
-              ) : `Buy Pizza for ${partyName}`}
+                <>{t('step.buyPizzaFor', { recipient: '' })}{stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
+              ) : t('step.buyPizzaForEvent', { eventName: partyName })}
             </p>
           </div>
         </div>
@@ -102,14 +104,14 @@ export const DonationStep: React.FC<DonationStepProps> = ({
         <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
           <Heart className="w-8 h-8 text-[#ff393a]" />
         </div>
-        <h2 className="text-2xl font-bold text-theme-text mb-2">Donate</h2>
+        <h2 className="text-2xl font-bold text-theme-text mb-2">{t('step.donateTitle')}</h2>
         <p className="text-sm text-theme-text-secondary mb-1">
           {stats.recipient ? (
-            <>Supporting {stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
-          ) : `Supporting ${partyName}`}
+            <>{t('step.supportingRecipient', { recipient: '' })}{stats.recipientUrl ? <a href={stats.recipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{stats.recipient}</a> : stats.recipient}</>
+          ) : t('step.supportingEvent', { eventName: partyName })}
         </p>
         <p className="text-theme-text-secondary">
-          {stats.message || 'Would you like to make a donation to help make this event possible?'}
+          {stats.message || t('step.defaultMessage')}
         </p>
       </div>
 
@@ -118,10 +120,10 @@ export const DonationStep: React.FC<DonationStepProps> = ({
         <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-theme-text-secondary text-sm">
-              {stats.donorCount} {stats.donorCount === 1 ? 'person has' : 'people have'} donated
+              {t('step.donorCount', { count: stats.donorCount })}
             </span>
             <span className="text-[#39d98a] font-bold">
-              {formatAmount(stats.totalAmount)} raised
+              {t('step.raised', { amount: formatAmount(stats.totalAmount) })}
             </span>
           </div>
 
@@ -137,7 +139,7 @@ export const DonationStep: React.FC<DonationStepProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <span className="text-theme-text-muted flex items-center gap-1">
                   <Target size={12} />
-                  Goal: ${stats.goal}
+                  {t('step.goal', { amount: stats.goal })}
                 </span>
                 <span className="text-theme-text-muted">{goalProgress.toFixed(0)}%</span>
               </div>
@@ -149,14 +151,14 @@ export const DonationStep: React.FC<DonationStepProps> = ({
       {/* Recent Donors */}
       {stats.recentDonors && stats.recentDonors.length > 0 && (
         <div className="mb-6">
-          <p className="text-theme-text-muted text-sm mb-2">Recent supporters:</p>
+          <p className="text-theme-text-muted text-sm mb-2">{t('step.recentSupporters')}</p>
           <div className="flex flex-wrap gap-2">
             {stats.recentDonors.slice(0, 5).map((donor, index) => (
               <span
                 key={index}
                 className="px-3 py-1 bg-theme-surface rounded-full text-sm text-theme-text-secondary"
               >
-                {donor.name || 'Anonymous'}
+                {donor.name || t('step.anonymous')}
               </span>
             ))}
           </div>
@@ -170,13 +172,13 @@ export const DonationStep: React.FC<DonationStepProps> = ({
           className="w-full btn-primary flex items-center justify-center gap-2"
         >
           <DollarSign size={18} />
-          Make a Donation
+          {t('step.makeADonation')}
         </button>
         <button
           onClick={onSkip}
           className="w-full btn-secondary flex items-center justify-center gap-2"
         >
-          Back
+          {t('step.back')}
         </button>
       </div>
     </div>

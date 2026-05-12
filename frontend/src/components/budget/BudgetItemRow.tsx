@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Clock, MoreVertical, Pencil, Trash2, Receipt, FileText, User } from 'lucide-react';
 import { BudgetItem, BUDGET_CATEGORIES } from '../../types';
 
@@ -15,6 +16,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { t } = useTranslation('host');
   const [showMenu, setShowMenu] = useState(false);
 
   const formatCurrency = (amount: number) => {
@@ -40,7 +42,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
             ? 'text-green-400 hover:text-green-300'
             : 'text-theme-text-faint hover:text-theme-text-muted'
         }`}
-        title={item.status === 'paid' ? 'Mark as pending' : 'Mark as paid'}
+        title={item.status === 'paid' ? t('budget.markAsPending') : t('budget.markAsPaid')}
       >
         {item.status === 'paid' ? (
           <CheckCircle size={20} />
@@ -64,7 +66,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
               rel="noopener noreferrer"
               className="flex-shrink-0 text-theme-text-muted hover:text-theme-text-secondary transition-colors"
               onClick={(e) => e.stopPropagation()}
-              title="View receipt"
+              title={t('budget.viewReceiptTitle')}
             >
               {isPdfUrl(item.receiptUrl) ? (
                 <FileText size={16} />
@@ -120,7 +122,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover"
               >
                 <Pencil size={14} />
-                Edit
+                {t('budget.edit')}
               </button>
               <button
                 onClick={() => {
@@ -130,7 +132,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-theme-surface-hover"
               >
                 <Trash2 size={14} />
-                Delete
+                {t('budget.delete')}
               </button>
             </div>
           </>

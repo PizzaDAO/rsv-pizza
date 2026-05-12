@@ -1,0 +1,78 @@
+{
+  "notFound": {
+    "title": "イベントが見つかりません",
+    "goHome": "ホームに戻る"
+  },
+  "password": {
+    "title": "パスワードが必要です",
+    "placeholder": "パスワード",
+    "verifying": "確認中...",
+    "continue": "続行",
+    "alreadyRsvpd": "RSVP済みですか？ログイン",
+    "or": "または",
+    "postToGetIn": "投稿して参加する",
+    "pasteTweetUrl": "ツイートのURLを貼り付けてイベントをアンロック",
+    "verifyUnlock": "確認してアンロック"
+  },
+  "editPassword": {
+    "title": "主催者パスワードが必要です",
+    "subtitle": "このイベントを編集するには、作成時に設定したパスワードを入力してください。",
+    "label": "パスワード",
+    "placeholder": "パスワードを入力",
+    "cancel": "キャンセル",
+    "continue": "続行"
+  },
+  "hostDashboard": "主催者ダッシュボード",
+  "donate": "寄付する",
+  "buyPizzaFor": "{{recipient}}にピザを贈る",
+  "buyPizzaForEvent": "{{eventName}}にピザを贈る",
+  "supportingRecipient": "{{recipient}}を応援",
+  "supportingEvent": "{{eventName}}を応援",
+  "guest_one": "{{count}}名のゲスト",
+  "guest_other": "{{count}}名のゲスト",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "（キャンセル待ち受付中）",
+  "spotsLeft": "（残り{{count}}席）",
+  "rsvp": "RSVP",
+  "editRsvp": "RSVPを編集",
+  "rsvpsClosed": "このイベントのRSVPは締め切りました",
+  "viewPhotos": "写真を見る（{{count}}）",
+  "sharePhotos": "写真を共有",
+  "pizzadaoDescription": "は、ピザ業界をオンチェーンにするための国際的なピザ協同組合です。毎年グローバルピザパーティーを開催し、毎月カンファレンスイベントを企画し、他の主催者のミートアップにピザを提供しています。",
+  "gppDefaultDescription": "2010年5月22日、2枚のピザが世界を変えました。ラズロ・ハニエツがジェレミー・スターディバントに10,000 BTCを支払い、2枚のピザを注文しました。これは世界初の実際のビットコイン取引であり、グローバルムーブメントのきっかけとなりました。\n\nPizzaDAOは[グローバルピザパーティー](https://globalpizza.party)にあなたを招待します。500以上の都市で開催されるビットコインピザデーの世界的なお祝いです。すべての始まりとなったピザを称えましょう。\n\n期待できること：\n🍕 無料ピザ\n🌍 500以上の都市でのグローバルなお祝い\n₿ 暗号通貨愛好家とビルダー\n💬 素晴らしい会話、新しい友達、そして楽しい雰囲気\n\n暗号通貨に詳しくても、ただピザを食べに来るだけでも、歴史の一部になるチャンスです。",
+  "sponsorDescription": {
+    "ens": "（Ethereum Name Service）は、インターネット上で人間が読める名前を可能にする分散型ネーミングプロトコルです。長くて複雑なブロックチェーンアドレスをコピー＆ペーストする代わりに、ENSを使えばシンプルで覚えやすい名前（pizzadao.ethなど）に置き換えることができ、ウォレット、アプリ、分散型ウェブ全体で利用できます。",
+    "brave": "ブラウザは、PC、Mac、モバイル向けの高速でプライベートかつ安全なウェブブラウザです。今すぐダウンロードして、データを節約しながら広告のない高速ブラウジング体験をお楽しみください。",
+    "wpc": "は、米国を拠点とする非営利の多国籍エリートピザ専門家グループです。教育支援、コミュニティサービス、ピザの普及に専念しています！"
+  },
+  "dateTbd": "日程未定",
+  "partiesList": {
+    "title": "すべてのパーティー",
+    "newParty": "+ 新しいパーティー",
+    "noParties": "パーティーが見つかりません。",
+    "createFirst": "最初のパーティーを作成",
+    "host": "主催者：{{name}}",
+    "closed": "締切",
+    "created": "作成日：",
+    "guests": "{{count}}名のゲスト",
+    "loading": "パーティーを読み込み中..."
+  },
+  "report": {
+    "notFound": "レポートが見つかりません",
+    "notFoundDesc": "このレポートは非公開になったか、リンクが無効です。",
+    "passwordProtected": "パスワード保護されています",
+    "enterPassword": "このレポートを表示するにはパスワードを入力してください。",
+    "enterPasswordPlaceholder": "パスワードを入力",
+    "incorrectPassword": "パスワードが正しくありません",
+    "viewReport": "レポートを表示"
+  },
+  "venueReport": {
+    "notFound": "会場レポートが見つかりません",
+    "notFoundDesc": "この会場レポートは非公開になったか、リンクが無効です。",
+    "passwordProtected": "パスワード保護されています",
+    "enterPassword": "この会場レポートを表示するにはパスワードを入力してください。",
+    "enterPasswordPlaceholder": "パスワードを入力",
+    "incorrectPassword": "パスワードが正しくありません",
+    "viewReport": "レポートを表示"
+  }
+}

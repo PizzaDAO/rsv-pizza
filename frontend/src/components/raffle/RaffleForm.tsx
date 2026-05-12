@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, Type, AlignLeft, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Raffle } from '../../types';
@@ -11,6 +12,7 @@ interface RaffleFormProps {
 }
 
 export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormProps) {
+  const { t } = useTranslation('host');
   const [name, setName] = useState(raffle?.name || '');
   const [description, setDescription] = useState(raffle?.description || '');
   const [entriesPerGuest, setEntriesPerGuest] = useState(raffle?.entriesPerGuest || 1);
@@ -31,7 +33,7 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
       <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <h2 className="text-lg font-semibold text-theme-text">
-            {raffle ? 'Edit Raffle' : 'Create Raffle'}
+            {raffle ? t('raffle.editRaffleTitle') : t('raffle.createRaffle')}
           </h2>
           <button
             onClick={onClose}
@@ -47,7 +49,7 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Raffle name"
+            placeholder={t('raffle.raffleNamePlaceholder')}
             required
             autoFocus
           />
@@ -58,7 +60,7 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description for guests"
+            placeholder={t('raffle.raffleDescPlaceholder')}
           />
 
           <div>
@@ -67,10 +69,10 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
               onChange={(e) => setEntriesPerGuest(parseInt(e.target.value, 10))}
               className="w-full bg-theme-surface border border-theme-stroke rounded-xl px-4 py-3 text-theme-text text-sm focus:outline-none focus:border-[#ff393a]/50"
             >
-              <option value={1} className="bg-theme-header text-theme-text">1 entry per guest</option>
-              <option value={2} className="bg-theme-header text-theme-text">2 entries per guest</option>
-              <option value={3} className="bg-theme-header text-theme-text">3 entries per guest</option>
-              <option value={5} className="bg-theme-header text-theme-text">5 entries per guest</option>
+              <option value={1} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_1')}</option>
+              <option value={2} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_2')}</option>
+              <option value={3} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_3')}</option>
+              <option value={5} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_5')}</option>
             </select>
           </div>
 
@@ -81,7 +83,7 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
               className="btn-secondary flex-1"
               disabled={isLoading}
             >
-              Cancel
+              {t('raffle.cancel')}
             </button>
             <button
               type="submit"
@@ -91,10 +93,10 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
               {isLoading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Saving...
+                  {t('raffle.saving')}
                 </>
               ) : (
-                raffle ? 'Update Raffle' : 'Create Raffle'
+                raffle ? t('raffle.updateRaffle') : t('raffle.createRaffle')
               )}
             </button>
           </div>

@@ -1,0 +1,78 @@
+{
+  "notFound": {
+    "title": "Événement introuvable",
+    "goHome": "Retour à l'accueil"
+  },
+  "password": {
+    "title": "Mot de passe requis",
+    "placeholder": "Mot de passe",
+    "verifying": "Vérification...",
+    "continue": "Continuer",
+    "alreadyRsvpd": "Déjà inscrit ? Connectez-vous",
+    "or": "ou",
+    "postToGetIn": "Publiez pour entrer",
+    "pasteTweetUrl": "Collez l'URL de votre tweet pour déverrouiller l'événement",
+    "verifyUnlock": "Vérifier et déverrouiller"
+  },
+  "editPassword": {
+    "title": "Mot de passe hôte requis",
+    "subtitle": "Entrez le mot de passe que vous avez défini lors de la création de cet événement pour le modifier.",
+    "label": "Mot de passe",
+    "placeholder": "Entrez le mot de passe",
+    "cancel": "Annuler",
+    "continue": "Continuer"
+  },
+  "hostDashboard": "Tableau de bord hôte",
+  "donate": "Donner",
+  "buyPizzaFor": "Offrir une pizza à {{recipient}}",
+  "buyPizzaForEvent": "Offrir une pizza pour {{eventName}}",
+  "supportingRecipient": "Soutenir {{recipient}}",
+  "supportingEvent": "Soutenir {{eventName}}",
+  "guest_one": "{{count}} invité",
+  "guest_other": "{{count}} invités",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "(Liste d'attente ouverte)",
+  "spotsLeft": "({{count}} places restantes)",
+  "rsvp": "RSVP",
+  "editRsvp": "Modifier le RSVP",
+  "rsvpsClosed": "Les inscriptions sont fermées pour cet événement",
+  "viewPhotos": "Voir les photos ({{count}})",
+  "sharePhotos": "Partager les photos",
+  "pizzadaoDescription": "est une coopérative internationale de pizza qui met l'industrie de la pizza onchain. Nous organisons une fête mondiale de la pizza chaque année, des événements lors de conférences chaque mois, et soutenons les rencontres d'autres organisateurs avec de la pizza.",
+  "gppDefaultDescription": "Le 22 mai 2010, deux pizzas ont changé le monde. Laszlo Hanyecz a payé 10 000 BTC à Jeremy Sturdivant pour lui commander deux pizzas. C'était la première transaction Bitcoin du monde réel et l'étincelle d'un mouvement mondial.\n\nMaintenant, PizzaDAO vous invite à la [Global Pizza Party](https://globalpizza.party), une célébration mondiale du Bitcoin Pizza Day dans plus de 500 villes. Rejoignez-nous pour rendre hommage aux parts qui ont tout déclenché.\n\nÀ quoi s'attendre :\n🍕 Pizza gratuite\n🌍 Une célébration mondiale dans plus de 500 villes\n₿ Passionnés et bâtisseurs de crypto\n💬 De belles conversations, de nouveaux amis et de bonnes vibes\n\nQue vous soyez passionné de crypto ou juste là pour une part, c'est votre invitation à faire partie de l'histoire, encore une fois.",
+  "sponsorDescription": {
+    "ens": "(Ethereum Name Service) est le protocole de nommage décentralisé qui alimente les noms lisibles sur internet. Au lieu de copier-coller de longues adresses blockchain complexes, ENS vous permet de les remplacer par un nom simple et mémorable (comme pizzadao.eth) qui fonctionne dans les portefeuilles, les applications et le web décentralisé.",
+    "brave": "est un navigateur web rapide, privé et sécurisé pour PC, Mac et mobile. Téléchargez-le maintenant pour profiter d'une navigation plus rapide, sans publicité et économe en données.",
+    "wpc": "est un groupe multinational à but non lucratif basé aux États-Unis, composé de professionnels de la pizza d'élite. Dédié à l'éducation, au service communautaire et à la promotion de la pizza !"
+  },
+  "dateTbd": "Date à confirmer",
+  "partiesList": {
+    "title": "Tous les événements",
+    "newParty": "+ Nouvel événement",
+    "noParties": "Aucun événement trouvé.",
+    "createFirst": "Créez votre premier événement",
+    "host": "Hôte : {{name}}",
+    "closed": "Fermé",
+    "created": "Créé :",
+    "guests": "{{count}} invités",
+    "loading": "Chargement des événements..."
+  },
+  "report": {
+    "notFound": "Rapport introuvable",
+    "notFoundDesc": "Ce rapport a peut-être été retiré ou le lien est invalide.",
+    "passwordProtected": "Protégé par mot de passe",
+    "enterPassword": "Entrez le mot de passe pour voir ce rapport.",
+    "enterPasswordPlaceholder": "Entrez le mot de passe",
+    "incorrectPassword": "Mot de passe incorrect",
+    "viewReport": "Voir le rapport"
+  },
+  "venueReport": {
+    "notFound": "Rapport de lieu introuvable",
+    "notFoundDesc": "Ce rapport de lieu a peut-être été retiré ou le lien est invalide.",
+    "passwordProtected": "Protégé par mot de passe",
+    "enterPassword": "Entrez le mot de passe pour voir ce rapport de lieu.",
+    "enterPasswordPlaceholder": "Entrez le mot de passe",
+    "incorrectPassword": "Mot de passe incorrect",
+    "viewReport": "Voir le rapport"
+  }
+}
