@@ -776,7 +776,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowDiscountInfoModal(false)}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-theme-text">How to Ask Your Pizzeria for a Discount</h2>
+              <h2 className="text-lg font-semibold text-theme-text">Getting Guests a 10% Discount</h2>
               <button onClick={() => setShowDiscountInfoModal(false)} className="text-theme-text-muted hover:text-theme-text transition-colors">
                 <X size={20} />
               </button>
