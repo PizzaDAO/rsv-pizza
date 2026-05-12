@@ -432,7 +432,11 @@ function HostPageContent() {
                     };
 
                     const existing = party.coHosts || [];
-                    const updated = [...existing, newCoHost];
+                    // Deduplicate — update existing co-host if name matches, otherwise add new
+                    const existingIdx = existing.findIndex(c => c.name?.toLowerCase() === data.name.toLowerCase());
+                    const updated = existingIdx >= 0
+                      ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
+                      : [...existing, newCoHost];
                     await updateParty(party.id, { co_hosts: updated });
                     if (party.inviteCode) await loadParty(party.inviteCode);
                   }}

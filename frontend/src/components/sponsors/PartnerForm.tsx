@@ -297,7 +297,7 @@ export function PartnerForm({
     if (handle && !formData.coHostAvatarUrl && !avatarFile) {
       handleChange('coHostAvatarUrl', `https://unavatar.io/x/${handle}`);
     }
-  }, [formData.brandTwitter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [formData.brandTwitter, addAsCoHost]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -382,17 +382,9 @@ export function PartnerForm({
         setUploadingAvatar(false);
       }
 
-      await onSubmit({
-        ...formData,
-        name: formData.name.trim(),
-        logoUrl,
-        coHostAvatarUrl: avatarUrl || '',
-        lastContactedAt: formData.lastContactedAt || null,
-      });
-
-      // If "Also add as event host" was checked, fire the callback
+      // Fire co-host callback BEFORE onSubmit (which closes the form)
       if (addAsCoHost && onAddAsCoHost) {
-        onAddAsCoHost({
+        await onAddAsCoHost({
           name: formData.name.trim(),
           website: normalizeUrl(formData.website),
           twitter: formData.brandTwitter.trim(),
@@ -401,6 +393,14 @@ export function PartnerForm({
           avatarUrl,
         });
       }
+
+      await onSubmit({
+        ...formData,
+        name: formData.name.trim(),
+        logoUrl,
+        coHostAvatarUrl: avatarUrl || '',
+        lastContactedAt: formData.lastContactedAt || null,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }
@@ -547,14 +547,21 @@ export function PartnerForm({
             </div>
           </div>
           {(avatarPreview || formData.coHostAvatarUrl) && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <img
                 src={avatarPreview || formData.coHostAvatarUrl}
                 alt=""
-                className="w-8 h-8 rounded-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                className="w-10 h-10 rounded-full object-cover border border-white/20"
+                onError={e => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).className = 'w-10 h-10 rounded-full bg-white/10 border border-white/20'; }}
               />
-              <span className="text-xs text-theme-text-muted">{t('sponsors.avatarPreview')}</span>
+              <span className="text-xs text-theme-text-muted flex-1 truncate">{avatarPreview ? 'Uploaded image' : formData.coHostAvatarUrl}</span>
+              <button
+                type="button"
+                onClick={() => { setAvatarFile(null); setAvatarPreview(null); handleChange('coHostAvatarUrl', ''); }}
+                className="text-xs text-red-400 hover:text-red-300"
+              >
+                Clear
+              </button>
             </div>
           )}
         </div>
