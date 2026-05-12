@@ -449,17 +449,6 @@ export function GPPLandingPage() {
                 </div>
               )}
             </div>
-            <a
-              href="/login"
-              className="text-sm font-medium px-4 py-2 rounded-lg border transition-colors"
-              style={{
-                color: C.darkText,
-                borderColor: 'rgba(0,0,0,0.15)',
-                background: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              {t('header.logIn')}
-            </a>
           </div>
         </div>
       </header>
