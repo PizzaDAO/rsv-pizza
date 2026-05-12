@@ -30,6 +30,7 @@ export interface FlyerRegenData {
   inviteCode?: string | null;
   eventType?: string | null;
   flyerConfig?: Record<string, any> | null;
+  eventTags?: string[];
 }
 
 // ---- Debounce map (partyId → timer handle) ----
@@ -228,6 +229,7 @@ async function doRegen(
     is12h,
     sponsors: sponsors.map((s) => ({ id: s.id, logoUrl: s.logoUrl! })),
     config: layoutConfig,
+    eventTags: data.eventTags,
   });
 
   // 5. Convert canvas to blob
