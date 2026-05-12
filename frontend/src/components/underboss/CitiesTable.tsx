@@ -41,9 +41,30 @@ const STATUS_ORDER: Record<CityStatusValue, number> = { created: 0, todo: 1, ski
 
 // Map sheet region names to GPP region IDs they belong to
 const SHEET_REGION_TO_GPP: Record<string, string[]> = {
-  'north-america': ['usa', 'canada'],
   'africa': ['west-africa', 'east-africa', 'south-africa'],
 };
+
+// For "North America" sheet region, determine GPP region from city's country field
+function sheetCityToGppRegion(city: { region: string; country: string }): string[] {
+  const sheetRegion = city.region.toLowerCase().replace(/\s+/g, '-');
+
+  if (sheetRegion === 'north-america') {
+    const c = city.country.toLowerCase().trim();
+    if (c.startsWith('usa') || c === 'united states' || c === 'iowa') return ['usa'];
+    if (c.startsWith('canada')) return ['canada'];
+    if (c === 'mexico') return ['central-america'];
+    if (c === 'bahamas') return ['central-america'];
+    // Fallback: show in both usa and canada
+    return ['usa', 'canada'];
+  }
+
+  // Check umbrella mappings
+  const mapped = SHEET_REGION_TO_GPP[sheetRegion];
+  if (mapped) return mapped;
+
+  // Direct match (e.g., "western-europe" === "western-europe")
+  return [sheetRegion];
+}
 
 interface CitiesTableProps {
   events: UnderbossEvent[];
@@ -181,11 +202,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const myRegions = meData.regions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
-        if (myRegions.includes(sheetRegion)) return true;
-        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
-        if (mappedGppIds) return mappedGppIds.some((id) => myRegions.includes(id));
-        return false;
+        const cityGppRegions = sheetCityToGppRegion(c);
+        return cityGppRegions.some((id) => myRegions.includes(id));
       });
     }
 
@@ -194,15 +212,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const normalizedRegions = selectedRegions.map((r) => r.toLowerCase());
       result = result.filter((c) => {
         if (!c.region) return false;
-        const sheetRegion = c.region.toLowerCase().replace(/\s+/g, '-');
-        // Direct match (e.g. "western-europe" === "western-europe")
-        if (normalizedRegions.includes(sheetRegion)) return true;
-        // Sheet uses umbrella regions (e.g. "North America" covers usa + canada)
-        const mappedGppIds = SHEET_REGION_TO_GPP[sheetRegion];
-        if (mappedGppIds) {
-          return mappedGppIds.some((id) => normalizedRegions.includes(id));
-        }
-        return false;
+        const cityGppRegions = sheetCityToGppRegion(c);
+        return cityGppRegions.some((id) => normalizedRegions.includes(id));
       });
     }
 
