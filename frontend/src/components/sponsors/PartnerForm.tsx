@@ -257,7 +257,11 @@ export function PartnerForm({
   });
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [addAsCoHost, setAddAsCoHost] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Re-initialize when sponsor changes (CRM mode)
   useEffect(() => {
@@ -285,6 +289,24 @@ export function PartnerForm({
 
   const handleChange = (field: keyof PartnerFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Auto-populate avatar from X handle when avatar is empty
+  useEffect(() => {
+    const handle = formData.brandTwitter.trim();
+    if (handle && !formData.coHostAvatarUrl && !avatarFile) {
+      handleChange('coHostAvatarUrl', `https://unavatar.io/x/${handle}`);
+    }
+  }, [formData.brandTwitter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setError('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be less than 5MB'); return; }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setError(null);
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,22 +367,38 @@ export function PartnerForm({
         setUploadingLogo(false);
       }
 
+      // Upload avatar if a file was selected
+      let avatarUrl = formData.coHostAvatarUrl.trim() || undefined;
+      if (avatarFile) {
+        setUploadingAvatar(true);
+        const uploadedAvatar = await uploadSponsorLogo(avatarFile);
+        if (uploadedAvatar) {
+          avatarUrl = uploadedAvatar;
+        } else {
+          setError('Failed to upload avatar. Please try again.');
+          setUploadingAvatar(false);
+          return;
+        }
+        setUploadingAvatar(false);
+      }
+
       await onSubmit({
         ...formData,
         name: formData.name.trim(),
         logoUrl,
+        coHostAvatarUrl: avatarUrl || '',
         lastContactedAt: formData.lastContactedAt || null,
       });
 
       // If "Also add as event host" was checked, fire the callback
-      if (addAsCoHost && onAddAsCoHost && !isEditing) {
+      if (addAsCoHost && onAddAsCoHost) {
         onAddAsCoHost({
           name: formData.name.trim(),
           website: normalizeUrl(formData.website),
           twitter: formData.brandTwitter.trim(),
           instagram: formData.brandInstagram.trim(),
           logoUrl,
-          avatarUrl: formData.coHostAvatarUrl.trim() || undefined,
+          avatarUrl,
         });
       }
     } catch (err) {
@@ -465,8 +503,8 @@ export function PartnerForm({
         )}
       </div>}
 
-      {/* Also add as co-host — CRM mode, new partners only */}
-      {!logoOnly && isCrm && !isEditing && onAddAsCoHost && (
+      {/* Also add as co-host — CRM mode */}
+      {!logoOnly && isCrm && onAddAsCoHost && (
         <Checkbox
           checked={addAsCoHost}
           onChange={() => setAddAsCoHost(!addAsCoHost)}
@@ -482,17 +520,36 @@ export function PartnerForm({
             <User size={16} />
             {t('sponsors.coHostProfile')}
           </h3>
-          <IconInput
-            icon={Image}
-            type="url"
-            value={formData.coHostAvatarUrl}
-            onChange={e => handleChange('coHostAvatarUrl', e.target.value)}
-            placeholder="Avatar URL"
-          />
-          {formData.coHostAvatarUrl && (
+          <div className="flex gap-3">
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+            >
+              <Upload size={16} />
+              Upload
+            </button>
+            <div className="flex-1">
+              <IconInput
+                icon={Image}
+                type="url"
+                value={formData.coHostAvatarUrl}
+                onChange={e => { setAvatarFile(null); setAvatarPreview(null); handleChange('coHostAvatarUrl', e.target.value); }}
+                placeholder="Avatar URL"
+              />
+            </div>
+          </div>
+          {(avatarPreview || formData.coHostAvatarUrl) && (
             <div className="flex items-center gap-2">
               <img
-                src={formData.coHostAvatarUrl}
+                src={avatarPreview || formData.coHostAvatarUrl}
                 alt=""
                 className="w-8 h-8 rounded-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -882,7 +939,7 @@ export function PartnerForm({
         <div className="pt-4 border-t border-theme-stroke">
           <button
             type="submit"
-            disabled={isLoading || uploadingLogo}
+            disabled={isLoading || uploadingLogo || uploadingAvatar}
             className="w-full px-4 py-3 bg-[#ff393a] hover:bg-[#ff393a]/80 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading || uploadingLogo ? (
