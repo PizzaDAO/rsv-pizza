@@ -716,6 +716,7 @@ interface EventCardProps {
 }
 
 function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
+  const { t } = useTranslation('partner');
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
 
@@ -1123,7 +1124,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               icon={StickyNote}
               multiline
               rows={5}
-              placeholder="{t('eventCard.privateNotes')}"
+              placeholder={t('eventCard.privateNotes')}
               value={notes}
               onChange={(e) => handleNotesChange((e.target as HTMLTextAreaElement).value)}
               autoFocus
