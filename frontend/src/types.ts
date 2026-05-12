@@ -352,6 +352,7 @@ export interface Pizzeria {
   description?: string;
   photos?: string[];
   orderingOptions: OrderingOption[];
+  offersDiscount?: boolean;
 }
 
 export interface OrderingOption {
