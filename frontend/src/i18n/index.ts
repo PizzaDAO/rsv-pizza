@@ -164,6 +164,11 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    react: {
+      useSuspense: true,
+      bindI18n: 'languageChanged loaded',
+      bindI18nStore: 'added removed',
+    },
   });
 
 // Update html lang attribute when language changes
