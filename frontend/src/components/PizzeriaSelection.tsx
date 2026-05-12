@@ -790,16 +790,16 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 <ol className="list-decimal list-inside space-y-1.5 text-theme-text-muted">
                   <li>Talk to the pizzeria owner or manager before the event</li>
                   <li>Explain that you're serving their pizza at the local Global Pizza Party and would like to send guests their way afterward</li>
-                  <li>Ask if they'd offer a 10% discount to verified attendees — they'll show the discount page on their phone</li>
+                  <li>Ask if they'd offer a 10% discount to verified attendees. They'll show the discount page on their phone</li>
                   <li>If they agree, check the "Offering 10% discount" box for that pizzeria so guests know</li>
                 </ol>
               </div>
               <div>
                 <p className="font-medium text-theme-text mb-2">Talking points:</p>
                 <ul className="list-disc list-inside space-y-1.5 text-theme-text-muted">
-                  <li>"This is one of more than 500 parties worldwide, you can see it at <a href="https://globalpizza.party" target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:underline">globalpizza.party</a>"</li>
-                  <li>"It's a one-time use discount per guest, shown on their phone"</li>
-                  <li>"It's a great way to turn event guests into customers"</li>
+                  <li>This is one of more than 500 parties worldwide, you can see it at <a href="https://globalpizza.party" target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:underline">globalpizza.party</a></li>
+                  <li>It's a one-time use discount per guest, shown on their phone</li>
+                  <li>It's a great way to turn party guests into customers</li>
                 </ul>
               </div>
             </div>
