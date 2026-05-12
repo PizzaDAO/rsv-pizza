@@ -382,25 +382,20 @@ export function PartnerForm({
         setUploadingAvatar(false);
       }
 
-      // Fire co-host callback BEFORE onSubmit (which closes the form)
-      if (addAsCoHost && onAddAsCoHost) {
-        await onAddAsCoHost({
-          name: formData.name.trim(),
-          website: normalizeUrl(formData.website),
-          twitter: formData.brandTwitter.trim(),
-          instagram: formData.brandInstagram.trim(),
-          logoUrl,
-          avatarUrl,
-        });
-      }
-
       await onSubmit({
         ...formData,
         name: formData.name.trim(),
         logoUrl,
         coHostAvatarUrl: avatarUrl || '',
         lastContactedAt: formData.lastContactedAt || null,
-      });
+      }, addAsCoHost ? {
+        name: formData.name.trim(),
+        website: normalizeUrl(formData.website),
+        twitter: formData.brandTwitter.trim(),
+        instagram: formData.brandInstagram.trim(),
+        logoUrl,
+        avatarUrl,
+      } : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }

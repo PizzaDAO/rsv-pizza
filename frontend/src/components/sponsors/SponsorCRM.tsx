@@ -105,7 +105,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   }, [sponsors, loadUnifiedPartners]);
 
   // Handle form submission
-  const handleFormSubmit = async (formData: PartnerFormData) => {
+  const handleFormSubmit = async (formData: PartnerFormData, coHostData?: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => {
     const data = extractSponsorData(formData);
     setIsSubmitting(true);
     try {
@@ -123,6 +123,11 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         if (result) {
           setSponsors(prev => [result.sponsor, ...prev]);
         }
+      }
+
+      // Add as co-host if requested — do this before closing the form
+      if (coHostData && onAddAsCoHost) {
+        await onAddAsCoHost(coHostData);
       }
 
       // Refresh stats
