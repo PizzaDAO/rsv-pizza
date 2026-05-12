@@ -73,6 +73,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [showPizzaBoxModal, setShowPizzaBoxModal] = useState(false);
+  const [showPizzaSelfieModal, setShowPizzaSelfieModal] = useState(false);
   const config = ITEM_CONFIG[itemKey];
 
   const isDisabled = itemKey === 'join_telegram' && !actionContext.telegramUrl;
@@ -108,7 +109,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
         actionContext.onOpenScanner();
         break;
       case 'pizza_selfie':
-        onComplete(itemKey, undefined, 'self_report');
+        setShowPizzaSelfieModal(true);
         break;
       case 'sign_pizza_box':
         setShowPizzaBoxModal(true);
@@ -189,8 +190,8 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
 
       {/* URL Input (for post item) - appears below the row */}
       {showInput && !completed && (
-        <div className="ml-11 p-3 bg-[#1a1a2e] border border-white/10 rounded-lg">
-          <p className="text-xs text-white/60 mb-2">Paste the link to your post:</p>
+        <div className="ml-11 p-3 bg-theme-surface border border-theme-stroke rounded-lg">
+          <p className="text-xs text-theme-text-muted mb-2">Paste the link to your post:</p>
           <div className="flex gap-2">
             <IconInput
               icon={Link2}
@@ -205,6 +206,40 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
               className="px-3 py-1.5 rounded bg-[#ff393a] hover:bg-[#ff5a5b] text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Submit
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pizza Selfie Modal */}
+      {showPizzaSelfieModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setShowPizzaSelfieModal(false)}
+        >
+          <div
+            className="bg-[#1a1a2e] border border-white/10 rounded-xl max-w-sm w-full mx-4 p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowPizzaSelfieModal(false)}
+              className="absolute top-3 right-3 text-white/50 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-white mb-3">Pizza Selfie</h3>
+            <p className="text-sm text-white/70 mb-4">
+              Take a selfie with a slice of pizza and upload it to the photo gallery!
+            </p>
+            <button
+              onClick={() => {
+                setShowPizzaSelfieModal(false);
+                actionContext.onOpenPhotos();
+                onComplete('pizza_selfie', undefined, 'self_report');
+              }}
+              className="w-full py-2.5 rounded-lg bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium transition-colors"
+            >
+              Upload Photo
             </button>
           </div>
         </div>
