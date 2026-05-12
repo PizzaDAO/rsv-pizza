@@ -286,7 +286,7 @@ export function GraphicsDashboard() {
 
         const sponsorResult = await getSponsors(event.id);
         const sponsors = (sponsorResult?.sponsors ?? []).filter(
-          (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
+          (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed'),
         );
 
         const canvas = await renderFlyer({
@@ -383,7 +383,7 @@ export function GraphicsDashboard() {
 
       const sponsorResult = await getSponsors(event.id);
       const sponsors = (sponsorResult?.sponsors ?? []).filter(
-        (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
+        (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed'),
       );
 
       const canvas = await renderFlyer({

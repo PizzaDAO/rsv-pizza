@@ -169,7 +169,7 @@ async function doRegen(
   // 2. Fetch sponsors with logo + yes/paid status
   const sponsorResult = await getSponsors(data.id);
   const sponsors = (sponsorResult?.sponsors ?? []).filter(
-    (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
+    (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed'),
   );
 
   // 3. Derive flyer text fields from party data

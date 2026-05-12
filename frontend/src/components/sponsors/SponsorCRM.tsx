@@ -413,7 +413,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       {/* Partner Flyer Generator (GPP only) */}
       {party?.eventType === 'gpp' && (() => {
         const flyerSponsors = sponsors.filter(
-          s => (s.status === 'yes' || s.status === 'paid') && s.logoUrl
+          s => (s.status === 'yes' || s.status === 'paid' || s.status === 'billed') && s.logoUrl
         );
         const cityName = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || '';
         return flyerSponsors.length > 0 ? (
