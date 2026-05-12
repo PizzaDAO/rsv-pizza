@@ -353,7 +353,7 @@ export function PartnerForm({
       });
 
       // If "Also add as event host" was checked, fire the callback
-      if (addAsCoHost && onAddAsCoHost && !isEditing) {
+      if (addAsCoHost && onAddAsCoHost) {
         onAddAsCoHost({
           name: formData.name.trim(),
           website: normalizeUrl(formData.website),
@@ -465,8 +465,8 @@ export function PartnerForm({
         )}
       </div>}
 
-      {/* Also add as co-host — CRM mode, new partners only */}
-      {!logoOnly && isCrm && !isEditing && onAddAsCoHost && (
+      {/* Also add as co-host — CRM mode */}
+      {!logoOnly && isCrm && onAddAsCoHost && (
         <Checkbox
           checked={addAsCoHost}
           onChange={() => setAddAsCoHost(!addAsCoHost)}
@@ -482,13 +482,28 @@ export function PartnerForm({
             <User size={16} />
             {t('sponsors.coHostProfile')}
           </h3>
-          <IconInput
-            icon={Image}
-            type="url"
-            value={formData.coHostAvatarUrl}
-            onChange={e => handleChange('coHostAvatarUrl', e.target.value)}
-            placeholder="Avatar URL"
-          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <IconInput
+                icon={Image}
+                type="url"
+                value={formData.coHostAvatarUrl}
+                onChange={e => handleChange('coHostAvatarUrl', e.target.value)}
+                placeholder="Avatar URL"
+              />
+            </div>
+            {formData.brandTwitter.trim() && (
+              <button
+                type="button"
+                onClick={() => handleChange('coHostAvatarUrl', `https://unavatar.io/x/${formData.brandTwitter.trim()}`)}
+                className="px-3 py-2 text-xs bg-white/10 hover:bg-white/20 text-theme-text rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5"
+                title="Use X profile picture"
+              >
+                <XIcon size={12} />
+                Pull from X
+              </button>
+            )}
+          </div>
           {formData.coHostAvatarUrl && (
             <div className="flex items-center gap-2">
               <img
