@@ -7,7 +7,7 @@ import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchUnderbossMe, fetchUnderbossDashboard, bulkUpdateEventTags } from '../lib/api';
+import { fetchUnderbossMe, fetchUnderbossDashboard, bulkUpdateEventTags, getSponsors } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import {
   Loader2, Shield, Image, Pencil, Search, AlertTriangle, RefreshCw, Plus, X,
@@ -284,6 +284,11 @@ export function GraphicsDashboard() {
             }
           : undefined;
 
+        const sponsorResult = await getSponsors(event.id);
+        const sponsors = (sponsorResult?.sponsors ?? []).filter(
+          (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
+        );
+
         const canvas = await renderFlyer({
           city,
           venueName,
@@ -291,7 +296,8 @@ export function GraphicsDashboard() {
           dateDisplay,
           timeDisplay,
           is12h,
-          sponsors: [],
+          sponsors: sponsors.map((s) => ({ id: s.id, logoUrl: s.logoUrl! })),
+          eventTags: event.eventTags,
           config: layoutConfig,
         });
 
@@ -375,6 +381,11 @@ export function GraphicsDashboard() {
           }
         : undefined;
 
+      const sponsorResult = await getSponsors(event.id);
+      const sponsors = (sponsorResult?.sponsors ?? []).filter(
+        (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid'),
+      );
+
       const canvas = await renderFlyer({
         city,
         venueName,
@@ -382,7 +393,8 @@ export function GraphicsDashboard() {
         dateDisplay,
         timeDisplay,
         is12h,
-        sponsors: [],
+        sponsors: sponsors.map((s) => ({ id: s.id, logoUrl: s.logoUrl! })),
+        eventTags: event.eventTags,
         config: layoutConfig,
       });
 
