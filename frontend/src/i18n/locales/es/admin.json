@@ -116,6 +116,7 @@
     "showing": "mostrando {{count}}",
     "searchPlaceholder": "Buscar eventos, hosts...",
     "regionAll": "Region: Todas",
+    "tagAll": "Etiqueta: Todas",
     "staleFlyers": "Flyers desactualizados",
     "generateMissing": "Generar Faltantes ({{count}})",
     "generating": "Generando {{current}}/{{total}}...",

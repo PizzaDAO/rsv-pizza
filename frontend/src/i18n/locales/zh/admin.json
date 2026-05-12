@@ -116,6 +116,7 @@
     "showing": "显示 {{count}} 个",
     "searchPlaceholder": "搜索活动、主办方...",
     "regionAll": "区域：全部",
+    "tagAll": "标签：全部",
     "staleFlyers": "过期传单",
     "generateMissing": "生成缺失（{{count}}）",
     "generating": "正在生成 {{current}}/{{total}}...",

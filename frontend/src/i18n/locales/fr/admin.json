@@ -116,6 +116,7 @@
     "showing": "affichant {{count}}",
     "searchPlaceholder": "Rechercher événements, hôtes...",
     "regionAll": "Région : Toutes",
+    "tagAll": "Tag : Tous",
     "staleFlyers": "Flyers obsolètes",
     "generateMissing": "Générer les manquants ({{count}})",
     "generating": "Génération {{current}}/{{total}}...",
