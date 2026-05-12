@@ -12,6 +12,7 @@ import {
   reorderSponsors,
   getUnifiedSponsors,
   ensureUnderbossSponsors,
+  updateSponsorUser,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
@@ -128,6 +129,23 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       // Add as co-host if requested — do this before closing the form
       if (coHostData && onAddAsCoHost) {
         await onAddAsCoHost(coHostData);
+      }
+
+      // Update partner avatar in SponsorUser table if avatar was set
+      if (formData.coHostAvatarUrl) {
+        const sponsorId = editingSponsor?.id;
+        const match = sponsorId
+          ? unifiedPartners.find(p => p.sponsorId === sponsorId)
+          : null;
+        if (match?.sponsorUserId) {
+          try {
+            await updateSponsorUser(match.sponsorUserId, {
+              coHostAvatarUrl: formData.coHostAvatarUrl,
+            });
+          } catch (e) {
+            console.error('Failed to update partner avatar:', e);
+          }
+        }
       }
 
       // Refresh stats
