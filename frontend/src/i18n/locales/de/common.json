@@ -1,0 +1,31 @@
+{
+  "header": {
+    "logIn": "Anmelden / Registrieren"
+  },
+  "languageSwitcher": {
+    "en": "EN",
+    "es": "ES",
+    "fr": "FR",
+    "pt": "PT",
+    "zh": "中文",
+    "ja": "JA",
+    "de": "DE"
+  },
+  "buttons": {
+    "close": "Schließen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "continue": "Fortfahren",
+    "submit": "Absenden",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "clear": "Löschen",
+    "connect": "Verbinden"
+  },
+  "errors": {
+    "partyNotFound": "Party nicht gefunden",
+    "partyNotFoundDesc": "Party nicht gefunden. Der Einladungslink ist möglicherweise ungültig oder abgelaufen.",
+    "incorrectPassword": "Falsches Passwort. Bitte versuchen Sie es erneut.",
+    "invalidWallet": "Geben Sie eine gültige Adresse (0x...) oder einen ENS-Namen (.eth) ein"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "title": "Gäste-Check-in",
+  "loading": "Gast wird eingecheckt...",
+  "success": {
+    "title": "Eingecheckt!",
+    "backToDashboard": "Zurück zum Event-Dashboard"
+  },
+  "alreadyCheckedIn": {
+    "title": "Bereits eingecheckt",
+    "checkedInAt": "Eingecheckt um {{time}}"
+  },
+  "unauthorized": {
+    "title": "Nicht autorisiert",
+    "message": "Sie sind nicht berechtigt, Gäste für dieses Event einzuchecken. Nur Gastgeber und Co-Gastgeber können Gäste einchecken.",
+    "goHome": "Zur Startseite"
+  },
+  "notFound": {
+    "title": "Nicht gefunden",
+    "goHome": "Zur Startseite"
+  },
+  "error": {
+    "title": "Check-in fehlgeschlagen",
+    "tryAgain": "Erneut versuchen",
+    "goHome": "Zur Startseite"
+  }
+}

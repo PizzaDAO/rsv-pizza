@@ -1,0 +1,126 @@
+{
+  "step1": {
+    "title": "RSVP für {{eventName}}",
+    "editTitle": "RSVP bearbeiten",
+    "stepIndicator": "Schritt 1 von 2",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "E-Mail",
+    "walletPlaceholder": "Wallet-Adresse oder ENS (z.B. vitalik.eth)",
+    "roleQuestion": "Welcher Ninja Turtle sind Sie am ähnlichsten?",
+    "mailingList": "PizzaDAO-Mailingliste beitreten",
+    "swcJoin": "Stand with Crypto beitreten",
+    "swcNotify": "Benachrichtigen Sie mich über zukünftige Stand With Crypto Events.",
+    "ethconfDiscount": "ETHConf-Rabatt zusenden",
+    "next": "Weiter"
+  },
+  "step2": {
+    "title": "Pizza-Wünsche",
+    "editTitle": "Pizza-Vorlieben bearbeiten",
+    "stepIndicator": "Schritt 2 von 2",
+    "diet": "Ernährung",
+    "toppings": "Beläge",
+    "drinkPreferences": "Getränkewünsche",
+    "favoritePizzerias": "Lieblingspizzerien",
+    "clickToRank": "(klicken zum Bewerten 1-3)",
+    "suggestPizzeria": "Pizzeria vorschlagen",
+    "suggestPizzeriaPrompt": "Pizzeria vorschlagen",
+    "searchPizzeria": "Pizzeria suchen...",
+    "saveToProfile": "Im Profil speichern",
+    "saveToProfileDesc": "Meine Vorlieben für zukünftige Events merken",
+    "back": "Zurück",
+    "submit": "RSVP",
+    "editSubmit": "RSVP bearbeiten",
+    "submitting": "Wird gesendet...",
+    "saving": "Wird gespeichert..."
+  },
+  "success": {
+    "seeYou": "Wir sehen uns bei {{eventName}}!",
+    "alreadyRegistered": "Sie sind bereits angemeldet!",
+    "alreadyRegisteredDesc": "Diese E-Mail-Adresse wurde bereits für die Anmeldung zu diesem Event verwendet.",
+    "rsvpSubmitted": "RSVP eingereicht!",
+    "pendingApproval": "Ihre Anmeldung wartet auf Genehmigung durch den Gastgeber. Sie erhalten eine E-Mail mit Ihrem Check-in-QR-Code, sobald die Anmeldung genehmigt wurde.",
+    "rsvpUpdated": "RSVP aktualisiert",
+    "preferenceSaved": "Ihre Vorlieben wurden gespeichert.",
+    "waitlisted": "Sie stehen auf der Warteliste!",
+    "waitlistedDesc": "Dieses Event ist derzeit ausgebucht, aber Sie sind Nr. {{position}} auf der Warteliste! Wir benachrichtigen Sie, wenn ein Platz frei wird.",
+    "backToEvent": "Zurück zum Event"
+  },
+  "password": {
+    "title": "Passwort erforderlich",
+    "subtitle": "Dieses Event ist passwortgeschützt",
+    "placeholder": "Event-Passwort",
+    "continue": "Fortfahren"
+  },
+  "donation": {
+    "donate": "Spenden",
+    "defaultMessage": "Spenden Sie, um dieses Event zu ermöglichen",
+    "makeADonation": "Spenden",
+    "buyPizzaFor": "Pizza kaufen für {{recipient}}",
+    "buyPizzaForEvent": "Pizza für dieses Event kaufen",
+    "buyPizzaForEventName": "Pizza kaufen für {{eventName}}",
+    "thanksForSupport": "Vielen Dank für Ihre Unterstützung!"
+  },
+  "nft": {
+    "minting": "Ihr NFT wird geprägt...",
+    "minted": "NFT geprägt!",
+    "alreadyClaimed": "NFT bereits beansprucht!",
+    "viewOnOpenSea": "Auf OpenSea ansehen",
+    "viewTransaction": "Transaktion ansehen",
+    "mintFailed": "NFT-Prägung fehlgeschlagen"
+  },
+  "share": {
+    "tellFriends": "Erzählen Sie Ihren Freunden von der Party!",
+    "shareOnX": "Auf X teilen",
+    "x": "X",
+    "download": "Herunterladen",
+    "save": "Speichern",
+    "copyLink": "Link kopieren",
+    "link": "Link",
+    "copied": "Kopiert!"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitglied der Stand with Crypto Alliance, Inc. zu werden, einer Basisbewegung, die Krypto-Verbraucher, -Entwickler und -Unterstützer befähigt, sich Gehör zu verschaffen. Durch Ankreuzen des Kästchens und Zustimmung zur Mitgliedschaft verstehen Sie, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "SWC-Datenschutzrichtlinie",
+    "termsConditions": "Allgemeine Geschäftsbedingungen"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Kanada",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Stand with Crypto über zukünftige Events und Interessenvertretung in Kanada zu erhalten. Sie verstehen, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "SWC Kanada Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Australien",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Stand with Crypto über zukünftige Events und Interessenvertretung in Australien zu erhalten. Sie verstehen, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "SWC Australien Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto EU",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Stand with Crypto über zukünftige Events und Interessenvertretung in Europa zu erhalten. Sie verstehen, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "SWC EU Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto UK",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Stand with Crypto über zukünftige Events und Interessenvertretung im Vereinigten Königreich zu erhalten. Sie verstehen, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "SWC UK Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen"
+  },
+  "roles": {
+    "Organizer": "Organisator",
+    "Builder": "Entwickler",
+    "Creative": "Kreativer",
+    "Connector": "Vernetzer",
+    "Storyteller": "Geschichtenerzähler",
+    "Counsel": "Berater",
+    "Ground Support": "Vor-Ort-Unterstützung"
+  },
+  "dietary": {
+    "Vegetarian": "Vegetarisch",
+    "Vegan": "Vegan",
+    "Gluten-Free": "Glutenfrei",
+    "Dairy-Free": "Laktosefrei"
+  }
+}
