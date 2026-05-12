@@ -38,6 +38,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
+  const [newCoHostShowOnEvent, setNewCoHostShowOnEvent] = useState(true);
+  const [newCoHostCanEdit, setNewCoHostCanEdit] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddHostModal, setShowAddHostModal] = useState(false);
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
@@ -122,7 +124,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       twitter: newCoHostTwitter.trim() || undefined,
       instagram: newCoHostInstagram.trim() || undefined,
       avatar_url: avatarUrl,
-      showOnEvent: true,
+      showOnEvent: newCoHostShowOnEvent,
+      canEdit: newCoHostCanEdit || undefined,
     };
 
     const newCoHosts = [...coHosts, newCoHost];
@@ -135,6 +138,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setNewCoHostTwitter('');
     setNewCoHostInstagram('');
     setNewCoHostAvatarUrl('');
+    setNewCoHostShowOnEvent(true);
+    setNewCoHostCanEdit(false);
     setShowAddHostModal(false);
 
     // Auto-save
@@ -611,6 +616,23 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 <span className="text-xs text-theme-text-muted">Avatar preview</span>
               </div>
             )}
+
+            <div className="flex items-center gap-4 mt-3">
+              <Checkbox
+                checked={newCoHostShowOnEvent}
+                onChange={() => setNewCoHostShowOnEvent(!newCoHostShowOnEvent)}
+                label="Show on event"
+                size={16}
+                labelClassName="text-xs font-medium text-white/60"
+              />
+              <Checkbox
+                checked={newCoHostCanEdit}
+                onChange={() => setNewCoHostCanEdit(!newCoHostCanEdit)}
+                label="Editor"
+                size={16}
+                labelClassName="text-xs font-medium text-white/60"
+              />
+            </div>
 
             <div className="flex gap-3 mt-4">
               <button
