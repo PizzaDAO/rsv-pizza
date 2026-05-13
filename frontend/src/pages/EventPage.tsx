@@ -1152,7 +1152,7 @@ export function EventPage() {
                           .filter(s => s.brandDescription)
                           .map(sponsor => {
                             const sponsorKey = ({ 'ENS': 'ens', 'Brave': 'brave', 'World Pizza Champions': 'wpc', 'Own The Doge': 'ownTheDoge', 'Stand With Crypto EU': 'swcEu' } as Record<string, string>)[sponsor.name];
-                            const desc = (sponsorKey && i18n.language !== 'en') ? t(`sponsorDescription.${sponsorKey}`) : sponsor.brandDescription;
+                            const desc = sponsorKey ? t(`sponsorDescription.${sponsorKey}`) : sponsor.brandDescription;
                             return (
                             <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
                               <strong>
