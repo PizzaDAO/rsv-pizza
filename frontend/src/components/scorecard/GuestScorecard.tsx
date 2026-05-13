@@ -10,6 +10,8 @@ interface GuestScorecardProps {
   customUrl: string | null;
   telegramUrl: string | null;
   twitterHandles: string[];
+  guestId: string;
+  guestName: string;
   onOpenPhotos: () => void;
   onOpenScanner: () => void;
 }
@@ -25,7 +27,7 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'signup_pizzadao',
 ];
 
-export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl, telegramUrl, twitterHandles, onOpenPhotos, onOpenScanner }: GuestScorecardProps) {
+export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl, telegramUrl, twitterHandles, guestId, guestName, onOpenPhotos, onOpenScanner }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
   const [totalItems, setTotalItems] = useState(8);
@@ -77,6 +79,9 @@ export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl
   const actionContext: ActionContext = {
     eventName,
     eventUrl: `https://rsv.pizza/${customUrl || inviteCode}`,
+    inviteCode,
+    guestId,
+    guestName,
     twitterHandles,
     telegramUrl,
     onOpenPhotos,

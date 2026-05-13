@@ -19,6 +19,9 @@ export type ScorecardItemKey =
 export interface ActionContext {
   eventName: string;
   eventUrl: string;
+  inviteCode: string;
+  guestId: string;
+  guestName: string;
   twitterHandles: string[];
   telegramUrl: string | null;
   onOpenPhotos: () => void;
@@ -36,7 +39,7 @@ interface ScorecardItemProps {
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
   post: { label: 'Post about the party', emoji: '📣' },
   photo: { label: 'Upload a photo', emoji: '📸' },
-  vouch: { label: 'Check someone in', emoji: '⛶' },
+  vouch: { label: 'Proof of network', emoji: '🤝' },
   pizza_selfie: { label: 'Pizza selfie', emoji: '🍕' },
   sign_pizza_box: { label: 'Sign the party pizza box', emoji: '✍️' },
   join_telegram: { label: "Join your city's PizzaDAO Telegram", emoji: 'tg' },
@@ -74,6 +77,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
   const [inputValue, setInputValue] = useState('');
   const [showPizzaBoxModal, setShowPizzaBoxModal] = useState(false);
   const [showPizzaSelfieModal, setShowPizzaSelfieModal] = useState(false);
+  const [showNetworkModal, setShowNetworkModal] = useState(false);
   const [selfieUploaded, setSelfieUploaded] = useState(false);
   const config = ITEM_CONFIG[itemKey];
 
@@ -107,7 +111,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
         actionContext.onOpenPhotos();
         break;
       case 'vouch':
-        actionContext.onOpenScanner();
+        setShowNetworkModal(true);
         break;
       case 'pizza_selfie':
         setShowPizzaSelfieModal(true);
@@ -143,7 +147,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
     switch (itemKey) {
       case 'post': return 'Share';
       case 'photo': return 'Upload';
-      case 'vouch': return 'Scan QR';
+      case 'vouch': return 'Show QR';
       case 'pizza_selfie': return 'I took one!';
       case 'sign_pizza_box': return 'I signed it!';
       case 'join_telegram': return 'I joined!';
@@ -289,6 +293,54 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
               className="w-full py-2.5 rounded-lg bg-[#E52828] hover:bg-[#CC2020] text-white font-medium transition-colors"
             >
               I signed it!
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Proof of Network Modal */}
+      {showNetworkModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setShowNetworkModal(false)}
+        >
+          <div
+            className="rounded-2xl shadow-lg max-w-sm w-full mx-4 p-7 relative"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(0,0,0,0.08)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowNetworkModal(false)}
+              className="absolute top-3 right-3 text-black/40 hover:text-black/70"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-1">Proof of Network</h3>
+            <p className="text-sm text-[#555] mb-4">
+              Show your QR so other guests can scan you, or scan someone else's code.
+            </p>
+
+            {/* QR Code */}
+            <div className="flex justify-center mb-4">
+              <div className="bg-white rounded-xl p-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`https://rsv.pizza/checkin/${actionContext.inviteCode}/${actionContext.guestId}`)}`}
+                  alt="Your QR code"
+                  width={200}
+                  height={200}
+                  className="block"
+                />
+              </div>
+            </div>
+            <p className="text-center text-xs text-[#555]/70 mb-4">{actionContext.guestName}</p>
+
+            <button
+              onClick={() => {
+                setShowNetworkModal(false);
+                actionContext.onOpenScanner();
+              }}
+              className="w-full py-2.5 rounded-lg bg-[#E52828] hover:bg-[#CC2020] text-white font-medium transition-colors"
+            >
+              Scan Someone Else's QR
             </button>
           </div>
         </div>

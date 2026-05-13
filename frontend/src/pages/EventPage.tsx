@@ -1047,6 +1047,8 @@ export function EventPage() {
                       ...(event.coHosts || []).filter((c: any) => c.twitter).map((c: any) => c.twitter),
                       ...(event.sponsors || []).filter((s) => s.brandTwitter).map((s) => s.brandTwitter!),
                     ]}
+                    guestId={existingGuestData?.id || ''}
+                    guestName={existingGuestData?.name || user?.name || ''}
                     onOpenPhotos={() => setShowPhotos(true)}
                     onOpenScanner={() => setShowScanner(true)}
                   />
