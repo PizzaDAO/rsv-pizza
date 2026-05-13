@@ -1204,6 +1204,8 @@ export interface SponsorDashboardEvent {
   date: string | null;
   timezone: string | null;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   venueName: string | null;
   region: string | null;
   telegramGroup: string | null;

@@ -14,6 +14,7 @@ import {
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
   Camera, ChevronLeft, ChevronRight, X, Link2,
+  Download, LayoutGrid, Map as MapIcon,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
@@ -21,6 +22,8 @@ import { fetchSheetCities } from '../lib/cities';
 import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
+import PartnerCharts from '../components/partner/PartnerCharts';
+import PartnerEventsMap from '../components/partner/PartnerEventsMap';
 
 interface DisplayPhoto {
   id: string;
@@ -192,6 +195,9 @@ export function PartnerDashboardPage() {
   // Region filter (simple dropdown like underboss)
   const [regionFilter, setRegionFilter] = useState<string>('all');
 
+  // View mode (grid vs map)
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+
   // City chat Telegram links from the master Google Sheet
   const [cityChats, setCityChats] = useState<Map<string, string>>(new Map());
 
@@ -358,6 +364,36 @@ export function PartnerDashboardPage() {
     setSearchQuery('');
     setRegionFilter('all');
   }
+
+  const exportCSV = () => {
+    if (!events.length) return;
+    const headers = ['Event Name', 'Date', 'Host', 'Venue', 'Address', 'Region', 'RSVPs', 'Invited', 'Expected', 'Page Views', 'Unique Visitors', 'Total Clicks', 'Unique Clickers'];
+    const rows = events.map(e => [
+      e.name,
+      e.date ? new Date(e.date).toLocaleDateString() : '',
+      e.hostName || '',
+      e.venueName || '',
+      e.address || '',
+      e.region || '',
+      String(e.rsvpCount),
+      String(e.invitedCount),
+      String(e.expectedGuests || ''),
+      String(e.impressions?.totalViews || 0),
+      String(e.impressions?.uniqueVisitors || 0),
+      String(e.clickStats?.totalClicks || 0),
+      String(e.clickStats?.uniqueClickers || 0),
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedTag || 'partner'}-events-report.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Loading state
   if (authLoading || loading) {
@@ -612,6 +648,9 @@ export function PartnerDashboardPage() {
           );
         })()}
 
+        {/* Performance Charts */}
+        <PartnerCharts events={events} />
+
         {/* Filters */}
         {allEvents.length > 0 && (
           <div className="mb-6 space-y-3">
@@ -663,39 +702,77 @@ export function PartnerDashboardPage() {
                   {t('filters.clearFilters')}
                 </button>
               )}
+
+              {/* Export CSV */}
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
+                title={t('export.csv')}
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('export.csv')}</span>
+              </button>
+
+              {/* Grid / Map view toggle */}
+              <div className="flex gap-1 bg-white/5 rounded-lg p-1 ml-auto">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'grid' ? 'bg-[#E52828]/20 text-white' : 'text-white/40 hover:text-white'
+                  }`}
+                  title="Grid view"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'map' ? 'bg-[#E52828]/20 text-white' : 'text-white/40 hover:text-white'
+                  }`}
+                  title="Map view"
+                >
+                  <MapIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Events grid */}
-        {events.length === 0 ? (
-          <div className="text-center py-16">
-            <Tag size={48} className="text-theme-text-faint mx-auto mb-4" />
-            {hasActiveFilters ? (
-              <>
-                <p className="text-theme-text-muted mb-3">{t('empty.noEventsFiltered')}</p>
-                <button
-                  onClick={clearAllFilters}
-                  className="px-4 py-2 text-sm text-theme-text-secondary hover:text-theme-text border border-theme-stroke hover:border-theme-stroke-hover rounded-xl transition-colors"
-                >
-                  {t('filters.clearAllFilters')}
-                </button>
-              </>
-            ) : (
-              <p className="text-theme-text-muted">{t('empty.noEventsTag')}</p>
-            )}
-          </div>
+        {/* Events grid / map */}
+        {viewMode === 'map' ? (
+          <PartnerEventsMap events={events} height="500px" />
         ) : (
-          <div className="grid gap-4 sm:gap-6">
-            {events.map(event => (
-              <EventCard
-                key={event.id}
-                event={event}
-                onToggleChecklist={(itemId) => handleToggleChecklist(event.id, itemId)}
-                cityChats={cityChats}
-              />
-            ))}
-          </div>
+          <>
+            {events.length === 0 ? (
+              <div className="text-center py-16">
+                <Tag size={48} className="text-theme-text-faint mx-auto mb-4" />
+                {hasActiveFilters ? (
+                  <>
+                    <p className="text-theme-text-muted mb-3">{t('empty.noEventsFiltered')}</p>
+                    <button
+                      onClick={clearAllFilters}
+                      className="px-4 py-2 text-sm text-theme-text-secondary hover:text-theme-text border border-theme-stroke hover:border-theme-stroke-hover rounded-xl transition-colors"
+                    >
+                      {t('filters.clearAllFilters')}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-theme-text-muted">{t('empty.noEventsTag')}</p>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:gap-6">
+                {events.map(event => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    onToggleChecklist={(itemId) => handleToggleChecklist(event.id, itemId)}
+                    cityChats={cityChats}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
         </div>{/* closes inner panel */}
       </main>
