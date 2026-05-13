@@ -276,7 +276,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     if (!party?.id) return;
     getSponsors(party.id).then(result => {
       if (result?.sponsors) {
-        setSponsors(result.sponsors.filter(s => s.logoUrl && (s.status === 'yes' || s.status === 'paid')));
+        setSponsors(result.sponsors.filter(s => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed')));
       }
     });
   }, [party?.id]);
@@ -333,7 +333,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       await updateSponsor(party.id, editingSponsor.id, data);
       const result = await getSponsors(party.id);
       if (result?.sponsors) {
-        setSponsors(result.sponsors.filter(s => s.logoUrl && (s.status === 'yes' || s.status === 'paid')));
+        setSponsors(result.sponsors.filter(s => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed')));
       }
       setEditingSponsor(null);
     } finally {
