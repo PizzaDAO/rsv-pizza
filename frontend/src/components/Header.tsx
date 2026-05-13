@@ -6,6 +6,7 @@ import { LoginModal } from './LoginModal';
 import { useTranslation } from 'react-i18next';
 
 const LANGUAGES = [
+  { code: 'de', label: 'DE', name: 'Deutsch' },
   { code: 'en', label: 'EN', name: 'English' },
   { code: 'es', label: 'ES', name: 'Español' },
   { code: 'fr', label: 'FR', name: 'Français' },

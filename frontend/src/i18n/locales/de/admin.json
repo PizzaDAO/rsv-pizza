@@ -1,0 +1,146 @@
+{
+  "title": "Admin-Panel",
+  "subtitle": "Admins und Underbosses verwalten",
+  "accessDenied": "Zugriff verweigert",
+  "accessDeniedDesc": "Sie haben keinen Admin-Zugriff. Bitte melden Sie sich mit einem Admin-Konto an.",
+  "admins": {
+    "title": "Admins",
+    "emailPlaceholder": "E-Mail-Adresse",
+    "namePlaceholder": "Name (optional)",
+    "addAdmin": "Admin hinzufügen",
+    "noAdmins": "Keine Admins gefunden",
+    "superAdmin": "Super-Admin",
+    "admin": "Admin",
+    "removeAdmin": "Admin entfernen",
+    "tableHeaders": {
+      "email": "E-Mail",
+      "name": "Name",
+      "role": "Rolle",
+      "added": "Hinzugefügt"
+    }
+  },
+  "underboss": {
+    "title": "Underbosses",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "E-Mail",
+    "regions": "Regionen",
+    "addUnderboss": "Underboss hinzufügen",
+    "noUnderbosses": "Noch keine Underbosses",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "deactivate": "Deaktivieren",
+    "tableHeaders": {
+      "name": "Name",
+      "email": "E-Mail",
+      "regions": "Regionen",
+      "status": "Status",
+      "actions": "Aktionen"
+    }
+  },
+  "partners": {
+    "title": "Partner",
+    "emailPlaceholder": "E-Mail-Adresse",
+    "tagPlaceholder": "Partner-Tag (z.B. swc)",
+    "namePlaceholder": "Name (optional)",
+    "addPartner": "Partner hinzufügen",
+    "noPartners": "Noch keine Partner",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "deactivatePartner": "Partner deaktivieren",
+    "tableHeaders": {
+      "email": "E-Mail",
+      "name": "Name",
+      "tag": "Tag",
+      "status": "Status",
+      "added": "Hinzugefügt"
+    }
+  },
+  "checklist": {
+    "title": "Event-Setup-Checkliste",
+    "auto": "(automatisch)",
+    "noItems": "Keine Checklisten-Einträge gefunden. Einträge werden erstellt, wenn ein GPP-Gastgeber seine Checkliste zum ersten Mal aufruft.",
+    "saving": "Wird gespeichert...",
+    "saveChecklistDates": "Checklisten-Termine speichern",
+    "newItemPlaceholder": "Neuer Checklisten-Eintrag...",
+    "adding": "Wird hinzugefügt...",
+    "addItem": "Eintrag hinzufügen"
+  },
+  "gppDescription": {
+    "title": "GPP-Standardbeschreibung",
+    "statsText": "{{defaultCount}} von {{totalEvents}} Events verwenden die Standardbeschreibung",
+    "placeholder": "Standardbeschreibung für neue GPP-Events...",
+    "saving": "Wird gespeichert...",
+    "saveAndApply": "Speichern & auf Standard-Events anwenden",
+    "customDescriptions": "{{count}} Event mit eigener Beschreibung",
+    "customDescriptions_plural": "{{count}} Events mit eigenen Beschreibungen"
+  },
+  "nft": {
+    "title": "GPP-NFT-Einstellungen",
+    "enableNft": "NFT-Prägung für alle GPP-Events aktivieren",
+    "saving": "Wird gespeichert...",
+    "saveSettings": "GPP-NFT-Einstellungen speichern"
+  },
+  "underbossDashboard": {
+    "title": "Underboss-Dashboard",
+    "loginPrompt": "Bitte melden Sie sich an, um auf das Underboss-Dashboard zuzugreifen.",
+    "logIn": "Anmelden",
+    "loadingDashboard": "Dashboard wird geladen...",
+    "error": "Fehler",
+    "notAuthorized": "Sie sind nicht berechtigt, auf das Underboss-Dashboard zuzugreifen.",
+    "gppSubtitle": "Global Pizza Party",
+    "underbossSubtitle": "Underboss-Dashboard",
+    "signedInAdmin": "Angemeldet als Admin ({{email}})",
+    "signedInAs": "Angemeldet als {{name}}",
+    "addUnderboss": "Underboss hinzufügen",
+    "noRegions": "Keine Regionen",
+    "allRegions": "Alle Regionen",
+    "regionsCount": "{{count}} Regionen",
+    "selectAll": "Alle Regionen",
+    "underbossCreated": "Underboss erstellt!",
+    "creating": "Wird erstellt...",
+    "createUnderboss": "Underboss erstellen",
+    "tabs": {
+      "events": "Events",
+      "cities": "Städte",
+      "partners": "Partner"
+    }
+  },
+  "graphics": {
+    "title": "Grafik-Dashboard",
+    "loginPrompt": "Melden Sie sich an, um Event-Flyer zu überprüfen.",
+    "logIn": "Anmelden",
+    "error": "Fehler",
+    "accessDenied": "Zugriff verweigert",
+    "accessDeniedDesc": "Sie benötigen Underboss- oder Admin-Zugriff, um diese Seite anzuzeigen.",
+    "events": "{{count}} Events",
+    "showing": "{{count}} angezeigt",
+    "searchPlaceholder": "Events, Gastgeber suchen...",
+    "regionAll": "Region: Alle",
+    "staleFlyers": "Veraltete Flyer",
+    "generateMissing": "Fehlende generieren ({{count}})",
+    "generating": "{{current}}/{{total}} wird generiert...",
+    "noEventsMatch": "Keine Events entsprechen Ihren Filtern.",
+    "newPartners": "Neue Partner",
+    "viewEvent": "Event ansehen"
+  },
+  "postComposer": {
+    "title": "Beitrags-Composer",
+    "accessDenied": "Zugriff verweigert",
+    "accessDeniedDesc": "Sie haben keinen Admin-Zugriff. Bitte melden Sie sich mit einem Admin-Konto an.",
+    "searchEvents": "Events suchen...",
+    "copyToClipboard": "In Zwischenablage kopieren",
+    "copied": "Kopiert!"
+  },
+  "shipping": {
+    "title": "Versand-Dashboard",
+    "loginPrompt": "Bitte melden Sie sich an, um auf das Versand-Dashboard zuzugreifen.",
+    "logIn": "Anmelden",
+    "loading": "Versand-Dashboard wird geladen...",
+    "accessDenied": "Zugriff verweigert",
+    "allRegions": "Alle Regionen",
+    "subtitle": "Global Pizza Party · Versand-Dashboard",
+    "signedInAdmin": "Angemeldet als Admin ({{email}})",
+    "signedInAs": "Angemeldet als {{name}}",
+    "kitRequests": "Kit-Anfragen ({{count}})"
+  }
+}

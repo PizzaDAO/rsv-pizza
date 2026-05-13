@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "Spenden",
+    "buyPizzaFor": "Pizza kaufen für {{recipient}}",
+    "buyPizzaForEvent": "Pizza kaufen für {{eventName}}",
+    "donateTitle": "Spenden",
+    "supportingRecipient": "Unterstützung für {{recipient}}",
+    "supportingEvent": "Unterstützung für {{eventName}}",
+    "defaultMessage": "Möchten Sie spenden, um dieses Event zu ermöglichen?",
+    "donorCount_one": "{{count}} Person hat gespendet",
+    "donorCount_other": "{{count}} Personen haben gespendet",
+    "raised": "{{amount}} gesammelt",
+    "goal": "Ziel: ${{amount}}",
+    "recentSupporters": "Neueste Unterstützer:",
+    "anonymous": "Anonym",
+    "makeADonation": "Spenden",
+    "back": "Zurück"
+  },
+  "form": {
+    "payWithCard": "Mit Karte oder Wallet bezahlen",
+    "cardSubtitle": "Kredit-/Debitkarte, Apple Pay, Google Pay & mehr",
+    "crypto": "Krypto",
+    "cryptoSubtitle": "ETH, USDC oder andere Token",
+    "cancel": "Abbrechen",
+    "backToPaymentOptions": "Zurück zu den Zahlungsoptionen",
+    "customAmount": "Benutzerdefinierter Betrag",
+    "minimumDonation": "Mindestspende beträgt $0,50",
+    "donate": "Spenden",
+    "donateAmount": "${{amount}} spenden",
+    "loading": "Wird geladen...",
+    "processing": "Wird verarbeitet...",
+    "paymentFailed": "Zahlung fehlgeschlagen",
+    "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
+    "failedToInitialize": "Zahlung konnte nicht initialisiert werden. Bitte versuchen Sie es erneut.",
+    "thankYou": "Vielen Dank!",
+    "donationReceived": "Ihre Spende von ${{amount}} wurde empfangen.",
+    "back": "Zurück"
+  },
+  "calendar": {
+    "addToCalendar": "Zum Kalender hinzufügen",
+    "googleCalendar": "Google Kalender",
+    "appleCalendar": "Apple Kalender",
+    "outlook": "Outlook"
+  }
+}

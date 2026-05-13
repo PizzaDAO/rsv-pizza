@@ -68,6 +68,17 @@ import jaCheckin from './locales/ja/checkin.json';
 import jaHost from './locales/ja/host.json';
 import jaAdmin from './locales/ja/admin.json';
 import jaPartner from './locales/ja/partner.json';
+import deCommon from './locales/de/common.json';
+import deRsvp from './locales/de/rsvp.json';
+import deEvent from './locales/de/event.json';
+import deAuth from './locales/de/auth.json';
+import deDonation from './locales/de/donation.json';
+import deGpp from './locales/de/gpp.json';
+import deAccount from './locales/de/account.json';
+import deCheckin from './locales/de/checkin.json';
+import deHost from './locales/de/host.json';
+import deAdmin from './locales/de/admin.json';
+import dePartner from './locales/de/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -151,6 +162,19 @@ i18n
         host: jaHost,
         admin: jaAdmin,
         partner: jaPartner,
+      },
+      de: {
+        common: deCommon,
+        rsvp: deRsvp,
+        event: deEvent,
+        auth: deAuth,
+        donation: deDonation,
+        gpp: deGpp,
+        account: deAccount,
+        checkin: deCheckin,
+        host: deHost,
+        admin: deAdmin,
+        partner: dePartner,
       },
     },
     fallbackLng: 'en',
