@@ -504,9 +504,11 @@ export function EventPage() {
   };
 
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
-  const googleMapsUrl = event.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
-    : null;
+  const googleMapsUrl = event.latitude && event.longitude
+    ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
+    : event.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
+      : null;
 
   const metaTitle = event.name;
 
@@ -1149,7 +1151,7 @@ export function EventPage() {
                         {event.sponsors && event.sponsors
                           .filter(s => s.brandDescription)
                           .map(sponsor => {
-                            const sponsorKey = ({ 'ENS': 'ens', 'Brave': 'brave', 'World Pizza Champions': 'wpc' } as Record<string, string>)[sponsor.name];
+                            const sponsorKey = ({ 'ENS': 'ens', 'Brave': 'brave', 'World Pizza Champions': 'wpc', 'Own The Doge': 'ownTheDoge', 'Stand With Crypto EU': 'swcEu' } as Record<string, string>)[sponsor.name];
                             const desc = (sponsorKey && i18n.language !== 'en') ? t(`sponsorDescription.${sponsorKey}`) : sponsor.brandDescription;
                             return (
                             <p key={sponsor.id} className="mb-2 last:mb-0 text-base">
