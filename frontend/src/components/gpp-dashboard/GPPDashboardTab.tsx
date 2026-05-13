@@ -73,7 +73,8 @@ export const GPPDashboardTab: React.FC = () => {
         label: item.name,
         done,
         tab: item.linkTab,
-        onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) : undefined,
+        onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
+                 item.name === 'Find Partners' ? () => goToTab('partners') : undefined,
         icon: ICON_MAP[item.name] ?? ClipboardCheck,
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
