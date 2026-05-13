@@ -219,17 +219,18 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
           onClick={() => setShowPizzaSelfieModal(false)}
         >
           <div
-            className="bg-[#1a1a2e] border border-white/10 rounded-xl max-w-sm w-full mx-4 p-6 relative"
+            className="rounded-2xl shadow-lg max-w-sm w-full mx-4 p-7 relative"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(0,0,0,0.08)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowPizzaSelfieModal(false)}
-              className="absolute top-3 right-3 text-white/50 hover:text-white"
+              className="absolute top-3 right-3 text-black/40 hover:text-black/70"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-3">Pizza Selfie</h3>
-            <p className="text-sm text-white/70 mb-4">
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-3">Pizza Selfie</h3>
+            <p className="text-sm text-[#555] mb-4">
               Take a selfie with a slice of pizza and upload it to the photo gallery!
             </p>
             {!selfieUploaded ? (
@@ -238,7 +239,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
                   actionContext.onOpenPhotos();
                   setSelfieUploaded(true);
                 }}
-                className="w-full py-2.5 rounded-lg bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium transition-colors"
+                className="w-full py-2.5 rounded-lg bg-[#E52828] hover:bg-[#CC2020] text-white font-medium transition-colors"
               >
                 Upload Photo
               </button>
@@ -264,17 +265,18 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
           onClick={() => setShowPizzaBoxModal(false)}
         >
           <div
-            className="bg-[#1a1a2e] border border-white/10 rounded-xl max-w-sm w-full mx-4 p-6 relative"
+            className="rounded-2xl shadow-lg max-w-sm w-full mx-4 p-7 relative"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(0,0,0,0.08)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowPizzaBoxModal(false)}
-              className="absolute top-3 right-3 text-white/50 hover:text-white"
+              className="absolute top-3 right-3 text-black/40 hover:text-black/70"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-3">Sign the Pizza Box</h3>
-            <p className="text-sm text-white/70 mb-4">
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-3">Sign the Pizza Box</h3>
+            <p className="text-sm text-[#555] mb-4">
               It's a PizzaDAO tradition! Every party has a pizza box that all guests
               sign as a memento. Find the party pizza box, grab a marker, and leave
               your mark -- your name, a doodle, a message, anything goes!
@@ -284,7 +286,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
                 onComplete('sign_pizza_box', undefined, 'self_report');
                 setShowPizzaBoxModal(false);
               }}
-              className="w-full py-2.5 rounded-lg bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium transition-colors"
+              className="w-full py-2.5 rounded-lg bg-[#E52828] hover:bg-[#CC2020] text-white font-medium transition-colors"
             >
               I signed it!
             </button>
