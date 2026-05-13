@@ -10,11 +10,9 @@ export type ScorecardItemKey =
   | 'post'
   | 'photo'
   | 'vouch'
-  | 'pizza_selfie'
   | 'sign_pizza_box'
   | 'join_telegram'
-  | 'follow_pizzadao'
-  | 'signup_pizzadao';
+  | 'follow_pizzadao';
 
 export interface ActionContext {
   eventName: string;
@@ -39,12 +37,10 @@ interface ScorecardItemProps {
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
   post: { label: 'Post about the party', emoji: '📣' },
   photo: { label: 'Upload a photo', emoji: '📸' },
-  vouch: { label: 'Proof of network', emoji: '🤝' },
-  pizza_selfie: { label: 'Pizza selfie', emoji: '🍕' },
+  vouch: { label: 'Make a friend', emoji: '🤝' },
   sign_pizza_box: { label: 'Sign the party pizza box', emoji: '✍️' },
   join_telegram: { label: "Join your city's PizzaDAO Telegram", emoji: 'tg' },
   follow_pizzadao: { label: 'Follow @pizza_dao', emoji: 'x' },
-  signup_pizzadao: { label: 'Sign up on pizzadao.org', emoji: '🌐' },
 };
 
 const XIcon = () => (
@@ -76,9 +72,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [showPizzaBoxModal, setShowPizzaBoxModal] = useState(false);
-  const [showPizzaSelfieModal, setShowPizzaSelfieModal] = useState(false);
   const [showNetworkModal, setShowNetworkModal] = useState(false);
-  const [selfieUploaded, setSelfieUploaded] = useState(false);
   const config = ITEM_CONFIG[itemKey];
 
   const isDisabled = itemKey === 'join_telegram' && !actionContext.telegramUrl;
@@ -113,9 +107,6 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
       case 'vouch':
         setShowNetworkModal(true);
         break;
-      case 'pizza_selfie':
-        setShowPizzaSelfieModal(true);
-        break;
       case 'sign_pizza_box':
         setShowPizzaBoxModal(true);
         break;
@@ -127,10 +118,6 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
         break;
       case 'follow_pizzadao':
         window.open('https://x.com/pizza_dao', '_blank');
-        onComplete(itemKey, undefined, 'self_report');
-        break;
-      case 'signup_pizzadao':
-        window.open('https://pizzadao.org', '_blank');
         onComplete(itemKey, undefined, 'self_report');
         break;
     }
@@ -148,11 +135,9 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
       case 'post': return 'Share';
       case 'photo': return 'Upload';
       case 'vouch': return 'Show QR';
-      case 'pizza_selfie': return 'I took one!';
       case 'sign_pizza_box': return 'I signed it!';
       case 'join_telegram': return 'I joined!';
       case 'follow_pizzadao': return 'I followed!';
-      case 'signup_pizzadao': return 'I signed up!';
       default: return '';
     }
   };
@@ -216,52 +201,6 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
         </div>
       )}
 
-      {/* Pizza Selfie Modal */}
-      {showPizzaSelfieModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={() => setShowPizzaSelfieModal(false)}
-        >
-          <div
-            className="rounded-2xl shadow-lg max-w-sm w-full mx-4 p-7 relative"
-            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(0,0,0,0.08)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowPizzaSelfieModal(false)}
-              className="absolute top-3 right-3 text-black/40 hover:text-black/70"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-bold text-[#1a1a1a] mb-3">Pizza Selfie</h3>
-            <p className="text-sm text-[#555] mb-4">
-              Take a selfie with a slice of pizza and upload it to the photo gallery!
-            </p>
-            {!selfieUploaded ? (
-              <button
-                onClick={() => {
-                  actionContext.onOpenPhotos();
-                  setSelfieUploaded(true);
-                }}
-                className="w-full py-2.5 rounded-lg bg-[#E52828] hover:bg-[#CC2020] text-white font-medium transition-colors"
-              >
-                Upload Photo
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  setShowPizzaSelfieModal(false);
-                  onComplete('pizza_selfie', undefined, 'self_report');
-                }}
-                className="w-full py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium transition-colors"
-              >
-                I uploaded my selfie!
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Pizza Box Modal */}
       {showPizzaBoxModal && (
         <div
@@ -314,7 +253,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-[#1a1a1a] mb-1">Proof of Network</h3>
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-1">Make a Friend</h3>
             <p className="text-sm text-[#555] mb-4">
               Show your QR so other guests can scan you, or scan someone else's code.
             </p>

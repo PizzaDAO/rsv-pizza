@@ -20,11 +20,9 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'post',
   'photo',
   'vouch',
-  'pizza_selfie',
   'sign_pizza_box',
   'join_telegram',
   'follow_pizzadao',
-  'signup_pizzadao',
 ];
 
 export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl, telegramUrl, twitterHandles, guestId, guestName, onOpenPhotos, onOpenScanner }: GuestScorecardProps) {
