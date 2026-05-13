@@ -165,6 +165,10 @@ export interface UpdatePartyData {
   meetupUrl?: string | null;
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
+  country?: string | null;
+  expectedGuests?: number | null;
+  telegramGroup?: string | null;
+  turtleRolesEnabled?: boolean;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -259,6 +263,10 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       meetupUrl: data.meetupUrl,
       eventbriteUrl: data.eventbriteUrl,
       externalLinks: data.externalLinks,
+      country: data.country,
+      expectedGuests: data.expectedGuests,
+      telegramGroup: data.telegramGroup,
+      turtleRolesEnabled: data.turtleRolesEnabled,
     },
   });
 }
