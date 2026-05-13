@@ -243,9 +243,10 @@ export function GraphicsDashboard() {
       setMassProgress({ current: i + 1, total: missing.length });
 
       try {
-        const city = event.name.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
-        const venueName = event.venueName || 'LOCATION TBA';
-        const streetAddress = event.address ? event.address.split(',')[0].trim() : '';
+        const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+        const city = rawCfg?.editCity ?? (event.name.replace(/^Global Pizza Party\s*/i, '').trim() || event.name);
+        const venueName = rawCfg?.editVenueName ?? (event.venueName || 'LOCATION TBA');
+        const streetAddress = rawCfg?.editStreetAddress ?? (event.address ? event.address.split(',')[0].trim() : '');
 
         // Parse date/time
         let dateDisplay = '';
@@ -272,9 +273,10 @@ export function GraphicsDashboard() {
           dateDisplay = `${monthStr} ${dayStr}`;
         }
 
-        // Use layout config (positions, logos) but NOT text overrides —
-        // mass gen should always use fresh event data for text.
-        const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+        if (rawCfg?.editTime != null) {
+          timeDisplay = rawCfg.editTime;
+        }
+
         const layoutConfig: FlyerConfig | undefined = rawCfg
           ? {
               positions: rawCfg.positions,
@@ -344,9 +346,10 @@ export function GraphicsDashboard() {
         // Continue with fallback fonts
       }
 
-      const city = event.name.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
-      const venueName = event.venueName || 'LOCATION TBA';
-      const streetAddress = event.address ? event.address.split(',')[0].trim() : '';
+      const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+      const city = rawCfg?.editCity ?? (event.name.replace(/^Global Pizza Party\s*/i, '').trim() || event.name);
+      const venueName = rawCfg?.editVenueName ?? (event.venueName || 'LOCATION TBA');
+      const streetAddress = rawCfg?.editStreetAddress ?? (event.address ? event.address.split(',')[0].trim() : '');
 
       let dateDisplay = '';
       let timeDisplay = '';
@@ -371,7 +374,10 @@ export function GraphicsDashboard() {
         dateDisplay = `${monthStr} ${dayStr}`;
       }
 
-      const rawCfg = event.flyerConfig as FlyerConfig | null | undefined;
+      if (rawCfg?.editTime != null) {
+        timeDisplay = rawCfg.editTime;
+      }
+
       const layoutConfig: FlyerConfig | undefined = rawCfg
         ? {
             positions: rawCfg.positions,

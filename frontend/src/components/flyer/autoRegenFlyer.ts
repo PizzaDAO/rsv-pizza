@@ -172,11 +172,15 @@ async function doRegen(
     (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed'),
   );
 
-  // 3. Derive flyer text fields from party data
+  // 3. Derive flyer text fields, preserving user customizations from flyerConfig
   const dbConfig = data.flyerConfig as FlyerConfig | null | undefined;
-  const city = parseCityFromName(data.name);
-  const venueName = data.venueName || 'LOCATION TBA';
-  const streetAddress = data.address ? data.address.split(',')[0].trim() : '';
+  const derivedCity = parseCityFromName(data.name);
+  const derivedVenue = data.venueName || 'LOCATION TBA';
+  const derivedStreet = data.address ? data.address.split(',')[0].trim() : '';
+
+  const city = dbConfig?.editCity ?? derivedCity;
+  const venueName = dbConfig?.editVenueName ?? derivedVenue;
+  const streetAddress = dbConfig?.editStreetAddress ?? derivedStreet;
 
   let dateDisplay = '';
   let timeDisplay = '';
@@ -209,8 +213,12 @@ async function doRegen(
     dateDisplay = `${monthFormatter.format(eventDate).toUpperCase()} ${dayFormatter.format(eventDate)}`;
   }
 
-  // 4. Render to canvas (uses DB config layout but always fresh event text).
-  //    Strip text overrides so auto-regen picks up venue/time/city changes.
+  // Use custom time override if set (editTime === '' means intentionally blank)
+  if (dbConfig?.editTime != null) {
+    timeDisplay = dbConfig.editTime;
+  }
+
+  // 4. Render to canvas with layout config
   const layoutConfig: FlyerConfig | undefined = dbConfig
     ? {
         positions: dbConfig.positions,
