@@ -74,6 +74,7 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
   const [inputValue, setInputValue] = useState('');
   const [showPizzaBoxModal, setShowPizzaBoxModal] = useState(false);
   const [showPizzaSelfieModal, setShowPizzaSelfieModal] = useState(false);
+  const [selfieUploaded, setSelfieUploaded] = useState(false);
   const config = ITEM_CONFIG[itemKey];
 
   const isDisabled = itemKey === 'join_telegram' && !actionContext.telegramUrl;
@@ -231,16 +232,27 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete, actionC
             <p className="text-sm text-white/70 mb-4">
               Take a selfie with a slice of pizza and upload it to the photo gallery!
             </p>
-            <button
-              onClick={() => {
-                setShowPizzaSelfieModal(false);
-                actionContext.onOpenPhotos();
-                onComplete('pizza_selfie', undefined, 'self_report');
-              }}
-              className="w-full py-2.5 rounded-lg bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium transition-colors"
-            >
-              Upload Photo
-            </button>
+            {!selfieUploaded ? (
+              <button
+                onClick={() => {
+                  actionContext.onOpenPhotos();
+                  setSelfieUploaded(true);
+                }}
+                className="w-full py-2.5 rounded-lg bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium transition-colors"
+              >
+                Upload Photo
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowPizzaSelfieModal(false);
+                  onComplete('pizza_selfie', undefined, 'self_report');
+                }}
+                className="w-full py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium transition-colors"
+              >
+                I uploaded my selfie!
+              </button>
+            )}
           </div>
         </div>
       )}
