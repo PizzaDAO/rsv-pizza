@@ -761,6 +761,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         date: event.date,
         timezone: event.timezone,
         address: event.address,
+        latitude: event.latitude || null,
+        longitude: event.longitude || null,
         venueName: event.venueName,
         region: event.region || null,
         telegramGroup: event.telegramGroup || null,

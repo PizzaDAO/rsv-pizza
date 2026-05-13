@@ -144,5 +144,20 @@
     "headerTitle": "Thanks for partnering with {{eventName}}!",
     "headerDescNew": "Please fill out the form below so we can feature your brand at the event.",
     "headerDescUpdate": "Update your partner information below."
+  },
+  "charts": {
+    "title": "Performance Charts",
+    "rsvps": "RSVPs",
+    "impressions": "Impressions",
+    "clicks": "Clicks",
+    "notEnoughData": "Need at least 2 events for charts"
+  },
+  "export": {
+    "csv": "Export CSV"
+  },
+  "map": {
+    "showing": "Showing {{shown}} of {{total}} events on map",
+    "noLocation": "No events have location data",
+    "viewEvent": "View Event"
   }
 }
