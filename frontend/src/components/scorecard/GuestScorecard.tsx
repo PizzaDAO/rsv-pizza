@@ -127,7 +127,7 @@ export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl
         <p className="text-xs text-white/50 mt-1.5 mb-2">
           {isComplete
             ? 'All tasks completed! You are a Pizza Chef!'
-            : `Complete tasks to earn your Pizza Chef title`}
+            : `Level up your pizza party playing card`}
         </p>
       </div>
 
