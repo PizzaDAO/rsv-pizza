@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
-import { geocodeAddress } from '../lib/ordering';
+import { geocodeAddress, geocodeAddressGoogle } from '../lib/ordering';
 
 interface VenueMapProps {
   address: string;
@@ -11,12 +11,70 @@ interface VenueMapProps {
   zoom?: number;
 }
 
+// Module-scope singleton: ensures we only inject the Maps JS SDK once per
+// page even when multiple <VenueMap> instances mount (EventPage renders 3:
+// the mobile square thumbnail, the desktop side-by-side, and the mobile
+// location section). Without this, each instance races to insert its own
+// <script> and the SDK warns "You have included the Google Maps JavaScript
+// API multiple times".
+let mapsLoaderPromise: Promise<void> | null = null;
+
+function loadGoogleMaps(apiKey: string): Promise<void> {
+  if (typeof window !== 'undefined' && window.google?.maps) {
+    return Promise.resolve();
+  }
+  if (mapsLoaderPromise) return mapsLoaderPromise;
+
+  mapsLoaderPromise = new Promise<void>((resolve, reject) => {
+    // Some other component on the page may have already inserted the script.
+    // Wait for it to finish loading instead of duplicating it.
+    const existingScript = document.querySelector(
+      'script[src*="maps.googleapis.com/maps/api/js"]'
+    );
+
+    if (existingScript) {
+      const waitForMaps = () => {
+        if (window.google?.maps) {
+          resolve();
+        } else {
+          setTimeout(waitForMaps, 100);
+        }
+      };
+      waitForMaps();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      // Reset so a future mount can retry (e.g. transient network failure
+      // during initial page load).
+      mapsLoaderPromise = null;
+      reject(new Error('Failed to load Google Maps JS SDK'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return mapsLoaderPromise;
+}
+
 /**
  * Dynamic Google Maps JS SDK venue thumbnail with a single red pin at the
  * geocoded venue address. Uses the same dynamic-loader + script-tag-collision
  * pattern as ParticipatingPizzeriasMap.tsx / GPPMap.tsx. Fills its parent
  * container via `className` so callers control sizing (aspect-square, w-[40%]
  * absolute, w-full h-48, etc.).
+ *
+ * Geocoding pipeline (in priority order):
+ *   1. Stored `latitude`/`longitude` props — no network call.
+ *   2. `geocodeAddress` (Nominatim, OSM) — handles English/European addresses
+ *      with no Google quota cost.
+ *   3. `geocodeAddressGoogle` (Maps JS SDK Geocoder) — fallback for the long
+ *      tail (CJK script, unusual transliterations) where Nominatim returns
+ *      zero results.
  */
 export default function VenueMap({
   address,
@@ -32,9 +90,7 @@ export default function VenueMap({
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState(false);
 
-  // Use stored lat/lng if available; otherwise geocode the venue address.
-  // We use the existing `geocodeAddress` helper as the fallback so behavior
-  // matches the distance badges in ParticipatingPizzerias.
+  // Resolve coordinates: stored props → Nominatim → Google SDK Geocoder.
   useEffect(() => {
     let cancelled = false;
     if (!address) {
@@ -42,19 +98,39 @@ export default function VenueMap({
       return;
     }
 
-    // If stored coordinates are provided, use them directly (no network call)
+    // Path 1: stored coordinates — no network call.
     if (latitude != null && longitude != null) {
       setLocation({ lat: latitude, lng: longitude });
       return;
     }
 
-    // Fallback: client-side geocoding via Nominatim
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
     (async () => {
       try {
-        const result = await geocodeAddress(address);
+        // Path 2: Nominatim (free, no Google quota cost). Handles the
+        // common case of English/European addresses.
+        const nominatimResult = await geocodeAddress(address);
         if (cancelled) return;
-        if (result) {
-          setLocation(result);
+        if (nominatimResult) {
+          setLocation(nominatimResult);
+          return;
+        }
+
+        // Path 3: Google SDK Geocoder fallback. Handles CJK-script
+        // addresses (e.g. Shenzhen) and other long-tail cases where
+        // Nominatim returns zero results. Skip if no API key, since
+        // we couldn't render the map anyway.
+        if (!apiKey) {
+          setError(true);
+          return;
+        }
+        await loadGoogleMaps(apiKey);
+        if (cancelled) return;
+        const googleResult = await geocodeAddressGoogle(address);
+        if (cancelled) return;
+        if (googleResult) {
+          setLocation(googleResult);
         } else {
           setError(true);
         }
@@ -78,8 +154,10 @@ export default function VenueMap({
     }
     if (!location) return;
 
+    let cancelled = false;
+
     const initMap = () => {
-      if (!containerRef.current) return;
+      if (cancelled || !containerRef.current) return;
 
       if (!mapRef.current) {
         mapRef.current = new google.maps.Map(containerRef.current, {
@@ -113,34 +191,15 @@ export default function VenueMap({
       });
     };
 
-    if (window.google?.maps) {
-      initMap();
-      return;
-    }
+    loadGoogleMaps(apiKey)
+      .then(() => initMap())
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
 
-    const existingScript = document.querySelector(
-      'script[src*="maps.googleapis.com/maps/api/js"]'
-    );
-
-    if (existingScript) {
-      const waitForMaps = () => {
-        if (window.google?.maps) {
-          initMap();
-        } else {
-          setTimeout(waitForMaps, 100);
-        }
-      };
-      waitForMaps();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => initMap();
-    script.onerror = () => setError(true);
-    document.head.appendChild(script);
+    return () => {
+      cancelled = true;
+    };
   }, [location, venueName, address, zoom]);
 
   // No address → render a subtle placeholder so the parent layout still has

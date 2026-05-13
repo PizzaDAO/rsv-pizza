@@ -84,6 +84,44 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
   return null;
 }
 
+// Geocode an address using the already-loaded Google Maps JS SDK Geocoder.
+// The caller is responsible for awaiting `loadGoogleMaps()` before invoking
+// this — we only do a defensive guard and return null if the SDK is missing.
+//
+// Used as a second-stage fallback in `VenueMap.tsx` when Nominatim returns
+// no result (e.g. for Chinese-script addresses like Shenzhen's). Reuses the
+// same browser-referrer-restricted Maps JS key already loaded for the map
+// render itself, so no extra key configuration is needed. Geocoding API
+// quota is billed separately from Maps JS map loads, so callers should only
+// invoke this on the long-tail miss path, never as a first try.
+export async function geocodeAddressGoogle(
+  address: string
+): Promise<{ lat: number; lng: number } | null> {
+  if (typeof window === 'undefined' || !window.google?.maps?.Geocoder) {
+    return null;
+  }
+
+  try {
+    const geocoder = new window.google.maps.Geocoder();
+    return await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+      geocoder.geocode({ address }, (results, status) => {
+        if (status !== 'OK' || !results || results.length === 0) {
+          resolve(null);
+          return;
+        }
+        const loc = results[0].geometry?.location;
+        if (!loc) {
+          resolve(null);
+          return;
+        }
+        resolve({ lat: loc.lat(), lng: loc.lng() });
+      });
+    });
+  } catch {
+    return null;
+  }
+}
+
 // Create a Square order
 export async function createSquareOrder(
   locationId: string,
