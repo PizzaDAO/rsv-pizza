@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
+import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
@@ -625,7 +626,12 @@ export function AdminPage() {
                 <tbody>
                   {admins.map((admin) => (
                     <tr key={admin.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
-                      <td className="px-4 py-3 text-theme-text">{admin.email}</td>
+                      <td className="px-4 py-3 text-theme-text">
+                        <div className="flex items-center gap-2">
+                          <span>{admin.email}</span>
+                          <CopyEmailButton email={admin.email} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-theme-text-secondary">{admin.name || '-'}</td>
                       <td className="px-4 py-3">
                         <span
@@ -732,7 +738,12 @@ export function AdminPage() {
                 <tbody>
                   {graphicsAdmins.map((ga) => (
                     <tr key={ga.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
-                      <td className="px-4 py-3 text-theme-text">{ga.email}</td>
+                      <td className="px-4 py-3 text-theme-text">
+                        <div className="flex items-center gap-2">
+                          <span>{ga.email}</span>
+                          <CopyEmailButton email={ga.email} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-theme-text-secondary">{ga.name || '-'}</td>
                       <td className="px-4 py-3 text-theme-text-muted">
                         {new Date(ga.createdAt).toLocaleDateString()}
@@ -849,7 +860,12 @@ export function AdminPage() {
                   {underbosses.map((ub) => (
                     <tr key={ub.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
                       <td className="px-4 py-3 text-theme-text">{ub.name}</td>
-                      <td className="px-4 py-3 text-theme-text-secondary">{ub.email}</td>
+                      <td className="px-4 py-3 text-theme-text-secondary">
+                        <div className="flex items-center gap-2">
+                          <span>{ub.email}</span>
+                          <CopyEmailButton email={ub.email} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-theme-text-secondary">
                         {editingUbId === ub.id ? (
                           <div>
@@ -1016,7 +1032,12 @@ export function AdminPage() {
                 <tbody>
                   {sponsorUsers.map((sp) => (
                     <tr key={sp.id} className="border-b border-theme-stroke hover:bg-theme-surface transition-colors">
-                      <td className="px-4 py-3 text-theme-text">{sp.email}</td>
+                      <td className="px-4 py-3 text-theme-text">
+                        <div className="flex items-center gap-2">
+                          <span>{sp.email}</span>
+                          <CopyEmailButton email={sp.email} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-theme-text-secondary">{sp.name || '-'}</td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-300">
