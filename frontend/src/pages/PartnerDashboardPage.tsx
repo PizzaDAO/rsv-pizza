@@ -13,7 +13,7 @@ import {
   Search, BarChart3, Calendar, MapPin,
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
-  Camera, ChevronLeft, ChevronRight, X, Link2,
+  Camera, ChevronLeft, ChevronRight, X, Link2, Download,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
@@ -165,6 +165,81 @@ function resolveCityChat(eventName: string, chats: Map<string, string>): string 
   return chats.get(city);
 }
 
+function buildEventsCsv(events: SponsorDashboardEvent[], chats: Map<string, string>): string {
+  const headers = [
+    'Event Name',
+    'City',
+    'Slug',
+    'Date',
+    'Timezone',
+    'Region',
+    'Venue',
+    'Address',
+    'Host Name',
+    'Co-Hosts',
+    'RSVPs',
+    'Invited',
+    'Approved',
+    'Max Guests',
+    'Expected Guests',
+    'Photo Count',
+    'Event Link',
+    'Telegram',
+    'Report Link',
+    'Budget Total',
+    'Budget Spent',
+    'Budget Paid',
+    'Budget Pending',
+    'Budget Remaining',
+    'Total Impressions',
+    'Unique Visitors',
+    'Total Clicks',
+    'Unique Clickers',
+  ];
+
+  const rows = events.map((e) => {
+    const city = e.name.replace(/^Global Pizza Party\s*/i, '').trim();
+    const telegram = e.telegramGroup || resolveCityChat(e.name, chats) || '';
+    const eventLink = e.slug ? `https://rsv.pizza/${e.slug}` : '';
+    const reportLink = e.reportPublicSlug ? `https://rsv.pizza/report/${e.reportPublicSlug}` : '';
+    const coHosts = (e.coHosts || []).map((c) => c.name).filter(Boolean).join('; ');
+    return [
+      e.name,
+      city,
+      e.slug,
+      e.date,
+      e.timezone,
+      e.region,
+      e.venueName,
+      e.address,
+      e.hostName,
+      coHosts,
+      e.rsvpCount,
+      e.invitedCount,
+      e.approvedCount,
+      e.maxGuests,
+      e.expectedGuests,
+      e.photoCount,
+      eventLink,
+      telegram,
+      reportLink,
+      e.budget?.total,
+      e.budget?.spent,
+      e.budget?.paid,
+      e.budget?.pending,
+      e.budget?.remaining,
+      e.impressions?.totalViews,
+      e.impressions?.uniqueVisitors,
+      e.clickStats?.totalClicks,
+      e.clickStats?.uniqueClickers,
+    ];
+  });
+
+  return [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+}
+
 export function PartnerDashboardPage() {
   const { t } = useTranslation('partner');
   const { user, loading: authLoading } = useAuth();
@@ -265,6 +340,20 @@ export function PartnerDashboardPage() {
 
     loadDashboard();
   }, [user, authLoading, selectedTag]);
+
+  function handleDownloadCsv() {
+    if (!events.length) return;
+    const csv = buildEventsCsv(events, cityChats);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const tagPart = dashboardData?.tag || 'all';
+    const datePart = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `partner-events-${tagPart}-${datePart}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function handleToggleChecklist(eventId: string, itemId: string) {
     if (!dashboardData) return;
@@ -663,6 +752,15 @@ export function PartnerDashboardPage() {
                   {t('filters.clearFilters')}
                 </button>
               )}
+
+              <button
+                onClick={handleDownloadCsv}
+                disabled={events.length === 0}
+                className="ml-auto inline-flex items-center gap-1.5 bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text hover:border-theme-stroke-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Download size={14} />
+                Download CSV
+              </button>
             </div>
           </div>
         )}
