@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
+import { CopyEmailButton } from '../CopyEmailButton';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
@@ -610,7 +611,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             />
           </div>
           {event.host.email && (
-            <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
+            <div className="flex items-center gap-1">
+              <div className="text-xs text-theme-text-faint truncate max-w-[150px]">{event.host.email}</div>
+              <CopyEmailButton email={event.host.email} />
+            </div>
           )}
           <HostTagsPills
             tags={eventTags}
