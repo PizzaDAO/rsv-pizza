@@ -262,7 +262,45 @@ function HostPageContent() {
           <GPPDashboardTab />
         ) : activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
-        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && (
+        ) : activeTab === 'partners' && party ? (
+          <SponsorCRM
+            partyId={party.id}
+            onAddAsCoHost={async (data) => {
+              // Use manually-provided avatar if available, otherwise auto-fetch from socials
+              let avatarUrl: string | undefined;
+              if (data.avatarUrl) {
+                avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
+              } else {
+                const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                if (xAvatar) {
+                  avatarUrl = await proxyAvatarToStorage(xAvatar);
+                } else if (data.instagram) {
+                  const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+                  avatarUrl = await proxyAvatarToStorage(igAvatar);
+                }
+              }
+
+              const newCoHost: CoHost = {
+                id: uuid(),
+                name: data.name,
+                website: data.website || undefined,
+                twitter: data.twitter || undefined,
+                instagram: data.instagram || undefined,
+                avatar_url: avatarUrl,
+                showOnEvent: true,
+              };
+
+              const existing = party.coHosts || [];
+              // Deduplicate — update existing co-host if name matches, otherwise add new
+              const existingIdx = existing.findIndex(c => c.name?.toLowerCase() === data.name.toLowerCase());
+              const updated = existingIdx >= 0
+                ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
+                : [...existing, newCoHost];
+              await updateParty(party.id, { co_hosts: updated });
+              if (party.inviteCode) await loadParty(party.inviteCode);
+            }}
+          />
+        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'partners' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">
               {activeTab === 'guests' && (
@@ -401,46 +439,6 @@ function HostPageContent() {
                     </div>
                   )}
                 </div>
-              )}
-
-              {activeTab === 'partners' && party && (
-                <SponsorCRM
-                  partyId={party.id}
-                  onAddAsCoHost={async (data) => {
-                    // Use manually-provided avatar if available, otherwise auto-fetch from socials
-                    let avatarUrl: string | undefined;
-                    if (data.avatarUrl) {
-                      avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
-                    } else {
-                      const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
-                      if (xAvatar) {
-                        avatarUrl = await proxyAvatarToStorage(xAvatar);
-                      } else if (data.instagram) {
-                        const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
-                        avatarUrl = await proxyAvatarToStorage(igAvatar);
-                      }
-                    }
-
-                    const newCoHost: CoHost = {
-                      id: uuid(),
-                      name: data.name,
-                      website: data.website || undefined,
-                      twitter: data.twitter || undefined,
-                      instagram: data.instagram || undefined,
-                      avatar_url: avatarUrl,
-                      showOnEvent: true,
-                    };
-
-                    const existing = party.coHosts || [];
-                    // Deduplicate — update existing co-host if name matches, otherwise add new
-                    const existingIdx = existing.findIndex(c => c.name?.toLowerCase() === data.name.toLowerCase());
-                    const updated = existingIdx >= 0
-                      ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
-                      : [...existing, newCoHost];
-                    await updateParty(party.id, { co_hosts: updated });
-                    if (party.inviteCode) await loadParty(party.inviteCode);
-                  }}
-                />
               )}
 
               {activeTab === 'staff' && party && (
