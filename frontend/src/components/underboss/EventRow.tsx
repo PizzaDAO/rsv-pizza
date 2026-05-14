@@ -464,9 +464,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
     saveNotes(notesValue);
   }, [notesValue, saveNotes]);
 
-  const eventUrl = event.customUrl
-    ? `https://rsv.pizza/${event.customUrl}`
-    : null;
+  const eventUrl = `https://rsv.pizza/${event.customUrl || event.inviteCode}`;
 
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
@@ -515,16 +513,14 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                   <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title="Community Listed" />
                 )}
                 <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
-                {eventUrl && (
-                  <a
-                    href={eventUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0"
-                  >
-                    <ExternalLink size={12} />
-                  </a>
-                )}
+                <a
+                  href={eventUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0"
+                >
+                  <ExternalLink size={12} />
+                </a>
                 <button
                   onClick={() => setNotesOpen(!notesOpen)}
                   className={`transition-colors shrink-0 ${
