@@ -62,8 +62,9 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
-            <Route path="/partner-dashboard" element={<PartnerDashboardPage />} />
-            <Route path="/sponsor-dashboard" element={<Navigate to="/partner-dashboard" replace />} />
+            <Route path="/partner" element={<PartnerDashboardPage />} />
+            <Route path="/partner-dashboard" element={<Navigate to="/partner" replace />} />
+            <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
