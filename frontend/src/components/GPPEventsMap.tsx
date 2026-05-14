@@ -174,8 +174,38 @@ export default function GPPEventsMap({
 
       markersRef.current = markers;
 
-      // Create clusterer
-      clustererRef.current = new MarkerClusterer({ map, markers });
+      // Create clusterer with red bubbles (Benny's shoe color: #FF0029)
+      clustererRef.current = new MarkerClusterer({
+        map,
+        markers,
+        renderer: {
+          render: ({ count, position }) => {
+            const svg = window.btoa(`
+              <svg fill="#FF0029" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+                <circle cx="120" cy="120" opacity=".6" r="70" />
+                <circle cx="120" cy="120" opacity=".3" r="90" />
+                <circle cx="120" cy="120" opacity=".2" r="110" />
+                <circle cx="120" cy="120" opacity=".1" r="130" />
+              </svg>
+            `);
+            return new google.maps.Marker({
+              position,
+              icon: {
+                url: `data:image/svg+xml;base64,${svg}`,
+                scaledSize: new google.maps.Size(45, 45),
+              },
+              label: {
+                text: String(count),
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: '12px',
+                fontWeight: '600',
+              },
+              title: `${count} events`,
+              zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+            });
+          },
+        },
+      });
 
       // Fit bounds to all markers, then cap zoom at 15 on idle
       if (markers.length > 0) {
