@@ -1,6 +1,7 @@
 {
   "title": "ゲストチェックイン",
   "loading": "ゲストをチェックイン中...",
+  "vouching": "認証中…",
   "success": {
     "title": "チェックイン完了！",
     "backToDashboard": "イベントダッシュボードに戻る"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "チェックイン済み",
     "checkedInAt": "{{time}}にチェックイン済み"
+  },
+  "notCheckedIn": {
+    "title": "チェックイン未完了",
+    "message": "まだチェックインされていません。会場でホストを探してください。"
   },
   "unauthorized": {
     "title": "権限がありません",

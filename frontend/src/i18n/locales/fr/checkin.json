@@ -1,6 +1,7 @@
 {
   "title": "Enregistrement des invités",
   "loading": "Enregistrement de l'invité...",
+  "vouching": "Validation…",
   "success": {
     "title": "Enregistré !",
     "backToDashboard": "Retour au tableau de bord"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Déjà enregistré",
     "checkedInAt": "Enregistré à {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Pas encore enregistré",
+    "message": "Vous n'avez pas encore été enregistré. Trouvez un organisateur à l'événement."
   },
   "unauthorized": {
     "title": "Non autorisé",

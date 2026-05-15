@@ -1,6 +1,7 @@
 {
   "title": "Check-In de Invitado",
   "loading": "Registrando invitado...",
+  "vouching": "Avalando…",
   "success": {
     "title": "¡Registrado!",
     "backToDashboard": "Volver al Panel del Evento"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Ya Registrado",
     "checkedInAt": "Registrado a las {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Sin check-in",
+    "message": "Todavía no se ha registrado tu llegada. Busca a un anfitrión en el evento."
   },
   "unauthorized": {
     "title": "No Autorizado",
