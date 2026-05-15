@@ -695,6 +695,7 @@ export interface DbGuest {
   swc_au_opt_in?: boolean;
   swc_eu_opt_in?: boolean;
   swc_uk_opt_in?: boolean;
+  swc_br_opt_in?: boolean;
   ethconf_opt_in?: boolean;
   submitted_at: string;
   submitted_via: string;
@@ -1244,6 +1245,7 @@ export async function addGuestToParty(
   swcAuOptIn?: boolean,
   swcEuOptIn?: boolean,
   swcUkOptIn?: boolean,
+  swcBrOptIn?: boolean,
   ethconfOptIn?: boolean
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
   if (!inviteCode) {
@@ -1273,14 +1275,19 @@ export async function addGuestToParty(
         swcAuOptIn: swcAuOptIn || false,
         swcEuOptIn: swcEuOptIn || false,
         swcUkOptIn: swcUkOptIn || false,
+        swcBrOptIn: swcBrOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData: any = null;
+      try {
+        errorData = await response.json();
+      } catch {}
       console.error('Error adding guest:', errorData);
-      return null;
+      const message = errorData?.error?.message || errorData?.message || `HTTP ${response.status}`;
+      throw new Error(message);
     }
 
     const data = await response.json();
@@ -1306,6 +1313,7 @@ export async function addGuestToParty(
       swc_au_opt_in: swcAuOptIn || false,
       swc_eu_opt_in: swcEuOptIn || false,
       swc_uk_opt_in: swcUkOptIn || false,
+      swc_br_opt_in: swcBrOptIn || false,
       ethconf_opt_in: ethconfOptIn || false,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),

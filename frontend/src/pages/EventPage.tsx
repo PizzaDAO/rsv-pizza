@@ -792,7 +792,7 @@ export function EventPage() {
               <div className="p-6 md:border-b md:border-theme-stroke">
                 {event.eventType === 'gpp' && (
                   <div className="mb-3">
-                    <GPPBadge />
+                    <GPPBadge community={event.underbossStatus === 'listed'} />
                   </div>
                 )}
                 <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0" data-testid="event-name" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>

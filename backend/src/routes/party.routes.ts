@@ -796,9 +796,19 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
     }
 
+    // Only reconcile status when row is PENDING — avoid clobbering WAITLISTED.
+    const existing = await prisma.guest.findUnique({
+      where: { id: guestId, partyId },
+      select: { status: true },
+    });
+    const updateData: { approved: boolean; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
+    if (existing?.status === 'PENDING') {
+      updateData.status = approved ? 'CONFIRMED' : 'DECLINED';
+    }
+
     const guest = await prisma.guest.update({
       where: { id: guestId, partyId },
-      data: { approved },
+      data: updateData,
     });
 
     // Trigger appropriate webhook

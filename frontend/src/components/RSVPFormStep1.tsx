@@ -513,6 +513,75 @@ export function RSVPFormStep1({
         </>
       )}
 
+      {/* SWC Brazil checkbox + info modal */}
+      {form.isSwcBrEvent && (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setSwcBrOptIn(!form.swcBrOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.swcBrOptIn ? (
+                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                {t('step1.swcBrNotify')}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setShowSwcBrInfoModal(true)}
+              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+            >
+              <Info size={18} />
+            </button>
+          </div>
+
+          {form.showSwcBrInfoModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowSwcBrInfoModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowSwcBrInfoModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcBrModal.title')}</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  {t('swcBrModal.description')}{' '}
+                  <a
+                    href="https://www.juntosporcripto.org/br/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    {t('swcBrModal.privacyPolicy')}
+                  </a> and{' '}
+                  <a
+                    href="https://www.juntosporcripto.org/br/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    {t('swcBrModal.termsOfService')}
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
+      )}
+
       {/* ETHConf discount opt-in */}
       {form.isEthconfEvent && (
         <button

@@ -60,6 +60,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         extraGppPhotos: true,
         telegramGroup: true,
         turtleRolesEnabled: true,
+        underbossStatus: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -128,6 +129,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           extraGppPhotos: true,
           telegramGroup: true,
           turtleRolesEnabled: true,
+          underbossStatus: true,
           password: true,
           userId: true,
           user: {
@@ -277,6 +279,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         coHosts: sanitizedCoHosts,
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
+        underbossStatus: party.underbossStatus,
         eventTags: party.eventTags,
         donationEnabled: party.donationEnabled,
         donationRecipient: party.donationRecipient,

@@ -578,6 +578,10 @@ body.gpp-theme-active .pac-item-query {
 /* Hide GPP badge on GPP-themed pages (redundant since the whole page is GPP-styled) */
 .gpp-theme .gpp-badge, body.gpp-theme-active .gpp-badge { display: none !important; }
 
+/* Exception: community-listed GPP events should still show the badge to mark them as community-organized */
+.gpp-theme .gpp-badge.gpp-badge-community,
+body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !important; }
+
 /* Round the bottom-right corner of the event image on desktop */
 .gpp-theme .card .aspect-square {
   border-bottom-right-radius: 18px;

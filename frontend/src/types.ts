@@ -1019,6 +1019,7 @@ export interface UnderbossEvent {
   duration: number | null;
   country?: string | null;
   host: { name: string | null; email: string | null };
+  hostTelegram?: string | null;
   coHosts: any[];
   progress: UnderbossEventProgress;
   guestCount: number;

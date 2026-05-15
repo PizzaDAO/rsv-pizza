@@ -10,6 +10,7 @@
     "mailingList": "Rejoindre la liste de diffusion PizzaDAO",
     "swcJoin": "Rejoindre Stand with Crypto",
     "swcNotify": "Me notifier des futurs événements Stand With Crypto.",
+    "swcBrNotify": "Informez-moi des événements de Juntos por Cripto.",
     "ethconfDiscount": "M'envoyer une réduction ETHConf",
     "next": "Suivant"
   },
@@ -108,6 +109,12 @@
     "privacyPolicy": "Politique de confidentialité SWC Royaume-Uni",
     "termsOfService": "Conditions d'utilisation"
   },
+  "swcBrModal": {
+    "title": "Juntos por Cripto",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Juntos por Cripto concernant les événements et les efforts de plaidoyer au Brésil. Vous comprenez que Juntos por Cripto et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité de Juntos por Cripto",
+    "termsOfService": "Conditions d'utilisation"
+  },
   "roles": {
     "Organizer": "Organisateur",
     "Builder": "Bâtisseur",
@@ -118,8 +125,10 @@
     "Ground Support": "Soutien terrain"
   },
   "dietary": {
+    "Meat": "Viande",
     "Vegetarian": "Végétarien",
     "Vegan": "Végétalien",
+    "Plain": "Nature",
     "Gluten-Free": "Sans gluten",
     "Dairy-Free": "Sans produits laitiers"
   }
