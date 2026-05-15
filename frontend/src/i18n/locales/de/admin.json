@@ -72,7 +72,7 @@
     "saving": "Wird gespeichert...",
     "saveAndApply": "Speichern & auf Standard-Events anwenden",
     "customDescriptions": "{{count}} Event mit eigener Beschreibung",
-    "customDescriptions_plural": "{{count}} Events mit eigenen Beschreibungen"
+    "customDescriptions_other": "{{count}} Events mit eigenen Beschreibungen"
   },
   "nft": {
     "title": "GPP-NFT-Einstellungen",
@@ -116,6 +116,7 @@
     "showing": "{{count}} angezeigt",
     "searchPlaceholder": "Events, Gastgeber suchen...",
     "regionAll": "Region: Alle",
+    "tagAll": "Tag: Alle",
     "staleFlyers": "Veraltete Flyer",
     "generateMissing": "Fehlende generieren ({{count}})",
     "generating": "{{current}}/{{total}} wird generiert...",
