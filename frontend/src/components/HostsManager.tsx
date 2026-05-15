@@ -514,6 +514,46 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             <h2 className="text-lg font-semibold text-theme-text mb-4">Edit Host</h2>
 
             <div className="space-y-3">
+              {/* Avatar upload */}
+              <div>
+                <input
+                  ref={editAvatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditAvatarFileChange}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-3">
+                  {(editAvatarFilePreview || editHostAvatarUrl) ? (
+                    <img
+                      src={editAvatarFilePreview || editHostAvatarUrl}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-theme-surface border border-theme-stroke shrink-0" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => editAvatarInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
+                  >
+                    <Upload size={16} />
+                    Upload avatar
+                  </button>
+                  {(editAvatarFilePreview || editHostAvatarUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); }}
+                      className="text-xs text-red-400 hover:text-red-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <input
                 type="text"
                 value={editHostName}
@@ -566,44 +606,6 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
-
-              {/* Avatar upload */}
-              <div>
-                <input
-                  ref={editAvatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleEditAvatarFileChange}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => editAvatarInputRef.current?.click()}
-                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
-                  >
-                    <Upload size={16} />
-                    Upload avatar
-                  </button>
-                  {(editAvatarFilePreview || editHostAvatarUrl) && (
-                    <>
-                      <img
-                        src={editAvatarFilePreview || editHostAvatarUrl}
-                        alt=""
-                        className="w-10 h-10 rounded-full object-cover border border-white/20"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); }}
-                        className="text-xs text-red-400 hover:text-red-300"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
             </div>
 
             <div className="flex gap-3 mt-4">
@@ -635,6 +637,46 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             <h2 className="text-lg font-semibold text-theme-text mb-4">Add Host</h2>
 
             <div className="space-y-3">
+              {/* Avatar upload */}
+              <div>
+                <input
+                  ref={newAvatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleNewAvatarFileChange}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-3">
+                  {(newAvatarFilePreview || newCoHostAvatarUrl) ? (
+                    <img
+                      src={newAvatarFilePreview || newCoHostAvatarUrl}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-theme-surface border border-theme-stroke shrink-0" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => newAvatarInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
+                  >
+                    <Upload size={16} />
+                    Upload avatar
+                  </button>
+                  {(newAvatarFilePreview || newCoHostAvatarUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); }}
+                      className="text-xs text-red-400 hover:text-red-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <input
                 type="text"
                 value={newCoHostName}
@@ -685,44 +727,6 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   placeholder="Instagram (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
-              </div>
-
-              {/* Avatar upload */}
-              <div>
-                <input
-                  ref={newAvatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleNewAvatarFileChange}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => newAvatarInputRef.current?.click()}
-                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
-                  >
-                    <Upload size={16} />
-                    Upload avatar
-                  </button>
-                  {(newAvatarFilePreview || newCoHostAvatarUrl) && (
-                    <>
-                      <img
-                        src={newAvatarFilePreview || newCoHostAvatarUrl}
-                        alt=""
-                        className="w-10 h-10 rounded-full object-cover border border-white/20"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); }}
-                        className="text-xs text-red-400 hover:text-red-300"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
 
