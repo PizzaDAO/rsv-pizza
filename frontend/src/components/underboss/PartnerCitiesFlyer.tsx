@@ -13,7 +13,7 @@ interface PartnerCitiesFlyerProps {
 
 const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
-const CITY_BOX = { x: 53, y: 597, width: 500, height: 490 };
+const CITY_BOX = { x: 55, y: 597, width: 500, height: 490 };
 const MAX_VISIBLE = 10;
 const CITY_FONT_SIZE = 42;
 const CITY_LINE_SPACING = 1.25;
