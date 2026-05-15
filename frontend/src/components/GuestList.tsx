@@ -20,6 +20,13 @@ export const GuestList: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
 
+  // Transient toast for check-in success/error
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -183,11 +190,16 @@ export const GuestList: React.FC = () => {
 
     setCheckingInId(guestId);
     try {
-      await checkInGuest(party.inviteCode, guestId);
+      const result = await checkInGuest(party.inviteCode, guestId);
       // Reload party data to get updated check-in status
       await loadParty(party.inviteCode);
+      if (!result.alreadyCheckedIn) {
+        showToast('success', result.message || 'Guest checked in');
+      }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check in guest';
       console.error('Failed to check in guest:', error);
+      showToast('error', message);
     } finally {
       setCheckingInId(null);
     }
@@ -214,15 +226,27 @@ export const GuestList: React.FC = () => {
   const handleBulkCheckIn = async () => {
     if (!party?.inviteCode) return;
     setBulkActionInProgress(true);
+    let successCount = 0;
+    const failures: string[] = [];
     try {
       const ids = [...selectedIds];
       const eligible = guests.filter(g => g.id && ids.includes(g.id) && (g.status === 'CONFIRMED' || g.status === 'INVITED') && !g.checkedInAt);
       for (const g of eligible) {
-        if (g.id) await checkInGuest(party.inviteCode, g.id);
+        if (!g.id) continue;
+        try {
+          await checkInGuest(party.inviteCode, g.id);
+          successCount++;
+        } catch (e) {
+          failures.push(g.name);
+          console.error(`Bulk check-in failed for ${g.name}:`, e);
+        }
       }
       await loadParty(party.inviteCode);
-    } catch (e) {
-      console.error('Bulk check-in failed:', e);
+      if (failures.length === 0 && successCount > 0) {
+        showToast('success', `Checked in ${successCount} guest${successCount === 1 ? '' : 's'}`);
+      } else if (failures.length > 0) {
+        showToast('error', `Failed to check in ${failures.length} guest${failures.length === 1 ? '' : 's'}: ${failures.slice(0, 3).join(', ')}${failures.length > 3 ? '…' : ''}`);
+      }
     } finally {
       clearSelection();
       setBulkActionInProgress(false);
@@ -278,7 +302,20 @@ export const GuestList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      {toast && (
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 text-sm font-medium px-4 py-2 rounded-xl shadow-lg animate-fade-in ${
+            toast.type === 'success'
+              ? 'bg-[#39d98a]/90 text-black'
+              : 'bg-red-500/90 text-white'
+          }`}
+          role="status"
+        >
+          {toast.text}
+        </div>
+      )}
+      <div className="space-y-6">
       {/* Confirmed Guests Section */}
       <div className="card p-6">
         <div className="flex justify-between items-center mb-4">
@@ -508,6 +545,7 @@ export const GuestList: React.FC = () => {
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
