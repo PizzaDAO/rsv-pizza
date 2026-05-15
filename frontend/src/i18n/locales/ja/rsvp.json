@@ -108,6 +108,12 @@
     "privacyPolicy": "SWC UKプライバシーポリシー",
     "termsOfService": "利用規約"
   },
+  "swcBrModal": {
+    "title": "Stand with Crypto ブラジル",
+    "description": "チェックボックスをオンにすることで、ブラジルでの今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "SWC ブラジルプライバシーポリシー",
+    "termsOfService": "利用規約"
+  },
   "roles": {
     "Organizer": "オーガナイザー",
     "Builder": "ビルダー",

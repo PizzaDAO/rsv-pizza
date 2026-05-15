@@ -108,6 +108,12 @@
     "privacyPolicy": "SWC 英国隐私政策",
     "termsOfService": "服务条款"
   },
+  "swcBrModal": {
+    "title": "Stand with Crypto 巴西",
+    "description": "勾选此框即表示您同意接收 Stand with Crypto 关于巴西未来活动和倡导工作的通讯。您了解 SWC 及其供应商可能会收集和使用您的个人信息。了解更多信息，请访问",
+    "privacyPolicy": "SWC 巴西隐私政策",
+    "termsOfService": "服务条款"
+  },
   "roles": {
     "Organizer": "组织者",
     "Builder": "建设者",

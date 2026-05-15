@@ -108,6 +108,12 @@
     "privacyPolicy": "Política de Privacidade SWC Reino Unido",
     "termsOfService": "Termos de Serviço"
   },
+  "swcBrModal": {
+    "title": "Juntos por Cripto",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Juntos por Cripto sobre eventos futuros e ações de advocacy no Brasil. Você entende que a SWC e seus parceiros podem coletar e utilizar suas informações pessoais. Para saber mais, acesse",
+    "privacyPolicy": "Política de Privacidade",
+    "termsOfService": "Termos de Serviço"
+  },
   "roles": {
     "Organizer": "Organizador",
     "Builder": "Construtor",

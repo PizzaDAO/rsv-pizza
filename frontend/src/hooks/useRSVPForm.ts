@@ -125,6 +125,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [showSwcEuInfoModal, setShowSwcEuInfoModal] = useState(false);
   const [swcUkOptIn, setSwcUkOptIn] = useState(false);
   const [showSwcUkInfoModal, setShowSwcUkInfoModal] = useState(false);
+  const [swcBrOptIn, setSwcBrOptIn] = useState(false);
+  const [showSwcBrInfoModal, setShowSwcBrInfoModal] = useState(false);
   const [ethconfOptIn, setEthconfOptIn] = useState(false);
 
   // Step 2 - Pizza Preferences
@@ -161,6 +163,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isSwcAuEvent = (eventData.eventTags || []).includes('swcau');
   const isSwcEuEvent = (eventData.eventTags || []).includes('swceu');
   const isSwcUkEvent = (eventData.eventTags || []).includes('swcuk');
+  const isSwcBrEvent = (eventData.eventTags || []).includes('swcbr');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
@@ -408,6 +411,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         swcAuOptIn || undefined,
         swcEuOptIn || undefined,
         swcUkOptIn || undefined,
+        swcBrOptIn || undefined,
         ethconfOptIn || undefined,
       );
 
@@ -449,7 +453,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, ethconfOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -493,6 +497,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setSwcUkOptIn,
     showSwcUkInfoModal,
     setShowSwcUkInfoModal,
+    swcBrOptIn,
+    setSwcBrOptIn,
+    showSwcBrInfoModal,
+    setShowSwcBrInfoModal,
     ethconfOptIn,
     setEthconfOptIn,
 
@@ -559,6 +567,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     isSwcAuEvent,
     isSwcEuEvent,
     isSwcUkEvent,
+    isSwcBrEvent,
     isEthconfEvent,
     isEditing,
     excludedToppings,

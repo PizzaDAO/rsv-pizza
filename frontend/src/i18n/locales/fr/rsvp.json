@@ -108,6 +108,12 @@
     "privacyPolicy": "Politique de confidentialité SWC Royaume-Uni",
     "termsOfService": "Conditions d'utilisation"
   },
+  "swcBrModal": {
+    "title": "Stand with Crypto Brésil",
+    "description": "En cochant la case, vous consentez à recevoir des communications de Stand with Crypto concernant les futurs événements et les efforts de plaidoyer au Brésil. Vous comprenez que SWC et ses fournisseurs peuvent collecter et utiliser vos informations personnelles. Pour en savoir plus, visitez",
+    "privacyPolicy": "Politique de confidentialité SWC Brésil",
+    "termsOfService": "Conditions d'utilisation"
+  },
   "roles": {
     "Organizer": "Organisateur",
     "Builder": "Bâtisseur",
