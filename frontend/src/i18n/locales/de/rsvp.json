@@ -125,8 +125,10 @@
     "Ground Support": "Vor-Ort-Unterstützung"
   },
   "dietary": {
+    "Meat": "Fleisch",
     "Vegetarian": "Vegetarisch",
     "Vegan": "Vegan",
+    "Plain": "Klassisch",
     "Gluten-Free": "Glutenfrei",
     "Dairy-Free": "Laktosefrei"
   }

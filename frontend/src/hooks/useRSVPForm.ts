@@ -446,7 +446,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         setError('Failed to submit. Please try again.');
       }
     } catch (err) {
-      setError('Failed to submit. The party may no longer exist.');
+      setError(err instanceof Error ? err.message : 'Failed to submit. Please try again.');
     }
 
     setSubmitting(false);

@@ -1281,9 +1281,13 @@ export async function addGuestToParty(
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData: any = null;
+      try {
+        errorData = await response.json();
+      } catch {}
       console.error('Error adding guest:', errorData);
-      return null;
+      const message = errorData?.error?.message || errorData?.message || `HTTP ${response.status}`;
+      throw new Error(message);
     }
 
     const data = await response.json();

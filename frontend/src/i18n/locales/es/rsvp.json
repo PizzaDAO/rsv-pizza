@@ -125,8 +125,10 @@
     "Ground Support": "Apoyo en Campo"
   },
   "dietary": {
+    "Meat": "Carne",
     "Vegetarian": "Vegetariano",
     "Vegan": "Vegano",
+    "Plain": "Simple",
     "Gluten-Free": "Sin Gluten",
     "Dairy-Free": "Sin Lácteos"
   }

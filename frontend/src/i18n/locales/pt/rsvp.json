@@ -125,8 +125,10 @@
     "Ground Support": "Apoio Local"
   },
   "dietary": {
+    "Meat": "Carne",
     "Vegetarian": "Vegetariano",
     "Vegan": "Vegano",
+    "Plain": "Simples",
     "Gluten-Free": "Sem Glúten",
     "Dairy-Free": "Sem Laticínios"
   }
