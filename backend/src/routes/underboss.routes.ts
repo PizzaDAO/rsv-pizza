@@ -223,6 +223,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
       name: party.user?.name || null,
       email: party.user?.email || null,
     },
+    hostTelegram: party.user?.telegram || null,
     coHosts: party.coHosts || [],
     progress: computeProgress(party, underbossEmails),
     guestCount,
@@ -405,7 +406,7 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
     const events = await prisma.party.findMany({
       where: whereClause,
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, telegram: true } },
         guests: {
           select: { id: true, approved: true, checkedInAt: true, status: true },
         },
@@ -472,7 +473,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
       prisma.party.findMany({
         where: { region, eventType: 'gpp' },
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true, telegram: true } },
           guests: {
             select: { id: true, approved: true, checkedInAt: true, status: true },
           },
@@ -537,7 +538,7 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
     const party = await prisma.party.findFirst({
       where: { id: partyId, region, eventType: 'gpp' },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, telegram: true } },
         guests: {
           select: { id: true, name: true, email: true, approved: true, checkedInAt: true, submittedAt: true },
           orderBy: { submittedAt: 'desc' },

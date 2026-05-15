@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
+import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle, Send } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
 import { CopyEmailButton } from '../CopyEmailButton';
@@ -541,6 +541,17 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                     title="Telegram group"
                   >
                     <MessageCircle size={12} />
+                  </a>
+                )}
+                {event.hostTelegram && (
+                  <a
+                    href={`https://t.me/${event.hostTelegram.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 transition-colors shrink-0"
+                    title="DM host on Telegram"
+                  >
+                    <Send size={12} />
                   </a>
                 )}
               </div>

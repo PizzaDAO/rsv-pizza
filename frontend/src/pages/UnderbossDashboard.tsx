@@ -456,7 +456,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(
