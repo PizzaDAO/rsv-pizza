@@ -92,7 +92,7 @@
     "saving": "保存中...",
     "saveAndApply": "保存并应用到默认活动",
     "customDescriptions": "{{count}} 个活动有自定义描述",
-    "customDescriptions_plural": "{{count}} 个活动有自定义描述"
+    "customDescriptions_other": "{{count}} 个活动有自定义描述"
   },
   "nft": {
     "title": "GPP NFT 设置",

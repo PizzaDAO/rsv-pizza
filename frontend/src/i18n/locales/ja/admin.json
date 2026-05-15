@@ -92,7 +92,7 @@
     "saving": "保存中...",
     "saveAndApply": "保存してデフォルトイベントに適用",
     "customDescriptions": "{{count}}件のイベントがカスタム説明文を使用",
-    "customDescriptions_plural": "{{count}}件のイベントがカスタム説明文を使用"
+    "customDescriptions_other": "{{count}}件のイベントがカスタム説明文を使用"
   },
   "nft": {
     "title": "GPP NFT設定",

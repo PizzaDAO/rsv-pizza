@@ -92,7 +92,7 @@
     "saving": "Enregistrement...",
     "saveAndApply": "Enregistrer et appliquer aux événements par défaut",
     "customDescriptions": "{{count}} événement avec des descriptions personnalisées",
-    "customDescriptions_plural": "{{count}} événements avec des descriptions personnalisées"
+    "customDescriptions_other": "{{count}} événements avec des descriptions personnalisées"
   },
   "nft": {
     "title": "Paramètres NFT GPP",
