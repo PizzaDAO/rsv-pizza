@@ -230,7 +230,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, placeId, venueName, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -279,6 +279,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         availableToppings: availableToppings || [],
         availableDietaryOptions: availableDietaryOptions || [],
         address: address || null,
+        placeId: placeId || null,
         venueName: venueName || null,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
@@ -405,7 +406,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, placeId, venueName, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
@@ -514,6 +515,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
         ...(country !== undefined && { country: country || null }),
+        ...(placeId !== undefined && { placeId: placeId || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),

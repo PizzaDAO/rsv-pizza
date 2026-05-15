@@ -68,6 +68,9 @@ export const EventDetailsTab: React.FC = () => {
   const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   // Pending country from LocationAutocomplete (fires before onPlaceSelected)
   const pendingCountryRef = useRef<string | null>(null);
+  // Pending Google place_id from LocationAutocomplete (set in onPlaceSelected just
+  // before saveLocation is called; null when user is editing venue name only)
+  const pendingPlaceIdRef = useRef<string | null>(null);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
@@ -509,12 +512,17 @@ export const EventDetailsTab: React.FC = () => {
     pendingCoordsRef.current = null;
     const country = pendingCountryRef.current;
     pendingCountryRef.current = null;
+    // Only include place_id in the payload when a new place was actually picked
+    // from the autocomplete dropdown — otherwise leave it untouched on the server
+    const placeId = pendingPlaceIdRef.current;
+    pendingPlaceIdRef.current = null;
     const success = await saveField('location', {
       address: newAddress.trim() || null,
       venue_name: newVenueName || null,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
       country: country || null,
+      ...(placeId !== null && { place_id: placeId }),
     });
     if (success) {
       setOriginalValues((prev: any) => ({
@@ -613,7 +621,8 @@ export const EventDetailsTab: React.FC = () => {
             onCitySelected={(cityData) => {
               pendingCountryRef.current = cityData.country || null;
             }}
-            onPlaceSelected={(newAddress, newVenueName) => {
+            onPlaceSelected={(newAddress, newVenueName, placeId) => {
+              pendingPlaceIdRef.current = placeId;
               saveLocation(newAddress, newVenueName);
             }}
             placeholder="Add Event Location"
