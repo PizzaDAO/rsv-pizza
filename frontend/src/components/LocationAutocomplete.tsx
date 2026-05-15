@@ -16,7 +16,7 @@ interface LocationAutocompleteProps {
   onChange: (value: string) => void;
   onVenueNameChange?: (venueName: string | null) => void;
   onTimezoneChange?: (timezone: string) => void;
-  onPlaceSelected?: (address: string, venueName: string | null) => void;
+  onPlaceSelected?: (address: string, venueName: string | null, placeId: string | null) => void;
   onLocationSelected?: (location: { lat: number; lng: number } | null) => void;
   onCitySelected?: (cityData: CityData) => void;
   types?: string[];
@@ -216,7 +216,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           // Call onPlaceSelected LAST — callers may trigger a save here
           // that reads coords set by onLocationSelected above
           if (onPlaceSelectedRef.current && selectedAddress) {
-            onPlaceSelectedRef.current(selectedAddress, selectedVenueName);
+            onPlaceSelectedRef.current(selectedAddress, selectedVenueName, place.place_id || null);
           }
         });
 

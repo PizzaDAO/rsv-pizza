@@ -92,6 +92,7 @@ export interface CreatePartyData {
   pizzaSize?: string;
   pizzaStyle?: string;
   address?: string;
+  placeId?: string;
   maxGuests?: number;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -114,6 +115,7 @@ export interface UpdatePartyData {
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  placeId?: string | null;
   venueName?: string | null;
   // Venue tracking fields
   venueStatus?: VenueStatus | null;
@@ -183,6 +185,7 @@ export async function createPartyApi(data: CreatePartyData) {
       pizzaSize: data.pizzaSize || 'large',
       pizzaStyle: data.pizzaStyle || 'new-york',
       address: data.address,
+      placeId: data.placeId,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -212,6 +215,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       address: data.address,
       latitude: data.latitude,
       longitude: data.longitude,
+      placeId: data.placeId,
       venueName: data.venueName,
       // Venue tracking fields
       venueStatus: data.venueStatus,
@@ -402,6 +406,7 @@ export interface PublicEvent {
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  placeId?: string | null;
   venueName: string | null;
   maxGuests: number | null;
   hideGuests: boolean;

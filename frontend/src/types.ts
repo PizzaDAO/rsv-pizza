@@ -238,6 +238,7 @@ export interface Party {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  placeId?: string | null;
   venueName: string | null;
   // Venue tracking fields
   venueStatus: VenueStatus | null;

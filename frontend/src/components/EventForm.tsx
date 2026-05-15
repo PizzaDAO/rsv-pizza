@@ -28,6 +28,7 @@ export function EventForm() {
   const [timezone, setTimezone] = useState('');
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
+  const [partyPlaceId, setPartyPlaceId] = useState<string | null>(null);
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
@@ -115,7 +116,8 @@ export function EventForm() {
         urlSlug,
         formData.timezone || undefined,
         undefined, // hostEmail
-        formData.hideGuests || false
+        formData.hideGuests || false,
+        formData.partyPlaceId || undefined
       );
 
       setCreating(false);
@@ -191,7 +193,7 @@ export function EventForm() {
     if (!user) {
       const formData = {
         partyName, startDate, startTime, endDate, endTime, timezone,
-        expectedGuests, partyAddress, partyPassword, eventImageUrl, eventDescription,
+        expectedGuests, partyAddress, partyPlaceId, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests, hideGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
@@ -256,7 +258,8 @@ export function EventForm() {
         urlSlug,
         timezone || undefined,
         undefined, // hostEmail
-        hideGuests
+        hideGuests,
+        partyPlaceId || undefined
       );
 
       setCreating(false);
@@ -290,8 +293,16 @@ export function EventForm() {
 
         <LocationAutocomplete
           value={partyAddress}
-          onChange={setPartyAddress}
+          onChange={(newAddress) => {
+            setPartyAddress(newAddress);
+            // Manual edits without picking from dropdown invalidate the captured place_id
+            setPartyPlaceId(null);
+          }}
           onTimezoneChange={setTimezone}
+          onPlaceSelected={(address, _venueName, placeId) => {
+            setPartyAddress(address);
+            setPartyPlaceId(placeId);
+          }}
           placeholder={t('eventForm.eventLocation')}
         />
 

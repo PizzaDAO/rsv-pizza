@@ -504,11 +504,16 @@ export function EventPage() {
   };
 
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
-  const googleMapsUrl = event.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
-    : event.latitude && event.longitude
-      ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
-      : null;
+  // Prefer place_id + address (opens canonical place card). Fall back to address
+  // alone, then to lat/lng if no address. Both place_id and address are required
+  // for the place_id form per Google's docs.
+  const googleMapsUrl = event.placeId && event.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
+    : event.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
+      : event.latitude && event.longitude
+        ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
+        : null;
 
   const metaTitle = event.name;
 
