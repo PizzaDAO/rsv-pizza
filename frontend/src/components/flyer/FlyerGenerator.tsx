@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, updateSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
-import { Sponsor } from '../../types';
+import { Sponsor, CoHost } from '../../types';
 import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check, Pencil } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
+import { uploadEventImage, updateParty, cdnUrl, proxyAvatarToStorage } from '../../lib/supabase';
+import { uuid } from '../../lib/utils';
+import { getXAvatarUrl } from '../../utils/avatarUtils';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime, getTemplateUrl,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
@@ -339,6 +341,41 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAddAsCoHost = async (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => {
+    if (!party) return;
+
+    let avatarUrl: string | undefined;
+    if (data.avatarUrl) {
+      avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
+    } else {
+      const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+      if (xAvatar) {
+        avatarUrl = await proxyAvatarToStorage(xAvatar);
+      } else if (data.instagram) {
+        const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+        avatarUrl = await proxyAvatarToStorage(igAvatar);
+      }
+    }
+
+    const newCoHost: CoHost = {
+      id: uuid(),
+      name: data.name,
+      website: data.website || undefined,
+      twitter: data.twitter || undefined,
+      instagram: data.instagram || undefined,
+      avatar_url: avatarUrl,
+      showOnEvent: true,
+    };
+
+    const existing = party.coHosts || [];
+    const existingIdx = existing.findIndex(c => c.name?.toLowerCase() === data.name.toLowerCase());
+    const updated = existingIdx >= 0
+      ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
+      : [...existing, newCoHost];
+    await updateParty(party.id, { co_hosts: updated });
+    if (party.inviteCode) await loadParty(party.inviteCode);
   };
 
   // Load both Hub 191 fonts, then trigger re-render for accurate fitText measurements
@@ -1599,6 +1636,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
           onClose={() => setShowAddSponsor(false)}
           isLoading={isSubmitting}
           defaultStatus="yes"
+          onAddAsCoHost={handleAddAsCoHost}
         />
       )}
       {editingSponsor && (
