@@ -50,9 +50,10 @@ export const ROLLUP_CONFIG: FormatConfig = {
   ],
   sponsorBox: {
     defaultX: 60,
-    defaultY: 2600,
+    defaultY: 2350,
     width: 960,
-    height: 300,
+    height: 540,
+    defaultRows: 3,
   },
   dbImageField: 'rollup_image_url',
   dbTimestampField: 'rollup_generated_at',
