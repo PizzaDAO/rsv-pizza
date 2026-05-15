@@ -710,7 +710,7 @@ export function PartnerDashboardPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
+                className="bg-theme-input border border-theme-stroke rounded-lg pl-3 pr-8 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
               >
                 <option value="date-desc">Newest first</option>
                 <option value="date-asc">Oldest first</option>
@@ -724,7 +724,7 @@ export function PartnerDashboardPage() {
                 <select
                   value={regionFilter}
                   onChange={(e) => setRegionFilter(e.target.value)}
-                  className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
+                  className="bg-theme-input border border-theme-stroke rounded-lg pl-3 pr-8 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                 >
                   <option value="all">Region: All</option>
                   {GPP_REGIONS.map((r) => (

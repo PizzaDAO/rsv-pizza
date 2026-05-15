@@ -1,6 +1,6 @@
 {
   "header": {
-    "logIn": "Iniciar Sesion / Registrarse"
+    "logIn": "Iniciar Sesión / Registrarse"
   },
   "languageSwitcher": {
     "en": "EN",
@@ -12,7 +12,7 @@
   },
   "buttons": {
     "close": "Cerrar",
-    "back": "Atras",
+    "back": "Atrás",
     "next": "Siguiente",
     "continue": "Continuar",
     "submit": "Enviar",
@@ -23,8 +23,8 @@
   },
   "errors": {
     "partyNotFound": "Evento No Encontrado",
-    "partyNotFoundDesc": "Evento no encontrado. El enlace de invitacion puede ser invalido o haber expirado.",
-    "incorrectPassword": "Contrasena incorrecta. Intenta de nuevo.",
-    "invalidWallet": "Ingresa una direccion valida (0x...) o nombre ENS (.eth)"
+    "partyNotFoundDesc": "Evento no encontrado. El enlace de invitación puede ser inválido o haber expirado.",
+    "incorrectPassword": "Contraseña incorrecta. Intenta de nuevo.",
+    "invalidWallet": "Ingresa una dirección válida (0x...) o nombre ENS (.eth)"
   }
 }
