@@ -29,6 +29,7 @@ export function EventForm() {
   const [expectedGuests, setExpectedGuests] = useState('');
   const [partyAddress, setPartyAddress] = useState('');
   const [partyPlaceId, setPartyPlaceId] = useState<string | null>(null);
+  const [partyVenueName, setPartyVenueName] = useState<string | null>(null);
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
@@ -117,7 +118,8 @@ export function EventForm() {
         formData.timezone || undefined,
         undefined, // hostEmail
         formData.hideGuests || false,
-        formData.partyPlaceId || undefined
+        formData.partyPlaceId || undefined,
+        formData.partyVenueName || undefined
       );
 
       setCreating(false);
@@ -193,7 +195,7 @@ export function EventForm() {
     if (!user) {
       const formData = {
         partyName, startDate, startTime, endDate, endTime, timezone,
-        expectedGuests, partyAddress, partyPlaceId, partyPassword, eventImageUrl, eventDescription,
+        expectedGuests, partyAddress, partyPlaceId, partyVenueName, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests, hideGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
@@ -259,7 +261,8 @@ export function EventForm() {
         timezone || undefined,
         undefined, // hostEmail
         hideGuests,
-        partyPlaceId || undefined
+        partyPlaceId || undefined,
+        partyVenueName || undefined
       );
 
       setCreating(false);
@@ -295,13 +298,15 @@ export function EventForm() {
           value={partyAddress}
           onChange={(newAddress) => {
             setPartyAddress(newAddress);
-            // Manual edits without picking from dropdown invalidate the captured place_id
+            // Manual edits without picking from dropdown invalidate captured place_id + venue_name
             setPartyPlaceId(null);
+            setPartyVenueName(null);
           }}
           onTimezoneChange={setTimezone}
-          onPlaceSelected={(address, _venueName, placeId) => {
+          onPlaceSelected={(address, venueName, placeId) => {
             setPartyAddress(address);
             setPartyPlaceId(placeId);
+            setPartyVenueName(venueName);
           }}
           placeholder={t('eventForm.eventLocation')}
         />

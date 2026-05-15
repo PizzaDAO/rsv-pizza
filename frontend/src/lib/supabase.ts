@@ -799,7 +799,8 @@ export async function createParty(
   timezone?: string,
   hostEmail?: string,
   hideGuests?: boolean,
-  placeId?: string
+  placeId?: string,
+  venueName?: string
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -812,6 +813,7 @@ export async function createParty(
         maxGuests: expectedGuests,
         address,
         placeId,
+        venueName,
         availableBeverages,
         duration,
         password,
@@ -886,6 +888,7 @@ export async function createParty(
       custom_url: customUrl || null,
       address: address || null,
       place_id: placeId || null,
+      venue_name: venueName || null,
       co_hosts: coHosts,
     })
     .select()
