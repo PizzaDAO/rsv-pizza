@@ -868,8 +868,8 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                       height: 14,
                       cursor: 'nwse-resize',
                       zIndex: 36,
-                      background: 'rgba(255,255,255,0.6)',
-                      border: '1.5px solid rgba(255,255,255,0.9)',
+                      background: handleColor,
+                      border: `1.5px solid ${handleColor}`,
                       borderRadius: 2,
                     }}
                   />
@@ -910,7 +910,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                       transform: 'translateY(-50%)',
                       cursor: 'ew-resize',
                       zIndex: 36,
-                      background: 'rgba(255,255,255,0.5)',
+                      background: handleColor,
                       borderRadius: 3,
                     }}
                   />
@@ -951,7 +951,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                       transform: 'translateX(-50%)',
                       cursor: 'ns-resize',
                       zIndex: 36,
-                      background: 'rgba(255,255,255,0.5)',
+                      background: handleColor,
                       borderRadius: 3,
                     }}
                   />
@@ -1115,7 +1115,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                         height: 14,
                         cursor: 'nwse-resize',
                         zIndex: 35,
-                        background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
+                        background: `linear-gradient(135deg, transparent 50%, ${handleColor} 50%)`,
                         borderRadius: '0 0 4px 0',
                       }}
                     />
@@ -1232,7 +1232,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                   height: 14,
                   cursor: 'nwse-resize',
                   zIndex: 35,
-                  background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
+                  background: `linear-gradient(135deg, transparent 50%, ${handleColor} 50%)`,
                   borderRadius: '0 0 4px 0',
                 }}
               />
