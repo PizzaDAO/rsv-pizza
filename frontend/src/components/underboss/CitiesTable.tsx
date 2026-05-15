@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
@@ -32,6 +32,7 @@ interface MergedCity {
   matchedEventUrl: string | null; // link to the matching event if auto-detected
   photoCount: number;
   matchedEventIds: string[];
+  hostTelegram: string | null;
 }
 
 type SortField = 'city' | 'country' | 'underboss' | 'status';
@@ -189,6 +190,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
         photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0) + (gppCounts[gppKey] || 0),
         matchedEventIds: matchedEvents.map(e => e.id),
+        hostTelegram: matchedEvents[0]?.hostTelegram || null,
       };
     });
   }, [sheetCities, cityStatuses, findMatchingEvents, gppCounts]);
@@ -812,6 +814,17 @@ function CityRow({
                 title="Telegram group"
               >
                 <ExternalLink size={10} />
+              </a>
+            )}
+            {city.hostTelegram && (
+              <a
+                href={`https://t.me/${city.hostTelegram.replace(/^@/, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+                title="DM host on Telegram"
+              >
+                <Send size={10} />
               </a>
             )}
           </div>

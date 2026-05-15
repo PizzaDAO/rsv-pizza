@@ -4,6 +4,7 @@ import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquar
 import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
 import { sendTelegramBroadcast, sendTelegramTest, BroadcastResult } from '../../lib/api';
+import type { UnderbossEvent } from '../../types';
 
 /** Normalize a city name for fuzzy matching (strip accents, suffixes, etc.) */
 function normalizeCity(name: string): string {
@@ -94,11 +95,12 @@ function citiesMatch(eventCity: string, sheetCity: string): boolean {
 interface TelegramBroadcastProps {
   onClose: () => void;
   preSelectedCities?: string[];
+  events?: UnderbossEvent[];
 }
 
 type ViewState = 'compose' | 'sending' | 'results';
 
-export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadcastProps) {
+export function TelegramBroadcast({ onClose, preSelectedCities, events }: TelegramBroadcastProps) {
   // Data loading
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -153,6 +155,25 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
     const regionSet = new Set(groups.map(g => g.region).filter(Boolean));
     return Array.from(regionSet).sort();
   }, [groups]);
+
+  // Build a lookup of group.city -> host telegram handle by fuzzy-matching event city names.
+  const hostTelegramByGroupId = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!events || events.length === 0) return map;
+    // Extract event city from "Global Pizza Party <city>" naming convention
+    const eventCities: { city: string; handle: string }[] = [];
+    for (const ev of events) {
+      if (!ev.hostTelegram) continue;
+      const match = ev.name.match(/Global Pizza Party\s+(.+)/i);
+      const city = match ? match[1].trim() : ev.name;
+      eventCities.push({ city, handle: ev.hostTelegram });
+    }
+    for (const g of groups) {
+      const found = eventCities.find(ec => citiesMatch(ec.city, g.city));
+      if (found) map[g.groupId] = found.handle;
+    }
+    return map;
+  }, [events, groups]);
 
   // Filtered groups
   const filteredGroups = useMemo(() => {
@@ -454,10 +475,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                               {allFilteredSelected && <Check size={10} className="text-white" />}
                             </button>
                           </div>
-                          <div className="flex-1 grid grid-cols-3 gap-2">
+                          <div className="flex-1 grid grid-cols-4 gap-2">
                             <span>City</span>
                             <span>Country</span>
                             <span>Underboss</span>
+                            <span>Host TG</span>
                           </div>
                           <div className="w-14 text-right">Test</div>
                         </div>
@@ -482,10 +504,26 @@ export function TelegramBroadcast({ onClose, preSelectedCities }: TelegramBroadc
                                 {selectedIds.has(group.groupId) && <Check size={10} className="text-white" />}
                               </div>
                             </div>
-                            <div className="flex-1 grid grid-cols-3 gap-2 text-sm">
+                            <div className="flex-1 grid grid-cols-4 gap-2 text-sm">
                               <span className="text-theme-text truncate">{group.city}</span>
                               <span className="text-theme-text-secondary truncate">{group.country}</span>
                               <span className="text-theme-text-faint truncate">{group.underboss}</span>
+                              <span className="text-theme-text-faint truncate">
+                                {hostTelegramByGroupId[group.groupId] ? (
+                                  <a
+                                    href={`https://t.me/${hostTelegramByGroupId[group.groupId].replace(/^@/, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-purple-400 hover:text-purple-300 transition-colors"
+                                    title="DM host on Telegram"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    @{hostTelegramByGroupId[group.groupId].replace(/^@/, '')}
+                                  </a>
+                                ) : (
+                                  '—'
+                                )}
+                              </span>
                             </div>
                             <div className="w-14 text-right">
                               <button
