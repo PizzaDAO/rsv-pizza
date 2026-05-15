@@ -957,6 +957,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
           select: {
             name: true,
             date: true,
+            timezone: true,
             address: true,
             inviteCode: true,
             customUrl: true,
@@ -970,6 +971,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             guestId: guest.id,
             partyName: party.name,
             partyDate: party.date,
+            partyTimezone: party.timezone,
             partyAddress: party.address,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,

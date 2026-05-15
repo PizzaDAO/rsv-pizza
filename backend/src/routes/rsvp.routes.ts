@@ -537,6 +537,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             guestName: name.trim(),
             partyName: party.name,
             partyDate: party.date,
+            partyTimezone: party.timezone,
             waitlistPosition: waitlistPosition!,
             inviteCode,
             customUrl: party.customUrl,
@@ -912,6 +913,7 @@ async function sendWaitlistConfirmationEmail(params: {
   guestName: string;
   partyName: string;
   partyDate: Date | null;
+  partyTimezone: string | null;
   waitlistPosition: number;
   inviteCode: string;
   customUrl: string | null;
@@ -936,6 +938,7 @@ async function sendWaitlistConfirmationEmail(params: {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: params.partyTimezone || undefined,
       })
     : 'Date TBD';
 
@@ -1013,6 +1016,7 @@ export async function sendPromotionEmail(params: {
   guestId: string;
   partyName: string;
   partyDate: Date | null;
+  partyTimezone: string | null;
   partyAddress: string | null;
   inviteCode: string;
   customUrl: string | null;
@@ -1043,6 +1047,7 @@ export async function sendPromotionEmail(params: {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: params.partyTimezone || undefined,
       })
     : 'Date TBD';
 

@@ -49,6 +49,7 @@ export function buildInviteEmail(
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: party.timezone || undefined,
       })
     : 'Date TBD';
 
