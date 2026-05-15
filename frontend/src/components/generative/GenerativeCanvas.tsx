@@ -3,10 +3,10 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, updateSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
 import { Sponsor } from '../../types';
-import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check, Pencil } from 'lucide-react';
+import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
+import { cdnUrl } from '../../lib/supabase';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime,
   CITY_COLOR, TIME_COLOR,
@@ -38,12 +38,11 @@ interface GenerativeCanvasProps {
 }
 
 export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
-  const { party, loadParty } = usePizza();
+  const { party } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadingHiRes, setDownloadingHiRes] = useState(false);
-  const [setImageState, setSetImageState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [containerWidth, setContainerWidth] = useState(config.previewMaxWidth);
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
@@ -480,44 +479,6 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
     }
   };
 
-  const handleUseAsEventImage = async () => {
-    if (!party) return;
-    setSetImageState('uploading');
-    try {
-      const canvas = await renderToCanvas();
-      const blob: Blob | null = await new Promise(resolve =>
-        canvas.toBlob(b => resolve(b), 'image/png')
-      );
-      if (!blob) throw new Error('Failed to encode as PNG');
-
-      const file = new File(
-        [blob],
-        `gpp-${config.id}-${party.inviteCode || 'event'}.png`,
-        { type: 'image/png' }
-      );
-
-      const uploadedUrl = await uploadEventImage(file);
-      if (!uploadedUrl) throw new Error('Upload failed');
-
-      const success = await updateParty(party.id, {
-        [config.dbImageField]: uploadedUrl,
-        [config.dbTimestampField]: new Date().toISOString(),
-      } as any);
-      if (!success) throw new Error('Failed to update party');
-
-      if (party.inviteCode) {
-        await loadParty(party.inviteCode);
-      }
-
-      setSetImageState('success');
-      setTimeout(() => setSetImageState('idle'), 2000);
-    } catch (err) {
-      console.error(`Failed to set ${config.id} as event image:`, err);
-      setSetImageState('error');
-      setTimeout(() => setSetImageState('idle'), 2500);
-    }
-  };
-
   const hasCustomPositions =
     Object.keys(poppedLogos).length > 0 ||
     Object.keys(logoSizes).length > 0 ||
@@ -532,8 +493,16 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
     sponsorBoxSize.height !== defaultSponsorBox.height;
 
   /** Build drag props for an element key */
+  const handleColor = config.handleColor || 'rgba(255,255,255,0.5)';
+  // City is normally locked (poster layout keeps it aligned with date/venue),
+  // but unlock it when all other text fields are hidden — e.g. on the
+  // rollup banner where city is the only text overlay.
+  const cityIsOnlyVisibleField = config.textFields.every(
+    f => f.key === 'city' || f.hidden,
+  );
   const getDragProps = (key: string) => {
-    const isLocked = key === 'city' || key === 'venue' || key === 'time';
+    const isLocked =
+      (key === 'city' && !cityIsOnlyVisibleField) || key === 'venue' || key === 'time';
     const isDragging = dragging === key;
     const isHovered = hoveredElement === key;
     const isEditing = (key === 'city' && editingField === 'city') ||
@@ -545,7 +514,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
       onMouseLeave: () => setHoveredElement(null),
       style: {
         cursor: isEditing ? 'text' : isLocked ? 'default' : isDragging ? 'grabbing' : 'grab',
-        outline: isHovered && !isDragging && !isEditing && !isLocked ? '2px dashed rgba(255,255,255,0.5)' : 'none',
+        outline: isHovered && !isDragging && !isEditing && !isLocked ? `2px dashed ${handleColor}` : 'none',
         outlineOffset: 4,
         zIndex: isDragging ? 20 : 10,
         userSelect: isEditing ? ('auto' as const) : ('none' as const),
@@ -831,7 +800,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                     position: 'absolute',
                     top: -20,
                     left: 0,
-                    color: 'rgba(255,255,255,0.7)',
+                    color: handleColor,
                     pointerEvents: 'none',
                   }}
                 />
@@ -1334,40 +1303,6 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
             <>
               <Download className="w-5 h-5" />
               Download
-            </>
-          )}
-        </button>
-        <button
-          onClick={handleUseAsEventImage}
-          disabled={setImageState === 'uploading'}
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm ${
-            setImageState === 'success'
-              ? 'bg-green-500/20 text-green-300'
-              : setImageState === 'error'
-              ? 'bg-red-500/20 text-red-300'
-              : 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white'
-          }`}
-          title={`Use this ${config.label.toLowerCase()} as the event image`}
-        >
-          {setImageState === 'uploading' ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Uploading...
-            </>
-          ) : setImageState === 'success' ? (
-            <>
-              <Check className="w-4 h-4" />
-              Set!
-            </>
-          ) : setImageState === 'error' ? (
-            <>
-              <ImagePlus className="w-4 h-4" />
-              Upload failed
-            </>
-          ) : (
-            <>
-              <ImagePlus className="w-4 h-4" />
-              Use for Event
             </>
           )}
         </button>

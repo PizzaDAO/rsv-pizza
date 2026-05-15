@@ -57,4 +57,5 @@ export const ROLLUP_CONFIG: FormatConfig = {
   dbImageField: 'rollup_image_url',
   dbTimestampField: 'rollup_generated_at',
   storageKey: (partyId: string) => `rollup-${partyId}`,
+  handleColor: 'rgba(80,80,80,0.85)',
 };

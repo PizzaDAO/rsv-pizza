@@ -37,6 +37,9 @@ export interface FormatConfig {
   dbImageField: string;
   dbTimestampField: string;
   storageKey: (partyId: string) => string;
+  /** Color for hover outlines and drag handles. Default white. Use a dark
+   *  shade for light-background templates where the default would vanish. */
+  handleColor?: string;
 }
 
 export interface CanvasConfig {
