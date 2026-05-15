@@ -728,25 +728,49 @@ export function EventPage() {
                 />
 
                 {/* Guest Count */}
-                {!event.hideGuests && (
-                  <div className="pt-4 border-t border-theme-stroke mt-4">
-                    <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {t('guest', { count: event.guestCount })}
-                        {event.maxGuests && ` / ${event.maxGuests}`}
-                      </span>
-                      {event.maxGuests && event.guestCount >= event.maxGuests && (
-                        <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
-                      )}
-                      {event.maxGuests && event.guestCount < event.maxGuests && (
-                        <span className="text-theme-text-muted text-xs">
-                          {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
-                        </span>
-                      )}
+                {!event.hideGuests && (() => {
+                  const isGpp = event.eventType === 'gpp';
+                  if (!isGpp) {
+                    return (
+                      <div className="pt-4 border-t border-theme-stroke mt-4">
+                        <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
+                          <Users className="w-4 h-4" />
+                          <span>
+                            {t('guest', { count: event.guestCount })}
+                            {event.maxGuests && ` / ${event.maxGuests}`}
+                          </span>
+                          {event.maxGuests && event.guestCount >= event.maxGuests && (
+                            <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
+                          )}
+                          {event.maxGuests && event.guestCount < event.maxGuests && (
+                            <span className="text-theme-text-muted text-xs">
+                              {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const spotsRemaining = event.maxGuests != null ? event.maxGuests - event.guestCount : null;
+                  const isSoldOut = spotsRemaining != null && spotsRemaining <= 0;
+                  const showSpotsLeft = spotsRemaining != null && spotsRemaining > 0 && spotsRemaining < 20;
+                  if (!isSoldOut && !showSpotsLeft) return null;
+                  return (
+                    <div className="pt-4 border-t border-theme-stroke mt-4">
+                      <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
+                        <Users className="w-4 h-4" />
+                        {isSoldOut && (
+                          <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
+                        )}
+                        {showSpotsLeft && (
+                          <span className="text-theme-text-muted text-xs">
+                            {t('spotsLeft', { count: spotsRemaining! })}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
 
@@ -1047,25 +1071,49 @@ export function EventPage() {
                 )}
 
                 {/* Guest Count - Mobile */}
-                {!event.hideGuests && (
-                  <div className="md:hidden pt-4 border-t border-theme-stroke">
-                    <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {t('guest', { count: event.guestCount })}
-                        {event.maxGuests && ` / ${event.maxGuests}`}
-                      </span>
-                      {event.maxGuests && event.guestCount >= event.maxGuests && (
-                        <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
-                      )}
-                      {event.maxGuests && event.guestCount < event.maxGuests && (
-                        <span className="text-theme-text-muted text-xs">
-                          {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
-                        </span>
-                      )}
+                {!event.hideGuests && (() => {
+                  const isGpp = event.eventType === 'gpp';
+                  if (!isGpp) {
+                    return (
+                      <div className="md:hidden pt-4 border-t border-theme-stroke">
+                        <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
+                          <Users className="w-4 h-4" />
+                          <span>
+                            {t('guest', { count: event.guestCount })}
+                            {event.maxGuests && ` / ${event.maxGuests}`}
+                          </span>
+                          {event.maxGuests && event.guestCount >= event.maxGuests && (
+                            <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
+                          )}
+                          {event.maxGuests && event.guestCount < event.maxGuests && (
+                            <span className="text-theme-text-muted text-xs">
+                              {t('spotsLeft', { count: event.maxGuests - event.guestCount })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const spotsRemaining = event.maxGuests != null ? event.maxGuests - event.guestCount : null;
+                  const isSoldOut = spotsRemaining != null && spotsRemaining <= 0;
+                  const showSpotsLeft = spotsRemaining != null && spotsRemaining > 0 && spotsRemaining < 20;
+                  if (!isSoldOut && !showSpotsLeft) return null;
+                  return (
+                    <div className="md:hidden pt-4 border-t border-theme-stroke">
+                      <div className="flex items-center gap-2 text-theme-text-secondary text-sm">
+                        <Users className="w-4 h-4" />
+                        {isSoldOut && (
+                          <span className="text-[#ffc107] text-xs">{t('waitlistOpen')}</span>
+                        )}
+                        {showSpotsLeft && (
+                          <span className="text-theme-text-muted text-xs">
+                            {t('spotsLeft', { count: spotsRemaining! })}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Description + Sponsor Blurbs */}
                 {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
