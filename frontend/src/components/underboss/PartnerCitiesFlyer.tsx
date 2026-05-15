@@ -53,20 +53,32 @@ async function renderCitiesFlyer(
   ctx.font = `${SUBHEAD_FONT_SIZE}px ${TEXT_FONT}`;
   ctx.fillText(SUBHEAD_TEXT, CITY_BOX.x, CITY_BOX.y + SUBHEAD_Y_OFFSET);
 
-  // 4) City names — fixed font size
+  // 4) City names — comma-separated, word-wrapped to CITY_BOX.width
   const hasOverflow = cities.length > MAX_VISIBLE;
   const display = hasOverflow ? cities.slice(0, MAX_VISIBLE) : cities;
-  const suffix = hasOverflow ? `+ ${cities.length - MAX_VISIBLE} MORE` : null;
+  const parts = display.map(c => c.toUpperCase());
+  if (hasOverflow) parts.push(`+ ${cities.length - MAX_VISIBLE} MORE`);
 
   ctx.fillStyle = CITY_COLOR;
   ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}`;
-  let y = CITY_BOX.y;
-  for (const c of display) {
-    ctx.fillText(c.toUpperCase(), CITY_BOX.x, y);
-    y += CITY_FONT_SIZE * CITY_LINE_SPACING;
+
+  const lines: string[] = [];
+  let current = '';
+  for (const p of parts) {
+    const candidate = current ? `${current}, ${p}` : p;
+    if (ctx.measureText(candidate).width > CITY_BOX.width && current) {
+      lines.push(`${current},`);
+      current = p;
+    } else {
+      current = candidate;
+    }
   }
-  if (suffix) {
-    ctx.fillText(suffix, CITY_BOX.x, y);
+  if (current) lines.push(current);
+
+  let y = CITY_BOX.y;
+  for (const line of lines) {
+    ctx.fillText(line, CITY_BOX.x, y);
+    y += CITY_FONT_SIZE * CITY_LINE_SPACING;
   }
 
   return canvas;
