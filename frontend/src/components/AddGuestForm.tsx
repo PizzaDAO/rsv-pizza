@@ -11,6 +11,7 @@ interface AddGuestFormProps {
 
 export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
   const { availableToppings, availableBeverages, addGuest, dietaryOptions, party } = usePizza();
+  const isGppEvent = party?.eventType === 'gpp';
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
@@ -209,7 +210,7 @@ export const AddGuestForm: React.FC<AddGuestFormProps> = ({ onClose }) => {
           </div>
 
           {/* Beverage Preferences - Only show if party has beverages configured */}
-          {party?.availableBeverages && party.availableBeverages.length > 0 && (
+          {!isGppEvent && party?.availableBeverages && party.availableBeverages.length > 0 && (
             <div>
               <h3 className="text-sm font-medium text-theme-text-secondary mb-3">
                 Beverage Preferences

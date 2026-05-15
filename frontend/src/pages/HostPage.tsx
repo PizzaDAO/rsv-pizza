@@ -161,7 +161,7 @@ function HostPageContent() {
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
       { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
-      { id: 'pizza' as TabType, label: t('tabs.pizzaAndDrinks'), icon: Pizza },
+      { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
       { id: 'photos' as TabType, label: t('tabs.photos'), icon: Camera },
     ];
 

@@ -58,7 +58,7 @@ export function RSVPFormStep2({
       </div>
 
       {/* Drinks */}
-      {form.availableBeverages.length > 0 && (
+      {!form.isGppEvent && form.availableBeverages.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-theme-text mb-3">
             {t('step2.drinkPreferences')}

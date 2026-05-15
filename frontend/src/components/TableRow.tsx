@@ -38,6 +38,8 @@ interface TableRowProps {
   // For requests variant - lookup functions
   toppingNameById?: (id: string) => string;
   beverageNameById?: (id: string) => string;
+  // Hide beverage chips in the requests variant (used for GPP events)
+  hideBeverages?: boolean;
   // Edit functionality
   editable?: boolean;
   onQuantityChange?: (id: string, newQuantity: number) => void;
@@ -66,6 +68,7 @@ export const TableRow: React.FC<TableRowProps> = ({
   onPromote,
   toppingNameById = (id) => id,
   beverageNameById = (id) => id,
+  hideBeverages = false,
   editable = false,
   onQuantityChange,
   onRemovePizza,
@@ -364,7 +367,7 @@ export const TableRow: React.FC<TableRowProps> = ({
                 </span>
               );
             })}
-            {guest.likedBeverages?.map(beverageId => {
+            {!hideBeverages && guest.likedBeverages?.map(beverageId => {
               const name = beverageNameById(beverageId);
               return (
                 <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded">
@@ -372,7 +375,7 @@ export const TableRow: React.FC<TableRowProps> = ({
                 </span>
               );
             })}
-            {guest.dislikedBeverages?.map(beverageId => {
+            {!hideBeverages && guest.dislikedBeverages?.map(beverageId => {
               const name = beverageNameById(beverageId);
               return (
                 <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded line-through">

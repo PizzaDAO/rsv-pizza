@@ -12,6 +12,7 @@ interface GuestPreferencesListProps {
 
 export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embedded = false }) => {
   const { guests, removeGuest, approveGuest, declineGuest, party, availableToppings, availableBeverages } = usePizza();
+  const isGppEvent = party?.eventType === 'gpp';
   const [showAddForm, setShowAddForm] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -23,16 +24,17 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
     return availableBeverages.find(b => b.id === id)?.name || id;
   };
 
-  // Filter to only guests who submitted requests (have any preferences)
+  // Filter to only guests who submitted requests (have any preferences).
+  // On GPP events, drop beverage signals so a guest who only liked drinks doesn't show as a ghost row.
   const guestsWithRequests = useMemo(() => {
     return guests.filter(guest =>
       (guest.dietaryRestrictions && guest.dietaryRestrictions.length > 0) ||
       (guest.toppings && guest.toppings.length > 0) ||
       (guest.dislikedToppings && guest.dislikedToppings.length > 0) ||
-      (guest.likedBeverages && guest.likedBeverages.length > 0) ||
-      (guest.dislikedBeverages && guest.dislikedBeverages.length > 0)
+      (!isGppEvent && guest.likedBeverages && guest.likedBeverages.length > 0) ||
+      (!isGppEvent && guest.dislikedBeverages && guest.dislikedBeverages.length > 0)
     );
-  }, [guests]);
+  }, [guests, isGppEvent]);
 
   const visibleGuests = expanded
     ? guestsWithRequests
@@ -107,6 +109,7 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
             onRemove={removeGuest}
             toppingNameById={toppingNameById}
             beverageNameById={beverageNameById}
+            hideBeverages={isGppEvent}
           />
         ))}
       </div>
