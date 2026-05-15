@@ -12,7 +12,8 @@
     "swcNotify": "Notificarme sobre futuros eventos de Stand With Crypto.",
     "swcBrNotify": "Notifícame sobre eventos de Juntos por Cripto.",
     "ethconfDiscount": "Enviarme un descuento de ETHConf",
-    "next": "Siguiente"
+    "next": "Siguiente",
+    "selectTurtles": "Selecciona tus tortugas"
   },
   "step2": {
     "title": "Preferencias de Pizza",

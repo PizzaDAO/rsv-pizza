@@ -1,7 +1,7 @@
 {
   "title": "Enregistrement des invités",
   "loading": "Enregistrement de l'invité...",
-  "vouching": "Validation de l'invité...",
+  "vouching": "Validation…",
   "success": {
     "title": "Enregistré !",
     "backToDashboard": "Retour au tableau de bord"
@@ -11,8 +11,8 @@
     "checkedInAt": "Enregistré à {{time}}"
   },
   "notCheckedIn": {
-    "title": "Non enregistré",
-    "message": "Vous devez être enregistré pour valider d'autres invités. Demandez à un hôte ou à un invité enregistré de vous enregistrer d'abord."
+    "title": "Pas encore enregistré",
+    "message": "Vous n'avez pas encore été enregistré. Trouvez un organisateur à l'événement."
   },
   "unauthorized": {
     "title": "Non autorisé",

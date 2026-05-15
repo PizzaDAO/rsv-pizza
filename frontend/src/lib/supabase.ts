@@ -151,6 +151,31 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 }
 
 /**
+ * Upload a co-host avatar image directly to Supabase Storage and return the public URL.
+ * Used by the cohost editor's file-upload affordance.
+ */
+export async function uploadCoHostAvatar(file: File): Promise<string | null> {
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileName = `co-host-avatars/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (error) {
+      console.error('uploadCoHostAvatar:', error);
+      return null;
+    }
+    const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch (error) {
+    console.error('uploadCoHostAvatar:', error);
+    return null;
+  }
+}
+
+/**
  * Proxy an external avatar image to Supabase Storage.
  * Skips if already a Supabase URL. Falls back to original URL on failure.
  */
@@ -1247,10 +1272,10 @@ export async function addGuestToParty(
   swcUkOptIn?: boolean,
   swcBrOptIn?: boolean,
   ethconfOptIn?: boolean
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
-    return null;
+    throw new Error('Invite code is required to submit RSVP');
   }
 
   try {
@@ -1331,7 +1356,7 @@ export async function addGuestToParty(
     };
   } catch (error) {
     console.error('Error adding guest:', error);
-    return null;
+    throw error;
   }
 }
 

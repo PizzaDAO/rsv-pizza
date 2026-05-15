@@ -1,7 +1,7 @@
 {
   "title": "Check-in de Convidados",
   "loading": "Fazendo check-in do convidado...",
-  "vouching": "Verificando convidado...",
+  "vouching": "Verificando…",
   "success": {
     "title": "Check-in Realizado!",
     "backToDashboard": "Voltar ao Painel do Evento"
@@ -11,8 +11,8 @@
     "checkedInAt": "Check-in realizado às {{time}}"
   },
   "notCheckedIn": {
-    "title": "Sem Check-in",
-    "message": "Você precisa ter feito check-in para validar outros convidados. Peça a um organizador ou convidado já registrado para fazer o seu check-in primeiro."
+    "title": "Sem check-in",
+    "message": "Ainda não fizeste check-in. Procura um organizador no evento."
   },
   "unauthorized": {
     "title": "Não Autorizado",
