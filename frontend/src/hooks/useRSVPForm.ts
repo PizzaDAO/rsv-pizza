@@ -371,12 +371,22 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       setError('Please enter your name');
       return;
     }
+    const emailValue = email.trim();
+    if (!emailValue) {
+      setError('Please enter your email');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(emailValue)) {
+      setError('Please enter a valid email address (including a domain like .com)');
+      return;
+    }
     setError(null);
     // Track funnel step
     const slug = eventData.customUrl || eventData.inviteCode;
     if (slug) trackRsvpFunnel(slug, 'rsvp_step1_complete');
     setStep(2);
-  }, [name, eventData.customUrl, eventData.inviteCode]);
+  }, [name, email, eventData.customUrl, eventData.inviteCode]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
