@@ -682,6 +682,10 @@ export interface DbParty {
   event_tags?: string[];
   flyer_generated_at?: string | null;
   flyer_config?: Record<string, any> | null;
+  poster_image_url?: string | null;
+  poster_generated_at?: string | null;
+  rollup_image_url?: string | null;
+  rollup_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
   hidden_gpp_photos?: string[];
@@ -761,7 +765,9 @@ export const SAFE_PARTY_COLUMNS = `
   telegram_group,
   turtle_roles_enabled,
   underboss_status,
-  flyer_config
+  flyer_config,
+  poster_image_url, poster_generated_at,
+  rollup_image_url, rollup_generated_at
 `;
 
 /**
@@ -1700,6 +1706,10 @@ export async function updateParty(
     region?: string | null;
     flyer_generated_at?: string | null;
     flyer_config?: Record<string, any> | null;
+    poster_image_url?: string | null;
+    poster_generated_at?: string | null;
+    rollup_image_url?: string | null;
+    rollup_generated_at?: string | null;
     hidden_gpp_photos?: string[];
     extra_gpp_photos?: string[];
     luma_url?: string | null;
@@ -1768,6 +1778,10 @@ export async function updateParty(
         region: updates.region,
         flyerGeneratedAt: updates.flyer_generated_at,
         flyerConfig: updates.flyer_config,
+        posterImageUrl: updates.poster_image_url,
+        posterGeneratedAt: updates.poster_generated_at,
+        rollupImageUrl: updates.rollup_image_url,
+        rollupGeneratedAt: updates.rollup_generated_at,
         hiddenGppPhotos: updates.hidden_gpp_photos,
         extraGppPhotos: updates.extra_gpp_photos,
         lumaUrl: updates.luma_url,

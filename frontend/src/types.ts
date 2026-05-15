@@ -276,6 +276,10 @@ export interface Party {
   region?: string | null;
   flyerGeneratedAt?: string | null;
   flyerConfig?: Record<string, any> | null;
+  posterImageUrl?: string | null;
+  posterGeneratedAt?: string | null;
+  rollupImageUrl?: string | null;
+  rollupGeneratedAt?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];

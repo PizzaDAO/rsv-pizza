@@ -1,6 +1,8 @@
 import React from 'react';
 import { Download, Tag } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
+import { PosterGenerator } from '../generative/PosterGenerator';
+import { RollupGenerator } from '../generative/RollupGenerator';
 
 type StickerShape = 'square' | 'round' | 'wide' | 'banner';
 
@@ -106,7 +108,23 @@ export function PrintMaterials() {
 export function PrintTab() {
   const { party } = usePizza();
   const eventTags = party?.eventTags || [];
-  return <PrintContent eventTags={eventTags} />;
+  return (
+    <div className="space-y-8">
+      {party?.eventType === 'gpp' && (
+        <>
+          <section>
+            <h3 className="text-lg font-semibold text-theme-text mb-3">Event Poster</h3>
+            <PosterGenerator />
+          </section>
+          <section>
+            <h3 className="text-lg font-semibold text-theme-text mb-3">Roll-Up Banner</h3>
+            <RollupGenerator />
+          </section>
+        </>
+      )}
+      <PrintContent eventTags={eventTags} />
+    </div>
+  );
 }
 
 function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: string[]; showAllSwc?: boolean }) {
