@@ -9,7 +9,8 @@ interface GuestCardProps {
 }
 
 export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
-  const { removeGuest, availableToppings, availableBeverages } = usePizza();
+  const { removeGuest, availableToppings, availableBeverages, party } = usePizza();
+  const isGppEvent = party?.eventType === 'gpp';
 
   const toppingNameById = (id: string) => {
     return availableToppings.find(t => t.id === id)?.name || id;
@@ -50,7 +51,7 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
             })}
           </div>
           {/* Beverage Preferences */}
-          {((guest.likedBeverages && guest.likedBeverages.length > 0) ||
+          {!isGppEvent && ((guest.likedBeverages && guest.likedBeverages.length > 0) ||
             (guest.dislikedBeverages && guest.dislikedBeverages.length > 0)) && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {guest.likedBeverages?.map(beverageId => {

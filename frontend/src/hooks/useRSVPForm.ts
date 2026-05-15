@@ -165,6 +165,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isSwcUkEvent = (eventData.eventTags || []).includes('swcuk');
   const isSwcBrEvent = (eventData.eventTags || []).includes('swcbr');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
+  const isGppEvent = eventData.eventType === 'gpp';
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
   // ---- Validate wallet address ----
@@ -579,6 +580,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     isSwcUkEvent,
     isSwcBrEvent,
     isEthconfEvent,
+    isGppEvent,
     isEditing,
     excludedToppings,
     availableBeverages: eventData.availableBeverages,

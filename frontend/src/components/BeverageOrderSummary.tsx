@@ -6,6 +6,9 @@ export const BeverageOrderSummary: React.FC = () => {
   const { beverageRecommendations, party, guests } = usePizza();
   const [isCopied, setIsCopied] = useState(false);
 
+  const isGppEvent = party?.eventType === 'gpp';
+  if (isGppEvent) return null;
+
   const totalBeverages = beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0);
   const respondedGuests = guests.length;
   const expectedGuests = party?.maxGuests || respondedGuests;
