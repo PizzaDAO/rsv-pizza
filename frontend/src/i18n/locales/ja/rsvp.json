@@ -10,6 +10,7 @@
     "mailingList": "PizzaDAOのメーリングリストに参加",
     "swcJoin": "Stand with Cryptoに参加",
     "swcNotify": "今後のStand With Cryptoイベントについて通知を受け取る。",
+    "swcBrNotify": "Juntos por Cripto のイベントについて通知してください。",
     "ethconfDiscount": "ETHConf割引を送ってほしい",
     "next": "次へ"
   },
@@ -109,9 +110,9 @@
     "termsOfService": "利用規約"
   },
   "swcBrModal": {
-    "title": "Stand with Crypto ブラジル",
-    "description": "チェックボックスをオンにすることで、ブラジルでの今後のイベントや活動についてStand with Cryptoからの連絡を受け取ることに同意します。SWCおよびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
-    "privacyPolicy": "SWC ブラジルプライバシーポリシー",
+    "title": "Juntos por Cripto",
+    "description": "チェックボックスをオンにすることで、ブラジルでのイベントや活動について Juntos por Cripto からの連絡を受け取ることに同意します。Juntos por Cripto およびそのベンダーがあなたの個人情報を収集・使用する場合があることを理解します。詳しくは",
+    "privacyPolicy": "Juntos por Cripto プライバシーポリシー",
     "termsOfService": "利用規約"
   },
   "roles": {

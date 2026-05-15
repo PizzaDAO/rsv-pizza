@@ -528,7 +528,7 @@ export function RSVPFormStep1({
                 <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
               <span className="text-sm text-theme-text">
-                {t('step1.swcNotify')}
+                {t('step1.swcBrNotify')}
               </span>
             </button>
             <button

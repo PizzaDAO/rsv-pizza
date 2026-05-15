@@ -10,6 +10,7 @@
     "mailingList": "Inscrever-se na lista de emails do PizzaDAO",
     "swcJoin": "Participar do Stand with Crypto",
     "swcNotify": "Notifique-me sobre futuros eventos Stand With Crypto.",
+    "swcBrNotify": "Notifique-me sobre eventos da Juntos por Cripto.",
     "ethconfDiscount": "Envie-me um desconto ETHConf",
     "next": "Próximo"
   },
@@ -110,8 +111,8 @@
   },
   "swcBrModal": {
     "title": "Juntos por Cripto",
-    "description": "Ao marcar a caixa, você consente em receber comunicações da Juntos por Cripto sobre eventos futuros e ações de advocacy no Brasil. Você entende que a SWC e seus parceiros podem coletar e utilizar suas informações pessoais. Para saber mais, acesse",
-    "privacyPolicy": "Política de Privacidade",
+    "description": "Ao marcar a caixa, você consente em receber comunicações da Juntos por Cripto sobre eventos e ações de advocacy no Brasil. Você entende que a Juntos por Cripto e seus parceiros podem coletar e utilizar suas informações pessoais. Para saber mais, acesse",
+    "privacyPolicy": "Política de Privacidade da Juntos por Cripto",
     "termsOfService": "Termos de Serviço"
   },
   "roles": {
