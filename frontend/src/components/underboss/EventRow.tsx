@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle, Send } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
@@ -92,6 +93,7 @@ function HostStatusBadge({
   eventId: string;
   onUpdate: (status: HostStatus | null) => void;
 }) {
+  const { t } = useTranslation('partner');
   const [isOpen, setIsOpen] = useState(false);
   const current = HOST_STATUS_OPTIONS.find((o) => o.value === (status || ''));
   const displayColor = current?.color || 'text-theme-text-faint';
@@ -104,7 +106,7 @@ function HostStatusBadge({
           status ? displayColor : 'border-theme-stroke text-theme-text-faint hover:text-theme-text-muted'
         }`}
       >
-        {status || 'status'}
+        {status || t('eventRow.statusLabel')}
       </button>
       {isOpen && (
         <>
@@ -154,6 +156,7 @@ function HostTagsPills({
   onUpdate: (tags: string[]) => void;
   partnerTags?: string[];
 }) {
+  const { t } = useTranslation('partner');
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
 
@@ -199,7 +202,7 @@ function HostTagsPills({
           key={tag}
           onClick={() => removeTag(tag)}
           className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors hover:opacity-70 inline-flex items-center gap-0.5 ${colorForTag(tag)}`}
-          title={`Click to remove "${tag}"`}
+          title={t('eventRow.removeTagTitle', { tag })}
         >
           {partnerTags.includes(tag) && (
             <Handshake size={9} className="shrink-0" />
@@ -232,7 +235,7 @@ function HostTagsPills({
               else { setIsAdding(false); setNewTag(''); }
             }}
             autoFocus
-            placeholder="tag..."
+            placeholder={t('eventRow.tagPlaceholder')}
             className="w-16 bg-transparent border-b border-theme-stroke text-[10px] text-theme-text focus:outline-none"
           />
           <button
@@ -246,7 +249,7 @@ function HostTagsPills({
         <button
           onClick={() => setIsAdding(true)}
           className="text-theme-text-faint hover:text-theme-text-muted transition-colors"
-          title="Add tag"
+          title={t('eventRow.addTag')}
         >
           <Plus size={12} />
         </button>
@@ -330,6 +333,7 @@ function PhotoLightbox({
 }
 
 export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
+  const { t } = useTranslation('partner');
   // Local state for optimistic updates
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [eventTags, setEventTags] = useState<string[]>(event.eventTags || []);
@@ -489,7 +493,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
                 : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
             }`}
-            title="Select event"
+            title={t('eventRow.selectEvent')}
           >
             <Check size={12} />
           </button>
@@ -501,16 +505,16 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 {event.underbossStatus === 'approved' && (
-                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title={t('eventRow.statusApproved')} />
                 )}
                 {event.underbossStatus === 'rejected' && (
-                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title="Rejected" />
+                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title={t('eventRow.statusRejected')} />
                 )}
                 {event.underbossStatus === 'hidden' && (
-                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title="Hidden" />
+                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title={t('eventRow.statusHidden')} />
                 )}
                 {event.underbossStatus === 'listed' && (
-                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title="Community Listed" />
+                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title={t('eventRow.statusCommunityListed')} />
                 )}
                 <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
                 <a
@@ -528,7 +532,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                       ? 'text-amber-400 hover:text-amber-300'
                       : 'text-theme-text-faint hover:text-theme-text-secondary'
                   }`}
-                  title={hasNotes ? 'Edit notes' : 'Add notes'}
+                  title={hasNotes ? t('eventRow.editNotes') : t('eventRow.addNotes')}
                 >
                   <StickyNote size={12} />
                 </button>
@@ -538,7 +542,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[#29B6F6] hover:text-[#4FC3F7] transition-colors shrink-0"
-                    title="Telegram group"
+                    title={t('eventRow.telegramGroup')}
                   >
                     <MessageCircle size={12} />
                   </a>
@@ -568,7 +572,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                   <IconInput
                     icon={StickyNote}
                     iconSize={12}
-                    placeholder="Underboss notes..."
+                    placeholder={t('eventRow.notesPlaceholder')}
                     value={notesValue}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
                     onBlur={handleNotesBlur}
@@ -577,7 +581,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                     className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
                   />
                   {notesSaving && (
-                    <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+                    <span className="text-[10px] text-theme-text-faint mt-0.5 block">{t('eventRow.saving')}</span>
                   )}
                 </div>
               )}
@@ -607,7 +611,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
         {/* Host + status badge + tags */}
         <td className="py-3 px-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-theme-text-secondary">{event.host.name || 'Unknown'}</span>
+            <span className="text-xs text-theme-text-secondary">{event.host.name || t('eventRow.unknownHost')}</span>
             <HostStatusBadge
               status={hostStatus}
               eventId={event.id}
@@ -646,7 +650,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 </span>
               </>
             ) : (
-              <span className="text-xs text-theme-text-faint">No venue</span>
+              <span className="text-xs text-theme-text-faint">{t('eventRow.noVenue')}</span>
             )}
           </div>
         </td>
@@ -658,10 +662,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             <span className="text-sm text-theme-text-secondary">{event.guestCount}</span>
           </div>
           {event.invitedCount > 0 && (
-            <div className="text-xs text-blue-400/60">{event.invitedCount} invited</div>
+            <div className="text-xs text-blue-400/60">{t('eventRow.invitedCount', { count: event.invitedCount })}</div>
           )}
           {event.checkedInCount > 0 && (
-            <div className="text-xs text-green-400/60">{event.checkedInCount} checked in</div>
+            <div className="text-xs text-green-400/60">{t('eventRow.checkedInCount', { count: event.checkedInCount })}</div>
           )}
           <div className="mt-1">
             <input
@@ -670,9 +674,9 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
               value={expectedGuestsValue}
               onChange={(e) => handleExpectedGuestsChange(e.target.value)}
               onBlur={handleExpectedGuestsBlur}
-              placeholder="exp."
+              placeholder={t('eventRow.expected')}
               className="w-12 bg-transparent border-b border-theme-stroke text-[10px] text-center text-theme-text-muted focus:outline-none focus:border-theme-stroke-hover placeholder:text-theme-text-faint [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              title="Expected guests"
+              title={t('eventRow.expectedGuests')}
             />
           </div>
         </td>
@@ -709,10 +713,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             {photosLoading ? (
               <div className="flex items-center gap-2 py-4">
                 <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
-                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+                <span className="text-xs text-theme-text-muted">{t('eventRow.loadingPhotos')}</span>
               </div>
             ) : displayPhotos.length === 0 ? (
-              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+              <p className="text-xs text-theme-text-faint py-2">{t('eventRow.noPhotos')}</p>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
@@ -741,7 +745,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                     onClick={() => setShowAllPhotos(true)}
                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                   >
-                    Show all {displayPhotos.length} photos
+                    {t('eventRow.showAllPhotos', { count: displayPhotos.length })}
                   </button>
                 )}
               </div>

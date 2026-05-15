@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { X, Download, RotateCcw, Pencil, Loader2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
@@ -81,6 +82,7 @@ function sortCitiesByTier(cities: string[]): string[] {
 }
 
 export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFlyerProps) {
+  const { t } = useTranslation('partner');
   const [logoPos, setLogoPos] = useState(DEFAULT_LOGO_POS);
   const [logoSize, setLogoSize] = useState(DEFAULT_LOGO_SIZE);
   const [containerWidth, setContainerWidth] = useState(500);
@@ -491,17 +493,17 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
                   className="btn-primary flex items-center gap-2 px-6 py-3"
                 >
                   {downloading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Generating...</>
+                    <><Loader2 className="w-5 h-5 animate-spin" /> {t('partnerFlyer.generating')}</>
                   ) : (
-                    <><Download className="w-5 h-5" /> Download</>
+                    <><Download className="w-5 h-5" /> {t('partnerFlyer.download')}</>
                   )}
                 </button>
                 <button
                   onClick={handleReset}
                   className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
-                  title="Reset to defaults"
+                  title={t('partnerManager.resetDefaults')}
                 >
-                  <RotateCcw className="w-4 h-4" /> Reset
+                  <RotateCcw className="w-4 h-4" /> {t('partnerFlyer.reset')}
                 </button>
               </div>
             </div>

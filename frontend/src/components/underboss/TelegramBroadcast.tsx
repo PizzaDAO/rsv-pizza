@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
@@ -101,6 +102,7 @@ interface TelegramBroadcastProps {
 type ViewState = 'compose' | 'sending' | 'results';
 
 export function TelegramBroadcast({ onClose, preSelectedCities, events }: TelegramBroadcastProps) {
+  const { t } = useTranslation('partner');
   // Data loading
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -266,7 +268,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (selectedGroups.length === 0 || !message.trim()) return;
 
     const confirmed = window.confirm(
-      `Send this message to ${selectedGroups.length} Telegram group${selectedGroups.length > 1 ? 's' : ''}?`
+      t('telegram.confirmSend', { count: selectedGroups.length })
     );
     if (!confirmed) return;
 
@@ -320,7 +322,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
             <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center">
               <Send size={16} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-theme-text">Broadcast Message</h3>
+            <h3 className="text-lg font-semibold text-theme-text">{t('telegram.broadcastMessage')}</h3>
           </div>
           <button
             onClick={onClose}
@@ -336,7 +338,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
           {loadingGroups && (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 size={28} className="animate-spin text-theme-text-muted mb-3" />
-              <p className="text-sm text-theme-text-muted">Loading Telegram groups...</p>
+              <p className="text-sm text-theme-text-muted">{t('telegram.loading')}</p>
             </div>
           )}
 
@@ -357,9 +359,9 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   <div className="flex items-start gap-2">
                     <AlertCircle size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-yellow-600">Duplicate Telegram groups detected</p>
+                      <p className="text-sm font-medium text-yellow-600">{t('telegram.duplicatesDetected')}</p>
                       <p className="text-xs text-yellow-600/80 mt-1">
-                        These cities share the same group ID in the sheet — only the first city per group will receive a message:
+                        {t('telegram.duplicatesDesc')}
                       </p>
                       <ul className="text-xs text-yellow-600/80 mt-1 space-y-0.5">
                         {duplicateGroupWarnings.map(d => (
@@ -377,9 +379,9 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-theme-text">
-                    Select Groups
+                    {t('telegram.selectGroups')}
                     <span className="ml-2 text-theme-text-faint font-normal">
-                      {selectedIds.size} of {filteredGroups.length} selected
+                      {t('telegram.selectedOf', { selected: selectedIds.size, total: filteredGroups.length })}
                     </span>
                   </h4>
                   <div className="flex items-center gap-2">
@@ -387,14 +389,14 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                       onClick={selectAll}
                       className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
                     >
-                      Select All
+                      {t('telegram.selectAll')}
                     </button>
                     <span className="text-theme-text-faint text-xs">/</span>
                     <button
                       onClick={deselectAll}
                       className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
                     >
-                      Deselect All
+                      {t('telegram.deselectAll')}
                     </button>
                   </div>
                 </div>
@@ -406,7 +408,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                       icon={Search}
                       iconSize={14}
                       type="text"
-                      placeholder="Search city, country, or underboss..."
+                      placeholder={t('telegram.searchPlaceholder')}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
@@ -416,7 +418,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                       onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
                       className="flex items-center gap-1.5 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text hover:border-theme-stroke-hover transition-colors"
                     >
-                      {regionFilter === 'all' ? 'All Regions' : regionFilter}
+                      {regionFilter === 'all' ? t('telegram.regionAll') : regionFilter}
                       <ChevronDown size={14} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {regionDropdownOpen && (
@@ -431,7 +433,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                                 : 'text-theme-text-secondary hover:bg-theme-surface'
                             }`}
                           >
-                            All Regions
+                            {t('telegram.regionAll')}
                           </button>
                           {regions.map(r => (
                             <button
@@ -457,7 +459,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   <div className="max-h-[280px] overflow-y-auto">
                     {filteredGroups.length === 0 ? (
                       <div className="px-4 py-8 text-center text-sm text-theme-text-faint">
-                        No groups match your search
+                        {t('telegram.noGroupsMatch')}
                       </div>
                     ) : (
                       <>
@@ -476,12 +478,12 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                             </button>
                           </div>
                           <div className="flex-1 grid grid-cols-4 gap-2">
-                            <span>City</span>
-                            <span>Country</span>
-                            <span>Underboss</span>
-                            <span>Host TG</span>
+                            <span>{t('telegram.tableHeaders.city')}</span>
+                            <span>{t('telegram.tableHeaders.country')}</span>
+                            <span>{t('telegram.tableHeaders.underboss')}</span>
+                            <span>{t('telegram.tableHeaders.hostTg')}</span>
                           </div>
-                          <div className="w-14 text-right">Test</div>
+                          <div className="w-14 text-right">{t('telegram.tableHeaders.test')}</div>
                         </div>
                         {filteredGroups.map(group => (
                           <div
@@ -533,12 +535,12 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                                 }}
                                 disabled={!message.trim() || testingChatId === group.groupId}
                                 className="text-xs text-theme-text-faint hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                title={message.trim() ? 'Send test message to this group' : 'Write a message first'}
+                                title={message.trim() ? t('telegram.testTitle') : t('telegram.writeMessageFirst')}
                               >
                                 {testingChatId === group.groupId ? (
                                   <Loader2 size={12} className="animate-spin inline" />
                                 ) : (
-                                  'Test'
+                                  t('telegram.test')
                                 )}
                               </button>
                             </div>
@@ -558,8 +560,8 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   }`}>
                     <span>
                       {testResult.success
-                        ? `Test sent successfully to ${testResult.chatId}`
-                        : `Test failed: ${testResult.error}`}
+                        ? t('telegram.testSentTo', { chatId: testResult.chatId })
+                        : t('telegram.testFailed', { error: testResult.error })}
                     </span>
                     <button onClick={() => setTestResult(null)} className="ml-2 hover:opacity-70">
                       <X size={12} />
@@ -571,7 +573,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
               {/* Message Section */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-medium text-theme-text">Message</h4>
+                  <h4 className="text-sm font-medium text-theme-text">{t('telegram.messageLabel')}</h4>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-theme-text-faint">
                       {message.length} / 4096
@@ -581,9 +583,9 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                       onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
                       className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                     >
-                      <option value="None">Plain Text</option>
-                      <option value="HTML">HTML</option>
-                      <option value="Markdown">Markdown</option>
+                      <option value="None">{t('telegram.formatPlain')}</option>
+                      <option value="HTML">{t('telegram.formatHtml')}</option>
+                      <option value="Markdown">{t('telegram.formatMarkdown')}</option>
                     </select>
                   </div>
                 </div>
@@ -591,7 +593,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   icon={MessageSquare}
                   multiline
                   rows={6}
-                  placeholder="Type your message here..."
+                  placeholder={t('telegram.messagePlaceholder')}
                   value={message}
                   onChange={(e) => {
                     if (e.target.value.length <= 4096) {
@@ -600,7 +602,14 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   }}
                 />
                 <p className="text-xs text-theme-text-faint mt-1.5">
-                  Use <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{city}'}</code> and <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80">{'{country}'}</code> for per-group personalization
+                  <Trans
+                    i18nKey="telegram.templateHint"
+                    ns="partner"
+                    components={{
+                      1: <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80" />,
+                      3: <code className="bg-theme-surface px-1 py-0.5 rounded text-red-500/80" />,
+                    }}
+                  />
                 </p>
               </div>
 
@@ -612,7 +621,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   className="flex items-center gap-2 bg-[#E52828] hover:bg-[#cc2222] disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
                 >
                   <Send size={14} />
-                  Send to {selectedIds.size} group{selectedIds.size !== 1 ? 's' : ''}
+                  {t('telegram.sendToGroups', { count: selectedIds.size })}
                 </button>
               </div>
             </div>
@@ -623,10 +632,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 size={32} className="animate-spin text-red-500 mb-4" />
               <p className="text-theme-text font-medium mb-1">
-                Sending to {selectedGroups.length} group{selectedGroups.length !== 1 ? 's' : ''}...
+                {t('telegram.sendingToGroups', { count: selectedGroups.length })}
               </p>
               <p className="text-sm text-theme-text-faint">
-                This may take a moment
+                {t('telegram.sendingSubtext')}
               </p>
             </div>
           )}
@@ -638,12 +647,12 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
               <div className="flex items-center gap-4 justify-center py-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">{sendStats.sent}</div>
-                  <div className="text-xs text-theme-text-faint">Sent</div>
+                  <div className="text-xs text-theme-text-faint">{t('telegram.sent')}</div>
                 </div>
                 <div className="w-px h-10 bg-theme-stroke" />
                 <div className="text-center">
                   <div className="text-2xl font-bold text-red-500">{sendStats.failed}</div>
-                  <div className="text-xs text-theme-text-faint">Failed</div>
+                  <div className="text-xs text-theme-text-faint">{t('telegram.failed')}</div>
                 </div>
               </div>
 
@@ -683,7 +692,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   onClick={onClose}
                   className="bg-theme-surface hover:bg-theme-card border border-theme-stroke text-theme-text px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
                 >
-                  Done
+                  {t('telegram.done')}
                 </button>
               </div>
             </div>
