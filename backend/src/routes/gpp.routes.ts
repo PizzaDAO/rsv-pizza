@@ -264,31 +264,35 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedHostName = hostName.trim();
     const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
 
-    // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars)
-    const customUrl = normalizedCity
+    // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars).
+    // NULL when the slug is empty (e.g. non-Latin scripts) so the unique constraint stays distinct.
+    const slug = normalizedCity
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '');
+    const customUrl = slug.length > 0 ? slug : null;
 
-    // Check for existing GPP event in this city
-    const existingEvent = await prisma.party.findFirst({
-      where: {
-        customUrl,
-        eventType: 'gpp',
-      },
-      select: {
-        id: true,
-        name: true,
-        customUrl: true,
-        inviteCode: true,
-      },
-    });
+    const eventName = `Global Pizza Party ${normalizedCity}`;
+
+    const existingRows = await prisma.$queryRaw<Array<{
+      id: string;
+      name: string;
+      custom_url: string | null;
+      invite_code: string;
+    }>>`
+      SELECT id, name, custom_url, invite_code
+      FROM parties
+      WHERE event_type = 'gpp'
+        AND lower(unaccent(name)) = lower(unaccent(${eventName}))
+      LIMIT 1
+    `;
+    const existingEvent = existingRows[0];
 
     if (existingEvent) {
-      const eventUrl = existingEvent.customUrl
-        ? `https://rsv.pizza/${existingEvent.customUrl}`
-        : `https://rsv.pizza/${existingEvent.inviteCode}`;
+      const eventUrl = existingEvent.custom_url
+        ? `https://rsv.pizza/${existingEvent.custom_url}`
+        : `https://rsv.pizza/${existingEvent.invite_code}`;
 
       throw new AppError(
         `This city's Global Pizza Party has already been created! Visit the event page: ${eventUrl}`,
@@ -318,9 +322,6 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         data: { telegram: normalizedTelegram },
       });
     }
-
-    // Generate event name with city (no dash, just space)
-    const eventName = `Global Pizza Party ${normalizedCity}`;
 
     // Calculate default date: May 22 of current or next year, 6-9 PM in event timezone
     const now = new Date();
