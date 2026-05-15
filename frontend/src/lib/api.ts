@@ -3264,6 +3264,7 @@ export interface GPPEventMapItem {
   longitude: number | null;
   rsvpCount: number;
   country: string | null;
+  underbossStatus?: string | null;
 }
 
 interface GPPEventApiResponse {
@@ -3279,6 +3280,7 @@ interface GPPEventApiResponse {
   longitude: number | null;
   guestCount: number;
   country: string | null;
+  underbossStatus?: string | null;
 }
 
 interface GPPEventsApiPayload {
@@ -3304,6 +3306,7 @@ export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
     longitude: e.longitude,
     rsvpCount: e.guestCount ?? 0,
     country: e.country,
+    underbossStatus: e.underbossStatus,
   }));
 }
 
