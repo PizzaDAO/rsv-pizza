@@ -504,10 +504,10 @@ export function EventPage() {
   };
 
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
-  const googleMapsUrl = event.latitude && event.longitude
-    ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
-    : event.address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
+  const googleMapsUrl = event.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
+    : event.latitude && event.longitude
+      ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
       : null;
 
   const metaTitle = event.name;
