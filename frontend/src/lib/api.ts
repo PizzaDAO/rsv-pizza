@@ -3242,6 +3242,62 @@ export async function saveGppPizzeriaPhoto(eventId: string, placeId: string, pho
   });
 }
 
+// GPP Events Map
+export interface GPPEventMapItem {
+  id: string;
+  name: string;
+  city: string;
+  slug: string;
+  date: string | null;
+  venueName: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  rsvpCount: number;
+  country: string | null;
+}
+
+interface GPPEventApiResponse {
+  id: string;
+  name: string;
+  city: string;
+  customUrl: string | null;
+  inviteCode: string;
+  date: string | null;
+  venueName: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  guestCount: number;
+  country: string | null;
+}
+
+interface GPPEventsApiPayload {
+  events: GPPEventApiResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
+  const data = await apiRequest<GPPEventsApiPayload>('/api/gpp/events?limit=500', {
+    requireAuth: false,
+  });
+  return (data.events || []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    city: e.city,
+    slug: e.customUrl || e.inviteCode,
+    date: e.date,
+    venueName: e.venueName,
+    address: e.address,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    rsvpCount: e.guestCount ?? 0,
+    country: e.country,
+  }));
+}
+
 // RSVP Funnel Stats (Underboss dashboard)
 
 export interface FunnelEventStats {
