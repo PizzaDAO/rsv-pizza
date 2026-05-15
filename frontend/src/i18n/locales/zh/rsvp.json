@@ -12,7 +12,8 @@
     "swcNotify": "通知我未来的 Stand With Crypto 活动。",
     "swcBrNotify": "通知我有关 Juntos por Cripto 活动的信息。",
     "ethconfDiscount": "给我发送 ETHConf 折扣",
-    "next": "下一步"
+    "next": "下一步",
+    "selectTurtles": "选择您的乌龟"
   },
   "step2": {
     "title": "披萨偏好",

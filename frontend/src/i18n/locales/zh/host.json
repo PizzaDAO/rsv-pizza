@@ -207,6 +207,8 @@
     "venueOptions": "场地选项",
     "addVenue": "添加场地",
     "noVenueOptionsYet": "暂无场地选项",
+    "iHaveMyVenue": "我已确定场地",
+    "stillExploring": "仍在寻找中",
     "addYourFirstVenue": "添加您的第一个场地",
     "selected": "已选择",
     "selectAsLocation": "选为活动地点",

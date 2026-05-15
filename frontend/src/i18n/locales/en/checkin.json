@@ -1,6 +1,7 @@
 {
   "title": "Guest Check-In",
   "loading": "Checking in guest...",
+  "vouching": "Vouching…",
   "success": {
     "title": "Checked In!",
     "backToDashboard": "Back to Event Dashboard"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Already Checked In",
     "checkedInAt": "Checked in at {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Not checked in",
+    "message": "You haven't been checked in yet. Please find an attestor at the event."
   },
   "unauthorized": {
     "title": "Unauthorized",
