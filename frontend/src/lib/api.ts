@@ -416,6 +416,7 @@ export interface PublicEvent {
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null;
+  underbossStatus?: string | null;
   eventTags?: string[];
   donationEnabled?: boolean;
   donationRecipient?: string | null;
