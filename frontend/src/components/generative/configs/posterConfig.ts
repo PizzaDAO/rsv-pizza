@@ -14,7 +14,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'city',
       label: 'City',
-      defaultX: 36,
+      defaultX: 35,
       defaultY: 800,
       boxWidth: 700,
       boxHeight: 72,
@@ -25,7 +25,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'time',
       label: 'Time',
-      defaultX: 36,
+      defaultX: 35,
       defaultY: 880,
       boxWidth: 700,
       boxHeight: 60,
@@ -36,7 +36,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'venue',
       label: 'Venue',
-      defaultX: 36,
+      defaultX: 35,
       defaultY: 950,
       boxWidth: 700,
       boxHeight: 110,
@@ -49,7 +49,8 @@ export const POSTER_CONFIG: FormatConfig = {
     defaultX: 27,
     defaultY: 1080,
     width: 1026,
-    height: 90,
+    height: 350,
+    defaultRows: 3,
   },
   dbImageField: 'poster_image_url',
   dbTimestampField: 'poster_generated_at',

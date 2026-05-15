@@ -117,8 +117,9 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
     // Group logos in flex layout
     if (groupSponsors.length > 0) {
       const sponsorCount = groupSponsors.length;
-      const sponsorCols = sponsorCount <= 4 ? sponsorCount : Math.ceil(sponsorCount / 2);
-      const sponsorRows = sponsorCount <= 4 ? 1 : 2;
+      const targetRows = config.sponsorBox.defaultRows ?? (sponsorCount <= 4 ? 1 : 2);
+      const sponsorRows = Math.max(1, Math.min(targetRows, Math.ceil(sponsorCount / 2)));
+      const sponsorCols = Math.max(1, Math.ceil(sponsorCount / sponsorRows));
       const maxLogoWidth = sponsorCols > 0 ? (boxW - (sponsorCols - 1) * gap) / sponsorCols : 0;
       const maxLogoHeight = sponsorRows > 0 ? (boxH - (sponsorRows - 1) * 12 * s) / sponsorRows : 0;
       const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight);

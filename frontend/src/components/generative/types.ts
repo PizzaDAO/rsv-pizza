@@ -33,6 +33,10 @@ export interface FormatConfig {
     defaultY: number;
     width: number;
     height: number;
+    /** Preferred number of rows for the sponsor grid auto-sizing. Default 2.
+     *  Drives both autoLogoSize and the flex-wrap target (wider logos = fewer
+     *  per row). */
+    defaultRows?: number;
   };
   dbImageField: string;
   dbTimestampField: string;
