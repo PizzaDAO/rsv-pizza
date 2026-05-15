@@ -2480,14 +2480,14 @@ export async function fetchChecklistDefaults(): Promise<{ items: ChecklistDefaul
   return apiRequest<{ items: ChecklistDefault[] }>('/api/admin/checklist-defaults');
 }
 
-export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string }>): Promise<{ totalUpdated: number }> {
+export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string; linkTab?: string | null }>): Promise<{ totalUpdated: number }> {
   return apiRequest<{ totalUpdated: number }>('/api/admin/checklist-defaults', {
     method: 'PATCH',
     body: { items },
   });
 }
 
-export async function addChecklistDefault(data: { name: string; dueDate?: string | null }): Promise<{ createdCount: number }> {
+export async function addChecklistDefault(data: { name: string; dueDate?: string | null; linkTab?: string | null }): Promise<{ createdCount: number }> {
   return apiRequest<{ createdCount: number }>('/api/admin/checklist-defaults', {
     method: 'POST',
     body: data,

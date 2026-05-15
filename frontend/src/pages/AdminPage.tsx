@@ -29,6 +29,14 @@ import { fetchSheetCities } from '../lib/cities';
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
 
+// Allowed host-page tab targets for checklist `link_tab`.
+// Keep in sync with backend ALLOWED_LINK_TABS and HostPage TabType.
+const LINK_TAB_OPTIONS: readonly string[] = [
+  'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
+  'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
+  'flyer', 'print',
+];
+
 function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
   return [...items].sort((a, b) => {
     if (!a.dueDate && !b.dueDate) return 0;
@@ -83,10 +91,12 @@ export function AdminPage() {
   // Checklist defaults state
   const [checklistItems, setChecklistItems] = useState<ChecklistDefault[]>([]);
   const [checklistEdits, setChecklistEdits] = useState<Record<string, string>>({});
+  const [checklistLinkTabEdits, setChecklistLinkTabEdits] = useState<Record<string, string | null>>({});
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [checklistMessage, setChecklistMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemDate, setNewItemDate] = useState('');
+  const [newItemLinkTab, setNewItemLinkTab] = useState('');
   const [addingItem, setAddingItem] = useState(false);
 
   // Sponsor users state
@@ -314,11 +324,23 @@ export function AdminPage() {
     setChecklistMessage(null);
     try {
       const updates = checklistItems
-        .filter(item => checklistEdits[item.name] !== undefined)
-        .map(item => ({
-          name: item.name,
-          dueDate: checklistEdits[item.name] || null,
-        }));
+        .filter(item =>
+          checklistEdits[item.name] !== undefined ||
+          checklistLinkTabEdits[item.name] !== undefined
+        )
+        .map(item => {
+          const update: { name: string; dueDate?: string | null; linkTab?: string | null } = {
+            name: item.name,
+          };
+          if (checklistEdits[item.name] !== undefined) {
+            update.dueDate = checklistEdits[item.name] || null;
+          }
+          if (checklistLinkTabEdits[item.name] !== undefined) {
+            const raw = checklistLinkTabEdits[item.name];
+            update.linkTab = raw === '' || raw == null ? null : raw;
+          }
+          return update;
+        });
       if (updates.length === 0) {
         setChecklistMessage({ type: 'error', text: 'No changes to save' });
         setSavingChecklist(false);
@@ -327,6 +349,7 @@ export function AdminPage() {
       const result = await updateChecklistDefaults(updates);
       setChecklistMessage({ type: 'success', text: `Updated ${result.totalUpdated} checklist items across all GPP events` });
       setChecklistEdits({});
+      setChecklistLinkTabEdits({});
       // Refresh
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
@@ -343,10 +366,15 @@ export function AdminPage() {
     setAddingItem(true);
     setChecklistMessage(null);
     try {
-      const result = await addChecklistDefault({ name: newItemName.trim(), dueDate: newItemDate || null });
+      const result = await addChecklistDefault({
+        name: newItemName.trim(),
+        dueDate: newItemDate || null,
+        linkTab: newItemLinkTab || null,
+      });
       setChecklistMessage({ type: 'success', text: `Added "${newItemName.trim()}" to ${result.createdCount} GPP events` });
       setNewItemName('');
       setNewItemDate('');
+      setNewItemLinkTab('');
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
@@ -1116,6 +1144,18 @@ export function AdminPage() {
                         onChange={(e) => setChecklistEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
                         className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-36"
                       />
+                      <select
+                        aria-label={t('checklist.linkTabPlaceholder')}
+                        title={t('checklist.linkTabPlaceholder')}
+                        value={checklistLinkTabEdits[item.name] ?? item.linkTab ?? ''}
+                        onChange={(e) => setChecklistLinkTabEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
+                        className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-28"
+                      >
+                        <option value="">—</option>
+                        {LINK_TAB_OPTIONS.map((tab) => (
+                          <option key={tab} value={tab}>{tab}</option>
+                        ))}
+                      </select>
                     </div>
                     <button
                       onClick={() => handleDeleteChecklistItem(item.name)}
@@ -1131,7 +1171,7 @@ export function AdminPage() {
                 )}
               </div>
 
-              {checklistItems.length > 0 && Object.keys(checklistEdits).length > 0 && (
+              {checklistItems.length > 0 && (Object.keys(checklistEdits).length > 0 || Object.keys(checklistLinkTabEdits).length > 0) && (
                 <button
                   onClick={handleSaveChecklist}
                   disabled={savingChecklist}
@@ -1157,6 +1197,18 @@ export function AdminPage() {
                   onChange={(e) => setNewItemDate(e.target.value)}
                   className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-36"
                 />
+                <select
+                  aria-label={t('checklist.linkTabPlaceholder')}
+                  title={t('checklist.linkTabPlaceholder')}
+                  value={newItemLinkTab}
+                  onChange={(e) => setNewItemLinkTab(e.target.value)}
+                  className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-28"
+                >
+                  <option value="">—</option>
+                  {LINK_TAB_OPTIONS.map((tab) => (
+                    <option key={tab} value={tab}>{tab}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={addingItem || !newItemName.trim()}
