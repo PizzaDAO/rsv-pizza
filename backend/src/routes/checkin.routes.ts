@@ -248,6 +248,69 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
   }
 });
 
+// POST /api/checkin/:inviteCode/:guestId — Manual host/co-host check-in
+router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheckIn) {
+      throw new AppError('You are not authorized to check in guests for this event', 403, 'UNAUTHORIZED');
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, partyId: party.id },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    if (guest.checkedInAt) {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        guest: {
+          id: guest.id,
+          name: guest.name,
+          email: guest.email,
+          checkedInAt: guest.checkedInAt,
+          checkedInBy: guest.checkedInBy,
+        },
+        message: `${guest.name} was already checked in`,
+      });
+    }
+
+    const updatedGuest = await prisma.guest.update({
+      where: { id: guestId },
+      data: {
+        checkedInAt: new Date(),
+        checkedInBy: req.userId, // CUID string; `checkedInBy` column is text, not uuid
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      alreadyCheckedIn: false,
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        email: updatedGuest.email,
+        checkedInAt: updatedGuest.checkedInAt,
+        checkedInBy: updatedGuest.checkedInBy,
+      },
+      message: `${updatedGuest.name} has been checked in!`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/checkin/:inviteCode/:guestId — Get guest check-in status (requires auth, host/co-host only)
 router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
