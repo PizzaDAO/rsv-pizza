@@ -1,15 +1,22 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { fetchGppEventsForMap, GPPEventMapItem } from '../lib/api';
+import { ArrowLeft, Loader2, Shield } from 'lucide-react';
+import { fetchGppEventsForMap, fetchUnderbossMe, GPPEventMapItem } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal } from '../components/LoginModal';
 
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
 export function EventsMapPage() {
+  const { user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState<GPPEventMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   const loadEvents = () => {
     setLoading(true);
@@ -27,8 +34,31 @@ export function EventsMapPage() {
   };
 
   useEffect(() => {
-    loadEvents();
-  }, []);
+    if (authLoading) return;
+
+    if (!user) {
+      setAccessChecked(true);
+      return;
+    }
+
+    async function checkAccess() {
+      try {
+        const me = await fetchUnderbossMe();
+        if (me.isAdmin || me.isUnderboss) {
+          setAuthorized(true);
+          loadEvents();
+        } else {
+          setAccessError('You are not authorized to view this page.');
+        }
+      } catch (err: any) {
+        setAccessError(err.message || 'Failed to check access');
+      } finally {
+        setAccessChecked(true);
+      }
+    }
+
+    checkAccess();
+  }, [user, authLoading]);
 
   // Count unique cities
   const cityCount = new Set(events.map((e) => e.city)).size;
@@ -65,63 +95,98 @@ export function EventsMapPage() {
 
         {/* Map area */}
         <div className="flex-1 relative">
-          {loading && (
+          {(!accessChecked || authLoading) ? (
             <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/30">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 size={36} className="animate-spin text-[#E52828]" />
-                <span className="text-sm font-medium text-gray-700">
-                  Loading events...
-                </span>
               </div>
             </div>
-          )}
-
-          {error && (
+          ) : !user ? (
             <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/30">
-              <div className="flex flex-col items-center gap-3 bg-white rounded-2xl p-8 shadow-lg">
-                <p className="text-red-600 font-medium">{error}</p>
+              <div className="bg-white rounded-2xl p-8 shadow-lg flex flex-col items-center gap-3">
+                <Shield size={32} className="text-[#E52828]" />
+                <h2 className="text-lg font-bold text-gray-800">Underboss access required</h2>
+                <p className="text-sm text-gray-600 text-center max-w-xs">
+                  Sign in with your underboss email to view the events map.
+                </p>
                 <button
-                  onClick={loadEvents}
+                  onClick={() => setShowLoginModal(true)}
                   className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-all hover:-translate-y-0.5"
                   style={{ background: '#E52828' }}
                 >
-                  Retry
+                  Sign in
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Floating stats badge */}
-          {!loading && !error && events.length > 0 && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-white/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg border border-white/50">
-                <span className="text-sm font-semibold text-gray-800">
-                  {events.length.toLocaleString()} events across{' '}
-                  {cityCount} {cityCount === 1 ? 'city' : 'cities'}
-                </span>
+          ) : accessError ? (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/30">
+              <div className="bg-white rounded-2xl p-8 shadow-lg flex flex-col items-center gap-3">
+                <p className="text-red-600 font-medium">{accessError}</p>
               </div>
             </div>
-          )}
+          ) : authorized ? (
+            <>
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/30">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 size={36} className="animate-spin text-[#E52828]" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Loading events...
+                    </span>
+                  </div>
+                </div>
+              )}
 
-          <Suspense
-            fallback={
-              <div
-                className="flex items-center justify-center"
-                style={{ height: 'calc(100vh - 64px)' }}
+              {error && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/30">
+                  <div className="flex flex-col items-center gap-3 bg-white rounded-2xl p-8 shadow-lg">
+                    <p className="text-red-600 font-medium">{error}</p>
+                    <button
+                      onClick={loadEvents}
+                      className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-all hover:-translate-y-0.5"
+                      style={{ background: '#E52828' }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating stats badge */}
+              {!loading && !error && events.length > 0 && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg border border-white/50">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {events.length.toLocaleString()} events across{' '}
+                      {cityCount} {cityCount === 1 ? 'city' : 'cities'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <Suspense
+                fallback={
+                  <div
+                    className="flex items-center justify-center"
+                    style={{ height: 'calc(100vh - 64px)' }}
+                  >
+                    <Loader2 size={36} className="animate-spin text-[#E52828]" />
+                  </div>
+                }
               >
-                <Loader2 size={36} className="animate-spin text-[#E52828]" />
-              </div>
-            }
-          >
-            {!loading && !error && (
-              <GPPEventsMap
-                events={events}
-                height="calc(100vh - 64px)"
-              />
-            )}
-          </Suspense>
+                {!loading && !error && (
+                  <GPPEventsMap
+                    events={events}
+                    height="calc(100vh - 64px)"
+                  />
+                )}
+              </Suspense>
+            </>
+          ) : null}
         </div>
       </div>
+
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </>
   );
 }
