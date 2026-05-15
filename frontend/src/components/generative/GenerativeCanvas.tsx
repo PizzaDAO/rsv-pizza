@@ -415,7 +415,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const sponsorCols = Math.max(1, Math.ceil(sponsorCount / sponsorRows));
   const maxLogoWidth = sponsorCols > 0 ? (sponsorBoxSize.width - (sponsorCols - 1) * 16) / sponsorCols : 0;
   const maxLogoHeight = sponsorRows > 0 ? (sponsorBoxSize.height - (sponsorRows - 1) * 12) / sponsorRows : 0;
-  const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight);
+  const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight) * (config.sponsorBox.logoScale ?? 1);
 
   const scale = containerWidth / config.canvasWidth;
   const aspectRatio = config.canvasHeight / config.canvasWidth;

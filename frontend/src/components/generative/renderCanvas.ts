@@ -122,7 +122,7 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
       const sponsorCols = Math.max(1, Math.ceil(sponsorCount / sponsorRows));
       const maxLogoWidth = sponsorCols > 0 ? (boxW - (sponsorCols - 1) * gap) / sponsorCols : 0;
       const maxLogoHeight = sponsorRows > 0 ? (boxH - (sponsorRows - 1) * 12 * s) / sponsorRows : 0;
-      const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight);
+      const autoLogoSize = Math.min(maxLogoWidth / 2.5, maxLogoHeight) * (config.sponsorBox.logoScale ?? 1);
 
       type LogoItem = { img: HTMLImageElement; w: number; h: number };
       const items: LogoItem[] = [];

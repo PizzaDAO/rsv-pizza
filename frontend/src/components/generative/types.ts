@@ -37,6 +37,9 @@ export interface FormatConfig {
      *  Drives both autoLogoSize and the flex-wrap target (wider logos = fewer
      *  per row). */
     defaultRows?: number;
+    /** Multiplier applied to the auto-computed logo size. >1 makes logos
+     *  larger (and likely wraps to more rows than the heuristic intended). */
+    logoScale?: number;
   };
   dbImageField: string;
   dbTimestampField: string;

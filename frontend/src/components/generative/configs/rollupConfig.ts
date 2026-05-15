@@ -54,6 +54,7 @@ export const ROLLUP_CONFIG: FormatConfig = {
     width: 960,
     height: 540,
     defaultRows: 3,
+    logoScale: 1.5,
   },
   dbImageField: 'rollup_image_url',
   dbTimestampField: 'rollup_generated_at',
