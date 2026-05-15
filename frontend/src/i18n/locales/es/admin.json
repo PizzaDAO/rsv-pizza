@@ -3,6 +3,24 @@
   "subtitle": "Gestionar administradores y underbosses",
   "accessDenied": "Acceso Denegado",
   "accessDeniedDesc": "No tienes acceso de administrador. Inicia sesión con una cuenta de administrador.",
+  "page": {
+    "exportEventsCsv": "Exportar Todos los Eventos a CSV",
+    "graphicsAdmins": "Administradores de Gráficos",
+    "addGraphicsAdmin": "Agregar Administrador de Gráficos",
+    "removeGraphicsAdmin": "Eliminar administrador de gráficos",
+    "noGraphicsAdmins": "Aún no hay administradores de gráficos",
+    "regions": "Regiones",
+    "analytics": "Analíticas",
+    "remove": "Eliminar",
+    "removeAdminTitle": "Eliminar administrador",
+    "deactivate": "Desactivar",
+    "close": "Cerrar",
+    "graphicsAdminsTable": {
+      "email": "Email",
+      "name": "Nombre",
+      "added": "Agregado"
+    }
+  },
   "admins": {
     "title": "Administradores",
     "emailPlaceholder": "Dirección de email",
@@ -29,6 +47,8 @@
     "active": "Activo",
     "inactive": "Inactivo",
     "deactivate": "Desactivar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
     "tableHeaders": {
       "name": "Nombre",
       "email": "Email",
@@ -99,6 +119,10 @@
     "underbossCreated": "¡Underboss creado!",
     "creating": "Creando...",
     "createUnderboss": "Crear Underboss",
+    "namePlaceholder": "Nombre",
+    "emailPlaceholder": "Email",
+    "regions": "Regiones",
+    "close": "Cerrar",
     "tabs": {
       "events": "Eventos",
       "cities": "Ciudades",

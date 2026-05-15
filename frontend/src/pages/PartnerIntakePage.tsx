@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { getPartnerIntake, submitPartnerIntake, PartnerIntakeData, PartnerIntakeResponse } from '../lib/api';
@@ -108,7 +108,12 @@ export function PartnerIntakePage() {
           <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">{t('intake.thankYou')}</h1>
           <p className="text-white/60 mb-4">
-            Your partner information for <span className="text-white font-medium">{eventName}</span> has been submitted successfully.
+            <Trans
+              i18nKey="intake.submittedSuccess"
+              t={t}
+              values={{ eventName }}
+              components={{ 1: <span className="text-white font-medium" /> }}
+            />
           </p>
           <p className="text-white/40 text-sm">
             {t('intake.revisitLink')}
@@ -148,7 +153,7 @@ export function PartnerIntakePage() {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-white/30 text-xs">
-            Powered by <a href="https://rsv.pizza" className="text-white/40 hover:text-white/60 transition-colors">RSV.Pizza</a>
+            {t('intake.poweredBy')} <a href="https://rsv.pizza" className="text-white/40 hover:text-white/60 transition-colors">RSV.Pizza</a>
           </p>
         </div>
       </div>

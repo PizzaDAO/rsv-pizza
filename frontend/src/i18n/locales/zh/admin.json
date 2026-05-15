@@ -3,6 +3,24 @@
   "subtitle": "管理管理员和 underboss",
   "accessDenied": "访问被拒绝",
   "accessDeniedDesc": "您没有管理员权限。请使用管理员账户登录。",
+  "page": {
+    "exportEventsCsv": "导出所有活动为CSV",
+    "graphicsAdmins": "设计管理员",
+    "addGraphicsAdmin": "添加设计管理员",
+    "removeGraphicsAdmin": "移除设计管理员",
+    "noGraphicsAdmins": "暂无设计管理员",
+    "regions": "区域",
+    "analytics": "分析",
+    "remove": "移除",
+    "removeAdminTitle": "移除管理员",
+    "deactivate": "停用",
+    "close": "关闭",
+    "graphicsAdminsTable": {
+      "email": "邮箱",
+      "name": "姓名",
+      "added": "添加时间"
+    }
+  },
   "admins": {
     "title": "管理员",
     "emailPlaceholder": "邮箱地址",
@@ -29,6 +47,8 @@
     "active": "活跃",
     "inactive": "未激活",
     "deactivate": "停用",
+    "save": "保存",
+    "cancel": "取消",
     "tableHeaders": {
       "name": "姓名",
       "email": "邮箱",
@@ -99,6 +119,10 @@
     "underbossCreated": "Underboss 已创建！",
     "creating": "创建中...",
     "createUnderboss": "创建 Underboss",
+    "namePlaceholder": "姓名",
+    "emailPlaceholder": "邮箱",
+    "regions": "区域",
+    "close": "关闭",
     "tabs": {
       "events": "活动",
       "cities": "城市",

@@ -27,5 +27,21 @@
     "title": "Échec de l'enregistrement",
     "tryAgain": "Réessayer",
     "goHome": "Accueil"
+  },
+  "postCheckIn": {
+    "claim10Title": "Réclamez votre réduction de 10% sur la pizza",
+    "claim10Desc": "Merci d'avoir assisté ! En tant qu'invité vérifié, vous avez gagné une réduction.",
+    "claimDiscount": "Réclamer la réduction",
+    "claim10Button": "Réclamer 10% de réduction",
+    "oneTimeUse": "Usage unique",
+    "discountClaimedTitle": "Réduction réclamée !",
+    "discountClaimedSubtitle": "Votre réduction de 10% sur la pizza a été utilisée.",
+    "discountClaimedAt": "Réclamée le {{date}}",
+    "discountUnavailable": "Réduction non disponible",
+    "discountUnavailableDesc": "Cette réduction est réservée aux participants vérifiés.",
+    "showQrCode": "Montrez votre code QR",
+    "qrDescription": "Montrez ce code QR à un hôte ou à un invité enregistré pour vérifier votre présence",
+    "qrSubmsg": "Un hôte ou un invité enregistré doit scanner ceci pour vous enregistrer",
+    "failedToClaim": "Échec de la réclamation de la réduction"
   }
 }

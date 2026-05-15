@@ -3,6 +3,24 @@
   "subtitle": "管理者とアンダーボスを管理",
   "accessDenied": "アクセス拒否",
   "accessDeniedDesc": "管理者権限がありません。管理者アカウントでログインしてください。",
+  "page": {
+    "exportEventsCsv": "すべてのイベントをCSVでエクスポート",
+    "graphicsAdmins": "グラフィックス管理者",
+    "addGraphicsAdmin": "グラフィックス管理者を追加",
+    "removeGraphicsAdmin": "グラフィックス管理者を削除",
+    "noGraphicsAdmins": "グラフィックス管理者はまだいません",
+    "regions": "地域",
+    "analytics": "分析",
+    "remove": "削除",
+    "removeAdminTitle": "管理者を削除",
+    "deactivate": "無効化",
+    "close": "閉じる",
+    "graphicsAdminsTable": {
+      "email": "メール",
+      "name": "名前",
+      "added": "追加日"
+    }
+  },
   "admins": {
     "title": "管理者",
     "emailPlaceholder": "メールアドレス",
@@ -29,6 +47,8 @@
     "active": "アクティブ",
     "inactive": "非アクティブ",
     "deactivate": "無効化",
+    "save": "保存",
+    "cancel": "キャンセル",
     "tableHeaders": {
       "name": "名前",
       "email": "メール",
@@ -99,6 +119,10 @@
     "underbossCreated": "アンダーボスを作成しました！",
     "creating": "作成中...",
     "createUnderboss": "アンダーボスを作成",
+    "namePlaceholder": "名前",
+    "emailPlaceholder": "メール",
+    "regions": "地域",
+    "close": "閉じる",
     "tabs": {
       "events": "イベント",
       "cities": "都市",

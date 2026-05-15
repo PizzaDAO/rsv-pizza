@@ -27,5 +27,21 @@
     "title": "チェックインに失敗しました",
     "tryAgain": "もう一度試す",
     "goHome": "ホームに戻る"
+  },
+  "postCheckIn": {
+    "claim10Title": "ピザ10%割引を受け取る",
+    "claim10Desc": "ご参加ありがとうございました！確認済みゲストとして、割引を獲得しました。",
+    "claimDiscount": "割引を受け取る",
+    "claim10Button": "10%割引を受け取る",
+    "oneTimeUse": "1回限り使用可能",
+    "discountClaimedTitle": "割引を受け取りました！",
+    "discountClaimedSubtitle": "ピザの10%割引が使用されました。",
+    "discountClaimedAt": "{{date}}に受け取り済み",
+    "discountUnavailable": "割引は利用できません",
+    "discountUnavailableDesc": "この割引は確認済み参加者のみが対象です。",
+    "showQrCode": "QRコードを表示",
+    "qrDescription": "このQRコードを主催者またはチェックイン済みのゲストに見せて参加を確認してもらってください",
+    "qrSubmsg": "主催者またはチェックイン済みのゲストがこれをスキャンしてあなたをチェックインする必要があります",
+    "failedToClaim": "割引の取得に失敗しました"
   }
 }
