@@ -94,6 +94,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [rsvpComparator, setRsvpComparator] = useState<'>' | '<'>('>');
+  const [rsvpThreshold, setRsvpThreshold] = useState<string>('');
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -203,6 +205,18 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       result = result.filter((e) => e.eventTags?.includes(tagFilter));
     }
 
+    // RSVP count filter — only applied when threshold has a non-empty value
+    if (rsvpThreshold.trim() !== '') {
+      const threshold = Number(rsvpThreshold);
+      if (Number.isFinite(threshold)) {
+        result = result.filter((e) =>
+          rsvpComparator === '>'
+            ? e.guestCount > threshold
+            : e.guestCount < threshold
+        );
+      }
+    }
+
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -226,7 +240,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold]);
 
   const availableTags = useMemo(
     () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
@@ -272,7 +286,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     );
   }
 
-  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all' || tagFilter !== 'all';
+  const hasActiveFilters =
+    progressIncludes.length > 0 ||
+    progressExcludes.length > 0 ||
+    regionFilter !== 'all' ||
+    tagFilter !== 'all' ||
+    rsvpThreshold.trim() !== '';
 
   return (
     <div className="space-y-3">
@@ -361,6 +380,28 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           </select>
         )}
 
+        {/* RSVP count filter */}
+        <div className="flex items-center gap-1">
+          <select
+            value={rsvpComparator}
+            onChange={(e) => setRsvpComparator(e.target.value as '>' | '<')}
+            className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
+            aria-label={t('eventTable.rsvpFilterLabel')}
+          >
+            <option value=">">{t('eventTable.rsvpGreaterThan')}</option>
+            <option value="<">{t('eventTable.rsvpLessThan')}</option>
+          </select>
+          <input
+            type="number"
+            min={0}
+            value={rsvpThreshold}
+            onChange={(e) => setRsvpThreshold(e.target.value)}
+            placeholder={t('eventTable.rsvpThresholdPlaceholder')}
+            className="w-20 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+            aria-label={t('eventTable.rsvpFilterLabel')}
+          />
+        </div>
+
         {/* Clear filters link */}
         {hasActiveFilters && (
           <button
@@ -369,6 +410,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setProgressExcludes([]);
               setRegionFilter('all');
               setTagFilter('all');
+              setRsvpThreshold('');
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
