@@ -125,12 +125,14 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
           <div className="text-xs text-theme-text-muted">Days Until Event</div>
         </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-theme-text">
-            {guests.filter((g) => g.status === 'PENDING').length}
+        {party.requireApproval && (
+          <div className="card p-4 text-center">
+            <div className="text-2xl font-bold text-theme-text">
+              {guests.filter((g) => g.approved === null).length}
+            </div>
+            <div className="text-xs text-theme-text-muted">Pending Approval</div>
           </div>
-          <div className="text-xs text-theme-text-muted">Pending Approval</div>
-        </div>
+        )}
         {party.underbossStatus === 'approved' && (
           <div className="card p-4 text-center border border-green-500/30">
             <div className="flex items-center justify-center gap-1.5 text-green-400">
