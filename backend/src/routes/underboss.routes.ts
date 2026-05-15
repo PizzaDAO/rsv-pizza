@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -638,12 +639,31 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
-    const result = await prisma.party.updateMany({
-      where: { id: { in: partyIds } },
-      data: { underbossStatus: status },
+    const email = req.userEmail!;
+    const isAdminUser = await isAdmin(email);
+    const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
+
+    const updatedCount = await prisma.$transaction(async (tx) => {
+      const before = await tx.party.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, underbossStatus: true },
+      });
+
+      // Skip no-ops to avoid noisy audit rows.
+      const changing = before.filter(p => p.underbossStatus !== status);
+
+      await tx.party.updateMany({
+        where: { id: { in: changing.map(p => p.id) } },
+        data: { underbossStatus: status },
+      });
+
+      for (const p of changing) {
+        await writeStatusAudit(tx, p.id, p.underbossStatus, status, email, actorKind);
+      }
+      return changing.length;
     });
 
-    res.json({ updated: result.count });
+    res.json({ updated: updatedCount });
   } catch (error) {
     next(error);
   }
@@ -829,10 +849,22 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
 
     if (underboss) {
       // Underboss/admin: allow all statuses
-      const party = await prisma.party.update({
-        where: { id: partyId },
-        data: { underbossStatus: status },
-        select: { id: true, underbossStatus: true },
+      const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
+      const party = await prisma.$transaction(async (tx) => {
+        const before = await tx.party.findUnique({
+          where: { id: partyId },
+          select: { underbossStatus: true },
+        });
+        if (!before) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+        const updated = await tx.party.update({
+          where: { id: partyId },
+          data: { underbossStatus: status },
+          select: { id: true, underbossStatus: true },
+        });
+
+        await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, actorKind);
+        return updated;
       });
       return res.json({ party });
     }
@@ -863,10 +895,15 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
       throw new AppError('Cannot change status from current state', 403, 'FORBIDDEN');
     }
 
-    const updated = await prisma.party.update({
-      where: { id: partyId },
-      data: { underbossStatus: status },
-      select: { id: true, underbossStatus: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.party.update({
+        where: { id: partyId },
+        data: { underbossStatus: status },
+        select: { id: true, underbossStatus: true },
+      });
+
+      await writeStatusAudit(tx, partyId, party.underbossStatus, status, email, 'owner');
+      return result;
     });
 
     res.json({ party: updated });
