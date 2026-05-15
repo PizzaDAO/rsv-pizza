@@ -1272,10 +1272,10 @@ export async function addGuestToParty(
   swcUkOptIn?: boolean,
   swcBrOptIn?: boolean,
   ethconfOptIn?: boolean
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
-    return null;
+    throw new Error('Invite code is required to submit RSVP');
   }
 
   try {
@@ -1356,7 +1356,7 @@ export async function addGuestToParty(
     };
   } catch (error) {
     console.error('Error adding guest:', error);
-    return null;
+    throw error;
   }
 }
 
