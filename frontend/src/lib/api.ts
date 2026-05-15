@@ -186,6 +186,7 @@ export async function createPartyApi(data: CreatePartyData) {
       pizzaStyle: data.pizzaStyle || 'new-york',
       address: data.address,
       placeId: data.placeId,
+      venueName: data.venueName,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
