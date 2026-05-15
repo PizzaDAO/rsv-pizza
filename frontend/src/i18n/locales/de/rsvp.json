@@ -10,6 +10,7 @@
     "mailingList": "PizzaDAO-Mailingliste beitreten",
     "swcJoin": "Stand with Crypto beitreten",
     "swcNotify": "Benachrichtigen Sie mich über zukünftige Stand With Crypto Events.",
+    "swcBrNotify": "Benachrichtigen Sie mich über Veranstaltungen von Juntos por Cripto.",
     "ethconfDiscount": "ETHConf-Rabatt zusenden",
     "next": "Weiter"
   },
@@ -106,6 +107,12 @@
     "title": "Stand with Crypto UK",
     "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Stand with Crypto über zukünftige Events und Interessenvertretung im Vereinigten Königreich zu erhalten. Sie verstehen, dass SWC und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
     "privacyPolicy": "SWC UK Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen"
+  },
+  "swcBrModal": {
+    "title": "Juntos por Cripto",
+    "description": "Durch Ankreuzen des Kästchens stimmen Sie zu, Mitteilungen von Juntos por Cripto über Veranstaltungen und Interessenvertretung in Brasilien zu erhalten. Sie verstehen, dass Juntos por Cripto und seine Dienstleister Ihre persönlichen Daten erheben und verwenden dürfen. Weitere Informationen finden Sie unter",
+    "privacyPolicy": "Datenschutzrichtlinie von Juntos por Cripto",
     "termsOfService": "Nutzungsbedingungen"
   },
   "roles": {
