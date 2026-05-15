@@ -1,6 +1,7 @@
 {
   "title": "Check-In de Invitado",
   "loading": "Registrando invitado...",
+  "vouching": "Verificando invitado...",
   "success": {
     "title": "¡Registrado!",
     "backToDashboard": "Volver al Panel del Evento"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Ya Registrado",
     "checkedInAt": "Registrado a las {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "No Registrado",
+    "message": "Necesitas estar registrado para validar a otros invitados. Pide a un anfitrión o invitado registrado que te registre primero."
   },
   "unauthorized": {
     "title": "No Autorizado",
@@ -22,5 +27,21 @@
     "title": "Error en el Check-in",
     "tryAgain": "Intentar de Nuevo",
     "goHome": "Ir al Inicio"
+  },
+  "postCheckIn": {
+    "claim10Title": "Reclama tu 10% de Descuento en Pizza",
+    "claim10Desc": "¡Gracias por asistir! Como invitado verificado, ganaste un descuento.",
+    "claimDiscount": "Reclamar Descuento",
+    "claim10Button": "Reclamar 10% de Descuento",
+    "oneTimeUse": "Uso único",
+    "discountClaimedTitle": "¡Descuento Reclamado!",
+    "discountClaimedSubtitle": "Tu 10% de descuento en pizza ha sido utilizado.",
+    "discountClaimedAt": "Reclamado el {{date}}",
+    "discountUnavailable": "Descuento No Disponible",
+    "discountUnavailableDesc": "Este descuento es solo para asistentes verificados.",
+    "showQrCode": "Muestra tu Código QR",
+    "qrDescription": "Muestra este código QR a un anfitrión o invitado registrado para verificar tu asistencia",
+    "qrSubmsg": "Un anfitrión o invitado registrado debe escanearlo para registrarte",
+    "failedToClaim": "Error al reclamar el descuento"
   }
 }

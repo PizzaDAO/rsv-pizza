@@ -3,6 +3,24 @@
   "subtitle": "Admins und Underbosses verwalten",
   "accessDenied": "Zugriff verweigert",
   "accessDeniedDesc": "Sie haben keinen Admin-Zugriff. Bitte melden Sie sich mit einem Admin-Konto an.",
+  "page": {
+    "exportEventsCsv": "Alle Events als CSV exportieren",
+    "graphicsAdmins": "Grafik-Admins",
+    "addGraphicsAdmin": "Grafik-Admin hinzufügen",
+    "removeGraphicsAdmin": "Grafik-Admin entfernen",
+    "noGraphicsAdmins": "Noch keine Grafik-Admins",
+    "regions": "Regionen",
+    "analytics": "Analysen",
+    "remove": "Entfernen",
+    "removeAdminTitle": "Admin entfernen",
+    "deactivate": "Deaktivieren",
+    "close": "Schließen",
+    "graphicsAdminsTable": {
+      "email": "E-Mail",
+      "name": "Name",
+      "added": "Hinzugefügt"
+    }
+  },
   "admins": {
     "title": "Admins",
     "emailPlaceholder": "E-Mail-Adresse",
@@ -29,6 +47,8 @@
     "active": "Aktiv",
     "inactive": "Inaktiv",
     "deactivate": "Deaktivieren",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
     "tableHeaders": {
       "name": "Name",
       "email": "E-Mail",
@@ -99,6 +119,10 @@
     "underbossCreated": "Underboss erstellt!",
     "creating": "Wird erstellt...",
     "createUnderboss": "Underboss erstellen",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "E-Mail",
+    "regions": "Regionen",
+    "close": "Schließen",
     "tabs": {
       "events": "Events",
       "cities": "Städte",
@@ -116,6 +140,7 @@
     "showing": "{{count}} angezeigt",
     "searchPlaceholder": "Events, Gastgeber suchen...",
     "regionAll": "Region: Alle",
+    "tagAll": "Tag: Alle",
     "staleFlyers": "Veraltete Flyer",
     "generateMissing": "Fehlende generieren ({{count}})",
     "generating": "{{current}}/{{total}} wird generiert...",

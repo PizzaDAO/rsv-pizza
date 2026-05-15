@@ -1,6 +1,7 @@
 {
   "title": "Guest Check-In",
   "loading": "Checking in guest...",
+  "vouching": "Vouching for guest...",
   "success": {
     "title": "Checked In!",
     "backToDashboard": "Back to Event Dashboard"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Already Checked In",
     "checkedInAt": "Checked in at {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Not Checked In",
+    "message": "You need to be checked in to vouch for other guests. Please ask a host or a checked-in guest to check you in first."
   },
   "unauthorized": {
     "title": "Unauthorized",
@@ -22,5 +27,21 @@
     "title": "Check-in Failed",
     "tryAgain": "Try Again",
     "goHome": "Go Home"
+  },
+  "postCheckIn": {
+    "claim10Title": "Claim Your 10% Pizza Discount",
+    "claim10Desc": "Thanks for attending! As a verified guest, you earned a discount.",
+    "claimDiscount": "Claim Discount",
+    "claim10Button": "Claim 10% Discount",
+    "oneTimeUse": "One-time Use",
+    "discountClaimedTitle": "Discount Claimed!",
+    "discountClaimedSubtitle": "Your 10% pizza discount has been used.",
+    "discountClaimedAt": "Claimed {{date}}",
+    "discountUnavailable": "Discount Unavailable",
+    "discountUnavailableDesc": "This discount is for verified attendees only.",
+    "showQrCode": "Show Your QR Code",
+    "qrDescription": "Show this QR code to a host or checked-in guest to verify your attendance",
+    "qrSubmsg": "A host or checked-in guest needs to scan this to check you in",
+    "failedToClaim": "Failed to claim discount"
   }
 }

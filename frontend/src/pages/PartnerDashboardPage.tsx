@@ -42,6 +42,7 @@ function PhotoLightbox({
   onClose: () => void;
   onNavigate: (index: number) => void;
 }) {
+  const { t } = useTranslation('partner');
   const photo = photos[currentIndex];
 
   useEffect(() => {
@@ -99,7 +100,7 @@ function PhotoLightbox({
       </div>
 
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-        {currentIndex + 1} of {photos.length}
+        {t('dashboard.photosCountOf', { current: currentIndex + 1, total: photos.length })}
       </p>
     </div>
   );
@@ -524,7 +525,10 @@ export function PartnerDashboardPage() {
               {dashboardData?.isAdmin ? t('title') : `${sponsor?.name || t('title')}`}
             </h1>
             <p className="text-sm text-theme-text-muted">
-              Showing {events.length}{events.length !== allEvents.length ? ` of ${allEvents.length}` : ''} event{events.length !== 1 ? 's' : ''}{dashboardData?.tag ? ` tagged "${dashboardData.tag}"` : ''}
+              {events.length !== allEvents.length
+                ? t('dashboard.showingCountOfTotal', { count: events.length, total: allEvents.length })
+                : t('dashboard.showingCount', { count: events.length })}
+              {dashboardData?.tag ? t('dashboard.taggedSuffix', { tag: dashboardData.tag }) : ''}
             </p>
           </div>
 
@@ -594,33 +598,33 @@ export function PartnerDashboardPage() {
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><BarChart3 size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Events</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.events')}</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{allEvents.length}</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Users size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Total RSVPs</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.totalRsvps')}</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalRsvps}</div>
-                  <div className="text-xs text-theme-text-muted mt-1">~{avgRsvps} per event</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{t('dashboard.perEvent', { avg: avgRsvps })}</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Eye size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Impressions</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.impressions')}</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalImpressions.toLocaleString()}</div>
-                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueVisitors.toLocaleString()} unique</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{t('dashboard.uniqueCount', { count: totalUniqueVisitors.toLocaleString() })}</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><MousePointerClick size={16} /></div>
-                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">Partner Link Clicks</span>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.partnerLinkClicks')}</span>
                   </div>
                   <div className="text-2xl font-bold text-theme-text">{totalClicks.toLocaleString()}</div>
-                  <div className="text-xs text-theme-text-muted mt-1">{totalUniqueClickers.toLocaleString()} unique</div>
+                  <div className="text-xs text-theme-text-muted mt-1">{t('dashboard.uniqueCount', { count: totalUniqueClickers.toLocaleString() })}</div>
                   {Object.keys(clicksByPartnerPlatformAgg).length > 0 && (
                     <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-theme-stroke/50">
                       {Object.entries(clicksByPartnerPlatformAgg)
@@ -629,7 +633,7 @@ export function PartnerDashboardPage() {
                           <div key={partner}>
                             <div className="flex items-center justify-between text-xs mb-1">
                               <span className="text-theme-text-secondary font-medium">{partner}</span>
-                              <span className="text-theme-text font-semibold">{data.total} <span className="text-theme-text-muted font-normal">({data.uniqueTotal} unique)</span></span>
+                              <span className="text-theme-text font-semibold">{data.total} <span className="text-theme-text-muted font-normal">{t('dashboard.uniqueParen', { count: data.uniqueTotal })}</span></span>
                             </div>
                             <div className="flex flex-wrap gap-2 ml-1">
                               {Object.entries(data.platforms)
@@ -655,30 +659,30 @@ export function PartnerDashboardPage() {
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><MapPin size={16} /></div>
-                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Venue</span>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.withVenue')}</span>
                       </div>
                       <div className="text-2xl font-bold text-theme-text">{withVenue}</div>
                     </div>
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Wallet size={16} /></div>
-                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">With Budget</span>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.withBudget')}</span>
                       </div>
                       <div className="text-2xl font-bold text-theme-text">{withBudget}</div>
                     </div>
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 col-span-2 md:col-span-3 lg:col-span-1">
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp size={14} className="text-theme-text-muted" />
-                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">Completion</span>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.completion')}</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-theme-text-muted w-14 shrink-0">Venue</span>
+                          <span className="text-xs text-theme-text-muted w-14 shrink-0">{t('dashboard.venue')}</span>
                           <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${venueRate}%` }} /></div>
                           <span className="text-xs text-theme-text-secondary w-10 text-right">{venueRate}%</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-theme-text-muted w-14 shrink-0">Budget</span>
+                          <span className="text-xs text-theme-text-muted w-14 shrink-0">{t('dashboard.budget')}</span>
                           <div className="flex-1 h-2 bg-theme-surface rounded-full overflow-hidden"><div className="h-full bg-green-500/60 rounded-full transition-all duration-500" style={{ width: `${budgetRate}%` }} /></div>
                           <span className="text-xs text-theme-text-secondary w-10 text-right">{budgetRate}%</span>
                         </div>
@@ -699,7 +703,7 @@ export function PartnerDashboardPage() {
               <IconInput
                 icon={Search}
                 type="search"
-                placeholder="Search events, hosts, venues..."
+                placeholder={t('dashboard.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
               />
@@ -712,11 +716,11 @@ export function PartnerDashboardPage() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
               >
-                <option value="date-desc">Newest first</option>
-                <option value="date-asc">Oldest first</option>
-                <option value="rsvps">Most RSVPs</option>
-                <option value="clicks">Most clicks</option>
-                <option value="name">Name A–Z</option>
+                <option value="date-desc">{t('dashboard.sortNewest')}</option>
+                <option value="date-asc">{t('dashboard.sortOldest')}</option>
+                <option value="rsvps">{t('dashboard.sortMostRsvps')}</option>
+                <option value="clicks">{t('dashboard.sortMostClicks')}</option>
+                <option value="name">{t('dashboard.sortNameAZ')}</option>
               </select>
 
               {/* Region filter dropdown — hidden when all events share one region */}
@@ -726,7 +730,7 @@ export function PartnerDashboardPage() {
                   onChange={(e) => setRegionFilter(e.target.value)}
                   className="bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                 >
-                  <option value="all">Region: All</option>
+                  <option value="all">{t('dashboard.regionAll')}</option>
                   {GPP_REGIONS.map((r) => (
                     <option key={r.id} value={r.id}>{r.label}</option>
                   ))}
@@ -749,7 +753,7 @@ export function PartnerDashboardPage() {
                 className="ml-auto inline-flex items-center gap-1.5 bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text hover:border-theme-stroke-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Download size={14} />
-                Download CSV
+                {t('dashboard.downloadCsv')}
               </button>
             </div>
           </div>
@@ -942,7 +946,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-theme-text hover:text-theme-text-secondary transition-colors"
-                title="View event page"
+                title={t('dashboard.viewEventPage')}
               >
                 {event.name}
               </a>
@@ -960,10 +964,10 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#29B6F6] hover:text-[#4FC3F7] border border-[#29B6F6]/30 hover:border-[#29B6F6]/50 rounded-md transition-colors"
-                  title="Join city Telegram group"
+                  title={t('dashboard.joinTelegram')}
                 >
                   <MessageCircle size={12} />
-                  Telegram
+                  {t('dashboard.telegram')}
                 </a>
               ) : null;
             })()}
@@ -973,18 +977,18 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
-                title="View event report"
+                title={t('dashboard.viewEventReport')}
               >
                 <BarChart3 size={12} />
-                Report
+                {t('dashboard.report')}
               </a>
             ) : (
               <span
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-faint border border-theme-surface rounded-md cursor-default"
-                title="Report not published yet"
+                title={t('dashboard.reportNotPublished')}
               >
                 <BarChart3 size={12} />
-                Report
+                {t('dashboard.report')}
               </span>
             )}
             <button
@@ -994,10 +998,10 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 setTimeout(() => setOneSheetCopied(false), 2000);
               }}
               className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
-              title="Copy One Sheet link"
+              title={t('dashboard.copyOneSheetLink')}
             >
               <Link2 size={12} />
-              {oneSheetCopied ? 'Copied!' : 'One Sheet'}
+              {oneSheetCopied ? t('dashboard.copied') : t('dashboard.oneSheet')}
             </button>
           </div>
         </div>
@@ -1027,12 +1031,12 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
               <div className="flex items-center gap-1.5">
                 <Users size={14} className="text-theme-text-muted" />
                 <span className="text-lg font-bold text-theme-text">{event.rsvpCount}</span>
-                <span className="text-xs text-theme-text-muted">RSVPs</span>
+                <span className="text-xs text-theme-text-muted">{t('dashboard.rsvps')}</span>
               </div>
               {event.invitedCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-lg font-bold text-blue-400">{event.invitedCount}</span>
-                  <span className="text-xs text-theme-text-muted">Invited</span>
+                  <span className="text-xs text-theme-text-muted">{t('dashboard.invited')}</span>
                 </div>
               )}
               {(event.photoCount + gppCount > 0) && (
@@ -1042,14 +1046,14 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 >
                   <Camera size={14} />
                   <span className="text-sm font-medium">{event.photoCount + gppCount}</span>
-                  <span className="text-xs">Photos</span>
+                  <span className="text-xs">{t('dashboard.photos')}</span>
                 </button>
               )}
               {event.expectedGuests != null && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-theme-text-faint">/</span>
                   <span className="text-lg font-bold text-theme-text">{event.expectedGuests}</span>
-                  <span className="text-xs text-theme-text-muted">expected</span>
+                  <span className="text-xs text-theme-text-muted">{t('dashboard.expected')}</span>
                 </div>
               )}
             </div>
@@ -1058,16 +1062,16 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 {event.impressions && event.impressions.totalViews > 0 && (
                   <div className="flex items-center gap-1.5">
                     <Eye size={12} />
-                    <span>{event.impressions.totalViews.toLocaleString()} views</span>
-                    <span className="text-theme-text-muted/50">({event.impressions.uniqueVisitors.toLocaleString()} unique)</span>
+                    <span>{t('dashboard.viewsCount', { count: event.impressions.totalViews.toLocaleString() })}</span>
+                    <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.impressions.uniqueVisitors.toLocaleString() })}</span>
                   </div>
                 )}
                 {event.clickStats && event.clickStats.totalClicks > 0 && (
                   <div className="flex items-center gap-1.5">
                     <MousePointerClick size={12} />
-                    <span>{event.clickStats.totalClicks} clicks</span>
+                    <span>{t('dashboard.clicksCount', { count: event.clickStats.totalClicks })}</span>
                     {event.clickStats.uniqueClickers > 0 && (
-                      <span className="text-theme-text-muted/50">({event.clickStats.uniqueClickers} unique)</span>
+                      <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.clickStats.uniqueClickers })}</span>
                     )}
                     {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
                       <span className="flex items-center gap-1.5">
@@ -1123,7 +1127,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
         <button
           onClick={() => setNotesModalOpen(true)}
           className="mt-2 flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors truncate max-w-full text-left"
-          title={notes || 'Add private notes'}
+          title={notes || t('eventCard.privateNotes')}
         >
           <StickyNote size={12} className="flex-shrink-0" />
           {savingNotes ? (
@@ -1139,10 +1143,10 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
             {photosLoading ? (
               <div className="flex items-center gap-2 py-3">
                 <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
-                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+                <span className="text-xs text-theme-text-muted">{t('dashboard.loadingPhotos')}</span>
               </div>
             ) : displayPhotos.length === 0 ? (
-              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+              <p className="text-xs text-theme-text-faint py-2">{t('dashboard.noPhotos')}</p>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-3 gap-1.5">
@@ -1171,7 +1175,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                     onClick={() => setShowAllPhotos(true)}
                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                   >
-                    Show all {displayPhotos.length} photos
+                    {t('dashboard.showAllPhotos', { count: displayPhotos.length })}
                   </button>
                 )}
               </div>
@@ -1204,7 +1208,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-theme-text flex items-center gap-2">
                 <StickyNote size={16} />
-                Notes — {event.name}
+                {t('dashboard.notesWithName', { name: event.name })}
               </h3>
               {savingNotes && <Loader2 size={14} className="animate-spin text-theme-text-muted" />}
             </div>
@@ -1222,7 +1226,7 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 onClick={handleModalClose}
                 className="px-4 py-1.5 text-sm font-medium text-white bg-[#E52828] rounded-lg hover:bg-[#CC2020] transition-colors"
               >
-                Done
+                {t('dashboard.done')}
               </button>
             </div>
           </div>

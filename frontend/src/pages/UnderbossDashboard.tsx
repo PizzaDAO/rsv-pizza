@@ -476,7 +476,7 @@ export function UnderbossDashboard() {
                   onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); }}
                   className="text-sm text-theme-text-muted hover:text-theme-text-secondary"
                 >
-                  Close
+                  {t('underbossDashboard.close')}
                 </button>
               </div>
             ) : (
@@ -497,7 +497,7 @@ export function UnderbossDashboard() {
                 <div>
                   <input
                     type="text"
-                    placeholder="Name"
+                    placeholder={t('underbossDashboard.namePlaceholder')}
                     value={addUbForm.name}
                     onChange={(e) => setAddUbForm({ ...addUbForm, name: e.target.value })}
                     required
@@ -507,7 +507,7 @@ export function UnderbossDashboard() {
                 <div>
                   <input
                     type="email"
-                    placeholder="Email"
+                    placeholder={t('underbossDashboard.emailPlaceholder')}
                     value={addUbForm.email}
                     onChange={(e) => setAddUbForm({ ...addUbForm, email: e.target.value })}
                     required
@@ -515,7 +515,7 @@ export function UnderbossDashboard() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
+                  <p className="text-sm text-theme-text-secondary mb-2">{t('underbossDashboard.regions')}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {GPP_REGIONS.map(r => (
                       <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">

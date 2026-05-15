@@ -3,6 +3,24 @@
   "subtitle": "Manage admins and underbosses",
   "accessDenied": "Access Denied",
   "accessDeniedDesc": "You do not have admin access. Please log in with an admin account.",
+  "page": {
+    "exportEventsCsv": "Export All Events CSV",
+    "graphicsAdmins": "Graphics Admins",
+    "addGraphicsAdmin": "Add Graphics Admin",
+    "removeGraphicsAdmin": "Remove graphics admin",
+    "noGraphicsAdmins": "No graphics admins yet",
+    "regions": "Regions",
+    "analytics": "Analytics",
+    "remove": "Remove",
+    "removeAdminTitle": "Remove admin",
+    "deactivate": "Deactivate",
+    "close": "Close",
+    "graphicsAdminsTable": {
+      "email": "Email",
+      "name": "Name",
+      "added": "Added"
+    }
+  },
   "admins": {
     "title": "Admins",
     "emailPlaceholder": "Email address",
@@ -29,6 +47,8 @@
     "active": "Active",
     "inactive": "Inactive",
     "deactivate": "Deactivate",
+    "save": "Save",
+    "cancel": "Cancel",
     "tableHeaders": {
       "name": "Name",
       "email": "Email",
@@ -99,6 +119,10 @@
     "underbossCreated": "Underboss created!",
     "creating": "Creating...",
     "createUnderboss": "Create Underboss",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Email",
+    "regions": "Regions",
+    "close": "Close",
     "tabs": {
       "events": "Events",
       "cities": "Cities",

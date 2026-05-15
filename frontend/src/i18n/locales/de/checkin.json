@@ -1,6 +1,7 @@
 {
   "title": "Gäste-Check-in",
   "loading": "Gast wird eingecheckt...",
+  "vouching": "Gast wird bestätigt...",
   "success": {
     "title": "Eingecheckt!",
     "backToDashboard": "Zurück zum Event-Dashboard"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Bereits eingecheckt",
     "checkedInAt": "Eingecheckt um {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Nicht eingecheckt",
+    "message": "Sie müssen eingecheckt sein, um andere Gäste zu bestätigen. Bitten Sie einen Gastgeber oder einen eingecheckten Gast, Sie zuerst einzuchecken."
   },
   "unauthorized": {
     "title": "Nicht autorisiert",
@@ -22,5 +27,21 @@
     "title": "Check-in fehlgeschlagen",
     "tryAgain": "Erneut versuchen",
     "goHome": "Zur Startseite"
+  },
+  "postCheckIn": {
+    "claim10Title": "Holen Sie sich Ihren 10% Pizza-Rabatt",
+    "claim10Desc": "Danke für Ihre Teilnahme! Als bestätigter Gast haben Sie einen Rabatt verdient.",
+    "claimDiscount": "Rabatt einlösen",
+    "claim10Button": "10% Rabatt einlösen",
+    "oneTimeUse": "Einmalig nutzbar",
+    "discountClaimedTitle": "Rabatt eingelöst!",
+    "discountClaimedSubtitle": "Ihr 10% Pizza-Rabatt wurde verwendet.",
+    "discountClaimedAt": "Eingelöst am {{date}}",
+    "discountUnavailable": "Rabatt nicht verfügbar",
+    "discountUnavailableDesc": "Dieser Rabatt ist nur für bestätigte Teilnehmer.",
+    "showQrCode": "Zeigen Sie Ihren QR-Code",
+    "qrDescription": "Zeigen Sie diesen QR-Code einem Gastgeber oder eingecheckten Gast, um Ihre Teilnahme zu bestätigen",
+    "qrSubmsg": "Ein Gastgeber oder eingecheckter Gast muss diesen scannen, um Sie einzuchecken",
+    "failedToClaim": "Rabatt konnte nicht eingelöst werden"
   }
 }

@@ -555,7 +555,7 @@ export function AdminPage() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 text-gray-700 text-sm font-medium hover:bg-white border border-gray-300 disabled:opacity-50"
             >
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              Export All Events CSV
+              {t('page.exportEventsCsv')}
             </button>
           </div>
 
@@ -585,7 +585,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Mail}
                       type="email"
-                      placeholder="Email address"
+                      placeholder={t('admins.emailPlaceholder')}
                       value={newEmail}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEmail(e.target.value)}
                       required
@@ -595,7 +595,7 @@ export function AdminPage() {
                     <IconInput
                       icon={User}
                       type="text"
-                      placeholder="Name (optional)"
+                      placeholder={t('admins.namePlaceholder')}
                       value={newName}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
                     />
@@ -616,10 +616,10 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.role')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.added')}</th>
                     {isSuperAdmin && <th className="px-4 py-3 font-medium w-20"></th>}
                   </tr>
                 </thead>
@@ -653,7 +653,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleRemoveAdmin(admin.id, admin.email)}
                               className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                              title="Remove admin"
+                              title={t('page.removeAdminTitle')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -678,7 +678,7 @@ export function AdminPage() {
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Palette size={18} className="text-theme-text-secondary" />
-              Graphics Admins ({graphicsAdmins.length})
+              {t('page.graphicsAdmins')} ({graphicsAdmins.length})
             </h2>
 
             {gaMessage && (
@@ -699,7 +699,7 @@ export function AdminPage() {
                   <IconInput
                     icon={Mail}
                     type="email"
-                    placeholder="Email address"
+                    placeholder={t('admins.emailPlaceholder')}
                     value={gaEmail}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaEmail(e.target.value)}
                     required
@@ -709,7 +709,7 @@ export function AdminPage() {
                   <IconInput
                     icon={User}
                     type="text"
-                    placeholder="Name (optional)"
+                    placeholder={t('admins.namePlaceholder')}
                     value={gaName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaName(e.target.value)}
                   />
@@ -720,7 +720,7 @@ export function AdminPage() {
                   className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                 >
                   {addingGa ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  Add Graphics Admin
+                  {t('page.addGraphicsAdmin')}
                 </button>
               </div>
             </form>
@@ -729,9 +729,9 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.added')}</th>
                     <th className="px-4 py-3 font-medium w-20"></th>
                   </tr>
                 </thead>
@@ -752,7 +752,7 @@ export function AdminPage() {
                         <button
                           onClick={() => handleRemoveGraphicsAdmin(ga.id, ga.email)}
                           className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                          title="Remove graphics admin"
+                          title={t('page.removeGraphicsAdmin')}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -762,7 +762,7 @@ export function AdminPage() {
                   {graphicsAdmins.length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-theme-text-faint">
-                        No graphics admins yet
+                        {t('page.noGraphicsAdmins')}
                       </td>
                     </tr>
                   )}
@@ -796,7 +796,7 @@ export function AdminPage() {
                   <IconInput
                     icon={User}
                     type="text"
-                    placeholder="Name"
+                    placeholder={t('underboss.namePlaceholder')}
                     value={ubName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUbName(e.target.value)}
                     required
@@ -806,7 +806,7 @@ export function AdminPage() {
                   <IconInput
                     icon={Mail}
                     type="email"
-                    placeholder="Email"
+                    placeholder={t('underboss.emailPlaceholder')}
                     value={ubEmail}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUbEmail(e.target.value)}
                     required
@@ -814,7 +814,7 @@ export function AdminPage() {
                 </div>
               </div>
               <div className="mb-3">
-                <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
+                <p className="text-sm text-theme-text-secondary mb-2">{t('underboss.regions')}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {GPP_REGIONS.map(r => (
                     <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">
@@ -849,11 +849,11 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Regions</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium text-right">Actions</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.regions')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.status')}</th>
+                    <th className="px-4 py-3 font-medium text-right">{t('underboss.tableHeaders.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -896,14 +896,14 @@ export function AdminPage() {
                                 onClick={saveEditRegions}
                                 disabled={savingRegions || editRegions.length === 0}
                                 className="text-green-500 hover:text-green-400 disabled:opacity-50 p-1"
-                                title="Save"
+                                title={t('underboss.save')}
                               >
                                 {savingRegions ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                               </button>
                               <button
                                 onClick={() => setEditingUbId(null)}
                                 className="text-theme-text-muted hover:text-theme-text-secondary p-1"
-                                title="Cancel"
+                                title={t('underboss.cancel')}
                               >
                                 <X size={14} />
                               </button>
@@ -933,7 +933,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleDeactivate(ub.id, ub.name)}
                               className="text-theme-text-muted hover:text-red-400 transition-colors p-1"
-                              title="Deactivate"
+                              title={t('underboss.deactivate')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -980,7 +980,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Mail}
                       type="email"
-                      placeholder="Email address"
+                      placeholder={t('partners.emailPlaceholder')}
                       value={spEmail}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpEmail(e.target.value)}
                       required
@@ -990,7 +990,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Tag}
                       type="text"
-                      placeholder="Partner tag (e.g. swc)"
+                      placeholder={t('partners.tagPlaceholder')}
                       value={spTag}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpTag(e.target.value)}
                       required
@@ -1000,7 +1000,7 @@ export function AdminPage() {
                     <IconInput
                       icon={User}
                       type="text"
-                      placeholder="Name (optional)"
+                      placeholder={t('partners.namePlaceholder')}
                       value={spName}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpName(e.target.value)}
                     />
@@ -1021,11 +1021,11 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Tag</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.tag')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.status')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.added')}</th>
                     {isSuperAdmin && <th className="px-4 py-3 font-medium w-20"></th>}
                   </tr>
                 </thead>
@@ -1064,7 +1064,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleDeactivateSponsor(sp.id, sp.email)}
                               className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                              title="Deactivate partner"
+                              title={t('partners.deactivatePartner')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1120,14 +1120,14 @@ export function AdminPage() {
                     <button
                       onClick={() => handleDeleteChecklistItem(item.name)}
                       className="text-red-400 hover:text-red-600 transition-colors p-1"
-                      title={`Remove ${item.name}`}
+                      title={`${t('page.remove')} ${item.name}`}
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 ))}
                 {checklistItems.length === 0 && (
-                  <p className="text-sm text-theme-text-faint py-4 text-center">No checklist items found. Items are created when a GPP host first views their checklist.</p>
+                  <p className="text-sm text-theme-text-faint py-4 text-center">{t('checklist.noItems')}</p>
                 )}
               </div>
 
@@ -1147,7 +1147,7 @@ export function AdminPage() {
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    placeholder="New checklist item..."
+                    placeholder={t('checklist.newItemPlaceholder')}
                     className="w-full text-sm bg-white/50 border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   />
                 </div>
@@ -1177,7 +1177,7 @@ export function AdminPage() {
               </div>
 
               <p className="text-sm text-theme-text-muted mb-4">
-                {gppDefaultCount} of {gppTotalEvents} events use the default
+                {t('gppDescription.statsText', { defaultCount: gppDefaultCount, totalEvents: gppTotalEvents })}
               </p>
 
               {descMessage && (
@@ -1192,7 +1192,7 @@ export function AdminPage() {
                 icon={FileText}
                 multiline
                 rows={8}
-                placeholder="Default description for new GPP events..."
+                placeholder={t('gppDescription.placeholder')}
                 value={gppDescription}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setGppDescription(e.target.value)}
               />
@@ -1213,7 +1213,7 @@ export function AdminPage() {
                     className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                   >
                     {showCustomized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    {gppCustomEvents.length} event{gppCustomEvents.length !== 1 ? 's' : ''} with custom descriptions
+                    {t('gppDescription.customDescriptions', { count: gppCustomEvents.length })}
                   </button>
 
                   {showCustomized && (
@@ -1299,7 +1299,7 @@ export function AdminPage() {
           {/* Analytics — RSVP Funnel */}
           <section className="mb-10">
             <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
-              Analytics
+              {t('page.analytics')}
             </h2>
             <FunnelTab regions={[]} />
           </section>

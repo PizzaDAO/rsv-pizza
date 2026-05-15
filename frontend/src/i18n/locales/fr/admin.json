@@ -3,6 +3,24 @@
   "subtitle": "Gérer les administrateurs et les sous-chefs",
   "accessDenied": "Accès refusé",
   "accessDeniedDesc": "Vous n'avez pas d'accès administrateur. Veuillez vous connecter avec un compte administrateur.",
+  "page": {
+    "exportEventsCsv": "Exporter tous les événements en CSV",
+    "graphicsAdmins": "Administrateurs graphiques",
+    "addGraphicsAdmin": "Ajouter un administrateur graphique",
+    "removeGraphicsAdmin": "Supprimer l'administrateur graphique",
+    "noGraphicsAdmins": "Aucun administrateur graphique pour le moment",
+    "regions": "Régions",
+    "analytics": "Analyses",
+    "remove": "Supprimer",
+    "removeAdminTitle": "Supprimer l'administrateur",
+    "deactivate": "Désactiver",
+    "close": "Fermer",
+    "graphicsAdminsTable": {
+      "email": "E-mail",
+      "name": "Nom",
+      "added": "Ajouté"
+    }
+  },
   "admins": {
     "title": "Administrateurs",
     "emailPlaceholder": "Adresse e-mail",
@@ -29,6 +47,8 @@
     "active": "Actif",
     "inactive": "Inactif",
     "deactivate": "Désactiver",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
     "tableHeaders": {
       "name": "Nom",
       "email": "E-mail",
@@ -99,6 +119,10 @@
     "underbossCreated": "Sous-chef créé !",
     "creating": "Création...",
     "createUnderboss": "Créer un sous-chef",
+    "namePlaceholder": "Nom",
+    "emailPlaceholder": "E-mail",
+    "regions": "Régions",
+    "close": "Fermer",
     "tabs": {
       "events": "Événements",
       "cities": "Villes",
