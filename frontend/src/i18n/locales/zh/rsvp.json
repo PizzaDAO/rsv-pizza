@@ -125,8 +125,10 @@
     "Ground Support": "后勤支持"
   },
   "dietary": {
+    "Meat": "肉类",
     "Vegetarian": "素食",
     "Vegan": "纯素",
+    "Plain": "原味",
     "Gluten-Free": "无麸质",
     "Dairy-Free": "无乳制品"
   }

@@ -125,8 +125,10 @@
     "Ground Support": "Ground Support"
   },
   "dietary": {
+    "Meat": "Meat",
     "Vegetarian": "Vegetarian",
     "Vegan": "Vegan",
+    "Plain": "Plain",
     "Gluten-Free": "Gluten-Free",
     "Dairy-Free": "Dairy-Free"
   }

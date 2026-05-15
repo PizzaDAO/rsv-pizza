@@ -125,8 +125,10 @@
     "Ground Support": "グラウンドサポート"
   },
   "dietary": {
+    "Meat": "肉",
     "Vegetarian": "ベジタリアン",
     "Vegan": "ヴィーガン",
+    "Plain": "プレーン",
     "Gluten-Free": "グルテンフリー",
     "Dairy-Free": "乳製品フリー"
   }
