@@ -634,7 +634,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
         })()}
 
         {/* Venue name and street address */}
-        {(() => {
+        {!venueField.hidden && (() => {
           const dragProps = getDragProps('venue');
           return (
             <div
@@ -731,7 +731,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
         })()}
 
         {/* Date + Time */}
-        {(() => {
+        {!timeField.hidden && (() => {
           const dragProps = getDragProps('time');
           return (
             <div

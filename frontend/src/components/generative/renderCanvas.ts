@@ -58,9 +58,9 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
   ctx.fillText(city.toUpperCase(), positions.city.x * s, positions.city.y * s);
 
   // 3) Date + Time
-  const fullTimeDisplay = timeDisplay ? `${dateDisplay}  ${timeDisplay}` : dateDisplay;
-  const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', timeField.maxFontSize * s, timeField.boxWidth * s, (timeField.minFontSize || 14) * s);
-  {
+  if (!timeField.hidden) {
+    const fullTimeDisplay = timeDisplay ? `${dateDisplay}  ${timeDisplay}` : dateDisplay;
+    const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', timeField.maxFontSize * s, timeField.boxWidth * s, (timeField.minFontSize || 14) * s);
     ctx.font = `${timeFontSize}px "Hub 191"`;
     ctx.fillStyle = CITY_COLOR;
     const dateStr = dateDisplay.toUpperCase();
@@ -74,15 +74,17 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
   }
 
   // 4) Venue name + street address
-  const venueX = positions.city.x * s;
-  const venueNameFontSize = fitText(venueName, 'Hub 191', venueField.maxFontSize * s, venueField.boxWidth * s, (venueField.minFontSize || 14) * s);
-  ctx.fillStyle = venueField.color;
-  ctx.font = `${venueNameFontSize}px "Hub 191"`;
-  ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y * s);
-  if (streetAddress) {
-    const streetFontSize = fitText(streetAddress, 'Hub 191', venueField.maxFontSize * s, venueField.boxWidth * s, (venueField.minFontSize || 14) * s);
-    ctx.font = `${streetFontSize}px "Hub 191"`;
-    ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y * s + venueNameFontSize + 4 * s);
+  if (!venueField.hidden) {
+    const venueX = positions.city.x * s;
+    const venueNameFontSize = fitText(venueName, 'Hub 191', venueField.maxFontSize * s, venueField.boxWidth * s, (venueField.minFontSize || 14) * s);
+    ctx.fillStyle = venueField.color;
+    ctx.font = `${venueNameFontSize}px "Hub 191"`;
+    ctx.fillText(venueName.toUpperCase(), venueX, positions.venue.y * s);
+    if (streetAddress) {
+      const streetFontSize = fitText(streetAddress, 'Hub 191', venueField.maxFontSize * s, venueField.boxWidth * s, (venueField.minFontSize || 14) * s);
+      ctx.font = `${streetFontSize}px "Hub 191"`;
+      ctx.fillText(streetAddress.toUpperCase(), venueX, positions.venue.y * s + venueNameFontSize + 4 * s);
+    }
   }
 
   // 5) Sponsor logos

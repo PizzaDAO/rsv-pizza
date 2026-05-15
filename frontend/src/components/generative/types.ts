@@ -9,6 +9,7 @@ export interface TextFieldConfig {
   fontFamily: string;
   maxFontSize: number;
   minFontSize?: number;
+  hidden?: boolean;
 }
 
 export interface CanvasPositions {

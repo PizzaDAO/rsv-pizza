@@ -33,6 +33,7 @@ export const ROLLUP_CONFIG: FormatConfig = {
       color: '#FFFFFF',
       fontFamily: '"Hub 191", "Comic Sans MS", "Comic Sans", cursive',
       maxFontSize: 60,
+      hidden: true,
     },
     {
       key: 'venue',
@@ -44,6 +45,7 @@ export const ROLLUP_CONFIG: FormatConfig = {
       color: '#0497C1',
       fontFamily: '"Hub 191", "Comic Sans MS", "Comic Sans", cursive',
       maxFontSize: 50,
+      hidden: true,
     },
   ],
   sponsorBox: {
