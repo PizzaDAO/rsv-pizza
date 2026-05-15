@@ -494,7 +494,14 @@ export const EventDetailsTab: React.FC = () => {
         timezone,
       }));
       if (party?.inviteCode) await loadParty(party.inviteCode);
-      if (party) triggerFlyerRegen(party, loadParty);
+      if (party) {
+        // Pass a party-shaped object with the just-saved timezone/date/duration so the
+        // regen doesn't race the React context refresh and render with stale values.
+        triggerFlyerRegen(
+          { ...party, timezone: timezone || null, date: startDateTime, duration: calculatedDuration },
+          loadParty,
+        );
+      }
     }
   };
 
@@ -1002,7 +1009,20 @@ export const EventDetailsTab: React.FC = () => {
 
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={async () => {
+          if (
+            originalValues && (
+              startDate !== originalValues.startDate ||
+              startTime !== originalValues.startTime ||
+              endDate !== originalValues.endDate ||
+              endTime !== originalValues.endTime ||
+              timezone !== originalValues.timezone
+            )
+          ) {
+            await saveDateTime();
+          }
+          setShowDateTimeModal(false);
+        }}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
 

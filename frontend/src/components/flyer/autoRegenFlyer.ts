@@ -33,6 +33,12 @@ export interface FlyerRegenData {
   eventTags?: string[];
 }
 
+/**
+ * Sponsor statuses that cause a sponsor to appear on the flyer.
+ * Keep this in sync with the filter inside `doRegen()` and any UI gates.
+ */
+export const FLYER_SPONSOR_STATUSES = new Set<string>(['yes', 'billed', 'paid']);
+
 // ---- Debounce map (partyId → timer handle) ----
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -169,7 +175,7 @@ async function doRegen(
   // 2. Fetch sponsors with logo + yes/paid status
   const sponsorResult = await getSponsors(data.id);
   const sponsors = (sponsorResult?.sponsors ?? []).filter(
-    (s) => s.logoUrl && (s.status === 'yes' || s.status === 'paid' || s.status === 'billed'),
+    (s) => s.logoUrl && FLYER_SPONSOR_STATUSES.has(s.status),
   );
 
   // 3. Derive flyer text fields, preserving user customizations from flyerConfig
