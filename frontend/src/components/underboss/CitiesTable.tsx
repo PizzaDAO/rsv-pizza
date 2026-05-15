@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
@@ -75,6 +76,7 @@ interface CitiesTableProps {
 }
 
 export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadcast }: CitiesTableProps) {
+  const { t } = useTranslation('partner');
   const [sheetCities, setSheetCities] = useState<SheetCity[]>([]);
   const [cityStatuses, setCityStatuses] = useState<CityStatusMap>({});
   const [loading, setLoading] = useState(true);
@@ -371,7 +373,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full" />
-        <span className="ml-3 text-sm text-theme-text-muted">Loading cities...</span>
+        <span className="ml-3 text-sm text-theme-text-muted">{t('cities.loading')}</span>
       </div>
     );
   }
@@ -396,7 +398,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               : 'bg-green-500/15 text-green-700 hover:bg-green-500/25'
           }`}
         >
-          {statusCounts.created} Created
+          {t('cities.statusCreatedCount', { count: statusCounts.created })}
         </button>
         <button
           onClick={() => setStatusFilter(statusFilter === 'todo' ? 'all' : 'todo')}
@@ -406,7 +408,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               : 'bg-orange-500/15 text-orange-700 hover:bg-orange-500/25'
           }`}
         >
-          {statusCounts.todo} To Do
+          {t('cities.statusTodoCount', { count: statusCounts.todo })}
         </button>
         <button
           onClick={() => setStatusFilter(statusFilter === 'skip' ? 'all' : 'skip')}
@@ -416,7 +418,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               : 'bg-gray-400/15 text-gray-600 hover:bg-gray-400/25'
           }`}
         >
-          {statusCounts.skip} Skip
+          {t('cities.statusSkipCount', { count: statusCounts.skip })}
         </button>
       </div>
 
@@ -429,7 +431,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
             type="text"
             value={search}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-            placeholder="Search cities, countries, underbosses..."
+            placeholder={t('cities.searchPlaceholder')}
             className="bg-theme-surface border border-theme-stroke rounded-lg pr-3 py-2 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
           />
         </div>
@@ -438,10 +440,10 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
           className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
         >
-          <option value="all">All Statuses</option>
-          <option value="created">Created</option>
-          <option value="todo">To Do</option>
-          <option value="skip">Skip</option>
+          <option value="all">{t('cities.statusAll')}</option>
+          <option value="created">{t('cities.statusCreated')}</option>
+          <option value="todo">{t('cities.statusTodo')}</option>
+          <option value="skip">{t('cities.statusSkip')}</option>
         </select>
       </div>
 
@@ -450,33 +452,33 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         {selectedKeys.size > 0 ? (
           <>
             <span className="text-theme-text-secondary font-medium">
-              {selectedKeys.size} selected
+              {t('cities.selected', { count: selectedKeys.size })}
             </span>
             <div className="relative">
               <button
                 onClick={() => setShowActionDropdown(!showActionDropdown)}
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
               >
-                Actions <ChevronDown size={12} />
+                {t('cities.actions')} <ChevronDown size={12} />
               </button>
               {showActionDropdown && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
                   <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
                     <button onClick={() => handleBulkStatus('created')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-theme-surface transition-colors">
-                      Set Created
+                      {t('cities.setCreated')}
                     </button>
                     <button onClick={() => handleBulkStatus('todo')} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-theme-surface transition-colors">
-                      Set To Do
+                      {t('cities.setTodo')}
                     </button>
                     <button onClick={() => handleBulkStatus('skip')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-theme-surface transition-colors">
-                      Set Skip
+                      {t('cities.setSkip')}
                     </button>
                     {onTelegramBroadcast && (
                       <>
                         <div className="border-t border-theme-stroke my-1" />
                         <button onClick={handleBulkTelegram} className="w-full text-left px-4 py-2 text-sm text-blue-500 hover:bg-theme-surface transition-colors">
-                          Send Telegram Message
+                          {t('cities.sendTelegramMessage')}
                         </button>
                       </>
                     )}
@@ -488,11 +490,11 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               onClick={() => { setSelectedKeys(new Set()); setShowActionDropdown(false); }}
               className="text-theme-text-faint hover:text-theme-text-secondary text-xs"
             >
-              Clear
+              {t('cities.clear')}
             </button>
           </>
         ) : (
-          <span className="text-theme-text-faint text-sm">No cities selected</span>
+          <span className="text-theme-text-faint text-sm">{t('cities.noCitiesSelected')}</span>
         )}
       </div>
 
@@ -510,18 +512,18 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
                   className="rounded border-theme-stroke-hover"
                 />
               </th>
-              <SortHeader field="status">Status</SortHeader>
-              <SortHeader field="city">City</SortHeader>
-              <SortHeader field="country">Country</SortHeader>
-              <SortHeader field="underboss">Underboss</SortHeader>
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Region</th>
+              <SortHeader field="status">{t('cities.tableHeaders.status')}</SortHeader>
+              <SortHeader field="city">{t('cities.tableHeaders.city')}</SortHeader>
+              <SortHeader field="country">{t('cities.tableHeaders.country')}</SortHeader>
+              <SortHeader field="underboss">{t('cities.tableHeaders.underboss')}</SortHeader>
+              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">{t('cities.tableHeaders.region')}</th>
               <th className="py-2 px-3 text-center text-xs uppercase tracking-wider text-theme-text-faint">
                 <div className="flex items-center justify-center gap-1">
                   <Camera size={10} />
-                  Photos
+                  {t('cities.tableHeaders.photos')}
                 </div>
               </th>
-              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">Actions</th>
+              <th className="py-2 px-3 text-left text-xs uppercase tracking-wider text-theme-text-faint">{t('cities.tableHeaders.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -537,7 +539,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
             {filteredCities.length === 0 && (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-theme-text-faint text-sm">
-                  No cities match your filters
+                  {t('cities.noCitiesMatch')}
                 </td>
               </tr>
             )}
@@ -552,13 +554,13 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         ))}
         {filteredCities.length === 0 && (
           <p className="py-8 text-center text-theme-text-faint text-sm">
-            No cities match your filters
+            {t('cities.noCitiesMatch')}
           </p>
         )}
       </div>
 
       <p className="text-xs text-theme-text-faint">
-        Showing {filteredCities.length} of {mergedCities.length} cities
+        {t('cities.showingOf', { shown: filteredCities.length, total: mergedCities.length })}
       </p>
     </div>
   );
@@ -566,10 +568,11 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
 
 // === Status Badge ===
 function StatusBadge({ status, isAuto, matchedEventUrl }: { status: CityStatusValue; isAuto: boolean; matchedEventUrl: string | null }) {
+  const { t } = useTranslation('partner');
   const config = {
-    created: { bg: 'bg-green-500/15', text: 'text-green-700', label: 'Created' },
-    skip: { bg: 'bg-gray-400/15', text: 'text-gray-600', label: 'Skip' },
-    todo: { bg: 'bg-orange-500/15', text: 'text-orange-700', label: 'To Do' },
+    created: { bg: 'bg-green-500/15', text: 'text-green-700', label: t('cities.statusLabels.created') },
+    skip: { bg: 'bg-gray-400/15', text: 'text-gray-600', label: t('cities.statusLabels.skip') },
+    todo: { bg: 'bg-orange-500/15', text: 'text-orange-700', label: t('cities.statusLabels.todo') },
   }[status];
 
   const badge = (
@@ -577,7 +580,7 @@ function StatusBadge({ status, isAuto, matchedEventUrl }: { status: CityStatusVa
       {config.label}
       {matchedEventUrl && <ExternalLink size={10} className="opacity-60" />}
       {isAuto && !matchedEventUrl && (
-        <span className="opacity-50 text-[10px]">(auto)</span>
+        <span className="opacity-50 text-[10px]">{t('cities.auto')}</span>
       )}
     </span>
   );
@@ -607,23 +610,24 @@ function StatusToggle({
   currentStatus: CityStatusValue;
   onStatusChange: (status: CityStatusValue) => void;
 }) {
+  const { t } = useTranslation('partner');
   const statuses: { value: CityStatusValue; icon: React.ReactNode; label: string; activeClass: string }[] = [
     {
       value: 'created',
       icon: <Check size={12} />,
-      label: 'Created',
+      label: t('cities.statusLabels.created'),
       activeClass: 'bg-green-500 text-white',
     },
     {
       value: 'todo',
       icon: <Clock size={12} />,
-      label: 'To Do',
+      label: t('cities.statusLabels.todo'),
       activeClass: 'bg-orange-500 text-white',
     },
     {
       value: 'skip',
       icon: <X size={12} />,
-      label: 'Skip',
+      label: t('cities.statusLabels.skip'),
       activeClass: 'bg-gray-500 text-white',
     },
   ];
@@ -736,6 +740,7 @@ function CityRow({
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
+  const { t } = useTranslation('partner');
   const [expanded, setExpanded] = useState(false);
   const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
@@ -811,7 +816,7 @@ function CityRow({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-theme-text-faint hover:text-blue-500 transition-colors"
-                title="Telegram group"
+                title={t('cities.telegramGroup')}
               >
                 <ExternalLink size={10} />
               </a>
@@ -856,10 +861,10 @@ function CityRow({
             {photosLoading ? (
               <div className="flex items-center gap-2 py-4">
                 <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
-                <span className="text-xs text-theme-text-muted">Loading photos...</span>
+                <span className="text-xs text-theme-text-muted">{t('cities.loadingPhotos')}</span>
               </div>
             ) : displayPhotos.length === 0 ? (
-              <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+              <p className="text-xs text-theme-text-faint py-2">{t('cities.noPhotos')}</p>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
@@ -888,7 +893,7 @@ function CityRow({
                     onClick={() => setShowAll(true)}
                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                   >
-                    Show all {displayPhotos.length} photos
+                    {t('cities.showAllPhotos', { count: displayPhotos.length })}
                   </button>
                 )}
               </div>
@@ -921,6 +926,7 @@ function CityCard({
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
+  const { t } = useTranslation('partner');
   const [expanded, setExpanded] = useState(false);
   const [displayPhotos, setDisplayPhotos] = useState<DisplayPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
@@ -998,7 +1004,7 @@ function CityCard({
       </div>
       <div className="flex items-center justify-between text-xs text-theme-text-faint">
         <div className="flex items-center gap-2">
-          <span>{city.country} &middot; {city.underboss || 'No underboss'}</span>
+          <span>{city.country} &middot; {city.underboss || t('cities.noUnderboss')}</span>
           <button
             onClick={toggleExpand}
             className="inline-flex items-center gap-1 text-theme-text-muted hover:text-theme-text-secondary cursor-pointer transition-colors"
@@ -1018,10 +1024,10 @@ function CityCard({
           {photosLoading ? (
             <div className="flex items-center gap-2 py-3">
               <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
-              <span className="text-xs text-theme-text-muted">Loading photos...</span>
+              <span className="text-xs text-theme-text-muted">{t('cities.loadingPhotos')}</span>
             </div>
           ) : displayPhotos.length === 0 ? (
-            <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+            <p className="text-xs text-theme-text-faint py-2">{t('cities.noPhotos')}</p>
           ) : (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-1.5">
@@ -1050,7 +1056,7 @@ function CityCard({
                   onClick={() => setShowAll(true)}
                   className="text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
-                  Show all {displayPhotos.length} photos
+                  {t('cities.showAllPhotos', { count: displayPhotos.length })}
                 </button>
               )}
             </div>

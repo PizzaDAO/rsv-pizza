@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
@@ -81,6 +82,7 @@ function HostStatusBadge({
   eventId: string;
   onUpdate: (status: HostStatus | null) => void;
 }) {
+  const { t } = useTranslation('partner');
   const [isOpen, setIsOpen] = useState(false);
   const current = HOST_STATUS_OPTIONS.find((o) => o.value === (status || ''));
   const displayColor = current?.color || 'text-theme-text-faint';
@@ -93,7 +95,7 @@ function HostStatusBadge({
           status ? displayColor : 'border-theme-stroke text-theme-text-faint hover:text-theme-text-muted'
         }`}
       >
-        {status || 'status'}
+        {status || t('eventRow.statusLabel')}
       </button>
       {isOpen && (
         <>
@@ -135,6 +137,7 @@ function HostTagsPills({
   eventId: string;
   onUpdate: (tags: string[]) => void;
 }) {
+  const { t } = useTranslation('partner');
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
   const presetTags = ['review', 'swc'];
@@ -169,7 +172,7 @@ function HostTagsPills({
           className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors hover:opacity-70 ${
             tagColors[tag] || 'bg-theme-surface text-theme-text-muted border-theme-stroke'
           }`}
-          title={`Remove "${tag}"`}
+          title={t('eventRow.removeTagTitle', { tag })}
         >
           {tag}
         </button>
@@ -198,7 +201,7 @@ function HostTagsPills({
               else { setIsAdding(false); setNewTag(''); }
             }}
             autoFocus
-            placeholder="tag..."
+            placeholder={t('eventRow.tagPlaceholder')}
             className="w-16 bg-transparent border-b border-theme-stroke text-[10px] text-theme-text focus:outline-none"
           />
           <button onClick={() => { setIsAdding(false); setNewTag(''); }} className="text-theme-text-faint hover:text-theme-text-muted">
@@ -206,7 +209,7 @@ function HostTagsPills({
           </button>
         </div>
       ) : (
-        <button onClick={() => setIsAdding(true)} className="text-theme-text-faint hover:text-theme-text-muted transition-colors" title="Add tag">
+        <button onClick={() => setIsAdding(true)} className="text-theme-text-faint hover:text-theme-text-muted transition-colors" title={t('eventRow.addTag')}>
           <Plus size={12} />
         </button>
       )}
@@ -289,6 +292,7 @@ function PhotoLightbox({
 }
 
 export function EventCard({ event, showRegion, onEventUpdate, isSelected, onToggleSelect }: EventCardProps) {
+  const { t } = useTranslation('partner');
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
   const [hostTags, setHostTags] = useState<string[]>(event.hostTags || []);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -399,7 +403,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
               ? 'bg-[#ff393a]/20 border-[#ff393a]/40 text-[#ff393a]'
               : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
           }`}
-          title="Select event"
+          title={t('eventRow.selectEvent')}
         >
           <Check size={12} />
         </button>
@@ -407,16 +411,16 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {event.underbossStatus === 'approved' && (
-              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="Approved" />
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title={t('eventRow.statusApproved')} />
             )}
             {event.underbossStatus === 'rejected' && (
-              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title="Rejected" />
+              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" title={t('eventRow.statusRejected')} />
             )}
             {event.underbossStatus === 'hidden' && (
-              <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title="Hidden" />
+              <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" title={t('eventRow.statusHidden')} />
             )}
             {event.underbossStatus === 'listed' && (
-              <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title="Community Listed" />
+              <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" title={t('eventRow.statusCommunityListed')} />
             )}
             <span className="text-sm font-medium text-theme-text truncate">{event.name.replace(/^Global Pizza Party\s*/i, '')}</span>
             <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="text-theme-text-faint hover:text-theme-text-secondary transition-colors shrink-0">
@@ -429,7 +433,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
                   ? 'text-amber-400 hover:text-amber-300'
                   : 'text-theme-text-faint hover:text-theme-text-secondary'
               }`}
-              title={hasNotes ? 'Edit notes' : 'Add notes'}
+              title={hasNotes ? t('eventRow.editNotes') : t('eventRow.addNotes')}
             >
               <StickyNote size={12} />
             </button>
@@ -457,7 +461,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
               <IconInput
                 icon={StickyNote}
                 iconSize={12}
-                placeholder="Underboss notes..."
+                placeholder={t('eventRow.notesPlaceholder')}
                 value={notesValue}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleNotesChange(e.target.value)}
                 onBlur={handleNotesBlur}
@@ -466,7 +470,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
                 className="bg-theme-surface border border-theme-stroke rounded-lg text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover !pl-8 py-1.5 pr-2"
               />
               {notesSaving && (
-                <span className="text-[10px] text-theme-text-faint mt-0.5 block">Saving...</span>
+                <span className="text-[10px] text-theme-text-faint mt-0.5 block">{t('eventRow.saving')}</span>
               )}
             </div>
           )}
@@ -485,7 +489,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
 
       {/* Host info */}
       <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-        <span className="text-xs text-theme-text-secondary">{event.host.name || 'Unknown'}</span>
+        <span className="text-xs text-theme-text-secondary">{event.host.name || t('eventRow.unknownHost')}</span>
         <HostStatusBadge
           status={hostStatus}
           eventId={event.id}
@@ -536,10 +540,10 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
           {photosLoading ? (
             <div className="flex items-center gap-2 py-3">
               <div className="animate-spin w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full" />
-              <span className="text-xs text-theme-text-muted">Loading photos...</span>
+              <span className="text-xs text-theme-text-muted">{t('eventRow.loadingPhotos')}</span>
             </div>
           ) : displayPhotos.length === 0 ? (
-            <p className="text-xs text-theme-text-faint py-2">No photos found</p>
+            <p className="text-xs text-theme-text-faint py-2">{t('eventRow.noPhotos')}</p>
           ) : (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-1.5">
@@ -568,7 +572,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
                   onClick={() => setShowAllPhotos(true)}
                   className="text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
-                  Show all {displayPhotos.length} photos
+                  {t('eventRow.showAllPhotos', { count: displayPhotos.length })}
                 </button>
               )}
             </div>
