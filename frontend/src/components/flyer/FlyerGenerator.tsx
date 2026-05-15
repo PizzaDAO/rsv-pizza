@@ -10,7 +10,7 @@ import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
 import { uploadEventImage, updateParty, cdnUrl, proxyAvatarToStorage } from '../../lib/supabase';
 import { uuid } from '../../lib/utils';
-import { getXAvatarUrl } from '../../utils/avatarUtils';
+import { fetchXAvatarToSupabase } from '../../utils/avatarUtils';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime, getTemplateUrl,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
@@ -350,9 +350,9 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     if (data.avatarUrl) {
       avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
     } else {
-      const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+      const xAvatar = data.twitter ? await fetchXAvatarToSupabase(data.twitter) : null;
       if (xAvatar) {
-        avatarUrl = await proxyAvatarToStorage(xAvatar);
+        avatarUrl = xAvatar;
       } else if (data.instagram) {
         const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
         avatarUrl = await proxyAvatarToStorage(igAvatar);

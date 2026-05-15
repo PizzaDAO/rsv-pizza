@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { updateParty, addGuestByHost, proxyAvatarToStorage } from '../lib/supabase';
-import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
+import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar } from '../lib/supabase';
+import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 
@@ -38,6 +38,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
+  const [newCoHostAvatarFile, setNewCoHostAvatarFile] = useState<File | null>(null);
   const [newCoHostShowOnEvent, setNewCoHostShowOnEvent] = useState(true);
   const [newCoHostCanEdit, setNewCoHostCanEdit] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -49,7 +50,53 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [editHostTwitter, setEditHostTwitter] = useState('');
   const [editHostInstagram, setEditHostInstagram] = useState('');
   const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
+  const [editHostAvatarFile, setEditHostAvatarFile] = useState<File | null>(null);
+  const [savingHost, setSavingHost] = useState(false);
   const [expandedPermissionsId, setExpandedPermissionsId] = useState<string | null>(null);
+
+  const newAvatarInputRef = useRef<HTMLInputElement>(null);
+  const editAvatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Manage object-URL preview for the locally-selected file (Add modal)
+  const newAvatarFilePreview = React.useMemo(
+    () => (newCoHostAvatarFile ? URL.createObjectURL(newCoHostAvatarFile) : null),
+    [newCoHostAvatarFile]
+  );
+  useEffect(() => {
+    return () => {
+      if (newAvatarFilePreview) URL.revokeObjectURL(newAvatarFilePreview);
+    };
+  }, [newAvatarFilePreview]);
+
+  // Manage object-URL preview for the locally-selected file (Edit modal)
+  const editAvatarFilePreview = React.useMemo(
+    () => (editHostAvatarFile ? URL.createObjectURL(editHostAvatarFile) : null),
+    [editHostAvatarFile]
+  );
+  useEffect(() => {
+    return () => {
+      if (editAvatarFilePreview) URL.revokeObjectURL(editAvatarFilePreview);
+    };
+  }, [editAvatarFilePreview]);
+
+  const handleNewAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    setNewCoHostAvatarFile(file);
+    // Clear any URL-based avatar (file takes precedence)
+    setNewCoHostAvatarUrl('');
+  };
+
+  const handleEditAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    setEditHostAvatarFile(file);
+    setEditHostAvatarUrl('');
+  };
 
   // Tabs available for permission assignment (exclude 'apps' which is always visible)
   const permissionTabs = ALL_HOST_TABS.filter(t => t.id !== 'apps');
@@ -110,40 +157,51 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
   const addCoHost = async () => {
     if (!newCoHostName.trim()) return;
+    if (savingHost) return;
+    setSavingHost(true);
 
-    // Proxy external avatar to storage
-    const avatarUrl = newCoHostAvatarUrl.trim()
-      ? await proxyAvatarToStorage(newCoHostAvatarUrl.trim())
-      : undefined;
+    try {
+      // Upload local file first; otherwise proxy any external URL through storage
+      let avatarUrl: string | undefined;
+      if (newCoHostAvatarFile) {
+        const uploaded = await uploadCoHostAvatar(newCoHostAvatarFile);
+        if (uploaded) avatarUrl = uploaded;
+      } else if (newCoHostAvatarUrl.trim()) {
+        avatarUrl = await proxyAvatarToStorage(newCoHostAvatarUrl.trim());
+      }
 
-    const newCoHost: CoHost = {
-      id: uuid(),
-      name: newCoHostName.trim(),
-      email: newCoHostEmail.trim().toLowerCase() || undefined,
-      website: newCoHostWebsite.trim() || undefined,
-      twitter: newCoHostTwitter.trim() || undefined,
-      instagram: newCoHostInstagram.trim() || undefined,
-      avatar_url: avatarUrl,
-      showOnEvent: newCoHostShowOnEvent,
-      canEdit: newCoHostCanEdit || undefined,
-    };
+      const newCoHost: CoHost = {
+        id: uuid(),
+        name: newCoHostName.trim(),
+        email: newCoHostEmail.trim().toLowerCase() || undefined,
+        website: newCoHostWebsite.trim() || undefined,
+        twitter: newCoHostTwitter.trim() || undefined,
+        instagram: newCoHostInstagram.trim() || undefined,
+        avatar_url: avatarUrl,
+        showOnEvent: newCoHostShowOnEvent,
+        canEdit: newCoHostCanEdit || undefined,
+      };
 
-    const newCoHosts = [...coHosts, newCoHost];
-    setCoHosts(newCoHosts);
+      const newCoHosts = [...coHosts, newCoHost];
+      setCoHosts(newCoHosts);
 
-    // Reset form and close modal
-    setNewCoHostName('');
-    setNewCoHostEmail('');
-    setNewCoHostWebsite('');
-    setNewCoHostTwitter('');
-    setNewCoHostInstagram('');
-    setNewCoHostAvatarUrl('');
-    setNewCoHostShowOnEvent(true);
-    setNewCoHostCanEdit(false);
-    setShowAddHostModal(false);
+      // Reset form and close modal
+      setNewCoHostName('');
+      setNewCoHostEmail('');
+      setNewCoHostWebsite('');
+      setNewCoHostTwitter('');
+      setNewCoHostInstagram('');
+      setNewCoHostAvatarUrl('');
+      setNewCoHostAvatarFile(null);
+      setNewCoHostShowOnEvent(true);
+      setNewCoHostCanEdit(false);
+      setShowAddHostModal(false);
 
-    // Auto-save
-    await saveCoHostsArray(newCoHosts);
+      // Auto-save
+      await saveCoHostsArray(newCoHosts);
+    } finally {
+      setSavingHost(false);
+    }
   };
 
   const startEditingHost = (host: CoHost) => {
@@ -154,6 +212,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostTwitter(host.twitter || '');
     setEditHostInstagram(host.instagram || '');
     setEditHostAvatarUrl(host.avatar_url || '');
+    setEditHostAvatarFile(null);
   };
 
   const cancelEditingHost = () => {
@@ -164,33 +223,44 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostTwitter('');
     setEditHostInstagram('');
     setEditHostAvatarUrl('');
+    setEditHostAvatarFile(null);
   };
 
   const saveHostEdit = async () => {
     if (!editHostName.trim()) return;
+    if (savingHost) return;
+    setSavingHost(true);
 
-    // Proxy external avatar to storage
-    const avatarUrl = editHostAvatarUrl.trim()
-      ? await proxyAvatarToStorage(editHostAvatarUrl.trim())
-      : undefined;
+    try {
+      // Upload local file first; otherwise proxy any external URL through storage
+      let avatarUrl: string | undefined;
+      if (editHostAvatarFile) {
+        const uploaded = await uploadCoHostAvatar(editHostAvatarFile);
+        if (uploaded) avatarUrl = uploaded;
+      } else if (editHostAvatarUrl.trim()) {
+        avatarUrl = await proxyAvatarToStorage(editHostAvatarUrl.trim());
+      }
 
-    const newCoHosts = coHosts.map(h =>
-      h.id === editingHostId
-        ? {
-          ...h,
-          name: editHostName.trim(),
-          email: editHostEmail.trim().toLowerCase() || undefined,
-          website: editHostWebsite.trim() || undefined,
-          twitter: editHostTwitter.trim() || undefined,
-          instagram: editHostInstagram.trim() || undefined,
-          avatar_url: avatarUrl,
-        }
-        : h
-    );
-    setCoHosts(newCoHosts);
-    // Auto-save
-    await saveCoHostsArray(newCoHosts);
-    cancelEditingHost();
+      const newCoHosts = coHosts.map(h =>
+        h.id === editingHostId
+          ? {
+            ...h,
+            name: editHostName.trim(),
+            email: editHostEmail.trim().toLowerCase() || undefined,
+            website: editHostWebsite.trim() || undefined,
+            twitter: editHostTwitter.trim() || undefined,
+            instagram: editHostInstagram.trim() || undefined,
+            avatar_url: avatarUrl,
+          }
+          : h
+      );
+      setCoHosts(newCoHosts);
+      // Auto-save
+      await saveCoHostsArray(newCoHosts);
+      cancelEditingHost();
+    } finally {
+      setSavingHost(false);
+    }
   };
 
   const removeCoHost = async (id: string) => {
@@ -460,37 +530,30 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="url"
-                  value={editHostWebsite}
-                  onChange={(e) => setEditHostWebsite(e.target.value)}
-                  onBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
-                  placeholder="Website"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-                <input
-                  type="url"
-                  value={editHostAvatarUrl}
-                  onChange={(e) => setEditHostAvatarUrl(e.target.value)}
-                  placeholder="Avatar URL"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
+              <input
+                type="url"
+                value={editHostWebsite}
+                onChange={(e) => setEditHostWebsite(e.target.value)}
+                onBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
+                placeholder="Website"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
                   value={editHostTwitter}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setEditHostTwitter(val);
-                    if (!editHostAvatarUrl.trim() || isAutoFilledXAvatar(editHostAvatarUrl)) {
-                      const avatarUrl = getXAvatarUrl(val);
-                      if (avatarUrl) setEditHostAvatarUrl(avatarUrl);
-                    }
+                  onChange={(e) => setEditHostTwitter(e.target.value)}
+                  onBlur={async () => {
+                    const handle = stripToHandle(editHostTwitter);
+                    setEditHostTwitter(handle);
+                    if (!handle) return;
+                    // Only auto-fill if avatar slot is empty or holding a legacy unavatar URL
+                    if (editHostAvatarFile) return;
+                    if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
+                    const fetched = await fetchXAvatarToSupabase(handle);
+                    if (fetched) setEditHostAvatarUrl(fetched);
                   }}
-                  onBlur={() => setEditHostTwitter(stripToHandle(editHostTwitter))}
                   placeholder="Twitter (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -503,20 +566,45 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
-            </div>
 
-            {/* Avatar Preview */}
-            {editHostAvatarUrl && (
-              <div className="flex items-center gap-2 mt-2">
-                <img
-                  src={editHostAvatarUrl}
-                  alt=""
-                  className="w-8 h-8 rounded-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              {/* Avatar upload */}
+              <div>
+                <input
+                  ref={editAvatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditAvatarFileChange}
+                  className="hidden"
                 />
-                <span className="text-xs text-theme-text-muted">Avatar preview</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => editAvatarInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
+                  >
+                    <Upload size={16} />
+                    Upload avatar
+                  </button>
+                  {(editAvatarFilePreview || editHostAvatarUrl) && (
+                    <>
+                      <img
+                        src={editAvatarFilePreview || editHostAvatarUrl}
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover border border-white/20"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); }}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             <div className="flex gap-3 mt-4">
               <button
@@ -529,10 +617,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <button
                 type="button"
                 onClick={saveHostEdit}
-                disabled={!editHostName.trim()}
+                disabled={!editHostName.trim() || savingHost}
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
-                Save
+                {savingHost ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -563,37 +651,29 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="url"
-                  value={newCoHostWebsite}
-                  onChange={(e) => setNewCoHostWebsite(e.target.value)}
-                  onBlur={() => setNewCoHostWebsite(normalizeUrl(newCoHostWebsite))}
-                  placeholder="Website"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-                <input
-                  type="url"
-                  value={newCoHostAvatarUrl}
-                  onChange={(e) => setNewCoHostAvatarUrl(e.target.value)}
-                  placeholder="Avatar URL"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
+              <input
+                type="url"
+                value={newCoHostWebsite}
+                onChange={(e) => setNewCoHostWebsite(e.target.value)}
+                onBlur={() => setNewCoHostWebsite(normalizeUrl(newCoHostWebsite))}
+                placeholder="Website"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
                   value={newCoHostTwitter}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNewCoHostTwitter(val);
-                    if (!newCoHostAvatarUrl.trim() || isAutoFilledXAvatar(newCoHostAvatarUrl)) {
-                      const avatarUrl = getXAvatarUrl(val);
-                      if (avatarUrl) setNewCoHostAvatarUrl(avatarUrl);
-                    }
+                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                  onBlur={async () => {
+                    const handle = stripToHandle(newCoHostTwitter);
+                    setNewCoHostTwitter(handle);
+                    if (!handle) return;
+                    if (newCoHostAvatarFile) return;
+                    if (newCoHostAvatarUrl.trim() && !isAutoFilledXAvatar(newCoHostAvatarUrl)) return;
+                    const fetched = await fetchXAvatarToSupabase(handle);
+                    if (fetched) setNewCoHostAvatarUrl(fetched);
                   }}
-                  onBlur={() => setNewCoHostTwitter(stripToHandle(newCoHostTwitter))}
                   placeholder="Twitter (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -606,20 +686,45 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
-            </div>
 
-            {/* Avatar Preview */}
-            {newCoHostAvatarUrl && (
-              <div className="flex items-center gap-2 mt-2">
-                <img
-                  src={newCoHostAvatarUrl}
-                  alt=""
-                  className="w-8 h-8 rounded-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              {/* Avatar upload */}
+              <div>
+                <input
+                  ref={newAvatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleNewAvatarFileChange}
+                  className="hidden"
                 />
-                <span className="text-xs text-theme-text-muted">Avatar preview</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => newAvatarInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
+                  >
+                    <Upload size={16} />
+                    Upload avatar
+                  </button>
+                  {(newAvatarFilePreview || newCoHostAvatarUrl) && (
+                    <>
+                      <img
+                        src={newAvatarFilePreview || newCoHostAvatarUrl}
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover border border-white/20"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); }}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             <div className="flex items-center gap-4 mt-3">
               <Checkbox
@@ -649,11 +754,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <button
                 type="button"
                 onClick={addCoHost}
-                disabled={!newCoHostName.trim()}
+                disabled={!newCoHostName.trim() || savingHost}
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
               >
                 <UserPlus size={16} />
-                Add Host
+                {savingHost ? 'Adding...' : 'Add Host'}
               </button>
             </div>
           </div>
