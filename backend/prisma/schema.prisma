@@ -74,6 +74,10 @@ model Party {
   eventImageUrl           String?   @map("event_image_url")
   flyerGeneratedAt        DateTime? @map("flyer_generated_at") @db.Timestamptz
   flyerConfig             Json?     @map("flyer_config")
+  posterImageUrl          String?   @map("poster_image_url")
+  posterGeneratedAt       DateTime? @map("poster_generated_at") @db.Timestamptz
+  rollupImageUrl          String?   @map("rollup_image_url")
+  rollupGeneratedAt       DateTime? @map("rollup_generated_at") @db.Timestamptz
   description             String?
   rsvpClosedAt            DateTime? @map("rsvp_closed_at") @db.Timestamptz
   createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz

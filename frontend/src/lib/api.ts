@@ -159,6 +159,10 @@ export interface UpdatePartyData {
   region?: string | null;
   flyerGeneratedAt?: string | null;
   flyerConfig?: Record<string, any> | null;
+  posterImageUrl?: string | null;
+  posterGeneratedAt?: string | null;
+  rollupImageUrl?: string | null;
+  rollupGeneratedAt?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   lumaUrl?: string | null;
@@ -257,6 +261,10 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       region: data.region,
       flyerGeneratedAt: data.flyerGeneratedAt,
       flyerConfig: data.flyerConfig,
+      posterImageUrl: data.posterImageUrl,
+      posterGeneratedAt: data.posterGeneratedAt,
+      rollupImageUrl: data.rollupImageUrl,
+      rollupGeneratedAt: data.rollupGeneratedAt,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
       lumaUrl: data.lumaUrl,
