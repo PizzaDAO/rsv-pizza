@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
-import { GPPEventMapItem } from '../lib/api';
+import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
 
 interface GPPEventsMapProps {
   events: GPPEventMapItem[];
@@ -14,8 +14,13 @@ export default function GPPEventsMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const markerByEventIdRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const eventByIdRef = useRef<Map<string, GPPEventMapItem>>(new Map());
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const infoWindowListenerRef = useRef<google.maps.MapsEventListener | null>(
+    null
+  );
   const [error, setError] = useState(false);
 
   // Filter out events with no valid coordinates
@@ -42,9 +47,17 @@ export default function GPPEventsMap({
     const initMap = () => {
       if (!containerRef.current) return;
 
+      // Populate event lookup ref (kept in sync with marker rebuild)
+      const eventIndex = new Map<string, GPPEventMapItem>();
+      for (const ev of validEvents) {
+        eventIndex.set(ev.id, ev);
+      }
+      eventByIdRef.current = eventIndex;
+
       // Clean up previous markers & clusterer
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
+      markerByEventIdRef.current.clear();
       if (clustererRef.current) {
         clustererRef.current.clearMarkers();
         clustererRef.current = null;
@@ -129,6 +142,24 @@ export default function GPPEventsMap({
 
         const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">View Event &rarr;</a>`;
 
+        let actionsHtml = '';
+        if (event.underbossStatus === 'approved') {
+          actionsHtml = `
+            <span style="background:#dcfce7;color:#16a34a;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Approved</span>
+            <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
+          `;
+        } else if (event.underbossStatus === 'rejected') {
+          actionsHtml = `
+            <span style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Rejected</span>
+            <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
+          `;
+        } else {
+          actionsHtml = `
+            <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
+            <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
+          `;
+        }
+
         return `
           <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
             <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${event.name}</h3>
@@ -139,9 +170,81 @@ export default function GPPEventsMap({
               ${linkHtml}
               ${rsvpHtml}
             </div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${actionsHtml}
+            </div>
           </div>
         `;
       }
+
+      async function onActionClick(e: Event) {
+        const button = e.currentTarget as HTMLButtonElement;
+        const action = button.dataset.action as 'approve' | 'reject';
+        const eventId = button.dataset.eventId;
+        if (!action || !eventId) return;
+
+        const actionButtons = document.querySelectorAll<HTMLButtonElement>(
+          '[data-action][data-event-id]'
+        );
+        const originalText = button.textContent;
+        actionButtons.forEach((b) => {
+          b.disabled = true;
+        });
+        button.textContent = 'Saving…';
+
+        try {
+          await updateUnderbossStatus(
+            eventId,
+            action === 'approve' ? 'approved' : 'rejected'
+          );
+        } catch (err) {
+          alert((err as Error).message || 'Failed to update');
+          actionButtons.forEach((b) => {
+            b.disabled = false;
+          });
+          button.textContent = originalText;
+          return;
+        }
+
+        const current = eventByIdRef.current.get(eventId);
+        if (!current) return;
+        const updated: GPPEventMapItem = {
+          ...current,
+          underbossStatus: action === 'approve' ? 'approved' : 'rejected',
+        };
+
+        // Mutate ref directly — no state update, so no useEffect re-run
+        eventByIdRef.current.set(eventId, updated);
+
+        infoWindow.setContent(buildInfoContent(updated));
+
+        if (action === 'reject') {
+          const marker = markerByEventIdRef.current.get(eventId);
+          if (marker) {
+            clustererRef.current?.removeMarker(marker);
+            marker.setMap(null);
+            markerByEventIdRef.current.delete(eventId);
+            markersRef.current = markersRef.current.filter((m) => m !== marker);
+          }
+        }
+      }
+
+      function attachActionHandlers() {
+        const buttons = document.querySelectorAll<HTMLButtonElement>(
+          '[data-action][data-event-id]'
+        );
+        buttons.forEach((b) => {
+          b.addEventListener('click', onActionClick);
+        });
+      }
+
+      if (infoWindowListenerRef.current) {
+        infoWindowListenerRef.current.remove();
+      }
+      infoWindowListenerRef.current = infoWindow.addListener(
+        'domready',
+        attachActionHandlers
+      );
 
       // Build markers
       const markers: google.maps.Marker[] = [];
@@ -164,12 +267,15 @@ export default function GPPEventsMap({
           },
         });
 
+        const eventId = event.id;
         marker.addListener('click', () => {
-          infoWindow.setContent(buildInfoContent(event));
+          const latest = eventByIdRef.current.get(eventId) ?? event;
+          infoWindow.setContent(buildInfoContent(latest));
           infoWindow.open(map, marker);
         });
 
         markers.push(marker);
+        markerByEventIdRef.current.set(event.id, marker);
       }
 
       markersRef.current = markers;
