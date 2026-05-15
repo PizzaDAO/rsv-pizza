@@ -14,7 +14,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'city',
       label: 'City',
-      defaultX: 4,
+      defaultX: 40,
       defaultY: 800,
       boxWidth: 700,
       boxHeight: 72,
@@ -25,7 +25,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'time',
       label: 'Time',
-      defaultX: 4,
+      defaultX: 40,
       defaultY: 880,
       boxWidth: 700,
       boxHeight: 60,
@@ -36,7 +36,7 @@ export const POSTER_CONFIG: FormatConfig = {
     {
       key: 'venue',
       label: 'Venue',
-      defaultX: 4,
+      defaultX: 40,
       defaultY: 950,
       boxWidth: 700,
       boxHeight: 110,
