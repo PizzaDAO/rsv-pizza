@@ -93,6 +93,7 @@
     "selected": "已选择 {{count}} 个",
     "actions": "操作",
     "approve": "批准",
+    "hide": "隐藏",
     "cancelEvent": "取消活动",
     "sendTelegram": "发送 Telegram",
     "copyCities": "复制城市",

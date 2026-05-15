@@ -93,6 +93,7 @@
     "selected": "{{count}}件選択中",
     "actions": "操作",
     "approve": "承認",
+    "hide": "非表示",
     "cancelEvent": "イベントをキャンセル",
     "sendTelegram": "Telegramを送信",
     "copyCities": "都市をコピー",

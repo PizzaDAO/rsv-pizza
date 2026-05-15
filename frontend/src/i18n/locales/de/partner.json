@@ -93,6 +93,7 @@
     "selected": "{{count}} ausgewählt",
     "actions": "Aktionen",
     "approve": "Genehmigen",
+    "hide": "Ausblenden",
     "cancelEvent": "Event absagen",
     "sendTelegram": "Telegram senden",
     "copyCities": "Städte kopieren",

@@ -1,6 +1,7 @@
 {
   "title": "来宾签到",
   "loading": "正在签到...",
+  "vouching": "验证中…",
   "success": {
     "title": "签到成功！",
     "backToDashboard": "返回活动面板"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "已签到",
     "checkedInAt": "签到时间：{{time}}"
+  },
+  "notCheckedIn": {
+    "title": "尚未签到",
+    "message": "您尚未签到。请在活动现场找到主办方。"
   },
   "unauthorized": {
     "title": "未授权",

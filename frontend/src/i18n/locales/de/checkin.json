@@ -1,6 +1,7 @@
 {
   "title": "Gäste-Check-in",
   "loading": "Gast wird eingecheckt...",
+  "vouching": "Bestätigung…",
   "success": {
     "title": "Eingecheckt!",
     "backToDashboard": "Zurück zum Event-Dashboard"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Bereits eingecheckt",
     "checkedInAt": "Eingecheckt um {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Nicht eingecheckt",
+    "message": "Du wurdest noch nicht eingecheckt. Bitte finde einen Veranstalter vor Ort."
   },
   "unauthorized": {
     "title": "Nicht autorisiert",

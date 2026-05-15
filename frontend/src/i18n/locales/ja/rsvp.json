@@ -12,7 +12,8 @@
     "swcNotify": "今後のStand With Cryptoイベントについて通知を受け取る。",
     "swcBrNotify": "Juntos por Cripto のイベントについて通知してください。",
     "ethconfDiscount": "ETHConf割引を送ってほしい",
-    "next": "次へ"
+    "next": "次へ",
+    "selectTurtles": "タートルを選択"
   },
   "step2": {
     "title": "ピザリクエスト",

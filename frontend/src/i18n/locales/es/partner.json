@@ -93,6 +93,7 @@
     "selected": "{{count}} seleccionados",
     "actions": "Acciones",
     "approve": "Aprobar",
+    "hide": "Ocultar",
     "cancelEvent": "Cancelar Evento",
     "sendTelegram": "Enviar Telegram",
     "copyCities": "Copiar Ciudades",
