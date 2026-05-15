@@ -19,7 +19,7 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
 import { uuid } from '../lib/utils';
-import { getXAvatarUrl } from '../utils/avatarUtils';
+import { fetchXAvatarToSupabase } from '../utils/avatarUtils';
 import { CoHost } from '../types';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
@@ -271,9 +271,9 @@ function HostPageContent() {
               if (data.avatarUrl) {
                 avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
               } else {
-                const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                const xAvatar = data.twitter ? await fetchXAvatarToSupabase(data.twitter) : null;
                 if (xAvatar) {
-                  avatarUrl = await proxyAvatarToStorage(xAvatar);
+                  avatarUrl = xAvatar;
                 } else if (data.instagram) {
                   const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
                   avatarUrl = await proxyAvatarToStorage(igAvatar);

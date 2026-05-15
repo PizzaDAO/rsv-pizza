@@ -8,7 +8,7 @@ import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { getUserSponsorships, UserSponsorshipEntry } from '../lib/api';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
-import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
+import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -459,9 +459,9 @@ export function AccountPage() {
                     type="text"
                     value={twitter}
                     onChange={(e) => setTwitter(e.target.value)}
-                    onBlur={() => {
+                    onBlur={async () => {
                       if (twitter.trim() && !profilePictureFile && (!profilePicture || isAutoFilledXAvatar(profilePicture))) {
-                        const avatarUrl = getXAvatarUrl(twitter);
+                        const avatarUrl = await fetchXAvatarToSupabase(twitter);
                         if (avatarUrl) setProfilePicture(avatarUrl);
                       }
                     }}

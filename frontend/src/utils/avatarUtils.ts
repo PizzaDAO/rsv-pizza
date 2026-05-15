@@ -1,16 +1,46 @@
+import { proxyAvatarToStorage } from '../lib/supabase';
+
+const HANDLE_RE = /^[a-zA-Z0-9_]{1,15}$/;
+
 /**
- * Generate an avatar URL from an X/Twitter username using unavatar.io
+ * Normalize an X/Twitter handle from a raw URL or @-handle.
+ * Returns null if the input doesn't resolve to a valid handle.
  */
-export function getXAvatarUrl(username: string): string | null {
-  const cleaned = username.replace(/^@/, '').trim();
-  if (!cleaned) return null;
-  if (!/^[a-zA-Z0-9_]{1,15}$/.test(cleaned)) return null;
-  return `https://unavatar.io/x/${cleaned}`;
+export function cleanXHandle(input: string): string | null {
+  if (!input) return null;
+  let h = input.trim();
+  if (!h) return null;
+  h = h.replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com)\//i, '');
+  h = h.split(/[/?#]/)[0];
+  h = h.replace(/^@/, '').trim();
+  return HANDLE_RE.test(h) ? h : null;
 }
 
 /**
- * Check if a URL is an auto-filled unavatar.io X avatar
+ * Fetch the real X profile picture via fxtwitter, mirror it to Supabase storage,
+ * and return the public URL. Returns null if the lookup or upload fails.
  */
-export function isAutoFilledXAvatar(url: string): boolean {
-  return url.trim().startsWith('https://unavatar.io/x/');
+export async function fetchXAvatarToSupabase(handleOrUrl: string): Promise<string | null> {
+  const handle = cleanXHandle(handleOrUrl);
+  if (!handle) return null;
+  try {
+    const res = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.code !== 200 || !json.user?.avatar_url) return null;
+    const big = String(json.user.avatar_url).replace(/_normal(\.[a-zA-Z0-9]+)$/, '_400x400$1');
+    // Mirror twimg URL into Supabase storage
+    return await proxyAvatarToStorage(big);
+  } catch {
+    return null;
+  }
 }
+
+/**
+ * Detect URLs that came from the legacy unavatar.io X auto-fill so that the X
+ * onBlur handler can safely replace them. User-uploaded files (Supabase
+ * storage URLs) and other manually-set avatars return false so we don't
+ * clobber them on blur.
+ */
+export const isAutoFilledXAvatar = (url: string): boolean =>
+  url.trim().startsWith('https://unavatar.io/x/');
