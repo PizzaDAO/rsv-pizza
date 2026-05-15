@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { fetchFunnelStats } from '../../lib/api';
 import type { FunnelStats, FunnelEventStats } from '../../lib/api';
@@ -26,6 +27,7 @@ function FunnelBar({ label, value, max, color }: { label: string; value: number;
 }
 
 export function FunnelTab({ regions }: FunnelTabProps) {
+  const { t } = useTranslation('partner');
   const [data, setData] = useState<FunnelStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,40 +55,42 @@ export function FunnelTab({ regions }: FunnelTabProps) {
   }
 
   if (!data || !data.totals || !data.events) {
-    return <p className="text-white/60 text-center py-8">Failed to load funnel data.</p>;
+    return <p className="text-white/60 text-center py-8">{t('funnel.loadFailed')}</p>;
   }
 
   const { totals, events } = data;
   const maxVal = Math.max(totals.views || 0, 1);
+  const openRatePct = totals.views > 0 ? Math.round((totals.opened / totals.views) * 100) : 0;
+  const completionPct = totals.opened > 0 ? Math.round((totals.submitted / totals.opened) * 100) : 0;
 
   return (
     <div className="space-y-6">
       {/* Aggregate funnel */}
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Overall RSVP Funnel</h3>
-        <FunnelBar label="Views" value={totals.views || 0} max={maxVal} color="bg-blue-500" />
-        <FunnelBar label="Opened" value={totals.opened || 0} max={maxVal} color="bg-cyan-500" />
-        <FunnelBar label="Step 1" value={totals.step1Complete || 0} max={maxVal} color="bg-amber-500" />
-        <FunnelBar label="Submitted" value={totals.submitted || 0} max={maxVal} color="bg-green-500" />
+        <h3 className="text-lg font-semibold text-white mb-4">{t('funnel.overallTitle')}</h3>
+        <FunnelBar label={t('funnel.labels.views')} value={totals.views || 0} max={maxVal} color="bg-blue-500" />
+        <FunnelBar label={t('funnel.labels.opened')} value={totals.opened || 0} max={maxVal} color="bg-cyan-500" />
+        <FunnelBar label={t('funnel.labels.step1')} value={totals.step1Complete || 0} max={maxVal} color="bg-amber-500" />
+        <FunnelBar label={t('funnel.labels.submitted')} value={totals.submitted || 0} max={maxVal} color="bg-green-500" />
         <div className="mt-3 text-xs text-white/50 flex gap-4">
-          <span>Open rate: {totals.views > 0 ? Math.round((totals.opened / totals.views) * 100) : 0}%</span>
-          <span>Completion: {totals.opened > 0 ? Math.round((totals.submitted / totals.opened) * 100) : 0}%</span>
+          <span>{t('funnel.openRate', { pct: openRatePct })}</span>
+          <span>{t('funnel.completion', { pct: completionPct })}</span>
         </div>
       </div>
 
       {/* Per-event table */}
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 overflow-x-auto">
-        <h3 className="text-lg font-semibold text-white mb-4">Per-Event Breakdown</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">{t('funnel.perEventTitle')}</h3>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-white/60 border-b border-white/10">
-              <th className="text-left py-2 px-2">Event</th>
-              <th className="text-left py-2 px-2">City</th>
-              <th className="text-right py-2 px-2">Views</th>
-              <th className="text-right py-2 px-2">Opened</th>
-              <th className="text-right py-2 px-2">Step 1</th>
-              <th className="text-right py-2 px-2">Submitted</th>
-              <th className="text-right py-2 px-2">Conv %</th>
+              <th className="text-left py-2 px-2">{t('funnel.tableHeaders.event')}</th>
+              <th className="text-left py-2 px-2">{t('funnel.tableHeaders.city')}</th>
+              <th className="text-right py-2 px-2">{t('funnel.tableHeaders.views')}</th>
+              <th className="text-right py-2 px-2">{t('funnel.tableHeaders.opened')}</th>
+              <th className="text-right py-2 px-2">{t('funnel.tableHeaders.step1')}</th>
+              <th className="text-right py-2 px-2">{t('funnel.tableHeaders.submitted')}</th>
+              <th className="text-right py-2 px-2">{t('funnel.tableHeaders.conversion')}</th>
             </tr>
           </thead>
           <tbody>
@@ -106,7 +110,7 @@ export function FunnelTab({ regions }: FunnelTabProps) {
           </tbody>
         </table>
         {events.length === 0 && (
-          <p className="text-center text-white/50 py-4">No funnel data yet.</p>
+          <p className="text-center text-white/50 py-4">{t('funnel.noData')}</p>
         )}
       </div>
     </div>
