@@ -1,12 +1,15 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, SlidersHorizontal, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { fetchGppEventsForMap, fetchUnderbossMe, GPPEventMapItem } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal } from '../components/LoginModal';
 
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
+
+const STATUS_FILTER_KEYS = ['approved', 'pending', 'listed', 'rejected'] as const;
+type StatusFilterKey = (typeof STATUS_FILTER_KEYS)[number];
 
 export function EventsMapPage() {
   const { user, loading: authLoading } = useAuth();
@@ -17,10 +20,19 @@ export function EventsMapPage() {
   const [canModerate, setCanModerate] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Filter state (only renders for moderators, but declared unconditionally for hook rules)
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusIncludes, setStatusIncludes] = useState<string[]>([]);
+  const [statusExcludes, setStatusExcludes] = useState<string[]>([]);
+  const [searchQ, setSearchQ] = useState('');
+  const [debouncedSearchQ, setDebouncedSearchQ] = useState('');
+  const [tagFilter, setTagFilter] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+
   const loadEvents = (moderator: boolean) => {
     setLoading(true);
     setError(null);
-    fetchGppEventsForMap(false, !moderator)
+    fetchGppEventsForMap(false, !moderator, moderator)
       .then((data) => {
         setEvents(data);
         setLoading(false);
@@ -36,7 +48,7 @@ export function EventsMapPage() {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const data = await fetchGppEventsForMap(true, !canModerate);
+      const data = await fetchGppEventsForMap(true, !canModerate, !!canModerate);
       setEvents(data);
     } catch (err) {
       console.error('Failed to refresh events:', err);
@@ -70,8 +82,104 @@ export function EventsMapPage() {
     resolveModeratorStatus();
   }, [user, authLoading]);
 
-  // Count unique cities
-  const cityCount = new Set(events.map((e) => e.city)).size;
+  // Debounce search input (200ms) — mirrors EventTable behavior.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchQ(searchQ), 200);
+    return () => clearTimeout(handle);
+  }, [searchQ]);
+
+  function getStatusFilterState(key: string): 'neutral' | 'include' | 'exclude' {
+    if (statusIncludes.includes(key)) return 'include';
+    if (statusExcludes.includes(key)) return 'exclude';
+    return 'neutral';
+  }
+
+  function setStatusFilterState(key: string, newState: 'neutral' | 'include' | 'exclude') {
+    setStatusIncludes((prev) => prev.filter((k) => k !== key));
+    setStatusExcludes((prev) => prev.filter((k) => k !== key));
+    if (newState === 'include') {
+      setStatusIncludes((prev) => [...prev, key]);
+    } else if (newState === 'exclude') {
+      setStatusExcludes((prev) => [...prev, key]);
+    }
+  }
+
+  const availableTags = useMemo(
+    () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
+    [events]
+  );
+  const availableCountries = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          events
+            .map((e) => e.country)
+            .filter((c): c is string => !!c)
+        )
+      ).sort(),
+    [events]
+  );
+
+  // Match an event against a status key. "pending" treats null/undefined as pending too.
+  function eventMatchesStatus(e: GPPEventMapItem, key: string): boolean {
+    if (key === 'pending') {
+      return e.underbossStatus === 'pending' || e.underbossStatus == null;
+    }
+    return e.underbossStatus === key;
+  }
+
+  const filteredEvents = useMemo(() => {
+    let result = events;
+
+    if (statusIncludes.length > 0) {
+      result = result.filter((e) => statusIncludes.every((k) => eventMatchesStatus(e, k)));
+    }
+    if (statusExcludes.length > 0) {
+      result = result.filter((e) => statusExcludes.every((k) => !eventMatchesStatus(e, k)));
+    }
+
+    const q = debouncedSearchQ.trim().toLowerCase();
+    if (q) {
+      result = result.filter(
+        (e) =>
+          e.name?.toLowerCase().includes(q) ||
+          e.city?.toLowerCase().includes(q) ||
+          e.venueName?.toLowerCase().includes(q) ||
+          e.address?.toLowerCase().includes(q) ||
+          e.country?.toLowerCase().includes(q)
+      );
+    }
+
+    if (tagFilter !== 'all') {
+      result = result.filter((e) => e.eventTags?.includes(tagFilter));
+    }
+
+    if (countryFilter !== 'all') {
+      result = result.filter((e) => e.country === countryFilter);
+    }
+
+    return result;
+  }, [events, statusIncludes, statusExcludes, debouncedSearchQ, tagFilter, countryFilter]);
+
+  const activeFilterCount =
+    statusIncludes.length +
+    statusExcludes.length +
+    (debouncedSearchQ.trim() === '' ? 0 : 1) +
+    (tagFilter !== 'all' ? 1 : 0) +
+    (countryFilter !== 'all' ? 1 : 0);
+
+  function clearFilters() {
+    setStatusIncludes([]);
+    setStatusExcludes([]);
+    setSearchQ('');
+    setDebouncedSearchQ('');
+    setTagFilter('all');
+    setCountryFilter('all');
+  }
+
+  // Count unique cities (use full events count for the non-moderator pill,
+  // filteredEvents for the moderator "X of Y" pill).
+  const cityCount = useMemo(() => new Set(events.map((e) => e.city)).size, [events]);
 
   return (
     <>
@@ -155,9 +263,32 @@ export function EventsMapPage() {
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
               <div className="bg-white/90 backdrop-blur-sm rounded-full pl-5 pr-2 py-1.5 shadow-lg border border-white/50 flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-800">
-                  {events.length.toLocaleString()} events across{' '}
-                  {cityCount} {cityCount === 1 ? 'city' : 'cities'}
+                  {canModerate && activeFilterCount > 0 ? (
+                    <>
+                      {filteredEvents.length.toLocaleString()} of{' '}
+                      {events.length.toLocaleString()} matching
+                    </>
+                  ) : (
+                    <>
+                      {events.length.toLocaleString()} events across{' '}
+                      {cityCount} {cityCount === 1 ? 'city' : 'cities'}
+                    </>
+                  )}
                 </span>
+                {canModerate && (
+                  <button
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                      activeFilterCount > 0
+                        ? 'bg-[#E52828]/10 text-[#E52828] hover:bg-[#E52828]/15'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    aria-label="Toggle filters"
+                  >
+                    <SlidersHorizontal size={12} />
+                    Filters ({activeFilterCount})
+                  </button>
+                )}
                 <button
                   onClick={refreshEvents}
                   disabled={isRefreshing}
@@ -167,6 +298,122 @@ export function EventsMapPage() {
                 >
                   <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Filter panel — moderator only */}
+          {canModerate && filtersOpen && !loading && !error && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 w-[calc(100vw-2rem)] max-w-[640px]">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-4 space-y-3">
+                {/* Status row */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                    Status
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {STATUS_FILTER_KEYS.map((key) => {
+                      const state = getStatusFilterState(key);
+                      return (
+                        <div
+                          key={key}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                            state === 'include'
+                              ? 'bg-[#39d98a]/20 border-[#39d98a]/40'
+                              : state === 'exclude'
+                                ? 'bg-[#ff393a]/20 border-[#ff393a]/40'
+                                : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                          <button
+                            onClick={() =>
+                              setStatusFilterState(key, state === 'include' ? 'neutral' : 'include')
+                            }
+                            className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                            title={`Must be ${key}`}
+                          >
+                            <ThumbsUp
+                              size={12}
+                              className={`transition-all ${
+                                state === 'include' ? 'text-[#39d98a]' : 'text-gray-400'
+                              }`}
+                            />
+                            <span className="text-gray-800 text-xs capitalize">{key}</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              setStatusFilterState(key, state === 'exclude' ? 'neutral' : 'exclude')
+                            }
+                            className="p-0.5 hover:opacity-70 transition-opacity"
+                            title={`Must NOT be ${key}`}
+                          >
+                            <ThumbsDown
+                              size={12}
+                              className={`transition-all ${
+                                state === 'exclude' ? 'text-[#ff393a]' : 'text-gray-400'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Search row */}
+                <div>
+                  <input
+                    type="text"
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    placeholder="Search by city, host, venue…"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-300"
+                  />
+                </div>
+
+                {/* Tag row */}
+                <div>
+                  <select
+                    value={tagFilter}
+                    onChange={(e) => setTagFilter(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-gray-300"
+                  >
+                    <option value="all">All tags</option>
+                    {availableTags.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Country row */}
+                <div>
+                  <select
+                    value={countryFilter}
+                    onChange={(e) => setCountryFilter(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-gray-300"
+                  >
+                    <option value="all">All countries</option>
+                    {availableCountries.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Footer — Clear filters link */}
+                {activeFilterCount > 0 && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-[#E52828] hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -183,7 +430,7 @@ export function EventsMapPage() {
           >
             {!loading && !error && canModerate !== null && (
               <GPPEventsMap
-                events={events}
+                events={canModerate ? filteredEvents : events}
                 height="calc(100vh - 64px)"
                 canModerate={canModerate}
               />

@@ -650,6 +650,8 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     const where: any = { eventType: 'gpp' };
     if (req.query.curated === '1') {
       where.underbossStatus = { in: ['approved', 'listed'] };
+    } else if (req.query.includeAll === '1') {
+      // moderator view — no underbossStatus filter; returns rejected/hidden too
     } else {
       where.underbossStatus = { notIn: ['rejected', 'hidden'] };
     }
