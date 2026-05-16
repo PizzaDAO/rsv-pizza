@@ -577,6 +577,16 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       throw new AppError('Sponsor not found', 404, 'NOT_FOUND');
     }
 
+    // Lock underboss-added partners as read-only for non-privileged users
+    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
+    if (existingSponsor.addedByUnderboss && !userIsPrivileged) {
+      throw new AppError(
+        'Underboss-added partners are read-only — manage via /underboss',
+        403,
+        'PARTNER_READONLY'
+      );
+    }
+
     // Validate status if provided
     const validStatuses = ['todo', 'asked', 'yes', 'billed', 'paid', 'stuck', 'alum', 'skip'];
     if (status && !validStatuses.includes(status)) {
@@ -595,10 +605,6 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
       throw new AppError(`Invalid category. Must be one of: ${validCategories.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
-    // Protect contact fields for underboss-added sponsors from non-privileged users
-    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
-    const stripContactFields = existingSponsor.addedByUnderboss && !userIsPrivileged;
-
     const sponsor = await prisma.sponsor.update({
       where: { id: sponsorId },
       data: {
@@ -608,10 +614,10 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
         ...(brandInstagram !== undefined && { brandInstagram: brandInstagram?.trim() || null }),
         ...(brandDescription !== undefined && { brandDescription: brandDescription?.trim() || null }),
         ...(pointPerson !== undefined && { pointPerson: pointPerson?.trim() || null }),
-        ...(!stripContactFields && contactName !== undefined && { contactName: contactName?.trim() || null }),
-        ...(!stripContactFields && contactEmail !== undefined && { contactEmail: contactEmail?.trim()?.toLowerCase() || null }),
-        ...(!stripContactFields && contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
-        ...(!stripContactFields && contactTwitter !== undefined && { contactTwitter: contactTwitter?.trim() || null }),
+        ...(contactName !== undefined && { contactName: contactName?.trim() || null }),
+        ...(contactEmail !== undefined && { contactEmail: contactEmail?.trim()?.toLowerCase() || null }),
+        ...(contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
+        ...(contactTwitter !== undefined && { contactTwitter: contactTwitter?.trim() || null }),
         ...(telegram !== undefined && { telegram: telegram?.trim() || null }),
         ...(status !== undefined && { status }),
         ...(amount !== undefined && { amount: amount !== null && amount !== '' ? amount : null }),
@@ -655,6 +661,16 @@ router.delete('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthRequ
 
     if (!existingSponsor) {
       throw new AppError('Sponsor not found', 404, 'NOT_FOUND');
+    }
+
+    // Lock underboss-added partners as read-only for non-privileged users
+    const userIsPrivileged = await isSuperAdmin(req.userEmail) || await isUnderboss(req.userEmail);
+    if (existingSponsor.addedByUnderboss && !userIsPrivileged) {
+      throw new AppError(
+        'Underboss-added partners are read-only — manage via /underboss',
+        403,
+        'PARTNER_READONLY'
+      );
     }
 
     await prisma.$transaction(async (tx) => {

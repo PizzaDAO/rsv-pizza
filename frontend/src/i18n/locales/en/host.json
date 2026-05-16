@@ -273,6 +273,7 @@
     "brandDescriptionOrder": "Brand Description Order",
     "dragToReorder": "(drag to reorder on event page)",
     "global": "Global",
+    "globalPartnerReadOnly": "Global partner — managed via /underboss",
     "tryAgain": "Try Again",
     "noPartnersYet": "No partners yet",
     "noPartnersDesc": "Add your first partner to start tracking your fundraising pipeline.",
