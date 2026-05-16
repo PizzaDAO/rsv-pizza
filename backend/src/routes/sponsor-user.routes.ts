@@ -544,7 +544,20 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       include: {
         user: { select: { name: true, email: true, profilePictureUrl: true, website: true, twitter: true, instagram: true } },
         guests: {
-          select: { id: true, approved: true, checkedInAt: true, status: true },
+          select: {
+            id: true,
+            approved: true,
+            checkedInAt: true,
+            status: true,
+            // Newsletter opt-in fields (admin-only response)
+            mailingListOptIn: true,
+            swcOptIn: true,
+            swcCaOptIn: true,
+            swcAuOptIn: true,
+            swcEuOptIn: true,
+            swcUkOptIn: true,
+            swcBrOptIn: true,
+          },
         },
         budgetItems: {
           select: { id: true, cost: true, status: true },
@@ -687,8 +700,22 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     const uniqueViewMap = new Map(uniqueViewStats.map(r => [r.party_id, Number(r.unique_count)]));
 
     const formattedEvents = events.map(event => {
-      const guestCount = event.guests.filter(g => g.status !== 'INVITED').length;
-      const approvedCount = event.guests.filter(g => g.approved !== false && g.status !== 'INVITED').length;
+      const submittedGuests = event.guests.filter(g => g.status !== 'INVITED');
+      const guestCount = submittedGuests.length;
+      const approvedCount = submittedGuests.filter(g => g.approved !== false).length;
+
+      // Admin-only: newsletter opt-in counts per event.
+      // Field is intentionally `undefined` for non-admins so JSON.stringify drops it
+      // (defense in depth — partners literally don't receive this data).
+      const newsletterSignups = req.isAdminViewing ? {
+        pizzadao: submittedGuests.filter(g => g.mailingListOptIn).length,
+        swc: submittedGuests.filter(g => g.swcOptIn).length,
+        swcCa: submittedGuests.filter(g => g.swcCaOptIn).length,
+        swcAu: submittedGuests.filter(g => g.swcAuOptIn).length,
+        swcEu: submittedGuests.filter(g => g.swcEuOptIn).length,
+        swcUk: submittedGuests.filter(g => g.swcUkOptIn).length,
+        swcBr: submittedGuests.filter(g => g.swcBrOptIn).length,
+      } : undefined;
 
       // Budget summary
       let budget = null;
@@ -794,6 +821,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         sponsorCount,
         partnerNotes: event.partnerEventNotes.length > 0 ? event.partnerEventNotes[0].notes : null,
         photoCount: event._count.photos,
+        newsletterSignups,
         checklist: event.sponsorChecklistItems.map(item => ({
           id: item.id,
           name: item.name,

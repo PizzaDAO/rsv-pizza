@@ -14,6 +14,7 @@ import {
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
   Camera, ChevronLeft, ChevronRight, X, Link2, Download,
+  Mail, Send,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
@@ -592,9 +593,33 @@ export function PartnerDashboardPage() {
           const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
           const venueRate = allEvents.length > 0 ? Math.round((withVenue / allEvents.length) * 100) : 0;
           const budgetRate = allEvents.length > 0 ? Math.round((withBudget / allEvents.length) * 100) : 0;
+
+          // Admin-only newsletter signup aggregation
+          const isAdmin = dashboardData?.isAdmin === true;
+          const newsletterTotals = isAdmin ? allEvents.reduce((acc, e) => {
+            const n = e.newsletterSignups;
+            if (n) {
+              acc.pizzadao += n.pizzadao;
+              acc.swc += n.swc;
+              acc.swcCa += n.swcCa;
+              acc.swcAu += n.swcAu;
+              acc.swcEu += n.swcEu;
+              acc.swcUk += n.swcUk;
+              acc.swcBr += n.swcBr;
+            }
+            return acc;
+          }, { pizzadao: 0, swc: 0, swcCa: 0, swcAu: 0, swcEu: 0, swcUk: 0, swcBr: 0 }) : null;
+          const swcTotal = newsletterTotals
+            ? newsletterTotals.swc + newsletterTotals.swcCa + newsletterTotals.swcAu + newsletterTotals.swcEu + newsletterTotals.swcUk + newsletterTotals.swcBr
+            : 0;
+
+          // Grid columns: expand when admin tiles are present
+          const gridColsClass = isSwc
+            ? (isAdmin ? 'md:grid-cols-3 lg:grid-cols-5' : 'md:grid-cols-3 lg:grid-cols-5')
+            : (isAdmin ? 'md:grid-cols-3 lg:grid-cols-6' : 'lg:grid-cols-4');
           return (
             <div className="mb-6 space-y-3">
-              <div className={`grid grid-cols-2 gap-3 ${isSwc ? 'md:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+              <div className={`grid grid-cols-2 gap-3 ${gridColsClass}`}>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><BarChart3 size={16} /></div>
@@ -654,6 +679,43 @@ export function PartnerDashboardPage() {
                     </div>
                   )}
                 </div>
+                {isAdmin && newsletterTotals && (
+                  <>
+                    <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Mail size={16} /></div>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.newsletterPizzadao')}</span>
+                      </div>
+                      <div className="text-2xl font-bold text-theme-text">{newsletterTotals.pizzadao.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Send size={16} /></div>
+                        <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.newsletterSwc')}</span>
+                      </div>
+                      <div className="text-2xl font-bold text-theme-text">{swcTotal.toLocaleString()}</div>
+                      {swcTotal > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-theme-stroke/50 text-xs">
+                          {([
+                            ['swc', t('dashboard.newsletterSwcRegion.global'), newsletterTotals.swc],
+                            ['swcCa', t('dashboard.newsletterSwcRegion.canada'), newsletterTotals.swcCa],
+                            ['swcAu', t('dashboard.newsletterSwcRegion.australia'), newsletterTotals.swcAu],
+                            ['swcEu', t('dashboard.newsletterSwcRegion.europe'), newsletterTotals.swcEu],
+                            ['swcUk', t('dashboard.newsletterSwcRegion.uk'), newsletterTotals.swcUk],
+                            ['swcBr', t('dashboard.newsletterSwcRegion.brazil'), newsletterTotals.swcBr],
+                          ] as [string, string, number][])
+                            .filter(([, , count]) => count > 0)
+                            .map(([key, label, count]) => (
+                              <span key={key} className="inline-flex items-center gap-1">
+                                <span className="text-theme-text-muted">{label}</span>
+                                <span className="font-semibold text-theme-text">{count}</span>
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
                 {isSwc && (
                   <>
                     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
@@ -785,6 +847,7 @@ export function PartnerDashboardPage() {
                 event={event}
                 onToggleChecklist={(itemId) => handleToggleChecklist(event.id, itemId)}
                 cityChats={cityChats}
+                isAdmin={dashboardData?.isAdmin === true}
               />
             ))}
           </div>
@@ -805,9 +868,10 @@ interface EventCardProps {
   event: SponsorDashboardEvent;
   onToggleChecklist: (itemId: string) => void;
   cityChats: Map<string, string>;
+  isAdmin?: boolean;
 }
 
-function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
+function EventCard({ event, onToggleChecklist, cityChats, isAdmin = false }: EventCardProps) {
   const { t } = useTranslation('partner');
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);
@@ -1100,6 +1164,27 @@ function EventCard({ event, onToggleChecklist, cityChats }: EventCardProps) {
                 )}
               </div>
             )}
+            {isAdmin && event.newsletterSignups && (() => {
+              const n = event.newsletterSignups;
+              const swcSum = n.swc + n.swcCa + n.swcAu + n.swcEu + n.swcUk + n.swcBr;
+              if (n.pizzadao === 0 && swcSum === 0) return null;
+              return (
+                <div className="flex items-center gap-3 text-xs text-theme-text-muted">
+                  {n.pizzadao > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Mail size={12} />
+                      <span>{t('eventCard.newsletterPizzadao')}: <span className="font-semibold text-theme-text">{n.pizzadao}</span></span>
+                    </span>
+                  )}
+                  {swcSum > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Send size={12} />
+                      <span>{t('eventCard.newsletterSwc')}: <span className="font-semibold text-theme-text">{swcSum}</span></span>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

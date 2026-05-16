@@ -49,7 +49,9 @@
     "uniqueClicks": "({{count}} únicos)",
     "privateNotes": "Notas privadas para este evento...",
     "notes": "Notas",
-    "done": "Pronto"
+    "done": "Pronto",
+    "newsletterPizzadao": "PizzaDAO",
+    "newsletterSwc": "SWC"
   },
   "empty": {
     "noEventsFiltered": "Nenhum evento corresponde aos seus filtros.",
@@ -221,7 +223,17 @@
     "showingCountOfTotal": "Mostrando {{count}} de {{total}} eventos",
     "showingCount": "Mostrando {{count}} eventos",
     "taggedSuffix": " marcado \"{{tag}}\"",
-    "photosCountOf": "{{current}} de {{total}}"
+    "photosCountOf": "{{current}} de {{total}}",
+    "newsletterPizzadao": "PizzaDAO Newsletter",
+    "newsletterSwc": "SWC Newsletter",
+    "newsletterSwcRegion": {
+      "global": "Global",
+      "canada": "Canada",
+      "australia": "Australia",
+      "europe": "Europe",
+      "uk": "UK",
+      "brazil": "Brazil"
+    }
   },
   "cities": {
     "loading": "Carregando cidades...",

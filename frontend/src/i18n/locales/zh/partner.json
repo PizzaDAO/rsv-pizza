@@ -49,7 +49,9 @@
     "uniqueClicks": "（{{count}} 独立）",
     "privateNotes": "此活动的私人备注...",
     "notes": "备注",
-    "done": "完成"
+    "done": "完成",
+    "newsletterPizzadao": "PizzaDAO",
+    "newsletterSwc": "SWC"
   },
   "empty": {
     "noEventsFiltered": "没有匹配您筛选条件的活动。",
@@ -221,7 +223,17 @@
     "showingCountOfTotal": "显示 {{total}} 个活动中的 {{count}} 个",
     "showingCount": "显示 {{count}} 个活动",
     "taggedSuffix": "（标记为 \"{{tag}}\"）",
-    "photosCountOf": "{{total}} 中的 {{current}}"
+    "photosCountOf": "{{total}} 中的 {{current}}",
+    "newsletterPizzadao": "PizzaDAO Newsletter",
+    "newsletterSwc": "SWC Newsletter",
+    "newsletterSwcRegion": {
+      "global": "Global",
+      "canada": "Canada",
+      "australia": "Australia",
+      "europe": "Europe",
+      "uk": "UK",
+      "brazil": "Brazil"
+    }
   },
   "cities": {
     "loading": "正在加载城市...",
