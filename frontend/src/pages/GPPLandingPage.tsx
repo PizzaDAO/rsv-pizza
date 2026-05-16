@@ -637,6 +637,14 @@ export function GPPLandingPage() {
               View All Pizzerias
               <MapPin size={16} />
             </Link>
+            <Link
+              to="/map"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5 border-2"
+              style={{ borderColor: C.red, color: C.red }}
+            >
+              View global map
+              <ArrowRight size={16} />
+            </Link>
           </div>
         </div>
       </div>
