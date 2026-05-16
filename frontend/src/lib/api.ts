@@ -3290,8 +3290,8 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
-  const data = await apiRequest<GPPEventsApiPayload>('/api/gpp/events?limit=500', {
+export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMapItem[]> {
+  const data = await apiRequest<GPPEventsApiPayload>(`/api/gpp/events?limit=500${force ? `&_t=${Date.now()}` : ''}`, {
     requireAuth: false,
   });
   return (data.events || []).map((e) => ({

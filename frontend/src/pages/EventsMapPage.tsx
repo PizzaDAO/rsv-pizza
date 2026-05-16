@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, Loader2, Shield } from 'lucide-react';
+import { ArrowLeft, Loader2, Shield, RefreshCw } from 'lucide-react';
 import { fetchGppEventsForMap, fetchUnderbossMe, GPPEventMapItem } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal } from '../components/LoginModal';
@@ -17,6 +17,7 @@ export function EventsMapPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadEvents = () => {
     setLoading(true);
@@ -31,6 +32,19 @@ export function EventsMapPage() {
         setError(err.message || 'Failed to load events');
         setLoading(false);
       });
+  };
+
+  const refreshEvents = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const data = await fetchGppEventsForMap(true);
+      setEvents(data);
+    } catch (err) {
+      console.error('Failed to refresh events:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -155,11 +169,20 @@ export function EventsMapPage() {
               {/* Floating stats badge */}
               {!loading && !error && events.length > 0 && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-                  <div className="bg-white/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg border border-white/50">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-full pl-5 pr-2 py-1.5 shadow-lg border border-white/50 flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-800">
                       {events.length.toLocaleString()} events across{' '}
                       {cityCount} {cityCount === 1 ? 'city' : 'cities'}
                     </span>
+                    <button
+                      onClick={refreshEvents}
+                      disabled={isRefreshing}
+                      className="p-1.5 rounded-full text-gray-600 hover:text-[#E52828] hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refresh events"
+                      aria-label="Refresh events"
+                    >
+                      <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
                   </div>
                 </div>
               )}
