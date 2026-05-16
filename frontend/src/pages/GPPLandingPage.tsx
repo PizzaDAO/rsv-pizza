@@ -175,6 +175,7 @@ export function GPPLandingPage() {
         ...(cd && {
           country: cd.country,
           countryCode: cd.countryCode,
+          cityFormattedName: cd.formattedName,
           cityLat: cd.lat,
           cityLng: cd.lng,
         }),
