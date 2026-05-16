@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, updateSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
@@ -286,6 +287,17 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
   useEffect(() => {
     loadSponsors();
   }, [loadSponsors]);
+
+  // Deep-link from /partners modal: ?openSponsor=<id> auto-opens that sponsor's edit modal
+  // once the sponsors list is loaded. Only fires when the URL param changes (or sponsors
+  // first arrive), not repeatedly.
+  const [searchParams] = useSearchParams();
+  const openSponsorId = searchParams.get('openSponsor');
+  useEffect(() => {
+    if (!openSponsorId || !sponsors.length) return;
+    const target = sponsors.find(s => s.id === openSponsorId);
+    if (target) setEditingSponsor(target);
+  }, [openSponsorId, sponsors]);
 
   /** Move a group logo left or right by swapping it with its neighbor in the group view. */
   const handleReorderLogo = useCallback(async (sponsorId: string, direction: -1 | 1, groupLogos: Sponsor[]) => {

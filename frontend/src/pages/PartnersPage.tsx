@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { GPPClouds } from '../components/GPPClouds';
-import { fetchGppPartners, GPPPartner } from '../lib/api';
+import { fetchGppPartners, fetchUnderbossMe, GPPPartner } from '../lib/api';
 
 /* ── colour tokens (from the 2026 flyer) ────────────────── */
 const C = {
@@ -21,9 +22,20 @@ const C = {
 };
 
 export function PartnersPage() {
+  const navigate = useNavigate();
   const [partners, setPartners] = useState<GPPPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Role detection (default to all-false — 401 / network errors are silent)
+  const [roles, setRoles] = useState<{ isAdmin: boolean; isUnderboss: boolean; isGraphicsAdmin: boolean }>({
+    isAdmin: false,
+    isUnderboss: false,
+    isGraphicsAdmin: false,
+  });
+
+  // Active modal partner (null = closed)
+  const [modalPartner, setModalPartner] = useState<GPPPartner | null>(null);
 
   const loadPartners = () => {
     setLoading(true);
@@ -43,6 +55,46 @@ export function PartnersPage() {
   useEffect(() => {
     loadPartners();
   }, []);
+
+  // Role check on mount. 401 / network errors -> logged-out user, default all-false.
+  useEffect(() => {
+    fetchUnderbossMe()
+      .then((me) => {
+        setRoles({
+          isAdmin: !!me.isAdmin,
+          isUnderboss: !!me.isUnderboss,
+          isGraphicsAdmin: !!me.isGraphicsAdmin,
+        });
+      })
+      .catch(() => {
+        // 401 for logged-out users is expected; ignore silently
+      });
+  }, []);
+
+  const canClick = roles.isAdmin || roles.isUnderboss || roles.isGraphicsAdmin;
+
+  // ESC closes modal
+  useEffect(() => {
+    if (!modalPartner) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModalPartner(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modalPartner]);
+
+  // Click on an event row inside the modal -> navigate based on role.
+  // Check isGraphicsAdmin FIRST (most specific role) — admins/underbosses who also
+  // hold the graphics-admin flag go to the flyer editor; everyone else goes to
+  // the public event page.
+  const handleEventClick = (slug: string, sponsorId: string) => {
+    if (roles.isGraphicsAdmin) {
+      navigate('/graphics/' + slug + '/edit?openSponsor=' + sponsorId);
+    } else {
+      navigate('/' + slug);
+    }
+    setModalPartner(null);
+  };
 
   const totalEvents = partners.reduce((sum, p) => sum + p.eventCount, 0);
 
@@ -177,6 +229,13 @@ export function PartnersPage() {
                 </div>
               );
 
+              const pillText = (
+                <>
+                  in {partner.eventCount.toLocaleString()}{' '}
+                  {partner.eventCount === 1 ? 'event' : 'events'}
+                </>
+              );
+
               return (
                 <div key={`${partner.name}-${partner.logoUrl}`} className="flex flex-col">
                   {partner.website ? (
@@ -198,10 +257,23 @@ export function PartnersPage() {
                     {partner.name}
                   </div>
                   <div className="mt-1 flex justify-center">
-                    <span className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828]">
-                      in {partner.eventCount.toLocaleString()}{' '}
-                      {partner.eventCount === 1 ? 'event' : 'events'}
-                    </span>
+                    {canClick ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setModalPartner(partner);
+                        }}
+                        className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828] cursor-pointer hover:scale-105 transition-transform"
+                      >
+                        {pillText}
+                      </button>
+                    ) : (
+                      <span className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828]">
+                        {pillText}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -209,6 +281,90 @@ export function PartnersPage() {
           </div>
         )}
       </div>
+
+      {/* ─── EVENTS MODAL (admin/underboss/graphics-admin only) ─── */}
+      {modalPartner && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setModalPartner(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setModalPartner(null)}
+              aria-label="Close"
+              className="absolute top-3 right-3 z-10 p-2 rounded-full hover:bg-black/5 transition-colors"
+              style={{ color: C.darkText }}
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-4 p-5 border-b" style={{ borderColor: C.cardBorder }}>
+              <div
+                className="flex-shrink-0 w-16 h-16 rounded-lg flex items-center justify-center p-2"
+                style={{ background: C.logoCardBg }}
+              >
+                <img
+                  src={modalPartner.logoUrl}
+                  alt={modalPartner.name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+              <div className="flex-1 min-w-0 pr-8">
+                <div
+                  className="truncate"
+                  style={{
+                    fontFamily: "'Bangers', cursive",
+                    fontSize: '1.6rem',
+                    color: C.darkText,
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {modalPartner.name}
+                </div>
+                <div className="text-xs mt-1" style={{ color: C.mutedText }}>
+                  in {modalPartner.eventCount.toLocaleString()}{' '}
+                  {modalPartner.eventCount === 1 ? 'event' : 'events'}
+                </div>
+              </div>
+            </div>
+
+            {/* Event list */}
+            <div className="overflow-y-auto max-h-[60vh]">
+              {modalPartner.events.length === 0 ? (
+                <div className="p-6 text-center text-sm" style={{ color: C.mutedText }}>
+                  No events to show.
+                </div>
+              ) : (
+                <ul className="divide-y" style={{ borderColor: C.cardBorder }}>
+                  {modalPartner.events.map((ev, idx) => (
+                    <li key={`${ev.sponsorId}-${idx}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleEventClick(ev.slug, ev.sponsorId)}
+                        className="w-full text-left px-5 py-3 hover:bg-black/5 transition-colors flex items-center justify-between gap-3"
+                      >
+                        <span className="font-semibold text-sm truncate" style={{ color: C.darkText }}>
+                          {ev.city}
+                        </span>
+                        <span className="text-xs font-mono truncate" style={{ color: C.mutedText }}>
+                          /{ev.slug}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
