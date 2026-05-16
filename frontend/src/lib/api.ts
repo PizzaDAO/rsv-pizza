@@ -3311,6 +3311,29 @@ export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMap
   }));
 }
 
+// GPP Partners (aggregated across approved GPP events)
+export interface GPPPartner {
+  name: string;
+  logoUrl: string;
+  website: string | null;
+  brandDescription: string | null;
+  brandTwitter: string | null;
+  brandInstagram: string | null;
+  category: string | null;
+  eventCount: number;
+  events: { slug: string; city: string }[];
+}
+
+export interface GPPPartnersResponse {
+  partners: GPPPartner[];
+  total: number;
+  generatedAt: string;
+}
+
+export async function fetchGppPartners(): Promise<GPPPartnersResponse> {
+  return apiRequest<GPPPartnersResponse>('/api/gpp/partners', { requireAuth: false });
+}
+
 // RSVP Funnel Stats (Underboss dashboard)
 
 export interface FunnelEventStats {
