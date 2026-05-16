@@ -29,16 +29,16 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [flyerPartnerId, setFlyerPartnerId] = useState<string | null>(null);
 
-  const loadPartners = useCallback(async () => {
+  const loadPartners = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const result = await fetchSponsorUsers();
       setPartners(result.sponsorUsers);
       setTagCounts(result.tagCounts);
     } catch (err: any) {
       setError(err.message || 'Failed to load partners');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -116,7 +116,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
         onFlyerRegenNeeded?.(data.tag);
       }
 
-      await loadPartners();
+      await loadPartners(true);
       onSyncComplete?.();
 
       if (!newSyncMessage) {
@@ -154,7 +154,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
     } catch (err) {
       console.error('Failed to save partner order:', err);
       // Reload to get correct order from server
-      await loadPartners();
+      await loadPartners(true);
     }
   };
 
@@ -162,7 +162,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
     if (!confirm(t('partnerManager.deactivateConfirm'))) return;
     try {
       await deleteSponsorUser(id);
-      await loadPartners();
+      await loadPartners(true);
       onSyncComplete?.();
     } catch (err: any) {
       setError(err.message || 'Failed to deactivate partner');
