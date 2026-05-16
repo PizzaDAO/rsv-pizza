@@ -336,13 +336,48 @@
     "sendingToGroups_other": "Sending to {{count}} groups...",
     "sendingSubtext": "This may take a moment",
     "done": "Done",
+    "recipients": {
+      "label": "Recipients",
+      "groups": "Groups",
+      "hosts": "Hosts",
+      "both": "Both"
+    },
+    "hostsList": {
+      "title": "Select Hosts",
+      "noConnectedHosts": "No hosts have connected their Telegram yet",
+      "notConnected": "Not connected",
+      "connected": "Connected"
+    },
+    "unknownHost": "Unknown host",
+    "sendToHosts": "Send to {{count}} host",
+    "sendToHosts_other": "Send to {{count}} hosts",
+    "sendToBoth": "Send to {{groups}} group + {{hosts}} host",
+    "sendToBoth_other": "Send to {{groups}} groups + {{hosts}} hosts",
+    "confirmSendHosts": "Send this DM to {{count}} host?",
+    "confirmSendHosts_other": "Send this DM to {{count}} hosts?",
     "tableHeaders": {
       "city": "City",
       "country": "Country",
       "underboss": "Underboss",
       "hostTg": "Host TG",
-      "test": "Test"
+      "test": "Test",
+      "host": "Host",
+      "status": "Status"
+    },
+    "results": {
+      "groupsSection": "Group chats",
+      "hostsSection": "Host DMs",
+      "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
     }
+  },
+  "hostConnect": {
+    "buttonConnect": "Connect your Telegram to receive PizzaDAO DMs",
+    "helperConnect": "Click to open Telegram. Tap Start in the bot to confirm. We'll only DM you about your event.",
+    "connected": "Telegram connected",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting...",
+    "connectError": "Couldn't generate connect link — please try again"
   },
   "eventRow": {
     "notesPlaceholder": "Underboss notes...",

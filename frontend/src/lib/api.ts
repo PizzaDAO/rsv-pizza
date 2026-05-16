@@ -174,6 +174,7 @@ export interface UpdatePartyData {
   country?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
+  hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
 }
 
@@ -279,6 +280,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       country: data.country,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
+      hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
     },
   });
@@ -2990,6 +2992,52 @@ export async function sendTelegramTest(
   return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
     method: 'POST',
     body: { chatId, message, parseMode },
+  });
+}
+
+// Host Telegram (bot-DM) API functions — backed by sausage-24183 backend routes.
+
+export interface BroadcastHost {
+  partyId: string;
+  city: string;
+  hostName: string;
+}
+
+export async function sendHostTelegramBroadcast(
+  hosts: BroadcastHost[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
+    method: 'POST',
+    body: { hosts, message, parseMode },
+  });
+}
+
+export async function sendHostTelegramTest(
+  partyId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
+    method: 'POST',
+    body: { partyId, message, parseMode },
+  });
+}
+
+export async function mintHostTelegramConnectToken(
+  partyId: string
+): Promise<{ token: string; deeplink: string }> {
+  return apiRequest<{ token: string; deeplink: string }>(`/api/parties/${partyId}/connect-token`, {
+    method: 'POST',
+  });
+}
+
+export async function disconnectHostTelegram(
+  partyId: string
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/parties/${partyId}/host-telegram`, {
+    method: 'DELETE',
   });
 }
 

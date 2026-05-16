@@ -290,6 +290,8 @@ export interface Party {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   telegramGroup?: string | null;
+  hostTelegramChatId?: string | null;
+  hostTelegramLinkToken?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
 }
@@ -1026,6 +1028,7 @@ export interface UnderbossEvent {
   country?: string | null;
   host: { name: string | null; email: string | null };
   hostTelegram?: string | null;
+  hostTelegramConnected?: boolean;
   coHosts: any[];
   progress: UnderbossEventProgress;
   guestCount: number;
