@@ -327,10 +327,11 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
 router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const rows = await prisma.cityStatus.findMany();
-    const map: Record<string, { status: string; updatedBy: string | null; updatedAt: string }> = {};
+    const map: Record<string, { status: string; priority: boolean; updatedBy: string | null; updatedAt: string }> = {};
     for (const row of rows) {
       map[row.cityKey] = {
         status: row.status,
+        priority: row.priority,
         updatedBy: row.updatedBy,
         updatedAt: row.updatedAt.toISOString(),
       };
@@ -341,33 +342,45 @@ router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Unde
   }
 });
 
-// PATCH /api/underboss/city-statuses - Upsert a city status (or delete if 'todo')
+// PATCH /api/underboss/city-statuses - Upsert a city status / priority
+// Accepts optional `status` and/or `priority`. Row is only deleted when the
+// effective state is { status: 'todo', priority: false } (the default).
 router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { cityKey, status } = req.body;
+    const { cityKey, status, priority } = req.body;
 
     if (!cityKey || typeof cityKey !== 'string') {
       throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
     }
 
-    const validStatuses = ['created', 'skip', 'todo'];
-    if (!validStatuses.includes(status)) {
+    if (status !== undefined && !['created', 'skip', 'todo'].includes(status)) {
       throw new AppError('status must be "created", "skip", or "todo"', 400, 'VALIDATION_ERROR');
+    }
+
+    if (priority !== undefined && typeof priority !== 'boolean') {
+      throw new AppError('priority must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    if (status === undefined && priority === undefined) {
+      throw new AppError('nothing to update — provide status and/or priority', 400, 'VALIDATION_ERROR');
     }
 
     const updatedBy = req.underboss?.email || null;
 
-    if (status === 'todo') {
-      // Default status doesn't need storage — delete the row
+    const existing = await prisma.cityStatus.findUnique({ where: { cityKey } });
+    const nextStatus = status ?? existing?.status ?? 'todo';
+    const nextPriority = priority ?? existing?.priority ?? false;
+
+    if (nextStatus === 'todo' && nextPriority === false) {
+      // Default state — no need to store
       await prisma.cityStatus.deleteMany({ where: { cityKey } });
       return res.json({ success: true, deleted: true });
     }
 
-    // Upsert: create or update
     const result = await prisma.cityStatus.upsert({
       where: { cityKey },
-      update: { status, updatedBy },
-      create: { cityKey, status, updatedBy },
+      update: { status: nextStatus, priority: nextPriority, updatedBy },
+      create: { cityKey, status: nextStatus, priority: nextPriority, updatedBy },
     });
 
     res.json({ success: true, cityStatus: result });

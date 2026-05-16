@@ -2611,7 +2611,7 @@ export async function bulkUpdateEventTags(
 // City Status API (Underboss)
 
 export interface CityStatusMap {
-  [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
+  [cityKey: string]: { status: string; priority: boolean; updatedBy: string | null; updatedAt: string };
 }
 
 export async function fetchCityStatuses(): Promise<CityStatusMap> {
@@ -2620,11 +2620,11 @@ export async function fetchCityStatuses(): Promise<CityStatusMap> {
 
 export async function updateCityStatus(
   cityKey: string,
-  status: 'created' | 'skip' | 'todo'
+  patch: { status?: 'created' | 'skip' | 'todo'; priority?: boolean }
 ): Promise<void> {
   await apiRequest('/api/underboss/city-statuses', {
     method: 'PATCH',
-    body: { cityKey, status },
+    body: { cityKey, ...patch },
   });
 }
 
