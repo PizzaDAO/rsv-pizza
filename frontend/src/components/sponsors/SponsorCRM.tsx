@@ -13,6 +13,7 @@ import {
   getUnifiedSponsors,
   ensureUnderbossSponsors,
   updateSponsorUser,
+  fetchUnderbossMe,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
@@ -35,6 +36,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPrivileged, setIsPrivileged] = useState(false);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -100,6 +102,26 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
     loadUnifiedPartners();
   }, [loadData, loadUnifiedPartners]);
 
+  // Detect whether the current user can manage underboss-added partners
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await fetchUnderbossMe();
+        if (!cancelled) {
+          setIsPrivileged(!!me?.isAdmin || !!me?.isUnderboss);
+        }
+      } catch {
+        if (!cancelled) {
+          setIsPrivileged(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Reload unified partners when sponsors change
   useEffect(() => {
     loadUnifiedPartners();
@@ -107,6 +129,12 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle form submission
   const handleFormSubmit = async (formData: PartnerFormData, coHostData?: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => {
+    // Block edits to underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (editingSponsor?.addedByUnderboss && !isPrivileged) {
+      setShowForm(false);
+      setEditingSponsor(null);
+      return;
+    }
     const data = extractSponsorData(formData);
     // Capture pre-edit snapshot for flyer-regen decision (only matters when editing)
     const previousSponsor = editingSponsor;
@@ -184,6 +212,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const handleDelete = async (sponsorId: string) => {
     // Capture sponsor before removing it so we can check if flyer needs regen
     const deletedSponsor = sponsors.find(s => s.id === sponsorId);
+    // Block deletes of underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (deletedSponsor?.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     const success = await deleteSponsor(partyId, sponsorId);
     if (success) {
       setSponsors(prev => prev.filter(s => s.id !== sponsorId));
@@ -201,6 +233,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle editing
   const handleEdit = (sponsor: Sponsor) => {
+    // Block edits to underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (sponsor.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     setEditingSponsor(sponsor);
     setShowForm(true);
   };
@@ -221,6 +257,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle inline status change with optimistic update
   const handleStatusChange = async (sponsor: Sponsor, newStatus: SponsorStatus) => {
+    // Block status changes on underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (sponsor.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     const oldStatus = sponsor.status;
 
     // Optimistic update
@@ -377,6 +417,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         onStatusChange={handleStatusChange}
         isLoading={isRefreshing}
         avatarUrls={sponsorAvatarUrls}
+        isPrivileged={isPrivileged}
       />
 
       {/* Brand Description Order (Unified) */}
