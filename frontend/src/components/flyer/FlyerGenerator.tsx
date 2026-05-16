@@ -412,22 +412,81 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
-  // One-time backfill: if DB has no flyerConfig but localStorage does, sync to DB
-  const backfillDone = useRef(false);
+  // One-time migration: legacy hosts customized their flyer in localStorage BEFORE
+  // calzone-91482 introduced DB persistence. The auto-regen gate in
+  // autoRegenFlyer.ts:68 skips regen for any party with no DB config but a
+  // localStorage key. Migrate the localStorage payload into DB on FlyerGenerator
+  // mount so future regens (billed sponsors, logo edits, timezone changes from
+  // napoletana-11413) preserve their customizations.
+  // jalapeno-32738
+  const migrationDone = useRef(false);
   useEffect(() => {
-    if (backfillDone.current || !party?.id || party.flyerConfig) return;
-    backfillDone.current = true;
+    if (migrationDone.current || !party?.id || !storageKey) return;
+
+    // Treat empty object {} as "no real config" — the regen gate uses a truthy
+    // check (`!party.flyerConfig`) so {} would block migration forever.
+    const dbConfig = party.flyerConfig as Record<string, any> | null | undefined;
+    const hasRealDbConfig = !!dbConfig && Object.keys(dbConfig).length > 0;
+    if (hasRealDbConfig) return;
+
+    migrationDone.current = true;
+
+    let raw: string | null = null;
     try {
-      const raw = storageKey ? localStorage.getItem(storageKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Only backfill if there's meaningful customization data
-        if (parsed && (parsed.positions || parsed.poppedLogos || parsed.logoSizes || parsed.editCity || parsed.editVenueName || parsed.editStreetAddress || parsed.editTime)) {
-          updateParty(party.id, { flyer_config: parsed }).catch(() => {});
+      raw = localStorage.getItem(storageKey);
+    } catch {
+      return; // localStorage unavailable — nothing to migrate
+    }
+    if (!raw) return; // no legacy data
+
+    let parsed: Record<string, any> | null = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      // Corrupt JSON — clear the key so the regen gate stops blocking this party.
+      console.warn('[jalapeno-32738] corrupt flyer localStorage, clearing:', err);
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      // Defensive: parsed null or a primitive — treat as corrupt.
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    // Only migrate if there's at least one customization field.
+    const hasContent =
+      parsed.positions || parsed.poppedLogos || parsed.logoSizes ||
+      parsed.sponsorBoxSize || parsed.editCity || parsed.editVenueName ||
+      parsed.editStreetAddress || parsed.editTime != null;
+    if (!hasContent) {
+      // Empty state — clear the stale key but don't waste a DB write.
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    updateParty(party.id, { flyer_config: parsed })
+      .then((ok) => {
+        if (ok) {
+          // DB write succeeded — clear localStorage so we don't drift.
+          try { localStorage.removeItem(storageKey); } catch {}
+          // Refresh party state so the regen gate now sees the DB config.
+          if (party.inviteCode) {
+            loadParty(party.inviteCode).catch(() => {});
+          }
+        } else {
+          // DB write failed — leave localStorage intact as fallback and
+          // allow a retry on next mount.
+          console.warn('[jalapeno-32738] updateParty returned false; preserving localStorage fallback');
+          migrationDone.current = false;
         }
-      }
-    } catch {}
-  }, [party?.id, party?.flyerConfig, storageKey]);
+      })
+      .catch((err) => {
+        console.warn('[jalapeno-32738] migration failed; preserving localStorage fallback:', err);
+        migrationDone.current = false;
+      });
+  }, [party?.id, party?.flyerConfig, party?.inviteCode, storageKey, loadParty]);
 
   if (!party) return null;
 
