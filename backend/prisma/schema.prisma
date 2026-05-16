@@ -144,6 +144,8 @@ model Party {
   eventbriteUrl    String? @map("eventbrite_url") // Eventbrite event URL
   externalLinks    Json?   @default("[]") @map("external_links") // Custom external links [{label, url}]
   telegramGroup    String? @map("telegram_group") @db.VarChar // City Telegram group link
+  hostTelegramChatId    BigInt? @map("host_telegram_chat_id") // Host's private Telegram chat_id (set via /start <token> webhook)
+  hostTelegramLinkToken String? @unique @map("host_telegram_link_token") @db.VarChar // nanoid(10) token for host /start deeplink
   poapEventId      String? @map("poap_event_id") // POAP event ID
   poapMints        Int?    @map("poap_mints") // POAP mint count
   poapMoments      Int?    @map("poap_moments") // POAP moments count

@@ -32,6 +32,8 @@ import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
+import telegramWebhookRoutes from './routes/telegram-webhook.routes.js';
+import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
@@ -105,6 +107,7 @@ app.use('/api/rsvp', rsvpLimiter);
 // Routes
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
+app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
@@ -113,6 +116,7 @@ app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-bas
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
