@@ -243,7 +243,7 @@ async function sendGPPWelcomeEmail(
 // POST /api/gpp/events - Create a GPP event (simplified flow, no auth required)
 router.post('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng, timezone } = req.body;
+    const { city, hostName, email, telegram, country, countryCode, cityFormattedName, cityLat, cityLng, timezone } = req.body;
 
     // Validate required fields
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
@@ -263,6 +263,15 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedCity = city.trim();
     const normalizedHostName = hostName.trim();
     const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
+
+    // Pre-fill address with the formatted city name (Google Places result) so the
+    // public event page has a location immediately. Falls back to the raw city
+    // the user typed if the formatted name isn't available. The
+    // `addressIsCityDefault` flag below marks this as a city-level pre-fill so
+    // the venue checklist item stays unchecked until the host adds a real venue.
+    const cityAddress =
+      (typeof cityFormattedName === 'string' && cityFormattedName.trim()) ||
+      normalizedCity;
 
     // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars).
     // NULL when the slug is empty (e.g. non-Latin scripts) so the unique constraint stays distinct.
@@ -398,6 +407,11 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         timezone: eventTimezone,
         region: inferredRegion,
         country: country || null,
+        address: cityAddress,
+        addressIsCityDefault: true,
+        latitude: typeof cityLat === 'number' ? cityLat : null,
+        longitude: typeof cityLng === 'number' ? cityLng : null,
+        placeId: null,
         availableBeverages: [],
         availableToppings: [],
         coHosts: [

@@ -54,6 +54,7 @@ model Party {
   placeId                 String?   @map("place_id")
   latitude                Float?
   longitude               Float?
+  addressIsCityDefault    Boolean   @default(false) @map("address_is_city_default")
   venueName               String?   @map("venue_name")
   venueStatus             String?   @map("venue_status")
   venueCapacity           Int?      @map("venue_capacity")
@@ -170,6 +171,7 @@ model Party {
   // Underboss dashboard fields
   hostStatus      String? @map("host_status")
   underbossStatus String  @default("pending") @map("underboss_status")
+  statusAudit     PartyStatusAudit[]
   hostTags        Json    @default("[]") @map("host_tags")
   underbossNotes  String? @map("underboss_notes")
 
@@ -212,6 +214,23 @@ model Party {
   scorecardItems        GuestScorecardItem[]
 
   @@map("parties")
+}
+
+model PartyStatusAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  partyId    String   @map("party_id") @db.Uuid
+  party      Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  action     String
+  oldStatus  String?  @map("old_status")
+  newStatus  String   @map("new_status")
+  actorEmail String   @map("actor_email")
+  actorKind  String   @map("actor_kind")
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([createdAt(sort: Desc)])
+  @@map("party_status_audit")
 }
 
 model Guest {

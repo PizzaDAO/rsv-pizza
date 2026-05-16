@@ -83,7 +83,8 @@
     "saveChecklistDates": "Checklisten-Termine speichern",
     "newItemPlaceholder": "Neuer Checklisten-Eintrag...",
     "adding": "Wird hinzugefügt...",
-    "addItem": "Eintrag hinzufügen"
+    "addItem": "Eintrag hinzufügen",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPP-Standardbeschreibung",

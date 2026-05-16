@@ -683,7 +683,9 @@
     "sent": "{{count}} sent",
     "skipped": "{{count}} skipped",
     "failed": "{{count}} failed",
-    "inviteMore": "Invite more"
+    "inviteMore": "Invite more",
+    "tagYourPartners": "Tag your partners in the image",
+    "tagYourPartnersHint": "Copy each handle, then paste it into X's tag-people field after you attach the image."
   },
   "raffle": {
     "editPrize": "Edit Prize",

@@ -911,6 +911,7 @@ export interface CreateGPPEventData {
   telegram?: string;
   country?: string;
   countryCode?: string;
+  cityFormattedName?: string;
   cityLat?: number;
   cityLng?: number;
   timezone?: string;
@@ -2480,14 +2481,14 @@ export async function fetchChecklistDefaults(): Promise<{ items: ChecklistDefaul
   return apiRequest<{ items: ChecklistDefault[] }>('/api/admin/checklist-defaults');
 }
 
-export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string }>): Promise<{ totalUpdated: number }> {
+export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string; linkTab?: string | null }>): Promise<{ totalUpdated: number }> {
   return apiRequest<{ totalUpdated: number }>('/api/admin/checklist-defaults', {
     method: 'PATCH',
     body: { items },
   });
 }
 
-export async function addChecklistDefault(data: { name: string; dueDate?: string | null }): Promise<{ createdCount: number }> {
+export async function addChecklistDefault(data: { name: string; dueDate?: string | null; linkTab?: string | null }): Promise<{ createdCount: number }> {
   return apiRequest<{ createdCount: number }>('/api/admin/checklist-defaults', {
     method: 'POST',
     body: data,
@@ -3264,6 +3265,7 @@ export interface GPPEventMapItem {
   longitude: number | null;
   rsvpCount: number;
   country: string | null;
+  underbossStatus?: string | null;
 }
 
 interface GPPEventApiResponse {
@@ -3279,6 +3281,7 @@ interface GPPEventApiResponse {
   longitude: number | null;
   guestCount: number;
   country: string | null;
+  underbossStatus?: string | null;
 }
 
 interface GPPEventsApiPayload {
@@ -3288,8 +3291,8 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
-  const data = await apiRequest<GPPEventsApiPayload>('/api/gpp/events?limit=500', {
+export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMapItem[]> {
+  const data = await apiRequest<GPPEventsApiPayload>(`/api/gpp/events?limit=500${force ? `&_t=${Date.now()}` : ''}`, {
     requireAuth: false,
   });
   return (data.events || []).map((e) => ({
@@ -3304,6 +3307,7 @@ export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
     longitude: e.longitude,
     rsvpCount: e.guestCount ?? 0,
     country: e.country,
+    underbossStatus: e.underbossStatus,
   }));
 }
 
