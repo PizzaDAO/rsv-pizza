@@ -647,7 +647,12 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const { limit = '500', offset = '0', city, country, region } = req.query;
 
-    const where: any = { eventType: 'gpp', underbossStatus: { notIn: ['rejected', 'hidden'] } };
+    const where: any = { eventType: 'gpp' };
+    if (req.query.curated === '1') {
+      where.underbossStatus = { in: ['approved', 'listed'] };
+    } else {
+      where.underbossStatus = { notIn: ['rejected', 'hidden'] };
+    }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }

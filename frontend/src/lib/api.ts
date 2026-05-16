@@ -3291,11 +3291,15 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMapItem[]> {
-  const data = await apiRequest<GPPEventsApiPayload>(`/api/gpp/events?limit=500${force ? `&_t=${Date.now()}` : ''}`, {
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean): Promise<GPPEventMapItem[]> {
+  const params: string[] = ['limit=500'];
+  if (curated) params.push('curated=1');
+  if (force) params.push(`_t=${Date.now()}`);
+  const url = `/api/gpp/events?${params.join('&')}`;
+  const data = await apiRequest<GPPEventsApiPayload>(url, {
     requireAuth: false,
   });
-  return (data.events || []).map((e) => ({
+  let events = (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
     city: e.city,
@@ -3309,6 +3313,10 @@ export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMap
     country: e.country,
     underbossStatus: e.underbossStatus,
   }));
+  if (curated) {
+    events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
+  }
+  return events;
 }
 
 // RSVP Funnel Stats (Underboss dashboard)
