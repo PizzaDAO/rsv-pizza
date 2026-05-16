@@ -2,6 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
+
+// Serialize BigInt as string in JSON. The only BigInt in the schema today is
+// parties.host_telegram_chat_id, which is sensitive enough that we never want
+// it leaking to clients via an implicit-select endpoint anyway — but several
+// existing endpoints do `res.json({ ...party })` on Prisma results without an
+// explicit select, and Express's default res.json throws on a raw BigInt.
+// The frontend's dbPartyToParty mapper already calls String() on this field,
+// so emitting it as a string here matches what the client expects.
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 import authRoutes from './routes/auth.routes.js';
 import partyRoutes from './routes/party.routes.js';
 import rsvpRoutes from './routes/rsvp.routes.js';
