@@ -243,6 +243,19 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
           <div className="space-y-1.5">
             {partnerXHandles.map(p => (
               <div key={p.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyHandle(p.id, p.handle)}
+                  aria-label={t('promo.copy')}
+                  title={t('promo.copy')}
+                  className="flex-shrink-0 p-1.5 rounded-md hover:bg-theme-surface-hover text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  {copiedHandle === p.id ? (
+                    <Check size={16} className="text-green-400" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                </button>
                 {p.avatarUrl ? (
                   <img
                     src={p.avatarUrl}
@@ -258,17 +271,6 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
                   <div className="text-sm text-theme-text truncate">{p.name}</div>
                   <div className="text-xs text-theme-text-muted truncate">@{p.handle}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopyHandle(p.id, p.handle)}
-                  className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors flex items-center gap-1 px-2 py-1 rounded"
-                >
-                  {copiedHandle === p.id ? (
-                    <><Check size={12} className="text-green-400" /> {t('promo.copied')}</>
-                  ) : (
-                    <><Copy size={12} /> {t('promo.copy')}</>
-                  )}
-                </button>
               </div>
             ))}
           </div>
