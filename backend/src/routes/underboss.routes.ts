@@ -225,6 +225,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
       email: party.user?.email || null,
     },
     hostTelegram: party.user?.telegram || null,
+    hostTelegramConnected: !!party.hostTelegramChatId,
     coHosts: party.coHosts || [],
     progress: computeProgress(party, underbossEmails),
     guestCount,

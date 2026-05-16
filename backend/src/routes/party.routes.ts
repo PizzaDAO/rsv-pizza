@@ -424,6 +424,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
       telegramGroup,
+      hostTelegramLinkToken,
+      // NOTE: hostTelegramChatId is intentionally NOT destructured here —
+      // the chat_id is webhook-only (set by /api/telegram/webhook when the host
+      // sends /start <token> to the bot). Allowing PATCH writes would let a host
+      // spoof another user's chat_id.
       turtleRolesEnabled
     } = req.body;
 
@@ -565,6 +570,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
+        ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
       },
       include: {
