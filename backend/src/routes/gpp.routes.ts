@@ -779,4 +779,170 @@ router.patch('/pizzerias/:partyId/photo', async (req: Request, res: Response, ne
   }
 });
 
+// GET /api/gpp/partners - Aggregated partners across all approved GPP events
+// Cross-event logo aggregation for the marketing site (globalpizza.party) and
+// the public partners page at rsv.pizza/partners. Sponsor rows are deduped
+// in-memory by normalized logoUrl (primary) then normalized name (fallback).
+router.get('/partners', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        party: {
+          eventType: 'gpp',
+          underbossStatus: 'approved', // strict — curated logo wall
+        },
+        status: { in: ['yes', 'billed', 'paid'] },
+        logoUrl: { not: null },
+      },
+      select: {
+        name: true,
+        logoUrl: true,
+        website: true,
+        brandDescription: true,
+        brandTwitter: true,
+        brandInstagram: true,
+        category: true,
+        sortOrder: true,
+        createdAt: true,
+        party: {
+          select: {
+            customUrl: true,
+            inviteCode: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Normalize logoUrl: trim, lowercase, strip protocol, strip trailing slash.
+    const normalizeUrl = (raw: string): string => {
+      return raw
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/+$/, '');
+    };
+
+    // Normalize name: strip diacritics, lowercase, alphanum only (same as city slug code above).
+    const normalizeName = (raw: string): string => {
+      return raw
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    interface Aggregate {
+      name: string;
+      logoUrl: string;
+      website: string | null;
+      brandDescription: string | null;
+      brandTwitter: string | null;
+      brandInstagram: string | null;
+      category: string | null;
+      eventCount: number;
+      events: { slug: string; city: string }[];
+      // tie-break tracking
+      bestSortOrder: number;
+      bestCreatedAt: Date;
+    }
+
+    const byLogoKey = new Map<string, Aggregate>();
+    const byNameKey = new Map<string, Aggregate>();
+
+    for (const s of sponsors) {
+      if (!s.logoUrl) continue;
+
+      const logoKey = normalizeUrl(s.logoUrl);
+      const nameKey = normalizeName(s.name);
+
+      // Derive city by stripping "Global Pizza Party " prefix; fallback to full party name.
+      const partyName = s.party?.name || '';
+      const city =
+        partyName.replace(/^Global Pizza Party\s*/i, '').trim() || partyName || 'Unknown';
+      const slug = s.party?.customUrl || s.party?.inviteCode || '';
+
+      // Find existing aggregate via logoKey first, then nameKey fallback.
+      let agg = byLogoKey.get(logoKey);
+      if (!agg && nameKey) {
+        agg = byNameKey.get(nameKey);
+      }
+
+      if (agg) {
+        agg.eventCount += 1;
+        // Cap events array at 500 to defend against pathological payload size.
+        if (agg.events.length < 500 && slug) {
+          agg.events.push({ slug, city });
+        }
+        // Tie-break: prefer the representative row with lowest sortOrder; if tied,
+        // prefer the more recent createdAt.
+        const isBetter =
+          s.sortOrder < agg.bestSortOrder ||
+          (s.sortOrder === agg.bestSortOrder && s.createdAt > agg.bestCreatedAt);
+        if (isBetter) {
+          agg.name = s.name;
+          agg.logoUrl = s.logoUrl;
+          agg.website = s.website;
+          agg.brandDescription = s.brandDescription;
+          agg.brandTwitter = s.brandTwitter;
+          agg.brandInstagram = s.brandInstagram;
+          agg.category = s.category;
+          agg.bestSortOrder = s.sortOrder;
+          agg.bestCreatedAt = s.createdAt;
+        }
+        // Ensure both maps point at the same aggregate even after a fallback merge.
+        byLogoKey.set(logoKey, agg);
+        if (nameKey) byNameKey.set(nameKey, agg);
+      } else {
+        const fresh: Aggregate = {
+          name: s.name,
+          logoUrl: s.logoUrl,
+          website: s.website,
+          brandDescription: s.brandDescription,
+          brandTwitter: s.brandTwitter,
+          brandInstagram: s.brandInstagram,
+          category: s.category,
+          eventCount: 1,
+          events: slug ? [{ slug, city }] : [],
+          bestSortOrder: s.sortOrder,
+          bestCreatedAt: s.createdAt,
+        };
+        byLogoKey.set(logoKey, fresh);
+        if (nameKey) byNameKey.set(nameKey, fresh);
+      }
+    }
+
+    // Collect unique aggregates (some may be present in both maps).
+    const uniqueAggregates = Array.from(new Set(byLogoKey.values()));
+
+    // Sort by popularity (eventCount DESC), then name ASC.
+    uniqueAggregates.sort((a, b) => {
+      if (b.eventCount !== a.eventCount) return b.eventCount - a.eventCount;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Strip tie-break tracking fields from the response.
+    const partners = uniqueAggregates.map((a) => ({
+      name: a.name,
+      logoUrl: a.logoUrl,
+      website: a.website,
+      brandDescription: a.brandDescription,
+      brandTwitter: a.brandTwitter,
+      brandInstagram: a.brandInstagram,
+      category: a.category,
+      eventCount: a.eventCount,
+      events: a.events,
+    }));
+
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json({
+      partners,
+      total: partners.length,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

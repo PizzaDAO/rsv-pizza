@@ -55,6 +55,8 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : [
       'https://rsv.pizza',
       'https://www.rsv.pizza',
+      'https://globalpizza.party',
+      'https://www.globalpizza.party',
       'http://localhost:5173',  // Vite dev server
       'http://localhost:5176',  // Vite dev server (alt port)
       'http://localhost:3000',
@@ -292,6 +294,40 @@ app.get('/api', (req, res) => {
 
 <h3>Example</h3>
 <pre><code>curl https://api.rsv.pizza/api/events/london</code></pre>
+
+<h2>Partners</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/gpp/partners</span>
+  <span class="badge">public</span>
+  <p class="desc">Aggregated partner logos across all approved Global Pizza Party events. Deduplicated by normalized logo URL with a fallback on normalized name. Cached for 10 minutes.</p>
+</div>
+
+<h3>Example Request</h3>
+<pre><code>curl https://api.rsv.pizza/api/gpp/partners</code></pre>
+
+<h3>Response</h3>
+<pre><code>{
+  "partners": [
+    {
+      "name": "PizzaDAO",
+      "logoUrl": "https://...",
+      "website": "https://pizzadao.org",
+      "brandDescription": "PizzaDAO is a community of pizza enthusiasts...",
+      "brandTwitter": "PizzaDAO",
+      "brandInstagram": "rare.pizzas",
+      "category": "community",
+      "eventCount": 423,
+      "events": [
+        { "slug": "london", "city": "London" },
+        { "slug": "saopaulo", "city": "São Paulo" }
+      ]
+    }
+  ],
+  "total": 47,
+  "generatedAt": "2026-05-15T12:34:56.789Z"
+}</code></pre>
 
 <h2>Health Check</h2>
 
