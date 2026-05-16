@@ -151,7 +151,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
   };
 
   const partnerXHandles = (party.coHosts ?? [])
-    .filter(c => c.isPartner && c.twitter && c.twitter.trim())
+    .filter(c => c.showOnEvent === true && c.twitter && c.twitter.trim())
     .map(c => ({
       id: c.id,
       name: c.name,
@@ -218,7 +218,7 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
             <button
               type="button"
               onClick={handleDownloadImage}
-              className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-black/90 text-theme-text text-xs font-medium px-2 py-1 rounded-lg transition-colors backdrop-blur-sm"
+              className="absolute bottom-2 right-2 flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-900 text-xs font-medium px-2 py-1 rounded-lg transition-colors shadow-sm"
             >
               <Download size={12} />
               {t('promo.downloadImage')}
