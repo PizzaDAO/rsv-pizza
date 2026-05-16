@@ -967,6 +967,7 @@ export interface AutoCompleteStates {
   venue_added: boolean;
   budget_submitted: boolean;
   team_built?: boolean;
+  pizzerias_selected?: boolean;
 }
 
 export interface ChecklistData {
