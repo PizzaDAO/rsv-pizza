@@ -15,6 +15,8 @@ const C = {
   darkText:  '#1a1a1a',
   mutedText: '#555',
   cardBg:    'rgba(255,255,255,0.92)',
+  // Logo tiles use a mid-gray so both white/cream and dark logos remain readable.
+  logoCardBg:'rgba(160,160,160,0.92)',
   cardBorder:'rgba(0,0,0,0.08)',
 };
 
@@ -164,7 +166,7 @@ export function PartnersPage() {
               const tile = (
                 <div
                   className="aspect-square flex items-center justify-center p-4 rounded-2xl border shadow-lg transition-transform duration-200 hover:scale-105"
-                  style={{ background: C.cardBg, borderColor: C.cardBorder }}
+                  style={{ background: C.logoCardBg, borderColor: C.cardBorder }}
                 >
                   <img
                     src={partner.logoUrl}
@@ -196,7 +198,7 @@ export function PartnersPage() {
                     {partner.name}
                   </div>
                   <div className="mt-1 flex justify-center">
-                    <span className="inline-block text-[10px] font-semibold rounded-full px-2 py-0.5 bg-[#E52828]/10 text-[#E52828]">
+                    <span className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828]">
                       in {partner.eventCount.toLocaleString()}{' '}
                       {partner.eventCount === 1 ? 'event' : 'events'}
                     </span>
