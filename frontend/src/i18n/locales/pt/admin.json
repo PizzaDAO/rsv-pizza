@@ -83,7 +83,8 @@
     "saveChecklistDates": "Salvar Datas do Checklist",
     "newItemPlaceholder": "Novo item do checklist...",
     "adding": "Adicionando...",
-    "addItem": "Adicionar Item"
+    "addItem": "Adicionar Item",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "Descrição Padrão do GPP",

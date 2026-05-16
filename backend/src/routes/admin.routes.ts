@@ -189,6 +189,21 @@ router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, ne
 // Checklist Defaults — using dedicated table
 // ============================================
 
+// Allow-list for `link_tab` values. Mirrors the host-page TabType enumeration
+// (excluding `dashboard`, `checklist`, `apps`, and null/empty which is "no link").
+const ALLOWED_LINK_TABS = [
+  'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
+  'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
+  'flyer', 'print',
+];
+
+function isValidLinkTab(v: unknown): v is string | null {
+  if (v === null || v === undefined) return true;
+  if (typeof v !== 'string') return false;
+  if (v === '') return true; // coerced to null upstream
+  return ALLOWED_LINK_TABS.includes(v);
+}
+
 // Raw-SQL admin check helpers (bypass Prisma UUID deserialization bug)
 async function rawIsAdmin(email?: string): Promise<boolean> {
   if (!email) return false;
@@ -264,23 +279,46 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
     let totalUpdated = 0;
     for (const item of items) {
       if (!item.name) continue;
+
+      const hasDueDate = Object.prototype.hasOwnProperty.call(item, 'dueDate');
+      const hasLinkTab = Object.prototype.hasOwnProperty.call(item, 'linkTab');
+
       const parsedDate = item.dueDate ? new Date(item.dueDate + 'T00:00:00.000Z') : null;
 
+      // Validate + coerce linkTab when provided
+      let linkTabValue: string | null | undefined;
+      if (hasLinkTab) {
+        if (!isValidLinkTab(item.linkTab)) {
+          throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
+        }
+        linkTabValue = item.linkTab === '' ? null : (item.linkTab ?? null);
+      }
+
+      if (!hasDueDate && !hasLinkTab) continue;
+
       // 1. Update the checklist_defaults row
+      const defaultData: Record<string, unknown> = {};
+      if (hasDueDate) defaultData.dueDate = parsedDate;
+      if (hasLinkTab) defaultData.linkTab = linkTabValue;
+
       await prisma.checklistDefault.updateMany({
         where: { name: item.name },
-        data: { dueDate: parsedDate },
+        data: defaultData,
       });
 
       // 2. Propagate to all GPP events' checklist_items
       if (gppPartyIds.length > 0) {
+        const itemData: Record<string, unknown> = {};
+        if (hasDueDate) itemData.dueDate = parsedDate;
+        if (hasLinkTab) itemData.linkTab = linkTabValue;
+
         const result = await prisma.checklistItem.updateMany({
           where: {
             partyId: { in: gppPartyIds },
             isDefault: true,
             name: item.name,
           },
-          data: { dueDate: parsedDate },
+          data: itemData,
         });
         totalUpdated += result.count;
       }
@@ -289,6 +327,11 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
     res.json({ success: true, totalUpdated });
   } catch (error: any) {
     console.error('[checklist-defaults PATCH]', error);
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        error: { message: error.message, code: error.code },
+      });
+    }
     res.status(500).json({
       error: {
         message: String(error?.message || error),
@@ -341,14 +384,19 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
       throw new AppError('Only super admins can add checklist items', 403, 'FORBIDDEN');
     }
 
-    const { name, dueDate } = req.body;
+    const { name, dueDate, linkTab } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
+    if (!isValidLinkTab(linkTab)) {
+      throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
+    }
+
     const trimmedName = name.trim();
     const parsedDate = dueDate ? new Date(dueDate + 'T00:00:00.000Z') : null;
+    const linkTabValue: string | null = linkTab === '' || linkTab == null ? null : linkTab;
 
     // Get next sort_order
     const existing = await prisma.checklistDefault.findMany({
@@ -365,6 +413,7 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
         dueDate: parsedDate,
         isAuto: false,
         sortOrder: nextSort,
+        linkTab: linkTabValue,
       },
     });
 
@@ -383,6 +432,7 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
           isAuto: false,
           isDefault: true,
           sortOrder: nextSort,
+          linkTab: linkTabValue,
         })),
       });
     }
