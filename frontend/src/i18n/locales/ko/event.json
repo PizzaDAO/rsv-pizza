@@ -1,0 +1,80 @@
+{
+  "notFound": {
+    "title": "이벤트를 찾을 수 없습니다",
+    "goHome": "홈으로 이동"
+  },
+  "password": {
+    "title": "비밀번호 필요",
+    "placeholder": "비밀번호",
+    "verifying": "확인 중...",
+    "continue": "계속",
+    "alreadyRsvpd": "이미 RSVP하셨나요? 로그인",
+    "or": "또는",
+    "postToGetIn": "포스트로 입장하기",
+    "pasteTweetUrl": "트윗 URL을 붙여넣어 이벤트를 잠금 해제하세요",
+    "verifyUnlock": "확인 및 잠금 해제"
+  },
+  "editPassword": {
+    "title": "호스트 비밀번호 필요",
+    "subtitle": "이벤트를 수정하려면 생성 시 설정한 비밀번호를 입력하세요.",
+    "label": "비밀번호",
+    "placeholder": "비밀번호 입력",
+    "cancel": "취소",
+    "continue": "계속"
+  },
+  "hostDashboard": "호스트 대시보드",
+  "donate": "후원",
+  "buyPizzaFor": "{{recipient}}을(를) 위해 피자 사기",
+  "buyPizzaForEvent": "{{eventName}}을(를) 위해 피자 사기",
+  "supportingRecipient": "{{recipient}} 지원",
+  "supportingEvent": "{{eventName}} 지원",
+  "guest_one": "게스트 {{count}}명",
+  "guest_other": "게스트 {{count}}명",
+  "guestWithMax": "{{count}} / {{max}}",
+  "waitlistOpen": "(대기자 명단 열림)",
+  "spotsLeft": "({{count}}자리 남음)",
+  "rsvp": "RSVP",
+  "editRsvp": "RSVP 수정",
+  "rsvpsClosed": "이 이벤트의 RSVP가 마감되었습니다",
+  "viewPhotos": "사진 보기 ({{count}})",
+  "sharePhotos": "사진 공유",
+  "pizzadaoDescription": "는 피자 산업을 온체인으로 가져오는 국제 피자 협동조합입니다. 매년 글로벌 피자 파티를 개최하고, 매월 컨퍼런스 이벤트를 마련하며, 다른 주최자들의 모임에 피자를 후원합니다.",
+  "gppDefaultDescription": "2010년 5월 22일, 피자 두 판이 세상을 바꿨습니다. Laszlo Hanyecz가 Jeremy Sturdivant에게 피자 두 판을 주문하기 위해 10,000 BTC를 지불했습니다. 이는 최초의 실생활 비트코인 거래였으며, 글로벌 운동의 시작이었습니다.\n\n이제 PizzaDAO는 500개 이상의 도시에서 비트코인 피자 데이를 기념하는 전 세계적인 축제, [Global Pizza Party](https://globalpizza.party)에 여러분을 초대합니다. 모든 것을 시작한 그 슬라이스를 함께 기념해요.\n\n예상되는 것:\n🍕 무료 피자\n🌍 500개 이상의 도시에서 펼쳐지는 글로벌 축제\n₿ 암호화폐 애호가 및 빌더\n💬 멋진 대화, 새로운 친구, 그리고 좋은 분위기\n\n암호화폐에 깊이 빠져 있든 단지 피자 한 조각을 위해 오셨든, 다시 한 번 역사의 일부가 되어보세요.",
+  "sponsorDescription": {
+    "ens": "(Ethereum Name Service)는 인터넷에서 사람이 읽을 수 있는 이름을 지원하는 탈중앙화 네이밍 프로토콜입니다. 길고 복잡한 블록체인 주소를 복사·붙여넣기하는 대신, ENS는 지갑, 앱, 탈중앙 웹 전반에서 작동하는 간단하고 기억하기 쉬운 이름(예: pizzadao.eth)으로 대체할 수 있게 해줍니다.",
+    "brave": "브라우저는 PC, Mac, 모바일용으로 빠르고 안전하며 프라이버시를 지키는 웹 브라우저입니다. 지금 다운로드하여 데이터를 절약하는 더 빠르고 광고 없는 브라우징을 경험해 보세요.",
+    "wpc": "는 미국에 본사를 둔 비영리 다국적 엘리트 피자 전문가 단체입니다. 교육 활동, 지역사회 봉사, 그리고 피자 홍보에 헌신하고 있습니다!",
+    "ownTheDoge": "는 Kabosu의 주인 Atsuko Sato가 발행한 상징적인 Doge 밈을 $DOG를 통해 공동 소유하는 커뮤니티입니다. 보유자는 $DOG를 락업하여 유명한 이미지에서 \"Doge Pixel\" NFT를 발행할 수 있습니다.",
+    "swcEu": "는 명확하고 상식적인 암호화폐 규제를 옹호하는 비영리 단체입니다. 블록체인의 힘을 믿고 EU와 정부가 암호 자산 및 블록체인 기술에 대해 긍정적인 비즈니스·정책 환경을 조성하기를 바란다면, 목소리를 내주세요."
+  },
+  "dateTbd": "날짜 미정",
+  "partiesList": {
+    "title": "모든 파티",
+    "newParty": "+ 새 파티",
+    "noParties": "파티를 찾을 수 없습니다.",
+    "createFirst": "첫 파티를 만들어보세요",
+    "host": "호스트: {{name}}",
+    "closed": "마감됨",
+    "created": "생성일:",
+    "guests": "게스트 {{count}}명",
+    "loading": "파티 불러오는 중..."
+  },
+  "report": {
+    "notFound": "리포트를 찾을 수 없습니다",
+    "notFoundDesc": "이 리포트는 게시 취소되었거나 링크가 유효하지 않을 수 있습니다.",
+    "passwordProtected": "비밀번호로 보호됨",
+    "enterPassword": "이 리포트를 보려면 비밀번호를 입력하세요.",
+    "enterPasswordPlaceholder": "비밀번호 입력",
+    "incorrectPassword": "비밀번호가 올바르지 않습니다",
+    "viewReport": "리포트 보기"
+  },
+  "venueReport": {
+    "notFound": "베뉴 리포트를 찾을 수 없습니다",
+    "notFoundDesc": "이 베뉴 리포트는 게시 취소되었거나 링크가 유효하지 않을 수 있습니다.",
+    "passwordProtected": "비밀번호로 보호됨",
+    "enterPassword": "이 베뉴 리포트를 보려면 비밀번호를 입력하세요.",
+    "enterPasswordPlaceholder": "비밀번호 입력",
+    "incorrectPassword": "비밀번호가 올바르지 않습니다",
+    "viewReport": "리포트 보기"
+  }
+}
