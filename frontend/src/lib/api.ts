@@ -3294,7 +3294,7 @@ interface GPPEventsApiPayload {
 }
 
 export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
-  const params: string[] = ['limit=500'];
+  const params: string[] = ['limit=2000'];
   if (curated) params.push('curated=1');
   if (includeAll) params.push('includeAll=1');
   if (force) params.push(`_t=${Date.now()}`);

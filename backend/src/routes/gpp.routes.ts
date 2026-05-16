@@ -665,7 +665,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
-    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
     const [events, total] = await Promise.all([
