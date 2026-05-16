@@ -650,6 +650,8 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     const where: any = { eventType: 'gpp' };
     if (req.query.curated === '1') {
       where.underbossStatus = { in: ['approved', 'listed'] };
+    } else if (req.query.includeAll === '1') {
+      // moderator view — no underbossStatus filter; returns rejected/hidden too
     } else {
       where.underbossStatus = { notIn: ['rejected', 'hidden'] };
     }
@@ -663,7 +665,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
-    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
     const [events, total] = await Promise.all([

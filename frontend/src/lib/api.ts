@@ -3266,6 +3266,7 @@ export interface GPPEventMapItem {
   rsvpCount: number;
   country: string | null;
   underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventApiResponse {
@@ -3282,6 +3283,7 @@ interface GPPEventApiResponse {
   guestCount: number;
   country: string | null;
   underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventsApiPayload {
@@ -3291,9 +3293,10 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(force?: boolean, curated?: boolean): Promise<GPPEventMapItem[]> {
-  const params: string[] = ['limit=500'];
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
+  const params: string[] = ['limit=2000'];
   if (curated) params.push('curated=1');
+  if (includeAll) params.push('includeAll=1');
   if (force) params.push(`_t=${Date.now()}`);
   const url = `/api/gpp/events?${params.join('&')}`;
   const data = await apiRequest<GPPEventsApiPayload>(url, {
@@ -3312,6 +3315,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean): 
     rsvpCount: e.guestCount ?? 0,
     country: e.country,
     underbossStatus: e.underbossStatus,
+    eventTags: e.eventTags ?? [],
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
