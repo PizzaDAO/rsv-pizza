@@ -1265,6 +1265,16 @@ export interface SponsorDashboardEvent {
   partnerNotes: string | null;
   photoCount: number;
   checklist: SponsorChecklistItem[];
+  // Admin-only: newsletter signup counts per event. Field is absent for non-admins.
+  newsletterSignups?: {
+    pizzadao: number;
+    swc: number;
+    swcCa: number;
+    swcAu: number;
+    swcEu: number;
+    swcUk: number;
+    swcBr: number;
+  };
 }
 
 export interface SponsorMeResponse {
