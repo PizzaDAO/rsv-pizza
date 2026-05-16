@@ -39,14 +39,10 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       select: { id: true },
     });
 
-    // 2. venue_added: party.venue_name is set OR venues table has an entry with isSelected
+    // 2. venue_added: party.address is set (picking a venue or filling the location autocomplete both write address)
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { venueName: true, coHosts: true, userId: true, region: true, user: { select: { email: true, name: true } } },
-    });
-    const selectedVenue = await prisma.venue.findFirst({
-      where: { partyId, isSelected: true },
-      select: { id: true },
+      select: { address: true, venueName: true, coHosts: true, userId: true, region: true, user: { select: { email: true, name: true } } },
     });
 
     // 3. budget_submitted: budget_items has items for this party
@@ -98,7 +94,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     const autoCompleteStates = {
       event_created: true,
       party_kit_submitted: !!partyKit,
-      venue_added: !!(party?.venueName) || !!selectedVenue,
+      venue_added: !!party?.address,
       budget_submitted: budgetItemCount > 0,
       team_built: teamBuilt,
     };
