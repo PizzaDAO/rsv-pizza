@@ -186,7 +186,7 @@ export const GPPDashboardTab: React.FC = () => {
               className="btn-primary flex items-center gap-2"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : null}
-              List My Event
+              List My Event Without Funding
             </button>
             <button
               onClick={async () => {
@@ -222,7 +222,7 @@ export const GPPDashboardTab: React.FC = () => {
       {party.underbossStatus === 'listed' && (
         <div className="card p-6 border border-green-500/30 bg-green-500/5">
           <p className="text-sm text-green-400">
-            Your event is listed as a Community event on the site.
+            Your event is listed as a Community event on the site. These are self funded events that will not be funded by PizzaDAO.
           </p>
         </div>
       )}
