@@ -112,8 +112,8 @@ export function UnderbossDashboard() {
     return t('underbossDashboard.regionsCount', { count: selectedRegions.length });
   }, [selectedRegions, availableRegions.length, t]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const result = await fetchUnderbossDashboard('all');
@@ -130,9 +130,10 @@ export function UnderbossDashboard() {
         // Non-critical — partner tags indicator won't show
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard');
+      if (!silent) setError(err.message || 'Failed to load dashboard');
+      else console.error('Silent dashboard refetch failed:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -437,7 +438,7 @@ export function UnderbossDashboard() {
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
           )}
 
           {activeTab === 'cities' && (
@@ -445,7 +446,7 @@ export function UnderbossDashboard() {
           )}
 
           {activeTab === 'partners' && (
-            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={() => loadDashboard(true)} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
 
 
