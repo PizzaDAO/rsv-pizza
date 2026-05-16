@@ -1,0 +1,136 @@
+{
+  "step1": {
+    "title": "{{eventName}}에 RSVP",
+    "editTitle": "RSVP 수정",
+    "stepIndicator": "1/2 단계",
+    "namePlaceholder": "이름",
+    "emailPlaceholder": "이메일",
+    "walletPlaceholder": "지갑 주소 또는 ENS (예: vitalik.eth)",
+    "roleQuestion": "어떤 닌자 거북이와 가장 닮았나요?",
+    "mailingList": "PizzaDAO 메일링 리스트에 가입",
+    "swcJoin": "Stand with Crypto에 가입",
+    "swcNotify": "Stand With Crypto 이벤트에 대해 알려주세요.",
+    "swcBrNotify": "Juntos por Cripto 이벤트에 대해 알려주세요.",
+    "ethconfDiscount": "ETHConf 할인을 보내주세요",
+    "next": "다음",
+    "selectTurtles": "거북이를 선택하세요"
+  },
+  "step2": {
+    "title": "피자 요청",
+    "editTitle": "피자 취향 수정",
+    "stepIndicator": "2/2 단계",
+    "diet": "식단",
+    "toppings": "토핑",
+    "drinkPreferences": "음료 취향",
+    "favoritePizzerias": "좋아하는 피자집",
+    "clickToRank": "(1-3위 순위 매기기)",
+    "suggestPizzeria": "피자집 추천",
+    "suggestPizzeriaPrompt": "피자집을 추천하세요",
+    "searchPizzeria": "피자집 검색...",
+    "saveToProfile": "프로필에 저장",
+    "saveToProfileDesc": "향후 이벤트를 위해 내 취향 기억하기",
+    "back": "뒤로",
+    "submit": "RSVP",
+    "editSubmit": "RSVP 수정",
+    "submitting": "제출 중...",
+    "saving": "저장 중..."
+  },
+  "success": {
+    "seeYou": "{{eventName}}에서 만나요!",
+    "alreadyRegistered": "이미 등록되었습니다!",
+    "alreadyRegisteredDesc": "이 이메일은 이미 이 이벤트의 RSVP에 사용되었습니다.",
+    "rsvpSubmitted": "RSVP가 제출되었습니다!",
+    "pendingApproval": "RSVP가 호스트의 승인 대기 중입니다. 승인되면 체크인 QR 코드와 함께 이메일을 받게 됩니다.",
+    "rsvpUpdated": "RSVP 업데이트됨",
+    "preferenceSaved": "취향이 저장되었습니다.",
+    "waitlisted": "대기자 명단에 등록되었습니다!",
+    "waitlistedDesc": "이 이벤트는 현재 정원이 찼지만, 대기자 명단에서 #{{position}}번입니다! 자리가 생기면 알려드립니다.",
+    "backToEvent": "이벤트로 돌아가기"
+  },
+  "password": {
+    "title": "비밀번호 필요",
+    "subtitle": "이 이벤트는 비밀번호로 보호됩니다",
+    "placeholder": "이벤트 비밀번호",
+    "continue": "계속"
+  },
+  "donation": {
+    "donate": "후원",
+    "defaultMessage": "이 이벤트가 성사되도록 후원해 주세요",
+    "makeADonation": "후원하기",
+    "buyPizzaFor": "{{recipient}}을(를) 위해 피자 사기",
+    "buyPizzaForEvent": "이 이벤트를 위해 피자 사기",
+    "buyPizzaForEventName": "{{eventName}}을(를) 위해 피자 사기",
+    "thanksForSupport": "후원해 주셔서 감사합니다!"
+  },
+  "nft": {
+    "minting": "NFT 발행 중...",
+    "minted": "NFT가 발행되었습니다!",
+    "alreadyClaimed": "NFT가 이미 청구되었습니다!",
+    "viewOnOpenSea": "OpenSea에서 보기",
+    "viewTransaction": "거래 보기",
+    "mintFailed": "NFT 발행에 실패했습니다"
+  },
+  "share": {
+    "tellFriends": "친구들에게 파티를 알리세요!",
+    "shareOnX": "X에 공유",
+    "x": "X",
+    "download": "다운로드",
+    "save": "저장",
+    "copyLink": "링크 복사",
+    "link": "링크",
+    "copied": "복사됨!"
+  },
+  "swcModal": {
+    "title": "Stand with Crypto",
+    "description": "체크 박스를 선택함으로써, 암호화폐 소비자, 빌더, 지지자들에게 목소리를 낼 권한을 부여하는 풀뿌리 운동인 Stand with Crypto Alliance, Inc.의 회원이 되는 데 동의합니다. 체크 박스를 선택하고 회원이 되는 데 동의함으로써, SWC 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "SWC 개인정보 처리방침",
+    "termsConditions": "이용약관"
+  },
+  "swcCaModal": {
+    "title": "Stand with Crypto Canada",
+    "description": "체크 박스를 선택함으로써, 캐나다에서의 향후 이벤트 및 옹호 활동에 관한 Stand with Crypto의 커뮤니케이션 수신에 동의합니다. SWC 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "SWC Canada 개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "swcAuModal": {
+    "title": "Stand with Crypto Australia",
+    "description": "체크 박스를 선택함으로써, 호주에서의 향후 이벤트 및 옹호 활동에 관한 Stand with Crypto의 커뮤니케이션 수신에 동의합니다. SWC 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "SWC Australia 개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "swcEuModal": {
+    "title": "Stand with Crypto EU",
+    "description": "체크 박스를 선택함으로써, 유럽에서의 향후 이벤트 및 옹호 활동에 관한 Stand with Crypto의 커뮤니케이션 수신에 동의합니다. SWC 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "SWC EU 개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "swcUkModal": {
+    "title": "Stand with Crypto UK",
+    "description": "체크 박스를 선택함으로써, 영국에서의 향후 이벤트 및 옹호 활동에 관한 Stand with Crypto의 커뮤니케이션 수신에 동의합니다. SWC 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "SWC UK 개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "swcBrModal": {
+    "title": "Juntos por Cripto",
+    "description": "체크 박스를 선택함으로써, 브라질에서의 이벤트 및 옹호 활동에 관한 Juntos por Cripto의 커뮤니케이션 수신에 동의합니다. Juntos por Cripto 및 그 협력업체가 귀하의 개인 정보를 수집하고 사용할 수 있음을 이해합니다. 자세한 내용은 다음을 방문하세요:",
+    "privacyPolicy": "Juntos por Cripto 개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "roles": {
+    "Organizer": "주최자",
+    "Builder": "빌더",
+    "Creative": "크리에이티브",
+    "Connector": "커넥터",
+    "Storyteller": "스토리텔러",
+    "Counsel": "자문",
+    "Ground Support": "현장 지원"
+  },
+  "dietary": {
+    "Meat": "고기",
+    "Vegetarian": "베지테리언",
+    "Vegan": "비건",
+    "Plain": "플레인",
+    "Gluten-Free": "글루텐 프리",
+    "Dairy-Free": "유제품 프리"
+  }
+}
