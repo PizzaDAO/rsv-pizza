@@ -3321,7 +3321,7 @@ export interface GPPPartner {
   brandInstagram: string | null;
   category: string | null;
   eventCount: number;
-  events: { slug: string; city: string }[];
+  events: { slug: string; city: string; sponsorId: string }[];
 }
 
 export interface GPPPartnersResponse {

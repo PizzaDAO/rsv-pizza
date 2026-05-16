@@ -795,6 +795,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
         logoUrl: { not: null },
       },
       select: {
+        id: true,
         name: true,
         logoUrl: true,
         website: true,
@@ -841,7 +842,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
       brandInstagram: string | null;
       category: string | null;
       eventCount: number;
-      events: { slug: string; city: string }[];
+      events: { slug: string; city: string; sponsorId: string }[];
       // tie-break tracking
       bestSortOrder: number;
       bestCreatedAt: Date;
@@ -872,7 +873,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
         agg.eventCount += 1;
         // Cap events array at 500 to defend against pathological payload size.
         if (agg.events.length < 500 && slug) {
-          agg.events.push({ slug, city });
+          agg.events.push({ slug, city, sponsorId: s.id });
         }
         // Tie-break: prefer the representative row with lowest sortOrder; if tied,
         // prefer the more recent createdAt.
@@ -903,7 +904,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
           brandInstagram: s.brandInstagram,
           category: s.category,
           eventCount: 1,
-          events: slug ? [{ slug, city }] : [],
+          events: slug ? [{ slug, city, sponsorId: s.id }] : [],
           bestSortOrder: s.sortOrder,
           bestCreatedAt: s.createdAt,
         };

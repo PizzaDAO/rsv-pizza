@@ -320,8 +320,8 @@ app.get('/api', (req, res) => {
       "category": "community",
       "eventCount": 423,
       "events": [
-        { "slug": "london", "city": "London" },
-        { "slug": "saopaulo", "city": "São Paulo" }
+        { "slug": "london", "city": "London", "sponsorId": "clz0a1b2c3d4e5f6g7h8i9j0" },
+        { "slug": "saopaulo", "city": "São Paulo", "sponsorId": "clz0k1l2m3n4o5p6q7r8s9t0" }
       ]
     }
   ],
