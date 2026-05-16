@@ -152,38 +152,22 @@ export function RSVPFormStep1({
         </div>
       )}
 
-      {/* PizzaDAO Newsletter opt-in */}
-      <button
-        type="button"
-        onClick={() => form.setMailingListOptIn(!form.mailingListOptIn)}
-        className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
-      >
-        {form.mailingListOptIn ? (
-          <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-        ) : (
-          <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-        )}
-        <span className="text-sm text-theme-text">
-          {t('step1.mailingList')}
-        </span>
-      </button>
-
-      {/* SWC checkbox + info modal (US) */}
-      {form.isSwcEvent && (
+      {/* Combined PizzaDAO + SWC opt-in (variant arm of A/B test, US SWC events only) */}
+      {form.isSwcEvent && form.optinAbVariant === 'variant' ? (
         <>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => form.setSwcOptIn(!form.swcOptIn)}
+              onClick={() => form.setCombinedOptIn(!form.combinedOptIn)}
               className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
             >
-              {form.swcOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+              {form.combinedOptIn ? (
+                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
               ) : (
                 <Square size={20} className="text-theme-text-muted flex-shrink-0" />
               )}
               <span className="text-sm text-theme-text">
-                {t('step1.swcJoin')}
+                {t('step1.combinedOptIn')}
               </span>
             </button>
             <button
@@ -233,6 +217,93 @@ export function RSVPFormStep1({
               </div>
             </div>,
             document.body
+          )}
+        </>
+      ) : (
+        <>
+          {/* PizzaDAO Newsletter opt-in */}
+          <button
+            type="button"
+            onClick={() => form.setMailingListOptIn(!form.mailingListOptIn)}
+            className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
+          >
+            {form.mailingListOptIn ? (
+              <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+            ) : (
+              <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+            )}
+            <span className="text-sm text-theme-text">
+              {t('step1.mailingList')}
+            </span>
+          </button>
+
+          {/* SWC checkbox + info modal (US) */}
+          {form.isSwcEvent && (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => form.setSwcOptIn(!form.swcOptIn)}
+                  className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+                >
+                  {form.swcOptIn ? (
+                    <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
+                  ) : (
+                    <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+                  )}
+                  <span className="text-sm text-theme-text">
+                    {t('step1.swcJoin')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => form.setShowSwcInfoModal(true)}
+                  className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+                >
+                  <Info size={18} />
+                </button>
+              </div>
+
+              {form.showSwcInfoModal && createPortal(
+                <div
+                  className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                  onClick={() => form.setShowSwcInfoModal(false)}
+                >
+                  <div
+                    className="card p-6 max-w-md w-full relative"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => form.setShowSwcInfoModal(false)}
+                      className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcModal.title')}</h3>
+                    <p className="text-sm text-theme-text-secondary leading-relaxed">
+                      {t('swcModal.description')}{' '}
+                      <a
+                        href="https://www.standwithcrypto.org/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 underline"
+                      >
+                        {t('swcModal.privacyPolicy')}
+                      </a> and{' '}
+                      <a
+                        href="https://www.standwithcrypto.org/terms-of-service"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 underline"
+                      >
+                        {t('swcModal.termsConditions')}
+                      </a>.
+                    </p>
+                  </div>
+                </div>,
+                document.body
+              )}
+            </>
           )}
         </>
       )}

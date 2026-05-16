@@ -248,6 +248,7 @@ model Guest {
   swcUkOptIn          Boolean  @default(false) @map("swc_uk_opt_in")
   swcBrOptIn          Boolean  @default(false) @map("swc_br_opt_in")
   ethconfOptIn        Boolean  @default(false) @map("ethconf_opt_in")
+  optinAbVariant      String?  @map("optin_ab_variant")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")
   dislikedToppings    String[] @map("disliked_toppings")

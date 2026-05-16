@@ -168,6 +168,22 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isGppEvent = eventData.eventType === 'gpp';
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
+  const [optinAbVariant] = useState<'control' | 'variant' | null>(() => {
+    const tags = eventData.eventTags || [];
+    if (!tags.includes('swc')) return null;
+    if (existingGuest?.optinAbVariant === 'control' || existingGuest?.optinAbVariant === 'variant') {
+      return existingGuest.optinAbVariant;
+    }
+    return Math.random() < 0.5 ? 'control' : 'variant';
+  });
+
+  const setCombinedOptIn = useCallback((v: boolean) => {
+    setMailingListOptIn(v);
+    setSwcOptIn(v);
+  }, []);
+
+  const combinedOptIn = mailingListOptIn && swcOptIn;
+
   // ---- Validate wallet address ----
   const validateWalletAddress = useCallback((address: string) => {
     if (!address.trim()) {
@@ -424,6 +440,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         swcUkOptIn || undefined,
         swcBrOptIn || undefined,
         ethconfOptIn || undefined,
+        optinAbVariant ?? undefined,
       );
 
       if (result) {
@@ -464,7 +481,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn, optinAbVariant,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -514,6 +531,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setShowSwcBrInfoModal,
     ethconfOptIn,
     setEthconfOptIn,
+    optinAbVariant,
+    combinedOptIn,
+    setCombinedOptIn,
 
     // Step 2 fields
     dietaryRestrictions,
