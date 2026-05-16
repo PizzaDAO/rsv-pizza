@@ -513,7 +513,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(duration !== undefined && { duration }),
         ...(timezone !== undefined && { timezone }),
         ...(pizzaStyle && { pizzaStyle }),
-        ...(address !== undefined && { address }),
+        ...(address !== undefined && { address, addressIsCityDefault: false }),
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
         ...(country !== undefined && { country: country || null }),

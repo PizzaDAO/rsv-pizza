@@ -54,6 +54,7 @@ model Party {
   placeId                 String?   @map("place_id")
   latitude                Float?
   longitude               Float?
+  addressIsCityDefault    Boolean   @default(false) @map("address_is_city_default")
   venueName               String?   @map("venue_name")
   venueStatus             String?   @map("venue_status")
   venueCapacity           Int?      @map("venue_capacity")

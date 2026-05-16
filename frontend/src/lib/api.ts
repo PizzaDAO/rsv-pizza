@@ -911,6 +911,7 @@ export interface CreateGPPEventData {
   telegram?: string;
   country?: string;
   countryCode?: string;
+  cityFormattedName?: string;
   cityLat?: number;
   cityLng?: number;
   timezone?: string;
