@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "nft:backfill": "tsx scripts/backfill-nft-mints.ts"
+    "nft:backfill": "tsx scripts/backfill-nft-mints.ts",
+    "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
