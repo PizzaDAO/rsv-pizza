@@ -78,7 +78,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           },
         },
         _count: {
-          select: { guests: true },
+          // mushroom-31723: exclude rejected guests (approved=false) from the public count.
+          select: { guests: { where: { approved: { not: false } } } },
         },
       },
     });
