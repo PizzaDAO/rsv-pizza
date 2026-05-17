@@ -3438,6 +3438,31 @@ export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats 
   }
 }
 
+export interface OptinABArm {
+  arm: 'control' | 'variant';
+  n: number;
+  pizzadaoOptins: number;
+  pizzadaoOptinPct: number;
+  swcOptins: number;
+  swcOptinPct: number;
+}
+
+export interface OptinABResults {
+  arms: OptinABArm[];
+}
+
+export async function fetchOptinABResults(): Promise<OptinABResults | null> {
+  try {
+    return await apiRequest<OptinABResults>('/api/admin/experiments/optin-ab', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching opt-in A/B results:', error);
+    return null;
+  }
+}
+
 // ── Guest Scorecard ──
 
 export interface ScorecardItem {
