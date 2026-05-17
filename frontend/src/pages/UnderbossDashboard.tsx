@@ -71,6 +71,8 @@ export function UnderbossDashboard() {
   // Tab state
   const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection'>('events');
 
+  const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
+
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
@@ -101,6 +103,24 @@ export function UnderbossDashboard() {
       events: filteredEvents,
     };
   }, [allData, selectedRegions, availableRegions.length]);
+
+  const displayData = useMemo(() => {
+    if (!filteredData) return null;
+    if (activeTab !== 'events' || !tableFilteredEvents) return filteredData;
+    return {
+      ...filteredData,
+      stats: recomputeStats(tableFilteredEvents),
+      events: tableFilteredEvents,
+    };
+  }, [filteredData, activeTab, tableFilteredEvents]);
+
+  useEffect(() => {
+    if (activeTab !== 'events') setTableFilteredEvents(null);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setTableFilteredEvents(null);
+  }, [allData]);
 
   // Derive the region label for the header
   const regionLabel = useMemo(() => {
@@ -272,7 +292,7 @@ export function UnderbossDashboard() {
     );
   }
 
-  if (!filteredData) return null;
+  if (!filteredData || !displayData) return null;
 
   const showMultiSelect = availableRegions.length > 1;
   const showRegionColumn = selectedRegions.length > 1;
@@ -390,7 +410,7 @@ export function UnderbossDashboard() {
 
         {/* Stats */}
         <section className="mb-8">
-          <RegionStats stats={filteredData.stats} />
+          <RegionStats stats={displayData.stats} />
         </section>
 
         {/* Events / Cities Tabs */}
@@ -404,7 +424,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              {t('underbossDashboard.tabs.events')} ({filteredData.events.length})
+              {t('underbossDashboard.tabs.events')} ({displayData.events.length})
               {activeTab === 'events' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -453,7 +473,7 @@ export function UnderbossDashboard() {
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} />
           )}
 
           {activeTab === 'cities' && (
