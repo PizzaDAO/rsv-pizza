@@ -697,6 +697,9 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Host Telegram bot connection
+  host_telegram_chat_id?: string | null; // serialized as string from API (BigInt)
+  host_telegram_link_token?: string | null;
   // Underboss status
   underboss_status?: string | null;
   // Turtle role selection toggle
@@ -763,6 +766,7 @@ export const SAFE_PARTY_COLUMNS = `
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
   telegram_group,
+  host_telegram_chat_id, host_telegram_link_token,
   turtle_roles_enabled,
   underboss_status,
   flyer_config,
@@ -1720,6 +1724,7 @@ export async function updateParty(
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
     telegram_group?: string | null;
+    host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
   }
 ): Promise<boolean> {
@@ -1792,6 +1797,7 @@ export async function updateParty(
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
         telegramGroup: updates.telegram_group,
+        hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
       });
       return true;
