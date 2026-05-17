@@ -249,6 +249,8 @@
     "statusPriorityCount": "{{count}} priority",
     "markPriority": "★ Mark Priority",
     "unmarkPriority": "☆ Unmark Priority",
+    "markPriorityTitle": "Mark as priority",
+    "unmarkPriorityTitle": "Unmark as priority",
     "noCitiesMatch": "No cities match your filters",
     "noCitiesSelected": "No cities selected",
     "selected": "{{count}} selected",
