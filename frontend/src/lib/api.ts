@@ -3348,6 +3348,7 @@ export interface GPPEventMapItem {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
 }
 
 interface GPPEventApiResponse {
@@ -3365,6 +3366,7 @@ interface GPPEventApiResponse {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
 }
 
 interface GPPEventsApiPayload {
@@ -3400,6 +3402,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     country: e.country,
     underbossStatus: e.underbossStatus,
     eventTags: e.eventTags ?? [],
+    telegramGroup: e.telegramGroup ?? null,
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');

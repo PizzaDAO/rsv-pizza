@@ -4,6 +4,7 @@ import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
 
 interface GPPEventsMapProps {
   events: GPPEventMapItem[];
+  cityChats?: Map<string, string>;
   height?: string;
   canModerate?: boolean;
   // When true, markers are rendered as status-colored circles (admin/underboss
@@ -44,6 +45,7 @@ function makeMarkerIcon(status?: string | null): google.maps.Icon {
 
 export default function GPPEventsMap({
   events,
+  cityChats = new Map(),
   height = '100%',
   canModerate = false,
   isModerator = false,
@@ -180,6 +182,13 @@ export default function GPPEventsMap({
         const linkLabel = canModerate ? 'View Event &rarr;' : 'RSVP &rarr;';
         const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">${linkLabel}</a>`;
 
+        const cityKey = event.name.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
+        const telegramUrlRaw = event.telegramGroup || cityChats.get(cityKey) || null;
+        const telegramUrl = telegramUrlRaw ? telegramUrlRaw.replace(/"/g, '&quot;') : null;
+        const telegramHtml = telegramUrl
+          ? `<a href="${telegramUrl}" target="_blank" rel="noopener noreferrer" style="color:#29B6F6;font-size:12px;text-decoration:none;font-weight:500">Telegram &rarr;</a>`
+          : '';
+
         let actionsHtml = '';
         if (canModerate) {
           // Status pill — shown for every moderator-visible event so the
@@ -218,6 +227,7 @@ export default function GPPEventsMap({
             ${addressHtml}
             <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               ${linkHtml}
+              ${telegramHtml}
               ${rsvpHtml}
             </div>
             ${actionsRowHtml}
@@ -404,7 +414,7 @@ export default function GPPEventsMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validEvents, canModerate, isModerator]);
+  }, [validEvents, cityChats, canModerate, isModerator]);
 
   if (error) {
     return (

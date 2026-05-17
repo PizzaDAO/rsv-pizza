@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowRight, Loader2, RefreshCw, SlidersHorizontal, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { fetchGppEventsForMap, fetchUnderbossMe, GPPEventMapItem } from '../lib/api';
+import { fetchSheetCities } from '../lib/cities';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal } from '../components/LoginModal';
 
@@ -24,6 +25,7 @@ const STATUS_LEGEND: { key: string; label: string; color: string }[] = [
 export function EventsMapPage() {
   const { user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState<GPPEventMapItem[]>([]);
+  const [cityChats, setCityChats] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -118,6 +120,20 @@ export function EventsMapPage() {
     const handle = setTimeout(() => setDebouncedSearchQ(searchQ), 200);
     return () => clearTimeout(handle);
   }, [searchQ]);
+
+  // Fetch city chat URLs once on mount (independent of auth).
+  // Used as a fallback Telegram link when an event has no per-event override.
+  useEffect(() => {
+    fetchSheetCities()
+      .then((cities) => {
+        const map = new Map<string, string>();
+        for (const c of cities) {
+          if (c.chatUrl) map.set(c.city.toLowerCase().trim(), c.chatUrl);
+        }
+        setCityChats(map);
+      })
+      .catch(() => { /* silent — Telegram links just won't show */ });
+  }, []);
 
   function getStatusFilterState(key: string): 'neutral' | 'include' | 'exclude' {
     if (statusIncludes.includes(key)) return 'include';
@@ -497,6 +513,7 @@ export function EventsMapPage() {
             {!loading && !error && canModerate !== null && (
               <GPPEventsMap
                 events={canModerate ? filteredEvents : events}
+                cityChats={cityChats}
                 height="calc(100vh - 64px)"
                 canModerate={canModerate}
                 isModerator={!!canModerate}
