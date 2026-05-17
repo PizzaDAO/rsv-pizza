@@ -37,6 +37,8 @@ function SponsorIntakeRedirect() {
 
 const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
 const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
+const StreamOverlay = React.lazy(() => import('./pages/StreamOverlay').then(m => ({ default: m.StreamOverlay })));
+const StreamControl = React.lazy(() => import('./pages/StreamControl').then(m => ({ default: m.StreamControl })));
 
 function App() {
   return (
@@ -77,6 +79,9 @@ function App() {
             <Route path="/graphics/:slug/edit" element={<Suspense fallback={null}><GraphicsFlyerEdit /></Suspense>} />
             <Route path="/post" element={<PostComposerPage />} />
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
+            {/* /stream/* must come before /:slug */}
+            <Route path="/stream/overlay" element={<Suspense fallback={null}><StreamOverlay /></Suspense>} />
+            <Route path="/stream/control" element={<Suspense fallback={null}><StreamControl /></Suspense>} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />
             <Route path="/cmohhr0640003jp047krjarz0" element={<Navigate to="/nashville" replace />} />
             {/* Catch-all route for custom URLs - must be last */}

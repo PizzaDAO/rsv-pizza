@@ -1391,3 +1391,20 @@ model GuestScorecardItem {
   @@index([partyId])
   @@map("guest_scorecard_items")
 }
+
+model StreamRegistrant {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String
+  partyId          String?   @map("party_id") @db.Uuid
+  zoomMeetingId    String    @map("zoom_meeting_id")
+  zoomRegistrantId String?   @map("zoom_registrant_id")
+  zoomJoinUrl      String?   @map("zoom_join_url")
+  displayName      String?   @map("display_name")
+  emailSentAt      DateTime? @map("email_sent_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([email, zoomMeetingId], map: "stream_registrants_email_meeting_unique")
+  @@index([zoomMeetingId], map: "stream_registrants_meeting_idx")
+  @@map("stream_registrants")
+}
