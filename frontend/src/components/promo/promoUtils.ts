@@ -140,7 +140,8 @@ export const EVENT_PLATFORMS: Record<EventPlatform, { name: string; color: strin
 /**
  * Generate a Twitter/X post for the party (single-element array).
  * Template:
- *   See you at {party.name}?
+ *   \u{1F5FA}\u{FE0F}\u{1F355}\u{1F973}
+ *   Join us at {party.name}!
  *   {rsvpUrl}
  *
  *   {partner @handles}   (only if any)
@@ -157,7 +158,11 @@ export function generateTwitterThread(party: Party): string[] {
     .map(c => `@${c.twitter!.replace(/^@/, '').trim()}`)
     .join(' ');
 
-  const lines: string[] = [`See you at ${party.name}?`, rsvpUrl];
+  const lines: string[] = [
+    '\u{1F5FA}\u{FE0F}\u{1F355}\u{1F973}',
+    `Join us at ${party.name}!`,
+    rsvpUrl,
+  ];
   if (partnerHandles) {
     lines.push('');
     lines.push(partnerHandles);
