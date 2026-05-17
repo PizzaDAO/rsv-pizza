@@ -3491,6 +3491,41 @@ export async function fetchOptinABResults(): Promise<OptinABResults | null> {
   }
 }
 
+export interface ExperimentFlag {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export async function fetchExperimentFlags(): Promise<ExperimentFlag[] | null> {
+  try {
+    const res = await apiRequest<{ flags: ExperimentFlag[] }>('/api/admin/experiments/flags', {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return res.flags;
+  } catch (error) {
+    console.error('Error fetching experiment flags:', error);
+    return null;
+  }
+}
+
+export async function setExperimentFlag(key: string, enabled: boolean): Promise<ExperimentFlag | null> {
+  try {
+    const res = await apiRequest<{ flag: ExperimentFlag }>(`/api/admin/experiments/flags/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: { enabled },
+      requireAuth: true,
+    });
+    return res.flag;
+  } catch (error) {
+    console.error('Error setting experiment flag:', error);
+    return null;
+  }
+}
+
 // ── Guest Scorecard ──
 
 export interface ScorecardItem {
