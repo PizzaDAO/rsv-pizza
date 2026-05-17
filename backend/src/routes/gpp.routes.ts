@@ -905,10 +905,19 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
       }
 
       if (agg) {
-        agg.eventCount += 1;
-        // Cap events array at 500 to defend against pathological payload size.
-        if (agg.events.length < 500 && slug) {
-          agg.events.push({ slug, city, sponsorId: s.id });
+        // Dedupe within this partner's events: if the same event already
+        // appears in this aggregate's list (e.g. duplicate sponsor rows for
+        // the same partner on one party), skip the push AND don't bump
+        // eventCount. First-seen wins.
+        const alreadyHasEvent = slug
+          ? agg.events.some((e) => e.slug === slug)
+          : false;
+        if (!alreadyHasEvent) {
+          agg.eventCount += 1;
+          // Cap events array at 500 to defend against pathological payload size.
+          if (agg.events.length < 500 && slug) {
+            agg.events.push({ slug, city, sponsorId: s.id });
+          }
         }
         // Tie-break: prefer the representative row with lowest sortOrder; if tied,
         // prefer the more recent createdAt.
@@ -950,6 +959,13 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
 
     // Collect unique aggregates (some may be present in both maps).
     const uniqueAggregates = Array.from(new Set(byLogoKey.values()));
+
+    // Final safety: keep eventCount strictly in sync with the deduped events
+    // array. The push-time check above already does this, but recomputing
+    // here guards against future edits drifting the two apart.
+    for (const a of uniqueAggregates) {
+      a.eventCount = a.events.length;
+    }
 
     // Sort by popularity (eventCount DESC), then name ASC.
     uniqueAggregates.sort((a, b) => {
