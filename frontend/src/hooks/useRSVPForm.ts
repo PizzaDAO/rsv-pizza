@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
+import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
@@ -168,14 +168,28 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isGppEvent = eventData.eventType === 'gpp';
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
-  const [optinAbVariant] = useState<'control' | 'variant' | null>(() => {
-    const tags = eventData.eventTags || [];
-    if (!tags.includes('swc')) return null;
+  const [optinAbVariant, setOptinAbVariant] = useState<'control' | 'variant' | null>(() => {
     if (existingGuest?.optinAbVariant === 'control' || existingGuest?.optinAbVariant === 'variant') {
       return existingGuest.optinAbVariant;
     }
-    return Math.random() < 0.5 ? 'control' : 'variant';
+    return null;
   });
+
+  useEffect(() => {
+    if (optinAbVariant !== null) return;
+    const tags = eventData.eventTags || [];
+    if (!tags.includes('swc')) return;
+
+    let cancelled = false;
+    (async () => {
+      const enabled = await getExperimentFlag('optin_ab_pizzadao_partners');
+      if (cancelled) return;
+      if (!enabled) return;
+      setOptinAbVariant(Math.random() < 0.5 ? 'control' : 'variant');
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setCombinedOptIn = useCallback((v: boolean) => {
     setMailingListOptIn(v);
