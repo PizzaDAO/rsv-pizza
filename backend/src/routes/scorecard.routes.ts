@@ -50,13 +50,16 @@ async function findPartyByCode(inviteCode: string) {
   return party;
 }
 
-// Helper: find the authenticated user's guest record for a party
+// Helper: find the authenticated user's guest record for a party.
+// mushroom-31723: rejected guests (approved=false) are excluded so they
+// can't view or edit their scorecard.
 async function findGuestForUser(partyId: string, userEmail?: string) {
   if (!userEmail) return null;
   return prisma.guest.findFirst({
     where: {
       partyId,
       email: userEmail.toLowerCase(),
+      approved: { not: false },
     },
     select: { id: true, checkedInAt: true },
   });

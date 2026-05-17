@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, X } from 'lucide-react';
@@ -16,8 +16,11 @@ const C = {
   darkText:  '#1a1a1a',
   mutedText: '#555',
   cardBg:    'rgba(255,255,255,0.92)',
-  // Logo tiles use a mid-gray so both white/cream and dark logos remain readable.
-  logoCardBg:'rgba(160,160,160,0.92)',
+  // Logo tiles use a pale cool-gray (between Tailwind gray-100 #f3f4f6 and
+  // slate-100 #f1f5f9) at 92% opacity — matches the visual gray of the
+  // host event-settings cards (bg-theme-card in the GPP/light theme), sitting
+  // as a near-white card on the sky-blue gradient.
+  logoCardBg:'rgba(241, 243, 246, 0.92)',
   cardBorder:'rgba(0,0,0,0.08)',
 };
 
@@ -96,7 +99,10 @@ export function PartnersPage() {
     setModalPartner(null);
   };
 
-  const totalEvents = partners.reduce((sum, p) => sum + p.eventCount, 0);
+  const uniqueEventCount = useMemo(
+    () => new Set(partners.flatMap((p) => p.events.map((e) => e.slug))).size,
+    [partners]
+  );
 
   return (
     <div
@@ -146,7 +152,7 @@ export function PartnersPage() {
           className="max-w-2xl mx-auto text-base md:text-lg mb-6"
           style={{ color: C.mutedText }}
         >
-          The brands powering the 2026 Global Pizza Party — slinging slices in cities around the world.
+          The orgs powering the 2026 Global Pizza Party
         </p>
 
         {!loading && !error && partners.length > 0 && (
@@ -161,7 +167,7 @@ export function PartnersPage() {
             >
               <span className="text-sm font-semibold">
                 {partners.length.toLocaleString()} partners across{' '}
-                {totalEvents.toLocaleString()} events
+                {uniqueEventCount.toLocaleString()} events
               </span>
             </div>
           </div>
@@ -256,8 +262,8 @@ export function PartnersPage() {
                   >
                     {partner.name}
                   </div>
-                  <div className="mt-1 flex justify-center">
-                    {canClick ? (
+                  {canClick && (
+                    <div className="mt-1 flex justify-center">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -269,12 +275,8 @@ export function PartnersPage() {
                       >
                         {pillText}
                       </button>
-                    ) : (
-                      <span className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828]">
-                        {pillText}
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

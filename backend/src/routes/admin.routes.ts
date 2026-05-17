@@ -782,4 +782,101 @@ router.get('/funnel-stats', requireAuth, async (req: AuthRequest, res: Response,
   }
 });
 
+// GET /api/admin/experiments/optin-ab — parmesan-98989 combined opt-in A/B results (admin only)
+router.get('/experiments/optin-ab', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const rows = await prisma.$queryRaw<Array<{
+      arm: string;
+      n: number;
+      pizzadao_optins: number;
+      pizzadao_optin_pct: number | string;
+      swc_optins: number;
+      swc_optin_pct: number | string;
+    }>>`
+      SELECT
+        g.optin_ab_variant AS arm,
+        COUNT(*)::int                                                        AS n,
+        COUNT(*) FILTER (WHERE g.mailing_list_opt_in)::int                   AS pizzadao_optins,
+        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE g.mailing_list_opt_in)
+                             / NULLIF(COUNT(*), 0), 2), 0)                   AS pizzadao_optin_pct,
+        COUNT(*) FILTER (WHERE g.swc_opt_in)::int                            AS swc_optins,
+        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE g.swc_opt_in)
+                             / NULLIF(COUNT(*), 0), 2), 0)                   AS swc_optin_pct
+      FROM guests g
+      JOIN parties p ON p.id = g.party_id
+      WHERE 'swc' = ANY(p.event_tags)
+        AND g.optin_ab_variant IN ('control', 'variant')
+        AND g.submitted_via = 'link'
+        AND (g.status IS NULL OR g.status != 'INVITED')
+      GROUP BY g.optin_ab_variant
+      ORDER BY g.optin_ab_variant;
+    `;
+
+    const byArm = new Map<string, typeof rows[number]>();
+    for (const r of rows) byArm.set(r.arm, r);
+
+    const arms = (['control', 'variant'] as const).map((arm) => {
+      const r = byArm.get(arm);
+      return {
+        arm,
+        n: r ? Number(r.n) : 0,
+        pizzadaoOptins: r ? Number(r.pizzadao_optins) : 0,
+        pizzadaoOptinPct: r ? Number(r.pizzadao_optin_pct) : 0,
+        swcOptins: r ? Number(r.swc_optins) : 0,
+        swcOptinPct: r ? Number(r.swc_optin_pct) : 0,
+      };
+    });
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ arms });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/experiments/flags', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const flags = await prisma.experimentFlag.findMany({ orderBy: { key: 'asc' } });
+    res.set('Cache-Control', 'no-store');
+    res.json({ flags });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/experiments/flags/:key', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const { key } = req.params;
+    const { enabled } = req.body ?? {};
+    if (typeof enabled !== 'boolean') {
+      throw new AppError('enabled (boolean) is required', 400, 'VALIDATION_ERROR');
+    }
+    const existing = await prisma.experimentFlag.findUnique({ where: { key } });
+    if (!existing) {
+      throw new AppError('Flag not found', 404, 'NOT_FOUND');
+    }
+    const updated = await prisma.experimentFlag.update({
+      where: { key },
+      data: {
+        enabled,
+        updatedAt: new Date(),
+        updatedBy: req.userEmail ?? null,
+      },
+    });
+    res.json({ flag: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

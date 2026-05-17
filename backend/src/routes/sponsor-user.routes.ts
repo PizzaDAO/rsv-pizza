@@ -534,7 +534,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       // PizzaDAO: show all GPP events (created via /gpp flow)
       where.eventType = 'gpp';
     } else if (req.isAdminViewing) {
-      // Admin with no tag filter — show events that have at least one eventTag
+      // Admin with no tag filter — show all GPP events that have at least one eventTag
+      where.eventType = 'gpp';
       where.NOT = { eventTags: { equals: [] } };
     }
 
@@ -786,6 +787,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         slug: event.customUrl || event.inviteCode,
         reportPublicSlug: event.reportPublished ? (event.reportPublicSlug || event.customUrl || event.inviteCode) : null,
         date: event.date,
+        createdAt: event.createdAt,
         timezone: event.timezone,
         address: event.address,
         venueName: event.venueName,
@@ -928,6 +930,137 @@ sponsorDashboardRouter.post('/checklist/:itemId/toggle', requireAuth, requireSpo
     });
 
     res.json({ item: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/sponsor/events/timeseries - Time-series data (RSVPs / impressions / clicks per hour)
+// Scoped to the sponsor's tag for non-admins; admins can pass ?tag= or omit for all-GPP-with-any-tag.
+// Buckets hour-by-hour across one of four ranges: 6hr / 24hr / 3d / 7d (default 24hr).
+sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    // Range gating
+    const rangeParam = (req.query.range as string | undefined)?.trim().toLowerCase();
+    const validRanges = ['6hr', '24hr', '3d', '7d'] as const;
+    type RangeKey = typeof validRanges[number];
+    const range: RangeKey = (validRanges as readonly string[]).includes(rangeParam || '')
+      ? (rangeParam as RangeKey)
+      : '24hr';
+
+    const rangeHoursMap: Record<RangeKey, number> = {
+      '6hr': 6,
+      '24hr': 24,
+      '3d': 72,
+      '7d': 168,
+    };
+    const hoursBack = rangeHoursMap[range];
+    const sinceDate = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+
+    // Resolve which events the chart should cover, using the same logic as GET /events
+    const queryTag = req.query.tag as string | undefined;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
+
+    const where: any = {};
+    if (tag && tag !== 'pizzadao') {
+      where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      where.eventType = 'gpp';
+    } else if (req.isAdminViewing) {
+      // Admin with no tag filter — show all GPP events that have at least one eventTag
+      where.eventType = 'gpp';
+      where.NOT = { eventTags: { equals: [] } };
+    }
+    // Non-admin without a tag (shouldn't happen — sponsor users always have a tag):
+    // `where` stays empty here, which would broaden the query. The `eventIds.length === 0`
+    // guard below catches the no-events case; if a non-admin somehow has no tag, the
+    // resulting empty-tag query would return all parties, which is wrong. Add an explicit
+    // guard above the findMany to early-return empty:
+    if (!tag && !req.isAdminViewing) {
+      return res.json({
+        range,
+        bucket: 'hour' as const,
+        since: sinceDate.toISOString(),
+        points: [],
+      });
+    }
+
+    const events = await prisma.party.findMany({
+      where,
+      select: { id: true },
+    });
+    const eventIds = events.map(e => e.id);
+
+    if (eventIds.length === 0) {
+      return res.json({
+        range,
+        bucket: 'hour' as const,
+        since: sinceDate.toISOString(),
+        points: [],
+      });
+    }
+
+    // Three hour-bucketed aggregations
+    const pageViewRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', viewed_at) as bucket, COUNT(*)::bigint as count
+      FROM page_views
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND viewed_at >= ${sinceDate}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const linkClickRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', clicked_at) as bucket, COUNT(*)::bigint as count
+      FROM link_clicks
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND clicked_at >= ${sinceDate}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const rsvpRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', submitted_at) as bucket, COUNT(*)::bigint as count
+      FROM guests
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND submitted_at >= ${sinceDate}
+      AND status != 'INVITED'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    // Build a dense hour-aligned series so the chart has zero-value points (avoids visual gaps)
+    const startHour = new Date(sinceDate);
+    startHour.setMinutes(0, 0, 0);
+    const nowHour = new Date();
+    nowHour.setMinutes(0, 0, 0);
+
+    const rsvpMap = new Map<string, number>();
+    for (const r of rsvpRows) rsvpMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+    const viewsMap = new Map<string, number>();
+    for (const r of pageViewRows) viewsMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+    const clicksMap = new Map<string, number>();
+    for (const r of linkClickRows) clicksMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+
+    const points: { timestamp: string; rsvps: number; impressions: number; clicks: number }[] = [];
+    for (let t = startHour.getTime(); t <= nowHour.getTime(); t += 60 * 60 * 1000) {
+      const iso = new Date(t).toISOString();
+      points.push({
+        timestamp: iso,
+        rsvps: rsvpMap.get(iso) || 0,
+        impressions: viewsMap.get(iso) || 0,
+        clicks: clicksMap.get(iso) || 0,
+      });
+    }
+
+    res.json({
+      range,
+      bucket: 'hour' as const,
+      since: sinceDate.toISOString(),
+      points,
+    });
   } catch (error) {
     next(error);
   }

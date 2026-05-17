@@ -7,6 +7,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
+import { OptinABTab } from '../components/underboss/OptinABTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
@@ -116,6 +117,8 @@ export function AdminPage() {
   const [savingDesc, setSavingDesc] = useState(false);
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'admin' | 'experiments'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -575,6 +578,37 @@ export function AdminPage() {
             </div>
           </div>
 
+          <div className="border-b border-theme-stroke mb-6 flex gap-6">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'admin'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Admin
+              {activeTab === 'admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('experiments')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'experiments'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Experiments
+              {activeTab === 'experiments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'admin' && (
+            <>
           {/* Export Events CSV */}
           <div className="mb-6">
             <button
@@ -1355,6 +1389,14 @@ export function AdminPage() {
             </h2>
             <FunnelTab regions={[]} />
           </section>
+            </>
+          )}
+
+          {activeTab === 'experiments' && (
+            <section className="mb-10">
+              <OptinABTab />
+            </section>
+          )}
         </div>
       </main>
 

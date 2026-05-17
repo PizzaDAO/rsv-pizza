@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -174,6 +174,7 @@ export interface UpdatePartyData {
   country?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
+  hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
 }
 
@@ -279,6 +280,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       country: data.country,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
+      hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
     },
   });
@@ -417,6 +419,7 @@ export interface PublicEvent {
   longitude?: number | null;
   placeId?: string | null;
   venueName: string | null;
+  country?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
@@ -2525,6 +2528,11 @@ export async function fetchUnderbossDashboard(
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
 }
 
+// Fetch fake-event detection review queue (blackolive-74932)
+export async function fetchFakeDetection(): Promise<FakeDetectionResponse> {
+  return apiRequest<FakeDetectionResponse>('/api/underboss/fake-detection');
+}
+
 // Update host status on an event (underboss auth)
 export async function updateHostStatus(
   partyId: string,
@@ -2993,6 +3001,52 @@ export async function sendTelegramTest(
   });
 }
 
+// Host Telegram (bot-DM) API functions — backed by sausage-24183 backend routes.
+
+export interface BroadcastHost {
+  partyId: string;
+  city: string;
+  hostName: string;
+}
+
+export async function sendHostTelegramBroadcast(
+  hosts: BroadcastHost[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
+    method: 'POST',
+    body: { hosts, message, parseMode },
+  });
+}
+
+export async function sendHostTelegramTest(
+  partyId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
+    method: 'POST',
+    body: { partyId, message, parseMode },
+  });
+}
+
+export async function mintHostTelegramConnectToken(
+  partyId: string
+): Promise<{ token: string; deeplink: string }> {
+  return apiRequest<{ token: string; deeplink: string }>(`/api/parties/${partyId}/connect-token`, {
+    method: 'POST',
+  });
+}
+
+export async function disconnectHostTelegram(
+  partyId: string
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/parties/${partyId}/host-telegram`, {
+    method: 'DELETE',
+  });
+}
+
 // Sponsor Dashboard API
 
 export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
@@ -3002,6 +3056,33 @@ export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
 export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboardData> {
   const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
   return apiRequest<SponsorDashboardData>(`/api/sponsor/events${params}`);
+}
+
+// Admin-only time-series for partner dashboard chart
+export type PartnerTimeSeriesRange = '6hr' | '24hr' | '3d' | '7d';
+
+export interface PartnerTimeSeriesPoint {
+  timestamp: string;
+  rsvps: number;
+  impressions: number;
+  clicks: number;
+}
+
+export interface PartnerTimeSeriesResponse {
+  range: PartnerTimeSeriesRange;
+  bucket: 'hour';
+  since: string;
+  points: PartnerTimeSeriesPoint[];
+}
+
+export async function fetchSponsorEventsTimeSeries(
+  range: PartnerTimeSeriesRange = '24hr',
+  tag?: string
+): Promise<PartnerTimeSeriesResponse> {
+  const params = new URLSearchParams();
+  params.set('range', range);
+  if (tag) params.set('tag', tag);
+  return apiRequest<PartnerTimeSeriesResponse>(`/api/sponsor/events/timeseries?${params.toString()}`);
 }
 
 export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
@@ -3266,6 +3347,7 @@ export interface GPPEventMapItem {
   rsvpCount: number;
   country: string | null;
   underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventApiResponse {
@@ -3282,6 +3364,7 @@ interface GPPEventApiResponse {
   guestCount: number;
   country: string | null;
   underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventsApiPayload {
@@ -3291,11 +3374,19 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMapItem[]> {
-  const data = await apiRequest<GPPEventsApiPayload>(`/api/gpp/events?limit=500${force ? `&_t=${Date.now()}` : ''}`, {
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
+  const params: string[] = ['limit=2000'];
+  if (curated) params.push('curated=1');
+  // `statuses=all` is the auth-gated path on the backend — only returns
+  // rejected/hidden events when the caller is an authenticated underboss/admin.
+  // Unauthenticated callers silently fall back to the filtered view.
+  if (includeAll) params.push('statuses=all');
+  if (force) params.push(`_t=${Date.now()}`);
+  const url = `/api/gpp/events?${params.join('&')}`;
+  const data = await apiRequest<GPPEventsApiPayload>(url, {
     requireAuth: false,
   });
-  return (data.events || []).map((e) => ({
+  let events = (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
     city: e.city,
@@ -3308,7 +3399,12 @@ export async function fetchGppEventsForMap(force?: boolean): Promise<GPPEventMap
     rsvpCount: e.guestCount ?? 0,
     country: e.country,
     underbossStatus: e.underbossStatus,
+    eventTags: e.eventTags ?? [],
   }));
+  if (curated) {
+    events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
+  }
+  return events;
 }
 
 // GPP Partners (aggregated across approved GPP events)
@@ -3370,6 +3466,66 @@ export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats 
   }
 }
 
+export interface OptinABArm {
+  arm: 'control' | 'variant';
+  n: number;
+  pizzadaoOptins: number;
+  pizzadaoOptinPct: number;
+  swcOptins: number;
+  swcOptinPct: number;
+}
+
+export interface OptinABResults {
+  arms: OptinABArm[];
+}
+
+export async function fetchOptinABResults(): Promise<OptinABResults | null> {
+  try {
+    return await apiRequest<OptinABResults>('/api/admin/experiments/optin-ab', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching opt-in A/B results:', error);
+    return null;
+  }
+}
+
+export interface ExperimentFlag {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export async function fetchExperimentFlags(): Promise<ExperimentFlag[] | null> {
+  try {
+    const res = await apiRequest<{ flags: ExperimentFlag[] }>('/api/admin/experiments/flags', {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return res.flags;
+  } catch (error) {
+    console.error('Error fetching experiment flags:', error);
+    return null;
+  }
+}
+
+export async function setExperimentFlag(key: string, enabled: boolean): Promise<ExperimentFlag | null> {
+  try {
+    const res = await apiRequest<{ flag: ExperimentFlag }>(`/api/admin/experiments/flags/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: { enabled },
+      requireAuth: true,
+    });
+    return res.flag;
+  } catch (error) {
+    console.error('Error setting experiment flag:', error);
+    return null;
+  }
+}
+
 // ── Guest Scorecard ──
 
 export interface ScorecardItem {
@@ -3412,5 +3568,105 @@ export async function completeScorecardItem(
     method: 'POST',
     body: { itemKey, proofUrl, proofType },
   });
+}
+
+// Logo cleanup (graphics admin)
+
+export interface LogoCleanupSponsor {
+  sponsorId: string;
+  partyId: string;
+  partySlug: string;
+  partyName: string;
+  partyCity: string;
+  partnerName: string;
+}
+
+export interface LogoCleanupItem {
+  logoUrl: string;
+  classification: 'white_bg_png' | 'jpeg_white';
+  sponsors: LogoCleanupSponsor[];
+  sponsorUserId: string | null;
+  sponsorUserName: string | null;
+  eventCount: number;
+}
+
+export async function fetchLogoBgAudit(): Promise<{ items: LogoCleanupItem[] }> {
+  return apiRequest<{ items: LogoCleanupItem[] }>('/api/admin/logo-bg-audit', {
+    requireAuth: true,
+  });
+}
+
+export async function applyLogoBgFix(
+  logoUrl: string
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: { logoUrl },
+    }
+  );
+}
+
+/**
+ * Manual replacement: upload a graphics-admin-supplied file from disk to
+ * replace the original logo, instead of auto-stripping the white background.
+ * Reads the File via FileReader, strips the data-URL prefix, and POSTs the
+ * raw base64 to the backend.
+ */
+export async function applyLogoBgFixUpload(
+  originalUrl: string,
+  file: File
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  const fileBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Failed to read file as data URL'));
+        return;
+      }
+      const commaIdx = result.indexOf(',');
+      if (commaIdx < 0) {
+        reject(new Error('Unexpected FileReader output'));
+        return;
+      }
+      resolve(result.slice(commaIdx + 1));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply-upload',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: {
+        logoUrl: originalUrl,
+        fileBase64,
+        contentType: file.type,
+      },
+    }
+  );
+}
+
+/**
+ * Fetch the stripped-background preview PNG as a Blob. Use URL.createObjectURL()
+ * on the result to bind it to an <img src>. We can't use a raw URL because the
+ * endpoint requires Bearer auth, and <img> won't send Authorization headers.
+ */
+export async function fetchLogoBgPreviewBlob(logoUrl: string): Promise<Blob> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('Not authenticated');
+  const url = `${API_URL}/api/admin/logo-bg-audit/preview?url=${encodeURIComponent(logoUrl)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Preview failed: ${res.status}`);
+  }
+  return res.blob();
 }
 

@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 
 const router = Router();
@@ -645,9 +647,42 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
 // GET /api/gpp/events - List all GPP events (for admin/public listing)
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '500', offset = '0', city, country, region } = req.query;
+    const { limit = '500', offset = '0', city, country, region, statuses } = req.query;
 
-    const where: any = { eventType: 'gpp', underbossStatus: { notIn: ['rejected', 'hidden'] } };
+    // Determine whether to include rejected/hidden statuses.
+    // The `?statuses=all` and legacy `?includeAll=1` params both request all-statuses,
+    // but the request is only honored when the caller is an authenticated
+    // underboss/admin. Unauthenticated callers silently fall back to the
+    // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
+    const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    let includeAllStatuses = false;
+    if (requestedAllStatuses) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          try {
+            const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+            const email = decoded.email;
+            if (email && (await isAdmin(email) || await isUnderboss(email))) {
+              includeAllStatuses = true;
+            }
+          } catch {
+            // Bad/expired token — silently fall back to the filtered view
+          }
+        }
+      }
+    }
+
+    const where: any = { eventType: 'gpp' };
+    if (req.query.curated === '1') {
+      where.underbossStatus = { in: ['approved', 'listed'] };
+    } else if (includeAllStatuses) {
+      // moderator view — no underbossStatus filter; returns rejected/hidden too
+    } else {
+      where.underbossStatus = { notIn: ['rejected', 'hidden'] };
+    }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }
@@ -658,7 +693,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
-    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
     const [events, total] = await Promise.all([
@@ -870,10 +905,19 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
       }
 
       if (agg) {
-        agg.eventCount += 1;
-        // Cap events array at 500 to defend against pathological payload size.
-        if (agg.events.length < 500 && slug) {
-          agg.events.push({ slug, city, sponsorId: s.id });
+        // Dedupe within this partner's events: if the same event already
+        // appears in this aggregate's list (e.g. duplicate sponsor rows for
+        // the same partner on one party), skip the push AND don't bump
+        // eventCount. First-seen wins.
+        const alreadyHasEvent = slug
+          ? agg.events.some((e) => e.slug === slug)
+          : false;
+        if (!alreadyHasEvent) {
+          agg.eventCount += 1;
+          // Cap events array at 500 to defend against pathological payload size.
+          if (agg.events.length < 500 && slug) {
+            agg.events.push({ slug, city, sponsorId: s.id });
+          }
         }
         // Tie-break: prefer the representative row with lowest sortOrder; if tied,
         // prefer the more recent createdAt.
@@ -915,6 +959,13 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
 
     // Collect unique aggregates (some may be present in both maps).
     const uniqueAggregates = Array.from(new Set(byLogoKey.values()));
+
+    // Final safety: keep eventCount strictly in sync with the deduped events
+    // array. The push-time check above already does this, but recomputing
+    // here guards against future edits drifting the two apart.
+    for (const a of uniqueAggregates) {
+      a.eventCount = a.events.length;
+    }
 
     // Sort by popularity (eventCount DESC), then name ASC.
     uniqueAggregates.sort((a, b) => {

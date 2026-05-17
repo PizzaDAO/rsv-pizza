@@ -27,6 +27,12 @@ model User {
   defaultLikedBeverages      String[]
   defaultDislikedBeverages   String[]
   defaultAddress             String?
+
+  // Payout preferences (arugula-38633)
+  preferredPayoutMethod String? @map("preferred_payout_method")
+  payoutWalletAddress   String? @map("payout_wallet_address")
+  payoutBankDetails     Json?   @map("payout_bank_details")
+
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 
@@ -35,6 +41,7 @@ model User {
   magicLinks   MagicLink[]
   apiKeys      ApiKey[]
   aiPhoneCalls AIPhoneCall[]
+  payouts      Payout[]
 }
 
 model Party {
@@ -144,6 +151,8 @@ model Party {
   eventbriteUrl    String? @map("eventbrite_url") // Eventbrite event URL
   externalLinks    Json?   @default("[]") @map("external_links") // Custom external links [{label, url}]
   telegramGroup    String? @map("telegram_group") @db.VarChar // City Telegram group link
+  hostTelegramChatId    BigInt? @map("host_telegram_chat_id") // Host's private Telegram chat_id (set via /start <token> webhook)
+  hostTelegramLinkToken String? @unique @map("host_telegram_link_token") @db.VarChar // nanoid(10) token for host /start deeplink
   poapEventId      String? @map("poap_event_id") // POAP event ID
   poapMints        Int?    @map("poap_mints") // POAP mint count
   poapMoments      Int?    @map("poap_moments") // POAP moments count
@@ -212,6 +221,7 @@ model Party {
   quizQuestions         QuizQuestion[]
   slugAliases           SlugAlias[]
   scorecardItems        GuestScorecardItem[]
+  payouts               Payout[]
 
   @@map("parties")
 }
@@ -1286,6 +1296,20 @@ model AppConfig {
 }
 
 // ============================================
+// Experiment Flags (kill switches)
+// ============================================
+
+model ExperimentFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  updatedBy   String?  @map("updated_by")
+
+  @@map("experiment_flags")
+}
+
+// ============================================
 // Quiz Models
 // ============================================
 
@@ -1389,4 +1413,96 @@ model GuestScorecardItem {
   @@index([guestId, partyId])
   @@index([partyId])
   @@map("guest_scorecard_items")
+}
+
+// ============================================
+// Host Payouts (arugula-38633)
+// ============================================
+// String fields (not Prisma enums) for status/payoutMethod to match the
+// project convention — see Admin.role, Party.status, etc. CHECK constraints
+// at the DB layer enforce allowed values.
+
+model Payout {
+  id                  String    @id @default(uuid()) @db.Uuid
+  partyId             String    @map("party_id") @db.Uuid
+  party               Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  hostUserId          String    @map("host_user_id")
+  host                User      @relation(fields: [hostUserId], references: [id], onDelete: Restrict)
+
+  originalAmount      Decimal   @map("original_amount") @db.Decimal(12, 2)
+  originalCurrency    String    @map("original_currency")
+  exchangeRate        Decimal   @map("exchange_rate") @db.Decimal(18, 6)
+  extractedAmountUsd  Decimal   @map("extracted_amount_usd") @db.Decimal(12, 2)
+  finalAmountUsd      Decimal   @map("final_amount_usd") @db.Decimal(12, 2)
+
+  status              String    @default("pending")
+  payoutMethod        String    @map("payout_method")
+
+  payoutWalletAddress String?   @map("payout_wallet_address")
+  payoutBankDetails   Json?     @map("payout_bank_details")
+  mercuryCardId       String?   @map("mercury_card_id")
+  mercuryCardLast4    String?   @map("mercury_card_last4")
+
+  hostNotes           String?   @map("host_notes")
+  adminNotes          String?   @map("admin_notes")
+  rejectionReason     String?   @map("rejection_reason")
+
+  reviewedBy          String?   @map("reviewed_by")
+  reviewedAt          DateTime? @map("reviewed_at") @db.Timestamptz
+  paidAt              DateTime? @map("paid_at") @db.Timestamptz
+
+  transactionHash     String?   @map("transaction_hash")
+  wireReference       String?   @map("wire_reference")
+
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  documents           PayoutDocument[]
+  audits              PayoutAudit[]
+
+  @@index([partyId])
+  @@index([hostUserId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("payouts")
+}
+
+model PayoutDocument {
+  id            String   @id @default(uuid()) @db.Uuid
+  payoutId      String   @map("payout_id") @db.Uuid
+  payout        Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  kind          String   // 'pizza' | 'receipt'
+  url           String
+  fileName      String   @map("file_name")
+  fileSize      Int      @map("file_size")
+  mimeType      String   @map("mime_type")
+  ocrAmount     Decimal? @map("ocr_amount") @db.Decimal(12, 2)
+  ocrCurrency   String?  @map("ocr_currency")
+  ocrConfidence Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
+  ocrRaw        Json?    @map("ocr_raw")
+  ocrError      String?  @map("ocr_error")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([payoutId])
+  @@map("payout_documents")
+}
+
+model PayoutAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  payoutId    String   @map("payout_id") @db.Uuid
+  payout      Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  action      String
+  oldStatus   String?  @map("old_status")
+  newStatus   String?  @map("new_status")
+  oldAmount   Decimal? @map("old_amount") @db.Decimal(12, 2)
+  newAmount   Decimal? @map("new_amount") @db.Decimal(12, 2)
+  actorEmail  String   @map("actor_email")
+  actorKind   String   @map("actor_kind")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([payoutId])
+  @@index([createdAt(sort: Desc)])
+  @@map("payout_audit")
 }

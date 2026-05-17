@@ -2,6 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
+
+// Serialize BigInt as string in JSON. The only BigInt in the schema today is
+// parties.host_telegram_chat_id, which is sensitive enough that we never want
+// it leaking to clients via an implicit-select endpoint anyway — but several
+// existing endpoints do `res.json({ ...party })` on Prisma results without an
+// explicit select, and Express's default res.json throws on a raw BigInt.
+// The frontend's dbPartyToParty mapper already calls String() on this field,
+// so emitting it as a string here matches what the client expects.
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 import authRoutes from './routes/auth.routes.js';
 import partyRoutes from './routes/party.routes.js';
 import rsvpRoutes from './routes/rsvp.routes.js';
@@ -32,10 +41,13 @@ import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
+import telegramWebhookRoutes from './routes/telegram-webhook.routes.js';
+import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
+import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
@@ -103,8 +115,10 @@ const rsvpLimiter = rateLimit({
 app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
+app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
+app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
@@ -113,6 +127,7 @@ app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-bas
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)

@@ -307,6 +307,13 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     [cityStatuses]
   );
 
+  const handleTogglePriority = useCallback(
+    (cityKey: string, priority: boolean) => {
+      handleStatusChange(cityKey, { priority });
+    },
+    [handleStatusChange]
+  );
+
   const toggleSelect = useCallback((key: string) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
@@ -576,6 +583,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
                 key={city.key}
                 city={city}
                 onStatusChange={handleStatusChange}
+                onTogglePriority={handleTogglePriority}
                 isSelected={selectedKeys.has(city.key)}
                 onToggleSelect={toggleSelect}
               />
@@ -594,7 +602,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       {/* Cards (mobile) */}
       <div className="md:hidden space-y-2">
         {filteredCities.map((city) => (
-          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
+          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} onTogglePriority={handleTogglePriority} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
         ))}
         {filteredCities.length === 0 && (
           <p className="py-8 text-center text-theme-text-faint text-sm">
@@ -776,11 +784,13 @@ function CityPhotoLightbox({
 function CityRow({
   city,
   onStatusChange,
+  onTogglePriority,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
+  onTogglePriority: (cityKey: string, priority: boolean) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -854,9 +864,6 @@ function CityRow({
           <div className="flex items-center gap-1.5">
             <MapPin size={12} className="text-theme-text-faint flex-shrink-0" />
             <span className="text-theme-text font-medium">{city.city}</span>
-            {city.priority && (
-              <Star size={12} className="fill-yellow-400 text-yellow-400 flex-shrink-0" aria-label={t('cities.statusPriority')} />
-            )}
             {city.chatUrl && (
               <a
                 href={city.chatUrl}
@@ -896,10 +903,24 @@ function CityRow({
           </button>
         </td>
         <td className="py-2.5 px-3">
-          <StatusToggle
-            currentStatus={city.status}
-            onStatusChange={(status) => onStatusChange(city.key, { status })}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onTogglePriority(city.key, !city.priority)}
+              className={`p-1.5 rounded transition-colors ${
+                city.priority
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'text-theme-text-faint hover:text-yellow-400'
+              }`}
+              title={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+              aria-label={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+            >
+              <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
+            </button>
+            <StatusToggle
+              currentStatus={city.status}
+              onStatusChange={(status) => onStatusChange(city.key, { status })}
+            />
+          </div>
         </td>
       </tr>
       {expanded && (
@@ -965,11 +986,13 @@ function CityRow({
 function CityCard({
   city,
   onStatusChange,
+  onTogglePriority,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
+  onTogglePriority: (cityKey: string, priority: boolean) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -1036,9 +1059,6 @@ function CityCard({
           />
           <MapPin size={14} className="text-theme-text-faint" />
           <span className="text-theme-text font-medium text-sm">{city.city}</span>
-          {city.priority && (
-            <Star size={12} className="fill-yellow-400 text-yellow-400 flex-shrink-0" aria-label={t('cities.statusPriority')} />
-          )}
           <StatusBadge status={city.status} isAuto={city.isAuto} matchedEventUrl={city.matchedEventUrl} />
         </div>
         {city.chatUrl && (
@@ -1065,10 +1085,24 @@ function CityCard({
         </div>
         <span>{GPP_REGIONS.find((r) => r.id === city.region.toLowerCase().replace(/\s+/g, '-'))?.label || city.region}</span>
       </div>
-      <StatusToggle
-        currentStatus={city.status}
-        onStatusChange={(status) => onStatusChange(city.key, { status })}
-      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onTogglePriority(city.key, !city.priority)}
+          className={`p-1.5 rounded transition-colors ${
+            city.priority
+              ? 'fill-yellow-400 text-yellow-400'
+              : 'text-theme-text-faint hover:text-yellow-400'
+          }`}
+          title={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+          aria-label={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+        >
+          <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
+        </button>
+        <StatusToggle
+          currentStatus={city.status}
+          onStatusChange={(status) => onStatusChange(city.key, { status })}
+        />
+      </div>
       {expanded && (
         <div className="pt-2 border-t border-theme-stroke/50">
           {photosLoading ? (

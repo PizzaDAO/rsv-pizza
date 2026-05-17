@@ -362,9 +362,10 @@ router.post('/:partyId/raffles/:raffleId/enter', async (req: AuthRequest, res: R
       throw new AppError('Raffle is not open for entries', 400, 'RAFFLE_NOT_OPEN');
     }
 
-    // Verify guest belongs to this party
+    // Verify guest belongs to this party. mushroom-31723: rejected guests
+    // (approved=false) cannot enter raffles.
     const guest = await prisma.guest.findFirst({
-      where: { id: guestId, partyId },
+      where: { id: guestId, partyId, approved: { not: false } },
     });
 
     if (!guest) {

@@ -5,11 +5,48 @@ import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
 interface GPPEventsMapProps {
   events: GPPEventMapItem[];
   height?: string;
+  canModerate?: boolean;
+  // When true, markers are rendered as status-colored circles (admin/underboss
+  // view). When false, the public Benny pizza icon is used to preserve brand on
+  // the public /map view. Defaults to false so the public landing page stays
+  // on-brand even if a caller forgets to pass it.
+  isModerator?: boolean;
+}
+
+// Semantic colors keyed on underbossStatus. Keep in sync with STATUS_LEGEND
+// in EventsMapPage.tsx so the legend matches the marker colors.
+const STATUS_COLORS: Record<string, string> = {
+  approved: '#22c55e',
+  listed: '#3b82f6',
+  pending: '#eab308',
+  rejected: '#ef4444',
+  hidden: '#6b7280',
+};
+
+function statusColor(status?: string | null): string {
+  if (!status) return STATUS_COLORS.pending;
+  return STATUS_COLORS[status] || STATUS_COLORS.pending;
+}
+
+function makeMarkerIcon(status?: string | null): google.maps.Icon {
+  const color = statusColor(status);
+  const svg = encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">` +
+      `<circle cx="16" cy="16" r="11" fill="${color}" stroke="white" stroke-width="3"/>` +
+      `</svg>`
+  );
+  return {
+    url: `data:image/svg+xml;utf8,${svg}`,
+    scaledSize: new google.maps.Size(32, 32),
+    anchor: new google.maps.Point(16, 16),
+  };
 }
 
 export default function GPPEventsMap({
   events,
   height = '100%',
+  canModerate = false,
+  isModerator = false,
 }: GPPEventsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -140,25 +177,38 @@ export default function GPPEventsMap({
 
         const rsvpHtml = `<span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${event.rsvpCount.toLocaleString()} RSVPs</span>`;
 
-        const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">View Event &rarr;</a>`;
+        const linkLabel = canModerate ? 'View Event &rarr;' : 'RSVP &rarr;';
+        const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">${linkLabel}</a>`;
 
         let actionsHtml = '';
-        if (event.underbossStatus === 'approved') {
-          actionsHtml = `
-            <span style="background:#dcfce7;color:#16a34a;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Approved</span>
-            <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
-          `;
-        } else if (event.underbossStatus === 'rejected') {
-          actionsHtml = `
-            <span style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Rejected</span>
-            <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
-          `;
-        } else {
-          actionsHtml = `
-            <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
-            <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
-          `;
+        if (canModerate) {
+          // Status pill — shown for every moderator-visible event so the
+          // marker color is interpretable in the InfoWindow too.
+          const statusKey = event.underbossStatus || 'pending';
+          const statusColorHex = statusColor(statusKey);
+          const statusPillHtml = `<span style="background:${statusColorHex}1a;color:${statusColorHex};font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600;text-transform:capitalize">${statusKey}</span>`;
+          if (statusKey === 'approved') {
+            actionsHtml = `
+              ${statusPillHtml}
+              <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
+            `;
+          } else if (statusKey === 'rejected') {
+            actionsHtml = `
+              ${statusPillHtml}
+              <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
+            `;
+          } else {
+            actionsHtml = `
+              ${statusPillHtml}
+              <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
+              <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
+            `;
+          }
         }
+
+        const actionsRowHtml = canModerate
+          ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${actionsHtml}</div>`
+          : '';
 
         return `
           <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
@@ -170,9 +220,7 @@ export default function GPPEventsMap({
               ${linkHtml}
               ${rsvpHtml}
             </div>
-            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              ${actionsHtml}
-            </div>
+            ${actionsRowHtml}
           </div>
         `;
       }
@@ -218,18 +266,17 @@ export default function GPPEventsMap({
 
         infoWindow.setContent(buildInfoContent(updated));
 
-        if (action === 'reject') {
+        if (isModerator) {
           const marker = markerByEventIdRef.current.get(eventId);
           if (marker) {
-            clustererRef.current?.removeMarker(marker);
-            marker.setMap(null);
-            markerByEventIdRef.current.delete(eventId);
-            markersRef.current = markersRef.current.filter((m) => m !== marker);
+            // Update the marker icon to reflect the new status color
+            marker.setIcon(makeMarkerIcon(updated.underbossStatus));
           }
         }
       }
 
       function attachActionHandlers() {
+        if (!canModerate) return;
         const buttons = document.querySelectorAll<HTMLButtonElement>(
           '[data-action][data-event-id]'
         );
@@ -240,11 +287,14 @@ export default function GPPEventsMap({
 
       if (infoWindowListenerRef.current) {
         infoWindowListenerRef.current.remove();
+        infoWindowListenerRef.current = null;
       }
-      infoWindowListenerRef.current = infoWindow.addListener(
-        'domready',
-        attachActionHandlers
-      );
+      if (canModerate) {
+        infoWindowListenerRef.current = infoWindow.addListener(
+          'domready',
+          attachActionHandlers
+        );
+      }
 
       // Build markers
       const markers: google.maps.Marker[] = [];
@@ -260,11 +310,13 @@ export default function GPPEventsMap({
         const marker = new google.maps.Marker({
           position,
           title: event.name,
-          icon: {
-            url: '/molto-benny-btc.svg',
-            scaledSize: new google.maps.Size(38, 38),
-            anchor: new google.maps.Point(19, 38),
-          },
+          icon: isModerator
+            ? makeMarkerIcon(event.underbossStatus)
+            : {
+                url: '/molto-benny-btc.svg',
+                scaledSize: new google.maps.Size(38, 38),
+                anchor: new google.maps.Point(19, 38),
+              },
         });
 
         const eventId = event.id;
@@ -352,7 +404,7 @@ export default function GPPEventsMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validEvents]);
+  }, [validEvents, canModerate, isModerator]);
 
   if (error) {
     return (

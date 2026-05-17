@@ -205,6 +205,11 @@
     "removeStaffConfirm": "Are you sure you want to remove this staff member?"
   },
   "venue": {
+    "findVenueModalTitle": "Find a Venue",
+    "findVenueModalSubtitle": "Search for an address or named venue. We'll save it to your event.",
+    "findVenueModalPlaceholder": "Search for an address or venue...",
+    "findVenueModalCta": "Picking a result saves the venue and ticks this checklist item.",
+    "findVenueSaveError": "Could not save the venue. Please try again.",
     "venueOptions": "Venue Options",
     "addVenue": "Add Venue",
     "noVenueOptionsYet": "No venue options yet",
