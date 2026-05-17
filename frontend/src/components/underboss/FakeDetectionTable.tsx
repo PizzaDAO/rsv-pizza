@@ -32,14 +32,39 @@ const TIER_LABEL: Record<FakeDetectionTier, string> = {
   clean: 'Clean',
 };
 
+const FLAG_LABELS: Record<string, string> = {
+  cap_fill_no_waitlist: 'Cap fill, no waitlist',
+  low_domain_entropy: 'Low email-domain entropy',
+  sig_collapse: 'Field signature collapse',
+  wallet_too_low: 'Too few wallets',
+  wallet_too_high_reuse: 'Wallet reuse (high)',
+  wallet_reuse: 'Wallet reuse',
+  host_self_rsvp_mismatch: 'Host self-RSVP mismatch',
+  pizzeria_fields_blank: 'Pizzeria fields blank',
+  wallet_source_all_null: 'Wallet source all null',
+  one_word_name: 'One-word event name',
+  firstname_digits_email: 'Firstname+digits emails',
+  day_gap_pattern: 'Day-gap pattern',
+  low_hour_entropy: 'Low hour-of-day entropy',
+  rapid_intersubmission: 'Rapid inter-submission',
+  cross_event_wallet: 'Cross-event sybil wallet',
+  high_per_visitor_rsvp_saturation: 'High per-visitor RSVP saturation',
+  low_funnel_coverage: 'Low funnel coverage',
+};
+
+function flagLabel(name: string): string {
+  return FLAG_LABELS[name] ?? name.replace(/_/g, ' ');
+}
+
 function FlagPill({ flag }: { flag: FakeDetectionRow['flags'][number] }) {
   if (!flag.fired) return null;
   return (
     <span
-      title={`${flag.name} (+${flag.weight}) — ${flag.detail}`}
-      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/20 text-red-300 border border-red-500/30"
+      title={`${flag.name} — ${flag.detail}`}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/15 text-red-700 border border-red-500/30"
     >
-      {flag.name}
+      <span>{flagLabel(flag.name)}</span>
+      <span className="text-red-700/60 tabular-nums">+{flag.weight}</span>
     </span>
   );
 }
