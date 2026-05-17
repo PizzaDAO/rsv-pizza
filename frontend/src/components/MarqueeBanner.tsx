@@ -1,6 +1,8 @@
 import React from 'react';
 
-const TEXT = 'Find a party in a different city at globalpizza.party';
+const CONTENT = (
+  <>Find a party in a different city at <span style={{ color: '#FE332C' }}>globalpizza.party</span></>
+);
 
 /**
  * Scrolling marquee banner that sits below the Header.
@@ -16,17 +18,16 @@ export const MarqueeBanner: React.FC = () => {
       style={{
         backgroundColor: '#0497C1',
         color: '#FFFFFF',
-        fontFamily: '"Hub 191 Display", "Comic Sans MS", cursive',
         height: '36px',
         lineHeight: '36px',
         fontSize: '18px',
       }}
     >
       <div className="marquee-track">
-        <span className="marquee-item" aria-hidden="false">{TEXT}</span>
-        <span className="marquee-item" aria-hidden="true">{TEXT}</span>
-        <span className="marquee-item" aria-hidden="true">{TEXT}</span>
-        <span className="marquee-item" aria-hidden="true">{TEXT}</span>
+        <span className="marquee-item" aria-hidden="false">{CONTENT}</span>
+        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
+        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
+        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
       </div>
     </a>
   );
