@@ -934,15 +934,11 @@ sponsorDashboardRouter.post('/checklist/:itemId/toggle', requireAuth, requireSpo
   }
 });
 
-// GET /api/sponsor/events/timeseries - Admin-only time-series data (RSVPs / impressions / clicks per hour)
+// GET /api/sponsor/events/timeseries - Time-series data (RSVPs / impressions / clicks per hour)
+// Scoped to the sponsor's tag for non-admins; admins can pass ?tag= or omit for all-GPP-with-any-tag.
 // Buckets hour-by-hour across one of four ranges: 6hr / 24hr / 3d / 7d (default 24hr).
 sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
-    // Admin-only — partners do not see this chart
-    if (!req.isAdminViewing) {
-      throw new AppError('Admin access required', 403, 'FORBIDDEN');
-    }
-
     // Range gating
     const rangeParam = (req.query.range as string | undefined)?.trim().toLowerCase();
     const validRanges = ['6hr', '24hr', '3d', '7d'] as const;
@@ -962,17 +958,32 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
 
     // Resolve which events the chart should cover, using the same logic as GET /events
     const queryTag = req.query.tag as string | undefined;
-    const tag = queryTag?.trim().toLowerCase() || undefined;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
 
     const where: any = {};
     if (tag && tag !== 'pizzadao') {
       where.eventTags = { has: tag };
     } else if (tag === 'pizzadao') {
       where.eventType = 'gpp';
-    } else {
-      // Admin with no tag filter — all GPP events that have at least one eventTag
+    } else if (req.isAdminViewing) {
+      // Admin with no tag filter — show all GPP events that have at least one eventTag
       where.eventType = 'gpp';
       where.NOT = { eventTags: { equals: [] } };
+    }
+    // Non-admin without a tag (shouldn't happen — sponsor users always have a tag):
+    // `where` stays empty here, which would broaden the query. The `eventIds.length === 0`
+    // guard below catches the no-events case; if a non-admin somehow has no tag, the
+    // resulting empty-tag query would return all parties, which is wrong. Add an explicit
+    // guard above the findMany to early-return empty:
+    if (!tag && !req.isAdminViewing) {
+      return res.json({
+        range,
+        bucket: 'hour' as const,
+        since: sinceDate.toISOString(),
+        points: [],
+      });
     }
 
     const events = await prisma.party.findMany({

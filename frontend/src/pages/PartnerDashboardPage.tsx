@@ -758,10 +758,7 @@ export function PartnerDashboardPage() {
           );
         })()}
 
-        {/* Admin-only time-series chart */}
-        {dashboardData?.isAdmin && (
-          <PartnerTimeSeriesChart tag={dashboardData?.tag} />
-        )}
+        <PartnerTimeSeriesChart tag={dashboardData?.tag} />
 
         {/* Filters */}
         {allEvents.length > 0 && (
