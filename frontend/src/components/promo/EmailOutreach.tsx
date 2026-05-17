@@ -60,9 +60,10 @@ export const EmailOutreach: React.FC<EmailOutreachProps> = ({ party, guests }) =
   const [includeEventDetails, setIncludeEventDetails] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  // Filter guests by status and who have emails
+  // Filter guests by status and who have emails. Drop rejected (approved===false)
+  // up-front so they never appear in any outreach list.
   const filteredGuests = useMemo(() => {
-    const withEmail = guests.filter(g => g.email);
+    const withEmail = guests.filter(g => g.email && g.approved !== false);
     switch (recipientFilter) {
       case 'approved':
         return withEmail.filter(g => g.approved === true);

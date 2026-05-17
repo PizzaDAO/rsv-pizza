@@ -253,9 +253,12 @@ export const PartyHeader: React.FC = () => {
                 <p className="text-sm text-theme-text-muted">
                   {party.hostName && `Hosted by ${party.hostName} • `}
                   {(() => {
-                    const invited = party.guests.filter(g => g.status === 'INVITED').length;
-                    const rsvpd = party.guests.filter(g => g.status !== 'INVITED').length;
-                    const checkedIn = party.guests.filter(g => g.checkedInAt).length;
+                    // Defensive: drop rejected guests (approved===false) from counts
+                    // in case the context-level filter ever misses this surface.
+                    const visible = party.guests.filter(g => g.approved !== false);
+                    const invited = visible.filter(g => g.status === 'INVITED').length;
+                    const rsvpd = visible.filter(g => g.status !== 'INVITED').length;
+                    const checkedIn = visible.filter(g => g.checkedInAt).length;
                     if (invited > 0) {
                       return (
                         <span>

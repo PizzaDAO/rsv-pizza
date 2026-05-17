@@ -130,13 +130,13 @@ export const GPPDashboardTab: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-theme-text">
-            {guests.filter(g => g.status === 'INVITED').length}
+            {guests.filter(g => g.approved !== false && g.status === 'INVITED').length}
           </div>
           <div className="text-xs text-theme-text-muted">Invited</div>
         </div>
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-theme-text">
-            {guests.filter(g => g.status !== 'INVITED').length}
+            {guests.filter(g => g.approved !== false && g.status !== 'INVITED').length}
           </div>
           <div className="text-xs text-theme-text-muted">RSVPs</div>
         </div>

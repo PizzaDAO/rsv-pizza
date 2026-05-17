@@ -6,6 +6,7 @@ import {
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
+  uncheckInGuestApi,
   promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
@@ -1531,7 +1532,7 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
   return true;
 }
 
-export async function updateGuestApproval(guestId: string, approved: boolean, partyId?: string): Promise<boolean> {
+export async function updateGuestApproval(guestId: string, approved: boolean | null, partyId?: string): Promise<boolean> {
   // Use API if authenticated and partyId provided (secure path)
   if (isAuthenticated() && partyId) {
     try {
@@ -1554,6 +1555,22 @@ export async function updateGuestApproval(guestId: string, approved: boolean, pa
     return false;
   }
   return true;
+}
+
+// Un-check-in a guest (host-side undo). Resolves invite code from party and calls
+// DELETE /api/checkin/:inviteCode/:guestId. Idempotent on backend.
+export async function uncheckInGuest(guestId: string, party: { id: string; inviteCode: string } | null | undefined): Promise<boolean> {
+  if (!party?.inviteCode) {
+    console.error('uncheckInGuest: missing party invite code');
+    return false;
+  }
+  try {
+    await uncheckInGuestApi(party.inviteCode, guestId);
+    return true;
+  } catch (error) {
+    console.error('Error un-checking-in guest via API:', error);
+    return false;
+  }
 }
 
 export async function promoteGuest(guestId: string, partyId: string): Promise<boolean> {

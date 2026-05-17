@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star, UserRoundX } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -33,6 +33,7 @@ interface TableRowProps {
   onDecline?: (id: string) => void;
   onRemove?: (id: string) => void;
   onCheckIn?: (id: string) => void;
+  onUncheckIn?: (id: string) => void;
   isCheckingIn?: boolean;
   onPromote?: (id: string) => void;
   // For requests variant - lookup functions
@@ -64,6 +65,7 @@ export const TableRow: React.FC<TableRowProps> = ({
   onDecline,
   onRemove,
   onCheckIn,
+  onUncheckIn,
   isCheckingIn = false,
   onPromote,
   toppingNameById = (id) => id,
@@ -438,12 +440,24 @@ export const TableRow: React.FC<TableRowProps> = ({
       {/* Check-in status badge or button */}
       {variant === 'basic' && onCheckIn && (
         guest.checkedInAt ? (
-          <div
-            className="flex items-center gap-1 text-green-400 text-xs flex-shrink-0 cursor-help"
-            title={`Checked in: ${format(new Date(guest.checkedInAt), 'MMM d, h:mm a')}`}
-          >
-            <CheckCircle2 size={14} />
-            <span className="hidden sm:inline">Checked in</span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <div
+              className="flex items-center gap-1 text-green-400 text-xs cursor-help"
+              title={`Checked in: ${format(new Date(guest.checkedInAt), 'MMM d, h:mm a')}`}
+            >
+              <CheckCircle2 size={14} />
+              <span className="hidden sm:inline">Checked in</span>
+            </div>
+            {onUncheckIn && (
+              <button
+                onClick={() => guest.id && onUncheckIn(guest.id)}
+                className="p-0.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors"
+                title="Undo check-in"
+                aria-label="Undo check-in"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         ) : (
           <button
@@ -469,14 +483,16 @@ export const TableRow: React.FC<TableRowProps> = ({
         </span>
       )}
 
-      {/* Delete */}
+      {/* Reject (soft-delete via approved=false). Reversible via "Rejected (N)"
+          modal in GuestList — no confirm prompt needed. */}
       {onRemove && (
         <button
           onClick={() => guest.id && onRemove(guest.id)}
           className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-          aria-label="Remove guest"
+          aria-label="Reject guest"
+          title="Reject guest"
         >
-          <Trash2 size={14} />
+          <UserRoundX size={14} />
         </button>
       )}
     </div>

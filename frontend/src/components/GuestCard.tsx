@@ -1,7 +1,7 @@
 import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { Trash2 } from 'lucide-react';
+import { UserRoundX } from 'lucide-react';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 
 interface GuestCardProps {
@@ -9,7 +9,7 @@ interface GuestCardProps {
 }
 
 export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
-  const { removeGuest, availableToppings, availableBeverages, party } = usePizza();
+  const { rejectGuest, availableToppings, availableBeverages, party } = usePizza();
   const isGppEvent = party?.eventType === 'gpp';
 
   const toppingNameById = (id: string) => {
@@ -74,11 +74,12 @@ export const GuestCard: React.FC<GuestCardProps> = ({ guest }) => {
           )}
         </div>
         <button
-          onClick={() => guest.id && removeGuest(guest.id)}
+          onClick={() => guest.id && rejectGuest(guest.id)}
           className="p-1 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-          aria-label="Remove guest"
+          aria-label="Reject guest"
+          title="Reject guest"
         >
-          <Trash2 size={14} />
+          <UserRoundX size={14} />
         </button>
       </div>
     </div>
