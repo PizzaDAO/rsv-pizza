@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, X } from 'lucide-react';
@@ -99,7 +99,10 @@ export function PartnersPage() {
     setModalPartner(null);
   };
 
-  const totalEvents = partners.reduce((sum, p) => sum + p.eventCount, 0);
+  const uniqueEventCount = useMemo(
+    () => new Set(partners.flatMap((p) => p.events.map((e) => e.slug))).size,
+    [partners]
+  );
 
   return (
     <div
@@ -164,7 +167,7 @@ export function PartnersPage() {
             >
               <span className="text-sm font-semibold">
                 {partners.length.toLocaleString()} partners across{' '}
-                {totalEvents.toLocaleString()} events
+                {uniqueEventCount.toLocaleString()} events
               </span>
             </div>
           </div>
