@@ -400,15 +400,12 @@ router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Un
 router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const isAdminUser = req.underboss!.regions.includes('__admin__');
-    if (!isAdminUser && req.underboss!.regions.length === 0) {
-      throw new AppError('Not authorized for any region', 403, 'FORBIDDEN');
+    if (!isAdminUser) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    // Same scope as /:region: admins see all, regional underbosses see their regions only.
-    const whereClause: { eventType: 'gpp'; region?: { in: string[] } } = { eventType: 'gpp' };
-    if (!isAdminUser) {
-      whereClause.region = { in: req.underboss!.regions };
-    }
+    // Admin-only: see all GPP events.
+    const whereClause: { eventType: 'gpp' } = { eventType: 'gpp' };
 
     // Cross-event wallet pre-pass — one raw query, then Set lookup per event.
     // A wallet is "sybil" when it appears on ≥4 distinct events under ≥2 distinct trimmed-lower names.
