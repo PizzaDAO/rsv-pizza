@@ -78,8 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
             color: '#FE332C',
           }}
         >
-          <span className="hidden md:inline">Find a different city's event</span>
-          <span className="md:hidden">Other cities</span>
+          global pizza party
         </a>
         <div className="flex items-center gap-3">
           {rightContent}
