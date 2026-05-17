@@ -499,6 +499,7 @@ export function EventsMapPage() {
                 events={canModerate ? filteredEvents : events}
                 height="calc(100vh - 64px)"
                 canModerate={canModerate}
+                isModerator={!!canModerate}
               />
             )}
           </Suspense>

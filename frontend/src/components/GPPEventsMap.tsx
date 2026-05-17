@@ -6,6 +6,11 @@ interface GPPEventsMapProps {
   events: GPPEventMapItem[];
   height?: string;
   canModerate?: boolean;
+  // When true, markers are rendered as status-colored circles (admin/underboss
+  // view). When false, the public Benny pizza icon is used to preserve brand on
+  // the public /map view. Defaults to false so the public landing page stays
+  // on-brand even if a caller forgets to pass it.
+  isModerator?: boolean;
 }
 
 // Semantic colors keyed on underbossStatus. Keep in sync with STATUS_LEGEND
@@ -41,6 +46,7 @@ export default function GPPEventsMap({
   events,
   height = '100%',
   canModerate = false,
+  isModerator = false,
 }: GPPEventsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -260,10 +266,12 @@ export default function GPPEventsMap({
 
         infoWindow.setContent(buildInfoContent(updated));
 
-        const marker = markerByEventIdRef.current.get(eventId);
-        if (marker) {
-          // Update the marker icon to reflect the new status color
-          marker.setIcon(makeMarkerIcon(updated.underbossStatus));
+        if (isModerator) {
+          const marker = markerByEventIdRef.current.get(eventId);
+          if (marker) {
+            // Update the marker icon to reflect the new status color
+            marker.setIcon(makeMarkerIcon(updated.underbossStatus));
+          }
         }
       }
 
@@ -302,7 +310,13 @@ export default function GPPEventsMap({
         const marker = new google.maps.Marker({
           position,
           title: event.name,
-          icon: makeMarkerIcon(event.underbossStatus),
+          icon: isModerator
+            ? makeMarkerIcon(event.underbossStatus)
+            : {
+                url: '/molto-benny-btc.svg',
+                scaledSize: new google.maps.Size(38, 38),
+                anchor: new google.maps.Point(19, 38),
+              },
         });
 
         const eventId = event.id;
@@ -390,7 +404,7 @@ export default function GPPEventsMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validEvents, canModerate]);
+  }, [validEvents, canModerate, isModerator]);
 
   if (error) {
     return (
