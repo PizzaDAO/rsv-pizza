@@ -149,7 +149,7 @@ export function PartnersPage() {
           className="max-w-2xl mx-auto text-base md:text-lg mb-6"
           style={{ color: C.mutedText }}
         >
-          The brands powering the 2026 Global Pizza Party — slinging slices in cities around the world.
+          The orgs powering the 2026 Global Pizza Party
         </p>
 
         {!loading && !error && partners.length > 0 && (
