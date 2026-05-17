@@ -435,19 +435,21 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
-            <button
-              onClick={() => setActiveTab('fake-detection')}
-              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
-                activeTab === 'fake-detection'
-                  ? 'text-theme-text'
-                  : 'text-theme-text-muted hover:text-theme-text-secondary'
-              }`}
-            >
-              {t('underbossDashboard.tabs.fakeDetection')}
-              {activeTab === 'fake-detection' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
-              )}
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('fake-detection')}
+                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                  activeTab === 'fake-detection'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
+                }`}
+              >
+                {t('underbossDashboard.tabs.fakeDetection')}
+                {activeTab === 'fake-detection' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                )}
+              </button>
+            )}
           </div>
 
           {activeTab === 'events' && (
@@ -462,7 +464,7 @@ export function UnderbossDashboard() {
             <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={() => loadDashboard(true)} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
 
-          {activeTab === 'fake-detection' && (
+          {isAdmin && activeTab === 'fake-detection' && (
             <FakeDetectionTable />
           )}
 
