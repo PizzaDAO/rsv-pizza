@@ -466,6 +466,9 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
         linkClicks: {
           select: { clickedAt: true },
         },
+        rsvpFunnelEvents: {
+          select: { visitorHash: true, step: true, createdAt: true },
+        },
       },
     });
 
@@ -506,6 +509,11 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
         p.linkClicks.map(c => ({ clickedAt: c.clickedAt })),
         sybilWallets,
         p.maxGuests,
+        p.rsvpFunnelEvents.map(e => ({
+          visitorHash: e.visitorHash,
+          step: e.step,
+          createdAt: e.createdAt,
+        })),
       ),
     );
 

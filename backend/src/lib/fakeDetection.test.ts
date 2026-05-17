@@ -18,6 +18,8 @@ import {
   checkLowHourEntropy,
   checkRapidIntersubmission,
   checkCrossEventWallet,
+  checkLowFunnelCoverage,
+  checkHighPerVisitorRsvpSaturation,
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
@@ -25,6 +27,7 @@ import {
   type FakeDetectionGuest,
   type FakeDetectionParty,
   type FakeDetectionLinkClick,
+  type FakeDetectionFunnelEvent,
 } from './fakeDetection.js';
 
 // ============================================
@@ -49,6 +52,17 @@ function makeGuest(overrides: Partial<FakeDetectionGuest> = {}): FakeDetectionGu
     roles: [],
     pizzeriaRankings: ['da Michele', 'Sorbillo'],
     suggestedPizzerias: [{ name: 'da Michele' }],
+    ...overrides,
+  };
+}
+
+function makeFunnelEvent(
+  overrides: Partial<FakeDetectionFunnelEvent> = {},
+): FakeDetectionFunnelEvent {
+  return {
+    visitorHash: 'visitor-default',
+    step: 'rsvp_opened',
+    createdAt: new Date('2026-04-01T12:00:00Z'),
     ...overrides,
   };
 }
@@ -387,6 +401,98 @@ describe('checkCrossEventWallet', () => {
   });
 });
 
+describe('checkLowFunnelCoverage', () => {
+  it('does not fire below min n=30', () => {
+    const guests = Array.from({ length: 20 }, () => makeGuest());
+    const funnel = Array.from({ length: 20 }, (_, i) =>
+      makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }),
+    );
+    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(false);
+  });
+  it('fires for Ilemela-like sparse funnel (7 unique visitors / 100 RSVPs)', () => {
+    const guests = Array.from({ length: 100 }, () => makeGuest());
+    const funnel = Array.from({ length: 7 }, (_, i) =>
+      makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }),
+    );
+    const result = checkLowFunnelCoverage(guests, funnel);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.uniqueVisitors).toBe(7);
+    expect(result.evidence?.linkRsvpCount).toBe(100);
+  });
+  it('does not fire for Lilongwe-like healthy funnel (8 unique visitors / 44 RSVPs = 0.18)', () => {
+    const guests = Array.from({ length: 44 }, () => makeGuest());
+    const funnel = Array.from({ length: 8 }, (_, i) =>
+      makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }),
+    );
+    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(false);
+  });
+  it('ignores non-opened steps in coverage count', () => {
+    const guests = Array.from({ length: 40 }, () => makeGuest());
+    // 20 unique visitors but all on a non-opened step → coverage = 0
+    const funnel = Array.from({ length: 20 }, (_, i) =>
+      makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_submitted' }),
+    );
+    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(true);
+  });
+});
+
+describe('checkHighPerVisitorRsvpSaturation', () => {
+  it('does not fire when there is no funnel data', () => {
+    const guests = Array.from({ length: 10 }, () => makeGuest());
+    expect(checkHighPerVisitorRsvpSaturation(guests, []).fired).toBe(false);
+  });
+  it('fires when one visitor temporally matches 6 distinct guests within ±10 min', () => {
+    const base = new Date('2026-04-01T12:00:00Z').getTime();
+    const guests = Array.from({ length: 6 }, (_, i) =>
+      makeGuest({
+        id: `g${i}`,
+        submittedAt: new Date(base + i * 60_000), // 6 guests spaced 1 min apart
+      }),
+    );
+    const funnel = [
+      makeFunnelEvent({
+        visitorHash: 'padder',
+        step: 'rsvp_opened',
+        createdAt: new Date(base + 2 * 60_000), // mid-window — all 6 within ±10 min
+      }),
+    ];
+    const result = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.max).toBe(6);
+    expect(result.evidence?.visitorHash).toBe('padder'.slice(0, 8));
+  });
+  it('does not fire when each visitor only matches 1-2 guests', () => {
+    const base = new Date('2026-04-01T12:00:00Z').getTime();
+    // 6 guests an hour apart → each is in its own ±10 min window
+    const guests = Array.from({ length: 6 }, (_, i) =>
+      makeGuest({ id: `g${i}`, submittedAt: new Date(base + i * 3600_000) }),
+    );
+    // Each visitor lines up with one guest
+    const funnel = Array.from({ length: 6 }, (_, i) =>
+      makeFunnelEvent({
+        visitorHash: `v${i}`,
+        step: 'rsvp_opened',
+        createdAt: new Date(base + i * 3600_000),
+      }),
+    );
+    expect(checkHighPerVisitorRsvpSaturation(guests, funnel).fired).toBe(false);
+  });
+  it('does not match a funnel event >10 min away from any guest', () => {
+    const base = new Date('2026-04-01T12:00:00Z').getTime();
+    const guests = Array.from({ length: 6 }, (_, i) =>
+      makeGuest({ id: `g${i}`, submittedAt: new Date(base + i * 60_000) }),
+    );
+    const funnel = [
+      makeFunnelEvent({
+        visitorHash: 'faraway',
+        step: 'rsvp_opened',
+        createdAt: new Date(base + 60 * 60_000), // 60 min later — outside window
+      }),
+    ];
+    expect(checkHighPerVisitorRsvpSaturation(guests, funnel).fired).toBe(false);
+  });
+});
+
 describe('buildSybilWalletSet', () => {
   it('includes wallets with ≥4 parties AND ≥2 distinct names', () => {
     const rows = [
@@ -472,17 +578,29 @@ describe('scoreEvent — integration fixtures', () => {
         }),
       ),
     ];
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    // Sparse funnel: 5 unique visitors / 95 RSVPs = 5.3% coverage → low_funnel_coverage fires.
+    // One visitor lined up at base — temporally matches >=5 of the rapid-fire RSVPs
+    // within ±10 min → high_per_visitor_rsvp_saturation fires.
+    const funnel: FakeDetectionFunnelEvent[] = [
+      makeFunnelEvent({ visitorHash: 'padder', step: 'rsvp_opened', createdAt: new Date(base) }),
+      makeFunnelEvent({ visitorHash: 'v1', step: 'rsvp_opened', createdAt: new Date(base) }),
+      makeFunnelEvent({ visitorHash: 'v2', step: 'rsvp_opened', createdAt: new Date(base) }),
+      makeFunnelEvent({ visitorHash: 'v3', step: 'rsvp_opened', createdAt: new Date(base) }),
+      makeFunnelEvent({ visitorHash: 'v4', step: 'rsvp_opened', createdAt: new Date(base) }),
+    ];
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel);
     // Should fire: 1 cap_fill, 2 low_domain_entropy, 3 sig_collapse,
     // 4a wallet_too_low, 6 host_self, 7 pizzeria_blank, 8 wallet_source_null,
-    // 9 one_word_name, 10 firstname_digits, 12 low_hour_entropy, 13 rapid_intersubmission
-    // = 15+10+15+8+20+5+5+5+5+7+8 = 103 → clamped to 100
+    // 9 one_word_name, 10 firstname_digits, 12 low_hour_entropy, 13 rapid_intersubmission,
+    // 15 low_funnel_coverage, 16 high_per_visitor_rsvp_saturation
     expect(row.score).toBeGreaterThanOrEqual(70);
     expect(row.tier).toBe('high');
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).toContain('cap_fill_no_waitlist');
     expect(firedIds).toContain('sig_collapse');
     expect(firedIds).toContain('host_self_rsvp_mismatch');
+    expect(firedIds).toContain('low_funnel_coverage');
+    expect(firedIds).toContain('high_per_visitor_rsvp_saturation');
   });
 
   it('"Lilongwe-like" clean event scores ≤10', () => {
@@ -524,8 +642,20 @@ describe('scoreEvent — integration fixtures', () => {
         suggestedPizzerias: [{ name: 'Local Pizza' }],
       }),
     );
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    // Healthy funnel: 35 RSVPs and 35 distinct visitors (1:1 coverage), each
+    // funnel event time-aligned with its own guest → neither funnel flag fires.
+    const funnel: FakeDetectionFunnelEvent[] = Array.from({ length: 35 }, (_, i) =>
+      makeFunnelEvent({
+        visitorHash: `lilongwe-v${i}`,
+        step: 'rsvp_opened',
+        createdAt: new Date(base + i * 3600000 * 4),
+      }),
+    );
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel);
     expect(row.score).toBeLessThanOrEqual(10);
     expect(row.tier === 'clean' || row.tier === 'low').toBe(true);
+    const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
+    expect(firedIds).not.toContain('low_funnel_coverage');
+    expect(firedIds).not.toContain('high_per_visitor_rsvp_saturation');
   });
 });
