@@ -149,7 +149,16 @@
       "score": "Score",
       "flags": "Fired flags",
       "status": "Status",
+      "actions": "Actions",
       "details": "Details"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
     }
   },
   "graphics": {

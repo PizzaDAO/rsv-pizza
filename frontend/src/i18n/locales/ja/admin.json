@@ -168,5 +168,18 @@
     "signedInAdmin": "管理者としてログイン中（{{email}}）",
     "signedInAs": "{{name}}としてログイン中",
     "kitRequests": "キットリクエスト（{{count}}）"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }
