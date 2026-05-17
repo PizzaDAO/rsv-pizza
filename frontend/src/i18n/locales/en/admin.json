@@ -127,7 +127,29 @@
     "tabs": {
       "events": "Events",
       "cities": "Cities",
-      "partners": "Partners"
+      "partners": "Partners",
+      "fakeDetection": "Fake Detection"
+    }
+  },
+  "fakeDetection": {
+    "loading": "Computing risk scores…",
+    "searchPlaceholder": "Search event, city, host…",
+    "showingOf": "{{filtered}} of {{total}} events",
+    "sybilWallets": "{{count}} sybil wallets",
+    "tier": "Tier",
+    "country": "Country",
+    "allCountries": "All",
+    "onlyFlagged": "Only flagged",
+    "noResults": "No events match the current filters.",
+    "openEvent": "Open event page",
+    "columns": {
+      "event": "Event",
+      "slug": "Slug",
+      "rsvps": "RSVPs",
+      "score": "Score",
+      "flags": "Fired flags",
+      "status": "Status",
+      "details": "Details"
     }
   },
   "graphics": {

@@ -1076,6 +1076,47 @@ export interface UnderbossDashboardData {
   events: UnderbossEvent[];
 }
 
+// ============================================
+// Fake-event detection (blackolive-74932)
+// ============================================
+
+export type FakeDetectionTier = 'high' | 'medium' | 'low' | 'clean';
+
+export interface FakeFlag {
+  id: string;
+  name: string;
+  fired: boolean;
+  weight: number;
+  detail: string;
+  evidence?: Record<string, unknown>;
+}
+
+export interface FakeDetectionRow {
+  id: string;
+  name: string;
+  customUrl: string | null;
+  country: string | null;
+  region: string | null;
+  underbossStatus: string | null;
+  hostName: string | null;
+  hostEmail: string | null;
+  rsvpCount: number;
+  maxGuests: number | null;
+  score: number;
+  tier: FakeDetectionTier;
+  flags: FakeFlag[];
+}
+
+export interface FakeDetectionResponse {
+  rows: FakeDetectionRow[];
+  meta: {
+    totalEvents: number;
+    sybilWalletCount: number;
+    scope: 'admin' | 'regions';
+    regions: string[] | null;
+  };
+}
+
 // Admin Management types
 
 export interface AdminUser {
