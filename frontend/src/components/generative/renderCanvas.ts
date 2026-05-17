@@ -129,7 +129,9 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
       for (const sp of groupSponsors) {
         try {
           const logoImg = await loadImg(sp.logoUrl);
-          const customSize = sp.id && logoSizes[sp.id] ? logoSizes[sp.id] * s : autoLogoSize;
+          const customSize = sp.id && logoSizes[sp.id]
+            ? logoSizes[sp.id] * s
+            : Math.min(80 * s, autoLogoSize);
           const maxW = customSize * 2.5;
           const maxH = customSize;
           const fitScale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
