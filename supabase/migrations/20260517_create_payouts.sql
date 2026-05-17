@@ -11,7 +11,7 @@
 CREATE TABLE payouts (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   party_id              UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-  host_user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  host_user_id          TEXT NOT NULL REFERENCES "User"(id) ON DELETE RESTRICT,
   -- Amount tracking (always store ALL three: original, USD, and "final" after admin edits)
   original_amount       NUMERIC(12, 2) NOT NULL,
   original_currency     TEXT NOT NULL,
@@ -91,10 +91,10 @@ CREATE INDEX idx_payout_audit_payout_id  ON payout_audit (payout_id);
 CREATE INDEX idx_payout_audit_created_at ON payout_audit (created_at DESC);
 
 -- 4. Host payout preferences on users table
-ALTER TABLE users ADD COLUMN preferred_payout_method TEXT
+ALTER TABLE "User" ADD COLUMN preferred_payout_method TEXT
   CHECK (preferred_payout_method IN ('mercury_card','wire','usdc_base'));
-ALTER TABLE users ADD COLUMN payout_wallet_address TEXT;
-ALTER TABLE users ADD COLUMN payout_bank_details JSONB;
+ALTER TABLE "User" ADD COLUMN payout_wallet_address TEXT;
+ALTER TABLE "User" ADD COLUMN payout_bank_details JSONB;
 -- No stripe_cardholder_id needed — Mercury doesn't require per-host KYC enrollment.
 
 -- 5. Permissions: per the Feb 2026 security audit, all writes go through the
