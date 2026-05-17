@@ -1,5 +1,6 @@
 import { Party } from '../../types';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
+import { countryNameToFlag } from '../../utils/countryFlag';
 
 /**
  * Get the public RSVP URL for the party.
@@ -159,7 +160,7 @@ export function generateTwitterThread(party: Party): string[] {
     .join(' ');
 
   const lines: string[] = [
-    '\u{1F5FA}\u{FE0F}\u{1F355}\u{1F973}',
+    `${countryNameToFlag(party.country)}\u{1F355}\u{1F973}`,
     `Join us at ${party.name}!`,
     rsvpUrl,
   ];

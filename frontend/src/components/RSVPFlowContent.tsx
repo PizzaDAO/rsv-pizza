@@ -118,6 +118,7 @@ export function RSVPFlowContent({
             customUrl={event.customUrl}
             inviteCode={event.inviteCode}
             twitterHandles={twitterHandles}
+            country={event.country}
             calendarSlot={event.date ? (
               <div className="relative flex-1">
                 <button
