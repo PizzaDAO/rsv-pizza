@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, ArrowUpDown, ExternalLink, Loader2, Search } from 'lucide-react';
+import { AlertCircle, ArrowUpDown, ExternalLink, Loader2, Search, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
-import { fetchFakeDetection } from '../../lib/api';
+import { fetchFakeDetection, updateUnderbossStatus } from '../../lib/api';
 import type { FakeDetectionResponse, FakeDetectionRow, FakeDetectionTier } from '../../types';
+
+type ActionStatus = 'pending' | 'approved' | 'rejected';
 
 type SortField = 'score' | 'name' | 'rsvps' | 'country';
 type SortDir = 'asc' | 'desc';
@@ -59,6 +61,97 @@ export function FakeDetectionTable() {
   });
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+
+  // Per-row action state (keyed by party id)
+  const [actionPending, setActionPending] = useState<Record<string, boolean>>({});
+  const [actionErrors, setActionErrors] = useState<Record<string, string | null>>({});
+  const [statusOverride, setStatusOverride] = useState<Record<string, ActionStatus>>({});
+
+  const effectiveStatus = (row: FakeDetectionRow): string =>
+    statusOverride[row.id] ?? row.underbossStatus ?? 'pending';
+
+  async function runAction(rowId: string, next: ActionStatus) {
+    const prev = statusOverride[rowId];
+    setActionPending((p) => ({ ...p, [rowId]: true }));
+    setActionErrors((e) => ({ ...e, [rowId]: null }));
+    setStatusOverride((s) => ({ ...s, [rowId]: next }));
+    try {
+      await updateUnderbossStatus(rowId, next);
+    } catch (err: unknown) {
+      setStatusOverride((s) => {
+        const n = { ...s };
+        if (prev) {
+          n[rowId] = prev;
+        } else {
+          delete n[rowId];
+        }
+        return n;
+      });
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionErrors((er) => ({ ...er, [rowId]: msg }));
+    } finally {
+      setActionPending((p) => ({ ...p, [rowId]: false }));
+    }
+  }
+
+  function StatusActions({ rowId, current }: { rowId: string; current: string }) {
+    const inFlight = !!actionPending[rowId];
+    const err = actionErrors[rowId];
+
+    if (inFlight) {
+      return (
+        <div className="flex items-center">
+          <Loader2 size={14} className="animate-spin text-theme-text-muted" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          {current !== 'approved' && (
+            <button
+              onClick={() => runAction(rowId, 'approved')}
+              className="px-2 py-1 text-xs rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
+            >
+              {t('fakeDetection.actions.approve', 'Approve')}
+            </button>
+          )}
+          {current !== 'rejected' && (
+            <button
+              onClick={() => runAction(rowId, 'rejected')}
+              className="px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              {t('fakeDetection.actions.reject', 'Reject')}
+            </button>
+          )}
+          {current !== 'pending' && (
+            <button
+              onClick={() => runAction(rowId, 'pending')}
+              className="px-2 py-1 text-xs rounded bg-theme-surface text-theme-text-muted hover:bg-theme-stroke transition-colors"
+              title={t('fakeDetection.actions.resetTitle', 'Reset to pending')}
+            >
+              {t('fakeDetection.actions.reset', 'Reset')}
+            </button>
+          )}
+        </div>
+        {err && (
+          <div className="flex items-center gap-1 text-[10px] text-red-400">
+            <span className="truncate max-w-[180px]" title={err}>
+              {t('fakeDetection.actions.errorPrefix', 'Failed')}: {err}
+            </span>
+            <button
+              onClick={() => setActionErrors((e) => ({ ...e, [rowId]: null }))}
+              title={t('fakeDetection.actions.dismiss', 'Dismiss')}
+              className="text-red-400 hover:text-red-300"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -258,13 +351,14 @@ export function FakeDetectionTable() {
               <SortHeader field="score">{t('fakeDetection.columns.score', 'Score')}</SortHeader>
               <th className="py-2 px-3 text-left">{t('fakeDetection.columns.flags', 'Fired flags')}</th>
               <th className="py-2 px-3 text-left">{t('fakeDetection.columns.status', 'Status')}</th>
+              <th className="py-2 px-3 text-left">{t('fakeDetection.columns.actions', 'Actions')}</th>
               <th className="py-2 px-3 text-left">{t('fakeDetection.columns.details', 'Details')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 px-3 text-center text-theme-text-muted">
+                <td colSpan={8} className="py-8 px-3 text-center text-theme-text-muted">
                   {t('fakeDetection.noResults', 'No events match the current filters.')}
                 </td>
               </tr>
@@ -311,7 +405,10 @@ export function FakeDetectionTable() {
                   </div>
                 </td>
                 <td className="py-2 px-3 align-top text-xs text-theme-text-muted">
-                  {row.underbossStatus ?? 'pending'}
+                  {effectiveStatus(row)}
+                </td>
+                <td className="py-2 px-3 align-top">
+                  <StatusActions rowId={row.id} current={effectiveStatus(row)} />
                 </td>
                 <td className="py-2 px-3 align-top">
                   {row.customUrl ? (

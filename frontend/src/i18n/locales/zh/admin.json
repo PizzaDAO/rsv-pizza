@@ -168,5 +168,18 @@
     "signedInAdmin": "以管理员身份登录（{{email}}）",
     "signedInAs": "以 {{name}} 身份登录",
     "kitRequests": "套装申请（{{count}}）"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

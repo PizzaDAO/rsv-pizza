@@ -168,5 +168,18 @@
     "signedInAdmin": "Angemeldet als Admin ({{email}})",
     "signedInAs": "Angemeldet als {{name}}",
     "kitRequests": "Kit-Anfragen ({{count}})"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

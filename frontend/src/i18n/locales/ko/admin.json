@@ -168,5 +168,18 @@
     "signedInAdmin": "관리자로 로그인됨 ({{email}})",
     "signedInAs": "{{name}}(으)로 로그인됨",
     "kitRequests": "키트 요청 ({{count}})"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }
