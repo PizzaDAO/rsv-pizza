@@ -12,6 +12,7 @@ import {
 } from '../../lib/api';
 import { ChecklistItemRow } from './ChecklistItemRow';
 import { ChecklistItemForm } from './ChecklistItemForm';
+import { FindVenueModal } from './FindVenueModal';
 
 interface ChecklistTabProps {
   partyId: string;
@@ -32,6 +33,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [findVenueOpen, setFindVenueOpen] = useState(false);
 
   const navigate = useNavigate();
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -97,6 +99,10 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   };
 
   const handleNavigate = (tab: string) => {
+    if (tab === 'venue') {
+      setFindVenueOpen(true);
+      return;
+    }
     if (inviteCode) {
       if (tab === 'details') {
         navigate(`/host/${inviteCode}`);
@@ -211,6 +217,12 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
           saving={saving}
         />
       )}
+
+      <FindVenueModal
+        open={findVenueOpen}
+        onClose={() => setFindVenueOpen(false)}
+        onSaved={loadChecklist}
+      />
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
