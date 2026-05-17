@@ -8,23 +8,32 @@
   font-display: swap;
 }
 
-/* MarqueeBanner — right-to-left infinite scroll */
+/* MarqueeBanner — right-to-left infinite scroll.
+   Two-track pattern: the .marquee-track contains exactly two identical
+   .marquee-set elements. We translate the track by -50% (one whole set),
+   so when the animation restarts the second set is in the position the
+   first set started in — the loop is visually seamless. */
 @keyframes marquee {
   from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  to   { transform: translateX(-50%); }
 }
 .marquee-track {
   display: inline-flex;
-  gap: 3rem;
-  padding-left: 3rem;
+  /* No padding, no gap between sets — the two sets must be perfectly
+     contiguous so translating by -50% lands exactly on a copy boundary. */
   animation: marquee 25s linear infinite;
   will-change: transform;
 }
-.marquee-item {
+.marquee-set {
+  display: inline-flex;
+  gap: 3rem;
+  /* Trailing space on each set so the seam between sets matches the
+     spacing between items within a set. */
+  padding-right: 3rem;
   flex-shrink: 0;
 }
-.marquee-track:hover {
-  animation-play-state: paused;
+.marquee-item {
+  flex-shrink: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .marquee-track {

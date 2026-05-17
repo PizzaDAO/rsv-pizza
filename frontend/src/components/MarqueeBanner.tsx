@@ -7,10 +7,31 @@ const CONTENT = (
   </>
 );
 
+// One "set" contains enough copies of the text that it will overflow any
+// reasonable viewport width on its own. The track renders TWO identical
+// sets, and the CSS animation translates the track by -50% (= exactly one
+// full set), so when the loop restarts the second set is in exactly the
+// position the first set started in. Result: a perfectly seamless loop.
+const SET_COPIES = 6;
+
+const Set: React.FC<{ ariaHidden?: boolean }> = ({ ariaHidden }) => (
+  <span className="marquee-set" aria-hidden={ariaHidden ? 'true' : 'false'}>
+    {Array.from({ length: SET_COPIES }).map((_, i) => (
+      <span key={i} className="marquee-item">
+        {CONTENT}
+      </span>
+    ))}
+  </span>
+);
+
 /**
  * Scrolling marquee banner that sits below the Header.
- * Right-to-left scroll, ~25s loop, pure CSS animation (defined in index.css).
+ * Right-to-left infinite scroll, pure CSS animation (defined in index.css).
  * Entire banner is a single link to globalpizza.party.
+ *
+ * Uses the two-track pattern: the inner track contains exactly two identical
+ * sets of repeated text and animates from translateX(0) to translateX(-50%).
+ * Because -50% equals exactly one set's width, the loop restart is invisible.
  */
 export const MarqueeBanner: React.FC = () => {
   return (
@@ -27,10 +48,8 @@ export const MarqueeBanner: React.FC = () => {
       }}
     >
       <div className="marquee-track">
-        <span className="marquee-item" aria-hidden="false">{CONTENT}</span>
-        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
-        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
-        <span className="marquee-item" aria-hidden="true">{CONTENT}</span>
+        <Set />
+        <Set ariaHidden />
       </div>
     </a>
   );
