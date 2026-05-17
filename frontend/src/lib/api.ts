@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -174,6 +174,7 @@ export interface UpdatePartyData {
   country?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
+  hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
 }
 
@@ -190,6 +191,7 @@ export async function createPartyApi(data: CreatePartyData) {
       pizzaStyle: data.pizzaStyle || 'new-york',
       address: data.address,
       placeId: data.placeId,
+      venueName: data.venueName,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -278,6 +280,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       country: data.country,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
+      hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
     },
   });
@@ -416,6 +419,7 @@ export interface PublicEvent {
   longitude?: number | null;
   placeId?: string | null;
   venueName: string | null;
+  country?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
@@ -910,6 +914,7 @@ export interface CreateGPPEventData {
   telegram?: string;
   country?: string;
   countryCode?: string;
+  cityFormattedName?: string;
   cityLat?: number;
   cityLng?: number;
   timezone?: string;
@@ -2479,14 +2484,14 @@ export async function fetchChecklistDefaults(): Promise<{ items: ChecklistDefaul
   return apiRequest<{ items: ChecklistDefault[] }>('/api/admin/checklist-defaults');
 }
 
-export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string }>): Promise<{ totalUpdated: number }> {
+export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string; linkTab?: string | null }>): Promise<{ totalUpdated: number }> {
   return apiRequest<{ totalUpdated: number }>('/api/admin/checklist-defaults', {
     method: 'PATCH',
     body: { items },
   });
 }
 
-export async function addChecklistDefault(data: { name: string; dueDate?: string | null }): Promise<{ createdCount: number }> {
+export async function addChecklistDefault(data: { name: string; dueDate?: string | null; linkTab?: string | null }): Promise<{ createdCount: number }> {
   return apiRequest<{ createdCount: number }>('/api/admin/checklist-defaults', {
     method: 'POST',
     body: data,
@@ -2521,6 +2526,11 @@ export async function fetchUnderbossDashboard(
   region: GPPRegion | 'all'
 ): Promise<UnderbossDashboardData> {
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
+}
+
+// Fetch fake-event detection review queue (blackolive-74932)
+export async function fetchFakeDetection(): Promise<FakeDetectionResponse> {
+  return apiRequest<FakeDetectionResponse>('/api/underboss/fake-detection');
 }
 
 // Update host status on an event (underboss auth)
@@ -2609,7 +2619,7 @@ export async function bulkUpdateEventTags(
 // City Status API (Underboss)
 
 export interface CityStatusMap {
-  [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
+  [cityKey: string]: { status: string; priority: boolean; updatedBy: string | null; updatedAt: string };
 }
 
 export async function fetchCityStatuses(): Promise<CityStatusMap> {
@@ -2618,11 +2628,11 @@ export async function fetchCityStatuses(): Promise<CityStatusMap> {
 
 export async function updateCityStatus(
   cityKey: string,
-  status: 'created' | 'skip' | 'todo'
+  patch: { status?: 'created' | 'skip' | 'todo'; priority?: boolean }
 ): Promise<void> {
   await apiRequest('/api/underboss/city-statuses', {
     method: 'PATCH',
-    body: { cityKey, status },
+    body: { cityKey, ...patch },
   });
 }
 
@@ -2991,6 +3001,52 @@ export async function sendTelegramTest(
   });
 }
 
+// Host Telegram (bot-DM) API functions — backed by sausage-24183 backend routes.
+
+export interface BroadcastHost {
+  partyId: string;
+  city: string;
+  hostName: string;
+}
+
+export async function sendHostTelegramBroadcast(
+  hosts: BroadcastHost[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
+    method: 'POST',
+    body: { hosts, message, parseMode },
+  });
+}
+
+export async function sendHostTelegramTest(
+  partyId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
+    method: 'POST',
+    body: { partyId, message, parseMode },
+  });
+}
+
+export async function mintHostTelegramConnectToken(
+  partyId: string
+): Promise<{ token: string; deeplink: string }> {
+  return apiRequest<{ token: string; deeplink: string }>(`/api/parties/${partyId}/connect-token`, {
+    method: 'POST',
+  });
+}
+
+export async function disconnectHostTelegram(
+  partyId: string
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/parties/${partyId}/host-telegram`, {
+    method: 'DELETE',
+  });
+}
+
 // Sponsor Dashboard API
 
 export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
@@ -3000,6 +3056,33 @@ export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
 export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboardData> {
   const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
   return apiRequest<SponsorDashboardData>(`/api/sponsor/events${params}`);
+}
+
+// Admin-only time-series for partner dashboard chart
+export type PartnerTimeSeriesRange = '6hr' | '24hr' | '3d' | '7d';
+
+export interface PartnerTimeSeriesPoint {
+  timestamp: string;
+  rsvps: number;
+  impressions: number;
+  clicks: number;
+}
+
+export interface PartnerTimeSeriesResponse {
+  range: PartnerTimeSeriesRange;
+  bucket: 'hour';
+  since: string;
+  points: PartnerTimeSeriesPoint[];
+}
+
+export async function fetchSponsorEventsTimeSeries(
+  range: PartnerTimeSeriesRange = '24hr',
+  tag?: string
+): Promise<PartnerTimeSeriesResponse> {
+  const params = new URLSearchParams();
+  params.set('range', range);
+  if (tag) params.set('tag', tag);
+  return apiRequest<PartnerTimeSeriesResponse>(`/api/sponsor/events/timeseries?${params.toString()}`);
 }
 
 export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
@@ -3263,6 +3346,8 @@ export interface GPPEventMapItem {
   longitude: number | null;
   rsvpCount: number;
   country: string | null;
+  underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventApiResponse {
@@ -3278,6 +3363,8 @@ interface GPPEventApiResponse {
   longitude: number | null;
   guestCount: number;
   country: string | null;
+  underbossStatus?: string | null;
+  eventTags?: string[];
 }
 
 interface GPPEventsApiPayload {
@@ -3287,11 +3374,19 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
-  const data = await apiRequest<GPPEventsApiPayload>('/api/gpp/events?limit=500', {
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
+  const params: string[] = ['limit=2000'];
+  if (curated) params.push('curated=1');
+  // `statuses=all` is the auth-gated path on the backend — only returns
+  // rejected/hidden events when the caller is an authenticated underboss/admin.
+  // Unauthenticated callers silently fall back to the filtered view.
+  if (includeAll) params.push('statuses=all');
+  if (force) params.push(`_t=${Date.now()}`);
+  const url = `/api/gpp/events?${params.join('&')}`;
+  const data = await apiRequest<GPPEventsApiPayload>(url, {
     requireAuth: false,
   });
-  return (data.events || []).map((e) => ({
+  let events = (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
     city: e.city,
@@ -3303,7 +3398,36 @@ export async function fetchGppEventsForMap(): Promise<GPPEventMapItem[]> {
     longitude: e.longitude,
     rsvpCount: e.guestCount ?? 0,
     country: e.country,
+    underbossStatus: e.underbossStatus,
+    eventTags: e.eventTags ?? [],
   }));
+  if (curated) {
+    events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
+  }
+  return events;
+}
+
+// GPP Partners (aggregated across approved GPP events)
+export interface GPPPartner {
+  name: string;
+  logoUrl: string;
+  website: string | null;
+  brandDescription: string | null;
+  brandTwitter: string | null;
+  brandInstagram: string | null;
+  category: string | null;
+  eventCount: number;
+  events: { slug: string; city: string; sponsorId: string }[];
+}
+
+export interface GPPPartnersResponse {
+  partners: GPPPartner[];
+  total: number;
+  generatedAt: string;
+}
+
+export async function fetchGppPartners(): Promise<GPPPartnersResponse> {
+  return apiRequest<GPPPartnersResponse>('/api/gpp/partners', { requireAuth: false });
 }
 
 // RSVP Funnel Stats (Underboss dashboard)

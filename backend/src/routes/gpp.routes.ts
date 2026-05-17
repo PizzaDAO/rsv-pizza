@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 
 const router = Router();
@@ -243,7 +245,7 @@ async function sendGPPWelcomeEmail(
 // POST /api/gpp/events - Create a GPP event (simplified flow, no auth required)
 router.post('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng, timezone } = req.body;
+    const { city, hostName, email, telegram, country, countryCode, cityFormattedName, cityLat, cityLng, timezone } = req.body;
 
     // Validate required fields
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
@@ -263,6 +265,15 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedCity = city.trim();
     const normalizedHostName = hostName.trim();
     const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
+
+    // Pre-fill address with the formatted city name (Google Places result) so the
+    // public event page has a location immediately. Falls back to the raw city
+    // the user typed if the formatted name isn't available. The
+    // `addressIsCityDefault` flag below marks this as a city-level pre-fill so
+    // the venue checklist item stays unchecked until the host adds a real venue.
+    const cityAddress =
+      (typeof cityFormattedName === 'string' && cityFormattedName.trim()) ||
+      normalizedCity;
 
     // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars).
     // NULL when the slug is empty (e.g. non-Latin scripts) so the unique constraint stays distinct.
@@ -398,6 +409,11 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         timezone: eventTimezone,
         region: inferredRegion,
         country: country || null,
+        address: cityAddress,
+        addressIsCityDefault: true,
+        latitude: typeof cityLat === 'number' ? cityLat : null,
+        longitude: typeof cityLng === 'number' ? cityLng : null,
+        placeId: null,
         availableBeverages: [],
         availableToppings: [],
         coHosts: [
@@ -631,9 +647,42 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
 // GET /api/gpp/events - List all GPP events (for admin/public listing)
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '500', offset = '0', city, country, region } = req.query;
+    const { limit = '500', offset = '0', city, country, region, statuses } = req.query;
 
-    const where: any = { eventType: 'gpp', underbossStatus: { notIn: ['rejected', 'hidden'] } };
+    // Determine whether to include rejected/hidden statuses.
+    // The `?statuses=all` and legacy `?includeAll=1` params both request all-statuses,
+    // but the request is only honored when the caller is an authenticated
+    // underboss/admin. Unauthenticated callers silently fall back to the
+    // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
+    const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    let includeAllStatuses = false;
+    if (requestedAllStatuses) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          try {
+            const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+            const email = decoded.email;
+            if (email && (await isAdmin(email) || await isUnderboss(email))) {
+              includeAllStatuses = true;
+            }
+          } catch {
+            // Bad/expired token — silently fall back to the filtered view
+          }
+        }
+      }
+    }
+
+    const where: any = { eventType: 'gpp' };
+    if (req.query.curated === '1') {
+      where.underbossStatus = { in: ['approved', 'listed'] };
+    } else if (includeAllStatuses) {
+      // moderator view — no underbossStatus filter; returns rejected/hidden too
+    } else {
+      where.underbossStatus = { notIn: ['rejected', 'hidden'] };
+    }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }
@@ -644,7 +693,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
-    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
     const [events, total] = await Promise.all([
@@ -762,6 +811,189 @@ router.patch('/pizzerias/:partyId/photo', async (req: Request, res: Response, ne
   } catch (err) {
     console.error('Error caching pizzeria photo:', err);
     res.status(500).json({ error: 'Failed to cache photo' });
+  }
+});
+
+// GET /api/gpp/partners - Aggregated partners across all approved GPP events
+// Cross-event logo aggregation for the marketing site (globalpizza.party) and
+// the public partners page at rsv.pizza/partners. Sponsor rows are deduped
+// in-memory by normalized logoUrl (primary) then normalized name (fallback).
+router.get('/partners', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        party: {
+          eventType: 'gpp',
+          underbossStatus: 'approved', // strict — curated logo wall
+        },
+        status: { in: ['yes', 'billed', 'paid'] },
+        logoUrl: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        website: true,
+        brandDescription: true,
+        brandTwitter: true,
+        brandInstagram: true,
+        category: true,
+        sortOrder: true,
+        createdAt: true,
+        party: {
+          select: {
+            customUrl: true,
+            inviteCode: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Normalize logoUrl: trim, lowercase, strip protocol, strip trailing slash.
+    const normalizeUrl = (raw: string): string => {
+      return raw
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/+$/, '');
+    };
+
+    // Normalize name: strip diacritics, lowercase, alphanum only (same as city slug code above).
+    const normalizeName = (raw: string): string => {
+      return raw
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    interface Aggregate {
+      name: string;
+      logoUrl: string;
+      website: string | null;
+      brandDescription: string | null;
+      brandTwitter: string | null;
+      brandInstagram: string | null;
+      category: string | null;
+      eventCount: number;
+      events: { slug: string; city: string; sponsorId: string }[];
+      // tie-break tracking
+      bestSortOrder: number;
+      bestCreatedAt: Date;
+    }
+
+    const byLogoKey = new Map<string, Aggregate>();
+    const byNameKey = new Map<string, Aggregate>();
+
+    for (const s of sponsors) {
+      if (!s.logoUrl) continue;
+
+      const logoKey = normalizeUrl(s.logoUrl);
+      const nameKey = normalizeName(s.name);
+
+      // Derive city by stripping "Global Pizza Party " prefix; fallback to full party name.
+      const partyName = s.party?.name || '';
+      const city =
+        partyName.replace(/^Global Pizza Party\s*/i, '').trim() || partyName || 'Unknown';
+      const slug = s.party?.customUrl || s.party?.inviteCode || '';
+
+      // Find existing aggregate via logoKey first, then nameKey fallback.
+      let agg = byLogoKey.get(logoKey);
+      if (!agg && nameKey) {
+        agg = byNameKey.get(nameKey);
+      }
+
+      if (agg) {
+        // Dedupe within this partner's events: if the same event already
+        // appears in this aggregate's list (e.g. duplicate sponsor rows for
+        // the same partner on one party), skip the push AND don't bump
+        // eventCount. First-seen wins.
+        const alreadyHasEvent = slug
+          ? agg.events.some((e) => e.slug === slug)
+          : false;
+        if (!alreadyHasEvent) {
+          agg.eventCount += 1;
+          // Cap events array at 500 to defend against pathological payload size.
+          if (agg.events.length < 500 && slug) {
+            agg.events.push({ slug, city, sponsorId: s.id });
+          }
+        }
+        // Tie-break: prefer the representative row with lowest sortOrder; if tied,
+        // prefer the more recent createdAt.
+        const isBetter =
+          s.sortOrder < agg.bestSortOrder ||
+          (s.sortOrder === agg.bestSortOrder && s.createdAt > agg.bestCreatedAt);
+        if (isBetter) {
+          agg.name = s.name;
+          agg.logoUrl = s.logoUrl;
+          agg.website = s.website;
+          agg.brandDescription = s.brandDescription;
+          agg.brandTwitter = s.brandTwitter;
+          agg.brandInstagram = s.brandInstagram;
+          agg.category = s.category;
+          agg.bestSortOrder = s.sortOrder;
+          agg.bestCreatedAt = s.createdAt;
+        }
+        // Ensure both maps point at the same aggregate even after a fallback merge.
+        byLogoKey.set(logoKey, agg);
+        if (nameKey) byNameKey.set(nameKey, agg);
+      } else {
+        const fresh: Aggregate = {
+          name: s.name,
+          logoUrl: s.logoUrl,
+          website: s.website,
+          brandDescription: s.brandDescription,
+          brandTwitter: s.brandTwitter,
+          brandInstagram: s.brandInstagram,
+          category: s.category,
+          eventCount: 1,
+          events: slug ? [{ slug, city, sponsorId: s.id }] : [],
+          bestSortOrder: s.sortOrder,
+          bestCreatedAt: s.createdAt,
+        };
+        byLogoKey.set(logoKey, fresh);
+        if (nameKey) byNameKey.set(nameKey, fresh);
+      }
+    }
+
+    // Collect unique aggregates (some may be present in both maps).
+    const uniqueAggregates = Array.from(new Set(byLogoKey.values()));
+
+    // Final safety: keep eventCount strictly in sync with the deduped events
+    // array. The push-time check above already does this, but recomputing
+    // here guards against future edits drifting the two apart.
+    for (const a of uniqueAggregates) {
+      a.eventCount = a.events.length;
+    }
+
+    // Sort by popularity (eventCount DESC), then name ASC.
+    uniqueAggregates.sort((a, b) => {
+      if (b.eventCount !== a.eventCount) return b.eventCount - a.eventCount;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Strip tie-break tracking fields from the response.
+    const partners = uniqueAggregates.map((a) => ({
+      name: a.name,
+      logoUrl: a.logoUrl,
+      website: a.website,
+      brandDescription: a.brandDescription,
+      brandTwitter: a.brandTwitter,
+      brandInstagram: a.brandInstagram,
+      category: a.category,
+      eventCount: a.eventCount,
+      events: a.events,
+    }));
+
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json({
+      partners,
+      total: partners.length,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -2,6 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
+
+// Serialize BigInt as string in JSON. The only BigInt in the schema today is
+// parties.host_telegram_chat_id, which is sensitive enough that we never want
+// it leaking to clients via an implicit-select endpoint anyway — but several
+// existing endpoints do `res.json({ ...party })` on Prisma results without an
+// explicit select, and Express's default res.json throws on a raw BigInt.
+// The frontend's dbPartyToParty mapper already calls String() on this field,
+// so emitting it as a string here matches what the client expects.
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 import authRoutes from './routes/auth.routes.js';
 import partyRoutes from './routes/party.routes.js';
 import rsvpRoutes from './routes/rsvp.routes.js';
@@ -32,6 +41,8 @@ import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
+import telegramWebhookRoutes from './routes/telegram-webhook.routes.js';
+import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
@@ -56,6 +67,8 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : [
       'https://rsv.pizza',
       'https://www.rsv.pizza',
+      'https://globalpizza.party',
+      'https://www.globalpizza.party',
       'http://localhost:5173',  // Vite dev server
       'http://localhost:5176',  // Vite dev server (alt port)
       'http://localhost:3000',
@@ -105,6 +118,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
+app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
@@ -113,6 +127,7 @@ app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-bas
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
@@ -294,6 +309,40 @@ app.get('/api', (req, res) => {
 
 <h3>Example</h3>
 <pre><code>curl https://api.rsv.pizza/api/events/london</code></pre>
+
+<h2>Partners</h2>
+
+<div class="endpoint">
+  <span class="method">GET</span>
+  <span class="path">/api/gpp/partners</span>
+  <span class="badge">public</span>
+  <p class="desc">Aggregated partner logos across all approved Global Pizza Party events. Deduplicated by normalized logo URL with a fallback on normalized name. Cached for 10 minutes.</p>
+</div>
+
+<h3>Example Request</h3>
+<pre><code>curl https://api.rsv.pizza/api/gpp/partners</code></pre>
+
+<h3>Response</h3>
+<pre><code>{
+  "partners": [
+    {
+      "name": "PizzaDAO",
+      "logoUrl": "https://...",
+      "website": "https://pizzadao.org",
+      "brandDescription": "PizzaDAO is a community of pizza enthusiasts...",
+      "brandTwitter": "PizzaDAO",
+      "brandInstagram": "rare.pizzas",
+      "category": "community",
+      "eventCount": 423,
+      "events": [
+        { "slug": "london", "city": "London", "sponsorId": "clz0a1b2c3d4e5f6g7h8i9j0" },
+        { "slug": "saopaulo", "city": "São Paulo", "sponsorId": "clz0k1l2m3n4o5p6q7r8s9t0" }
+      ]
+    }
+  ],
+  "total": 47,
+  "generatedAt": "2026-05-15T12:34:56.789Z"
+}</code></pre>
 
 <h2>Health Check</h2>
 

@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, type LucideIcon } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, Lock, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getChecklist, seedChecklist, updateUnderbossStatus } from '../../lib/api';
+import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
+import { FindVenueModal } from '../checklist/FindVenueModal';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -18,28 +19,29 @@ export const GPPDashboardTab: React.FC = () => {
   const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
   const [showCompleted, setShowCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [findVenueOpen, setFindVenueOpen] = useState(false);
+
+  const loadChecklist = useCallback(async () => {
+    if (!party?.id) return;
+    let data = await getChecklist(party.id);
+    // If not yet seeded, seed defaults so due dates propagate from checklist_defaults
+    if (data && !data.seeded) {
+      const seedResult = await seedChecklist(party.id);
+      if (seedResult) {
+        const refreshed = await getChecklist(party.id);
+        if (refreshed) data = refreshed;
+      }
+    }
+    setAutoStates(data?.autoCompleteStates ?? null);
+    setDbItems(data?.items ?? []);
+    setLoading(false);
+  }, [party?.id]);
 
   useEffect(() => {
     if (!party?.id) return;
-    let cancelled = false;
-    (async () => {
-      let data = await getChecklist(party.id);
-      // If not yet seeded, seed defaults so due dates propagate from checklist_defaults
-      if (data && !data.seeded) {
-        const seedResult = await seedChecklist(party.id);
-        if (seedResult) {
-          const refreshed = await getChecklist(party.id);
-          if (refreshed) data = refreshed;
-        }
-      }
-      if (!cancelled) {
-        setAutoStates(data?.autoCompleteStates ?? null);
-        setDbItems(data?.items ?? []);
-        setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [party?.id]);
+    loadChecklist();
+  }, [party?.id, loadChecklist]);
 
   // Map known item names to Lucide icons
   const ICON_MAP: Record<string, LucideIcon> = {
@@ -63,6 +65,21 @@ export const GPPDashboardTab: React.FC = () => {
     }
   };
 
+  const handleToggleItem = async (itemId: string) => {
+    if (!party?.id || togglingId) return;
+    setTogglingId(itemId);
+    try {
+      const result = await toggleChecklistItem(party.id, itemId);
+      if (result?.item) {
+        setDbItems(prev => prev.map(it => it.id === itemId
+          ? { ...it, completed: result.item.completed, completedAt: result.item.completedAt }
+          : it));
+      }
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const checklist = useMemo(() => {
     if (!party || dbItems.length === 0) return [];
     return dbItems.map((item) => {
@@ -70,11 +87,15 @@ export const GPPDashboardTab: React.FC = () => {
         ? (autoStates?.[item.autoRule as keyof AutoCompleteStates] ?? false)
         : item.completed;
       return {
+        id: item.id,
+        isAuto: item.isAuto,
+        autoRule: item.autoRule,
         label: item.name,
         done,
         tab: item.linkTab,
         onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
-                 item.name === 'Find Partners' ? () => goToTab('partners') : undefined,
+                 item.name === 'Find Partners' ? () => goToTab('partners') :
+                 item.name === 'Find a Venue' ? () => setFindVenueOpen(true) : undefined,
         icon: ICON_MAP[item.name] ?? ClipboardCheck,
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
@@ -167,7 +188,7 @@ export const GPPDashboardTab: React.FC = () => {
               className="btn-primary flex items-center gap-2"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : null}
-              List My Event
+              List My Event Without Funding
             </button>
             <button
               onClick={async () => {
@@ -203,7 +224,7 @@ export const GPPDashboardTab: React.FC = () => {
       {party.underbossStatus === 'listed' && (
         <div className="card p-6 border border-green-500/30 bg-green-500/5">
           <p className="text-sm text-green-400">
-            Your event is listed as a Community event on the site.
+            Your event is listed as a Community event on the site. These are self funded events that will not be funded by PizzaDAO.
           </p>
         </div>
       )}
@@ -248,19 +269,49 @@ export const GPPDashboardTab: React.FC = () => {
             {checklist.filter(item => showCompleted || !item.done).map((item) => {
               const Icon = item.icon;
               const clickable = item.tab || item.onClick;
-              const Wrapper = clickable ? 'button' : 'div';
+              const handleRowAction = item.onClick || (item.tab ? () => goToTab(item.tab!) : undefined);
+              const baseCircle = item.done ? (
+                <CheckCircle size={18} className="text-green-500 shrink-0" />
+              ) : (
+                <Circle size={18} className="text-theme-text-faint shrink-0" />
+              );
               return (
                 <React.Fragment key={item.label}>
-                  <Wrapper
-                    onClick={clickable ? (item.onClick || (() => goToTab(item.tab!))) : undefined}
+                  <div
+                    onClick={clickable && handleRowAction ? handleRowAction : undefined}
+                    onKeyDown={clickable && handleRowAction ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleRowAction();
+                      }
+                    } : undefined}
+                    role={clickable ? 'button' : undefined}
+                    tabIndex={clickable ? 0 : undefined}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
                       clickable ? 'hover:bg-theme-surface cursor-pointer' : ''
                     }`}
                   >
-                    {item.done ? (
-                      <CheckCircle size={18} className="text-green-500 shrink-0" />
+                    {item.isAuto ? (
+                      <span
+                        title="Auto-completes based on event setup"
+                        className="relative inline-flex shrink-0"
+                      >
+                        {baseCircle}
+                        <Lock
+                          size={9}
+                          className="absolute -bottom-0.5 -right-0.5 text-theme-text-muted bg-theme-surface rounded-full p-px"
+                        />
+                      </span>
                     ) : (
-                      <Circle size={18} className="text-theme-text-faint shrink-0" />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleToggleItem(item.id); }}
+                        disabled={togglingId === item.id}
+                        aria-label={`Mark ${item.label} ${item.done ? 'incomplete' : 'complete'}`}
+                        className="shrink-0 hover:opacity-70 transition-opacity disabled:opacity-50"
+                      >
+                        {baseCircle}
+                      </button>
                     )}
                     <Icon size={16} className={item.done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'} />
                     <span
@@ -286,7 +337,7 @@ export const GPPDashboardTab: React.FC = () => {
                         {item.label === 'Build a Team' && hostsExpanded ? '\u25B2' : 'Go \u2192'}
                       </span>
                     )}
-                  </Wrapper>
+                  </div>
                   {item.label === 'Build a Team' && hostsExpanded && (
                     <div className="ml-9 mr-3 mb-2 mt-1 p-4 bg-theme-surface rounded-xl border border-theme-stroke animate-fade-in">
                       <HostsManager
@@ -303,6 +354,12 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
         )}
       </div>
+
+      <FindVenueModal
+        open={findVenueOpen}
+        onClose={() => setFindVenueOpen(false)}
+        onSaved={loadChecklist}
+      />
 
       {/* Host Resources */}
       <HostResources />

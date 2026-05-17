@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, FakeDetectionTable } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -69,7 +69,9 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection'>('events');
+
+  const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
@@ -102,6 +104,24 @@ export function UnderbossDashboard() {
     };
   }, [allData, selectedRegions, availableRegions.length]);
 
+  const displayData = useMemo(() => {
+    if (!filteredData) return null;
+    if (activeTab !== 'events' || !tableFilteredEvents) return filteredData;
+    return {
+      ...filteredData,
+      stats: recomputeStats(tableFilteredEvents),
+      events: tableFilteredEvents,
+    };
+  }, [filteredData, activeTab, tableFilteredEvents]);
+
+  useEffect(() => {
+    if (activeTab !== 'events') setTableFilteredEvents(null);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setTableFilteredEvents(null);
+  }, [allData]);
+
   // Derive the region label for the header
   const regionLabel = useMemo(() => {
     if (selectedRegions.length === 0) return t('underbossDashboard.noRegions');
@@ -112,8 +132,8 @@ export function UnderbossDashboard() {
     return t('underbossDashboard.regionsCount', { count: selectedRegions.length });
   }, [selectedRegions, availableRegions.length, t]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const result = await fetchUnderbossDashboard('all');
@@ -130,9 +150,10 @@ export function UnderbossDashboard() {
         // Non-critical — partner tags indicator won't show
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard');
+      if (!silent) setError(err.message || 'Failed to load dashboard');
+      else console.error('Silent dashboard refetch failed:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -271,7 +292,7 @@ export function UnderbossDashboard() {
     );
   }
 
-  if (!filteredData) return null;
+  if (!filteredData || !displayData) return null;
 
   const showMultiSelect = availableRegions.length > 1;
   const showRegionColumn = selectedRegions.length > 1;
@@ -389,7 +410,7 @@ export function UnderbossDashboard() {
 
         {/* Stats */}
         <section className="mb-8">
-          <RegionStats stats={filteredData.stats} />
+          <RegionStats stats={displayData.stats} />
         </section>
 
         {/* Events / Cities Tabs */}
@@ -403,7 +424,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              {t('underbossDashboard.tabs.events')} ({filteredData.events.length})
+              {t('underbossDashboard.tabs.events')} ({displayData.events.length})
               {activeTab === 'events' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -434,10 +455,25 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('fake-detection')}
+                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                  activeTab === 'fake-detection'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
+                }`}
+              >
+                {t('underbossDashboard.tabs.fakeDetection')}
+                {activeTab === 'fake-detection' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                )}
+              </button>
+            )}
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} />
           )}
 
           {activeTab === 'cities' && (
@@ -445,9 +481,12 @@ export function UnderbossDashboard() {
           )}
 
           {activeTab === 'partners' && (
-            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={() => loadDashboard(true)} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
 
+          {isAdmin && activeTab === 'fake-detection' && (
+            <FakeDetectionTable />
+          )}
 
         </section>
         </div>

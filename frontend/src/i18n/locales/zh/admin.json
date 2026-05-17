@@ -83,7 +83,8 @@
     "saveChecklistDates": "保存清单日期",
     "newItemPlaceholder": "新清单项目...",
     "adding": "添加中...",
-    "addItem": "添加项目"
+    "addItem": "添加项目",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPP 默认描述",

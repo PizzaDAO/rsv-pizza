@@ -5,6 +5,8 @@ import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
+import { scoreEvent, buildSybilWalletSet } from '../lib/fakeDetection.js';
 
 // Extend Request to include underboss
 interface UnderbossRequest extends AuthRequest {
@@ -224,6 +226,7 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
       email: party.user?.email || null,
     },
     hostTelegram: party.user?.telegram || null,
+    hostTelegramConnected: !!party.hostTelegramChatId,
     coHosts: party.coHosts || [],
     progress: computeProgress(party, underbossEmails),
     guestCount,
@@ -326,10 +329,11 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
 router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const rows = await prisma.cityStatus.findMany();
-    const map: Record<string, { status: string; updatedBy: string | null; updatedAt: string }> = {};
+    const map: Record<string, { status: string; priority: boolean; updatedBy: string | null; updatedAt: string }> = {};
     for (const row of rows) {
       map[row.cityKey] = {
         status: row.status,
+        priority: row.priority,
         updatedBy: row.updatedBy,
         updatedAt: row.updatedAt.toISOString(),
       };
@@ -340,36 +344,182 @@ router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Unde
   }
 });
 
-// PATCH /api/underboss/city-statuses - Upsert a city status (or delete if 'todo')
+// PATCH /api/underboss/city-statuses - Upsert a city status / priority
+// Accepts optional `status` and/or `priority`. Row is only deleted when the
+// effective state is { status: 'todo', priority: false } (the default).
 router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { cityKey, status } = req.body;
+    const { cityKey, status, priority } = req.body;
 
     if (!cityKey || typeof cityKey !== 'string') {
       throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
     }
 
-    const validStatuses = ['created', 'skip', 'todo'];
-    if (!validStatuses.includes(status)) {
+    if (status !== undefined && !['created', 'skip', 'todo'].includes(status)) {
       throw new AppError('status must be "created", "skip", or "todo"', 400, 'VALIDATION_ERROR');
+    }
+
+    if (priority !== undefined && typeof priority !== 'boolean') {
+      throw new AppError('priority must be a boolean', 400, 'VALIDATION_ERROR');
+    }
+
+    if (status === undefined && priority === undefined) {
+      throw new AppError('nothing to update — provide status and/or priority', 400, 'VALIDATION_ERROR');
     }
 
     const updatedBy = req.underboss?.email || null;
 
-    if (status === 'todo') {
-      // Default status doesn't need storage — delete the row
+    const existing = await prisma.cityStatus.findUnique({ where: { cityKey } });
+    const nextStatus = status ?? existing?.status ?? 'todo';
+    const nextPriority = priority ?? existing?.priority ?? false;
+
+    if (nextStatus === 'todo' && nextPriority === false) {
+      // Default state — no need to store
       await prisma.cityStatus.deleteMany({ where: { cityKey } });
       return res.json({ success: true, deleted: true });
     }
 
-    // Upsert: create or update
     const result = await prisma.cityStatus.upsert({
       where: { cityKey },
-      update: { status, updatedBy },
-      create: { cityKey, status, updatedBy },
+      update: { status: nextStatus, priority: nextPriority, updatedBy },
+      create: { cityKey, status: nextStatus, priority: nextPriority, updatedBy },
     });
 
     res.json({ success: true, cityStatus: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// Fake-event detection review queue (blackolive-74932)
+// NOTE: Must be registered BEFORE /:region catch-all
+// ============================================
+
+// GET /api/underboss/fake-detection - Composite risk score queue for GPP events
+router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const isAdminUser = req.underboss!.regions.includes('__admin__');
+    if (!isAdminUser) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    // Admin-only: see all GPP events.
+    const whereClause: { eventType: 'gpp' } = { eventType: 'gpp' };
+
+    // Cross-event wallet pre-pass — one raw query, then Set lookup per event.
+    // A wallet is "sybil" when it appears on ≥4 distinct events under ≥2 distinct trimmed-lower names.
+    const sybilRows = await prisma.$queryRaw<
+      Array<{ ethereum_address: string; party_ids: string[]; names: string[] }>
+    >`
+      SELECT
+        lower(ethereum_address) AS ethereum_address,
+        array_agg(DISTINCT party_id::text) AS party_ids,
+        array_agg(DISTINCT lower(trim(name))) AS names
+      FROM guests
+      WHERE ethereum_address IS NOT NULL
+        AND submitted_via IN ('link','rsvp','api')
+      GROUP BY lower(ethereum_address)
+      HAVING COUNT(DISTINCT party_id) >= 4
+    `;
+    const sybilWallets = buildSybilWalletSet(
+      sybilRows.map(r => ({
+        ethereumAddress: r.ethereum_address,
+        partyIds: r.party_ids,
+        names: r.names,
+      })),
+    );
+
+    const parties = await prisma.party.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        customUrl: true,
+        country: true,
+        region: true,
+        timezone: true,
+        maxGuests: true,
+        createdAt: true,
+        underbossStatus: true,
+        user: { select: { id: true, name: true, email: true } },
+        guests: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            ethereumAddress: true,
+            submittedAt: true,
+            submittedVia: true,
+            waitlistPosition: true,
+            walletSource: true,
+            likedToppings: true,
+            dislikedToppings: true,
+            likedBeverages: true,
+            dislikedBeverages: true,
+            dietaryRestrictions: true,
+            roles: true,
+            pizzeriaRankings: true,
+            suggestedPizzerias: true,
+          },
+        },
+        linkClicks: {
+          select: { clickedAt: true },
+        },
+      },
+    });
+
+    const rows: ReturnType<typeof scoreEvent>[] = parties.map(p =>
+      scoreEvent(
+        {
+          id: p.id,
+          name: p.name,
+          customUrl: p.customUrl,
+          country: p.country,
+          region: p.region,
+          timezone: p.timezone,
+          maxGuests: p.maxGuests,
+          createdAt: p.createdAt ?? new Date(0),
+          underbossStatus: p.underbossStatus ?? null,
+          user: p.user
+            ? { id: p.user.id, name: p.user.name, email: p.user.email }
+            : null,
+        },
+        p.guests.map(g => ({
+          id: g.id,
+          name: g.name,
+          email: g.email,
+          ethereumAddress: g.ethereumAddress,
+          submittedAt: g.submittedAt,
+          submittedVia: g.submittedVia,
+          waitlistPosition: g.waitlistPosition,
+          walletSource: g.walletSource,
+          likedToppings: g.likedToppings,
+          dislikedToppings: g.dislikedToppings,
+          likedBeverages: g.likedBeverages,
+          dislikedBeverages: g.dislikedBeverages,
+          dietaryRestrictions: g.dietaryRestrictions,
+          roles: g.roles,
+          pizzeriaRankings: g.pizzeriaRankings,
+          suggestedPizzerias: g.suggestedPizzerias,
+        })),
+        p.linkClicks.map(c => ({ clickedAt: c.clickedAt })),
+        sybilWallets,
+        p.maxGuests,
+      ),
+    );
+
+    rows.sort((a, b) => b.score - a.score);
+
+    res.json({
+      rows,
+      meta: {
+        totalEvents: rows.length,
+        sybilWalletCount: sybilWallets.size,
+        scope: isAdminUser ? 'admin' : 'regions',
+        regions: isAdminUser ? null : req.underboss!.regions,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -638,12 +788,31 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
-    const result = await prisma.party.updateMany({
-      where: { id: { in: partyIds } },
-      data: { underbossStatus: status },
+    const email = req.userEmail!;
+    const isAdminUser = await isAdmin(email);
+    const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
+
+    const updatedCount = await prisma.$transaction(async (tx) => {
+      const before = await tx.party.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, underbossStatus: true },
+      });
+
+      // Skip no-ops to avoid noisy audit rows.
+      const changing = before.filter(p => p.underbossStatus !== status);
+
+      await tx.party.updateMany({
+        where: { id: { in: changing.map(p => p.id) } },
+        data: { underbossStatus: status },
+      });
+
+      for (const p of changing) {
+        await writeStatusAudit(tx, p.id, p.underbossStatus, status, email, actorKind);
+      }
+      return changing.length;
     });
 
-    res.json({ updated: result.count });
+    res.json({ updated: updatedCount });
   } catch (error) {
     next(error);
   }
@@ -829,10 +998,22 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
 
     if (underboss) {
       // Underboss/admin: allow all statuses
-      const party = await prisma.party.update({
-        where: { id: partyId },
-        data: { underbossStatus: status },
-        select: { id: true, underbossStatus: true },
+      const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
+      const party = await prisma.$transaction(async (tx) => {
+        const before = await tx.party.findUnique({
+          where: { id: partyId },
+          select: { underbossStatus: true },
+        });
+        if (!before) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+        const updated = await tx.party.update({
+          where: { id: partyId },
+          data: { underbossStatus: status },
+          select: { id: true, underbossStatus: true },
+        });
+
+        await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, actorKind);
+        return updated;
       });
       return res.json({ party });
     }
@@ -863,10 +1044,15 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
       throw new AppError('Cannot change status from current state', 403, 'FORBIDDEN');
     }
 
-    const updated = await prisma.party.update({
-      where: { id: partyId },
-      data: { underbossStatus: status },
-      select: { id: true, underbossStatus: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.party.update({
+        where: { id: partyId },
+        data: { underbossStatus: status },
+        select: { id: true, underbossStatus: true },
+      });
+
+      await writeStatusAudit(tx, partyId, party.underbossStatus, status, email, 'owner');
+      return result;
     });
 
     res.json({ party: updated });

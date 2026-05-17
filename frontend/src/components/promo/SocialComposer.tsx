@@ -17,7 +17,7 @@ interface SocialComposerProps {
 
 const PLATFORM_ORDER: SocialPlatform[] = ['twitter', 'instagram', 'facebook', 'linkedin'];
 
-const THREAD_LABELS = ['Post 1', 'Reply 1'];
+const THREAD_LABELS = ['Post 1'];
 
 // Platform icons as simple components
 function XIcon({ size = 16 }: { size?: number }) {
@@ -67,9 +67,10 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
   const { t } = useTranslation('host');
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>('twitter');
   const [postText, setPostText] = useState('');
-  const [threadPosts, setThreadPosts] = useState<string[]>(['', '']);
+  const [threadPosts, setThreadPosts] = useState<string[]>(['']);
   const [copied, setCopied] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
   const [shared, setShared] = useState<Record<SocialPlatform, boolean>>({
     twitter: false,
     instagram: false,
@@ -149,6 +150,25 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
     }
   };
 
+  const partnerXHandles = (party.coHosts ?? [])
+    .filter(c => c.showOnEvent === true && c.twitter && c.twitter.trim())
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      avatarUrl: c.avatar_url ?? null,
+      handle: c.twitter!.replace(/^@/, '').trim(),
+    }));
+
+  const handleCopyHandle = async (id: string, handle: string) => {
+    try {
+      await navigator.clipboard.writeText(handle);
+      setCopiedHandle(id);
+      setTimeout(() => setCopiedHandle(null), 1500);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   const updateThreadPost = (idx: number, value: string) => {
     setThreadPosts(prev => {
       const next = [...prev];
@@ -188,25 +208,71 @@ export const SocialComposer: React.FC<SocialComposerProps> = ({ party }) => {
 
       {/* Event Image Preview */}
       {party.eventImageUrl && (
-        <div className="rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface">
-          <div className="relative">
+        <div className="w-48 rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface">
+          <div className="relative w-48 h-48">
             <img
               src={party.eventImageUrl}
               alt={party.name}
-              className="w-full h-40 object-cover"
+              className="w-full h-full object-cover"
             />
             <button
               type="button"
               onClick={handleDownloadImage}
-              className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 hover:bg-black/90 text-theme-text text-xs font-medium px-3 py-1.5 rounded-lg transition-colors backdrop-blur-sm"
+              className="absolute bottom-2 right-2 flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-900 text-xs font-medium px-2 py-1 rounded-lg transition-colors shadow-sm"
             >
-              <Download size={14} />
+              <Download size={12} />
               {t('promo.downloadImage')}
             </button>
           </div>
           <div className="px-3 py-2 flex items-center gap-2 text-theme-text-muted text-xs">
             <Image size={12} />
             {t('promo.attachImage')}
+          </div>
+        </div>
+      )}
+
+      {/* Partner X-tag helper - only on Twitter/X tab */}
+      {isTwitter && partnerXHandles.length > 0 && (
+        <div className="rounded-lg border border-theme-stroke bg-theme-surface p-3">
+          <div className="text-xs text-theme-text-muted font-medium mb-1">
+            {t('promo.tagYourPartners')}
+          </div>
+          <div className="text-xs text-theme-text-muted/70 mb-2">
+            {t('promo.tagYourPartnersHint')}
+          </div>
+          <div className="space-y-1.5">
+            {partnerXHandles.map(p => (
+              <div key={p.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyHandle(p.id, p.handle)}
+                  aria-label={t('promo.copy')}
+                  title={t('promo.copy')}
+                  className="flex-shrink-0 p-1.5 rounded-md hover:bg-theme-surface-hover text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  {copiedHandle === p.id ? (
+                    <Check size={16} className="text-green-400" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                </button>
+                {p.avatarUrl ? (
+                  <img
+                    src={p.avatarUrl}
+                    alt={p.name}
+                    className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-theme-surface-hover text-theme-text-muted text-xs flex items-center justify-center flex-shrink-0">
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-theme-text truncate">{p.name}</div>
+                  <div className="text-xs text-theme-text-muted truncate">@{p.handle}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

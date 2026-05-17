@@ -1,0 +1,45 @@
+{
+  "step": {
+    "title": "후원하기",
+    "buyPizzaFor": "{{recipient}}을(를) 위해 피자 사기",
+    "buyPizzaForEvent": "{{eventName}}을(를) 위해 피자 사기",
+    "donateTitle": "후원",
+    "supportingRecipient": "{{recipient}} 지원",
+    "supportingEvent": "{{eventName}} 지원",
+    "defaultMessage": "이 이벤트가 성공적으로 개최되도록 후원해 주시겠습니까?",
+    "donorCount_one": "{{count}}명이 후원했습니다",
+    "donorCount_other": "{{count}}명이 후원했습니다",
+    "raised": "{{amount}} 모금됨",
+    "goal": "목표: ${{amount}}",
+    "recentSupporters": "최근 후원자:",
+    "anonymous": "익명",
+    "makeADonation": "후원하기",
+    "back": "뒤로"
+  },
+  "form": {
+    "payWithCard": "카드 또는 지갑으로 결제",
+    "cardSubtitle": "신용/체크 카드, Apple Pay, Google Pay 등",
+    "crypto": "암호화폐",
+    "cryptoSubtitle": "ETH, USDC 또는 기타 토큰",
+    "cancel": "취소",
+    "backToPaymentOptions": "결제 옵션으로 돌아가기",
+    "customAmount": "직접 입력",
+    "minimumDonation": "최소 후원 금액은 $0.50입니다",
+    "donate": "후원",
+    "donateAmount": "${{amount}} 후원",
+    "loading": "불러오는 중...",
+    "processing": "처리 중...",
+    "paymentFailed": "결제에 실패했습니다",
+    "unexpectedError": "예기치 않은 오류가 발생했습니다",
+    "failedToInitialize": "결제를 초기화하지 못했습니다. 다시 시도해 주세요.",
+    "thankYou": "감사합니다!",
+    "donationReceived": "${{amount}} 후원이 접수되었습니다.",
+    "back": "뒤로"
+  },
+  "calendar": {
+    "addToCalendar": "캘린더에 추가",
+    "googleCalendar": "Google 캘린더",
+    "appleCalendar": "Apple 캘린더",
+    "outlook": "Outlook"
+  }
+}

@@ -1,5 +1,6 @@
 import { Party } from '../../types';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
+import { countryNameToFlag } from '../../utils/countryFlag';
 
 /**
  * Get the public RSVP URL for the party.
@@ -138,59 +139,36 @@ export const EVENT_PLATFORMS: Record<EventPlatform, { name: string; color: strin
 };
 
 /**
- * Generate a Twitter/X thread (3 posts) for the party.
- * Post 1: Event name, date, location, CTA
- * Post 2: RSVP link only
- * Post 3: Hosts/co-hosts with Twitter handles
+ * Generate a Twitter/X post for the party (single-element array).
+ * Template:
+ *   \u{1F5FA}\u{FE0F}\u{1F355}\u{1F973}
+ *   Join us at {party.name}!
+ *   {rsvpUrl}
+ *
+ *   {partner @handles}   (only if any)
+ *
+ * Partner handles use the same filter as SocialComposer's partnerXHandles tag-list
+ * (visible co-host with a Twitter handle) so the post text and the tag-helper UI
+ * stay in sync.
  */
 export function generateTwitterThread(party: Party): string[] {
   const rsvpUrl = getRsvpUrl(party);
-  const dateStr = formatEventDateShort(party);
-  const location = getLocationString(party);
 
-  // Post 1: Main tweet
-  const post1Lines: string[] = [];
-  post1Lines.push(party.name);
-  if (party.date && location !== 'TBD') {
-    post1Lines.push(`${dateStr} at ${location}`);
-  } else if (party.date) {
-    post1Lines.push(dateStr);
-  } else if (location !== 'TBD') {
-    post1Lines.push(location);
+  const partnerHandles = (party.coHosts ?? [])
+    .filter(c => c.showOnEvent === true && c.twitter && c.twitter.trim())
+    .map(c => `@${c.twitter!.replace(/^@/, '').trim()}`)
+    .join(' ');
+
+  const lines: string[] = [
+    `${countryNameToFlag(party.country)}\u{1F355}\u{1F973}`,
+    `Join us at ${party.name}!`,
+    rsvpUrl,
+  ];
+  if (partnerHandles) {
+    lines.push('');
+    lines.push(partnerHandles);
   }
-  post1Lines.push('');
-  post1Lines.push('RSVP Below \u{1F447}');
-  const post1 = post1Lines.join('\n');
-
-  // Post 2: RSVP link + hosts
-  const post2Lines: string[] = [`RSVP at ${rsvpUrl}`];
-  post2Lines.push('');
-  post2Lines.push('At the event, connect w/:');
-
-  // Primary host
-  if (party.hostProfile?.twitter) {
-    const handle = party.hostProfile.twitter.replace(/^@/, '');
-    post2Lines.push(`@${handle}`);
-  } else if (party.hostName) {
-    post2Lines.push(party.hostName);
-  }
-
-  // Co-hosts (only those shown on event)
-  if (party.coHosts) {
-    for (const coHost of party.coHosts) {
-      if (coHost.showOnEvent === false) continue;
-      if (coHost.twitter) {
-        const handle = coHost.twitter.replace(/^@/, '');
-        post2Lines.push(`@${handle}`);
-      } else {
-        post2Lines.push(coHost.name);
-      }
-    }
-  }
-
-  const post2 = post2Lines.join('\n');
-
-  return [post1, post2];
+  return [lines.join('\n')];
 }
 
 /**

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send } from 'lucide-react';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send, Star } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
 import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
@@ -29,6 +29,7 @@ interface MergedCity {
   region: string;
   chatUrl: string;
   status: CityStatusValue;
+  priority: boolean;
   isAuto: boolean; // true if status came from matching event (no DB override)
   matchedEventUrl: string | null; // link to the matching event if auto-detected
   photoCount: number;
@@ -82,7 +83,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | CityStatusValue>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | CityStatusValue | 'priority'>('all');
   const [sortField, setSortField] = useState<SortField>('city');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -178,6 +179,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         status = 'todo';
       }
 
+      const priority = dbStatus?.priority === true;
+
       const gppKey = sc.city.toLowerCase().replace(/\s+/g, '');
 
       return {
@@ -188,6 +191,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         region: sc.region,
         chatUrl: sc.chatUrl,
         status,
+        priority,
         isAuto,
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
         photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0) + (gppCounts[gppKey] || 0),
@@ -233,7 +237,9 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     }
 
     // Status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'priority') {
+      result = result.filter((c) => c.priority);
+    } else if (statusFilter !== 'all') {
       result = result.filter((c) => c.status === statusFilter);
     }
 
@@ -260,14 +266,19 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
     return result;
   }, [mergedCities, meData, selectedRegions, search, statusFilter, sortField, sortDir]);
 
-  // Optimistic status update
+  // Optimistic status / priority update
   const handleStatusChange = useCallback(
-    async (cityKey: string, newStatus: CityStatusValue) => {
+    async (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => {
+      if (patch.status === undefined && patch.priority === undefined) return;
+
       // Optimistic: update local state immediately
       const previousStatuses = { ...cityStatuses };
+      const existing = cityStatuses[cityKey];
+      const nextStatus: CityStatusValue = (patch.status ?? (existing?.status as CityStatusValue) ?? 'todo');
+      const nextPriority: boolean = patch.priority ?? existing?.priority ?? false;
 
-      if (newStatus === 'todo') {
-        // Remove from map (default)
+      if (nextStatus === 'todo' && nextPriority === false) {
+        // Default — remove from map
         setCityStatuses((prev) => {
           const next = { ...prev };
           delete next[cityKey];
@@ -277,15 +288,16 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         setCityStatuses((prev) => ({
           ...prev,
           [cityKey]: {
-            status: newStatus,
-            updatedBy: null,
+            status: nextStatus,
+            priority: nextPriority,
+            updatedBy: prev[cityKey]?.updatedBy ?? null,
             updatedAt: new Date().toISOString(),
           },
         }));
       }
 
       try {
-        await updateCityStatus(cityKey, newStatus);
+        await updateCityStatus(cityKey, patch);
       } catch (err) {
         // Revert on error
         setCityStatuses(previousStatuses);
@@ -293,6 +305,13 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       }
     },
     [cityStatuses]
+  );
+
+  const handleTogglePriority = useCallback(
+    (cityKey: string, priority: boolean) => {
+      handleStatusChange(cityKey, { priority });
+    },
+    [handleStatusChange]
   );
 
   const toggleSelect = useCallback((key: string) => {
@@ -317,7 +336,19 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const keys = Array.from(selectedKeys);
       // Optimistic updates
       for (const key of keys) {
-        handleStatusChange(key, newStatus);
+        handleStatusChange(key, { status: newStatus });
+      }
+      setSelectedKeys(new Set());
+      setShowActionDropdown(false);
+    },
+    [selectedKeys, handleStatusChange]
+  );
+
+  const handleBulkPriority = useCallback(
+    async (newPriority: boolean) => {
+      const keys = Array.from(selectedKeys);
+      for (const key of keys) {
+        handleStatusChange(key, { priority: newPriority });
       }
       setSelectedKeys(new Set());
       setShowActionDropdown(false);
@@ -335,9 +366,10 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
 
   // Counts for header
   const statusCounts = useMemo(() => {
-    const counts = { created: 0, skip: 0, todo: 0, total: 0 };
+    const counts = { created: 0, skip: 0, todo: 0, priority: 0, total: 0 };
     for (const c of mergedCities) {
       counts[c.status]++;
+      if (c.priority) counts.priority++;
       counts.total++;
     }
     return counts;
@@ -420,6 +452,17 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         >
           {t('cities.statusSkipCount', { count: statusCounts.skip })}
         </button>
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'priority' ? 'all' : 'priority')}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium transition-all cursor-pointer ${
+            statusFilter === 'priority'
+              ? 'bg-yellow-400/30 text-yellow-700 ring-1 ring-yellow-400/40'
+              : 'bg-yellow-400/15 text-yellow-700 hover:bg-yellow-400/25'
+          }`}
+        >
+          <Star size={10} className="fill-yellow-400 text-yellow-400" />
+          {t('cities.statusPriorityCount', { count: statusCounts.priority })}
+        </button>
       </div>
 
       {/* Search + filters */}
@@ -444,6 +487,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
           <option value="created">{t('cities.statusCreated')}</option>
           <option value="todo">{t('cities.statusTodo')}</option>
           <option value="skip">{t('cities.statusSkip')}</option>
+          <option value="priority">{t('cities.statusPriority')}</option>
         </select>
       </div>
 
@@ -473,6 +517,13 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
                     </button>
                     <button onClick={() => handleBulkStatus('skip')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-theme-surface transition-colors">
                       {t('cities.setSkip')}
+                    </button>
+                    <div className="border-t border-theme-stroke my-1" />
+                    <button onClick={() => handleBulkPriority(true)} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-theme-surface transition-colors">
+                      {t('cities.markPriority')}
+                    </button>
+                    <button onClick={() => handleBulkPriority(false)} className="w-full text-left px-4 py-2 text-sm text-theme-text-secondary hover:bg-theme-surface transition-colors">
+                      {t('cities.unmarkPriority')}
                     </button>
                     {onTelegramBroadcast && (
                       <>
@@ -532,6 +583,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
                 key={city.key}
                 city={city}
                 onStatusChange={handleStatusChange}
+                onTogglePriority={handleTogglePriority}
                 isSelected={selectedKeys.has(city.key)}
                 onToggleSelect={toggleSelect}
               />
@@ -550,7 +602,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       {/* Cards (mobile) */}
       <div className="md:hidden space-y-2">
         {filteredCities.map((city) => (
-          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
+          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} onTogglePriority={handleTogglePriority} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
         ))}
         {filteredCities.length === 0 && (
           <p className="py-8 text-center text-theme-text-faint text-sm">
@@ -732,11 +784,13 @@ function CityPhotoLightbox({
 function CityRow({
   city,
   onStatusChange,
+  onTogglePriority,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
-  onStatusChange: (cityKey: string, status: CityStatusValue) => void;
+  onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
+  onTogglePriority: (cityKey: string, priority: boolean) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -849,10 +903,24 @@ function CityRow({
           </button>
         </td>
         <td className="py-2.5 px-3">
-          <StatusToggle
-            currentStatus={city.status}
-            onStatusChange={(status) => onStatusChange(city.key, status)}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onTogglePriority(city.key, !city.priority)}
+              className={`p-1.5 rounded transition-colors ${
+                city.priority
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'text-theme-text-faint hover:text-yellow-400'
+              }`}
+              title={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+              aria-label={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+            >
+              <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
+            </button>
+            <StatusToggle
+              currentStatus={city.status}
+              onStatusChange={(status) => onStatusChange(city.key, { status })}
+            />
+          </div>
         </td>
       </tr>
       {expanded && (
@@ -918,11 +986,13 @@ function CityRow({
 function CityCard({
   city,
   onStatusChange,
+  onTogglePriority,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
-  onStatusChange: (cityKey: string, status: CityStatusValue) => void;
+  onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
+  onTogglePriority: (cityKey: string, priority: boolean) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -1015,10 +1085,24 @@ function CityCard({
         </div>
         <span>{GPP_REGIONS.find((r) => r.id === city.region.toLowerCase().replace(/\s+/g, '-'))?.label || city.region}</span>
       </div>
-      <StatusToggle
-        currentStatus={city.status}
-        onStatusChange={(status) => onStatusChange(city.key, status)}
-      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onTogglePriority(city.key, !city.priority)}
+          className={`p-1.5 rounded transition-colors ${
+            city.priority
+              ? 'fill-yellow-400 text-yellow-400'
+              : 'text-theme-text-faint hover:text-yellow-400'
+          }`}
+          title={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+          aria-label={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
+        >
+          <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
+        </button>
+        <StatusToggle
+          currentStatus={city.status}
+          onStatusChange={(status) => onStatusChange(city.key, { status })}
+        />
+      </div>
       {expanded && (
         <div className="pt-2 border-t border-theme-stroke/50">
           {photosLoading ? (

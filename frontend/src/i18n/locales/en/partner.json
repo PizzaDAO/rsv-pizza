@@ -49,7 +49,9 @@
     "uniqueClicks": "({{count}} unique)",
     "privateNotes": "Private notes for this event...",
     "notes": "Notes",
-    "done": "Done"
+    "done": "Done",
+    "newsletterPizzadao": "PizzaDAO",
+    "newsletterSwc": "SWC"
   },
   "empty": {
     "noEventsFiltered": "No events match your filters.",
@@ -221,7 +223,17 @@
     "showingCountOfTotal": "Showing {{count}} of {{total}} events",
     "showingCount": "Showing {{count}} events",
     "taggedSuffix": " tagged \"{{tag}}\"",
-    "photosCountOf": "{{current}} of {{total}}"
+    "photosCountOf": "{{current}} of {{total}}",
+    "newsletterPizzadao": "PizzaDAO Newsletter",
+    "newsletterSwc": "SWC Newsletter",
+    "newsletterSwcRegion": {
+      "global": "Global",
+      "canada": "Canada",
+      "australia": "Australia",
+      "europe": "Europe",
+      "uk": "UK",
+      "brazil": "Brazil"
+    }
   },
   "cities": {
     "loading": "Loading cities...",
@@ -233,6 +245,12 @@
     "statusCreatedCount": "{{count}} Created",
     "statusTodoCount": "{{count}} To Do",
     "statusSkipCount": "{{count}} Skip",
+    "statusPriority": "Priority",
+    "statusPriorityCount": "{{count}} priority",
+    "markPriority": "★ Mark Priority",
+    "unmarkPriority": "☆ Unmark Priority",
+    "markPriorityTitle": "Mark as priority",
+    "unmarkPriorityTitle": "Unmark as priority",
     "noCitiesMatch": "No cities match your filters",
     "noCitiesSelected": "No cities selected",
     "selected": "{{count}} selected",
@@ -320,13 +338,48 @@
     "sendingToGroups_other": "Sending to {{count}} groups...",
     "sendingSubtext": "This may take a moment",
     "done": "Done",
+    "recipients": {
+      "label": "Recipients",
+      "groups": "Groups",
+      "hosts": "Hosts",
+      "both": "Both"
+    },
+    "hostsList": {
+      "title": "Select Hosts",
+      "noConnectedHosts": "No hosts have connected their Telegram yet",
+      "notConnected": "Not connected",
+      "connected": "Connected"
+    },
+    "unknownHost": "Unknown host",
+    "sendToHosts": "Send to {{count}} host",
+    "sendToHosts_other": "Send to {{count}} hosts",
+    "sendToBoth": "Send to {{groups}} group + {{hosts}} host",
+    "sendToBoth_other": "Send to {{groups}} groups + {{hosts}} hosts",
+    "confirmSendHosts": "Send this DM to {{count}} host?",
+    "confirmSendHosts_other": "Send this DM to {{count}} hosts?",
     "tableHeaders": {
       "city": "City",
       "country": "Country",
       "underboss": "Underboss",
       "hostTg": "Host TG",
-      "test": "Test"
+      "test": "Test",
+      "host": "Host",
+      "status": "Status"
+    },
+    "results": {
+      "groupsSection": "Group chats",
+      "hostsSection": "Host DMs",
+      "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
     }
+  },
+  "hostConnect": {
+    "buttonConnect": "Connect your Telegram to receive PizzaDAO DMs",
+    "helperConnect": "Click to open Telegram. Tap Start in the bot to confirm. We'll only DM you about your event.",
+    "connected": "Telegram connected",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting...",
+    "connectError": "Couldn't generate connect link — please try again"
   },
   "eventRow": {
     "notesPlaceholder": "Underboss notes...",
@@ -379,5 +432,21 @@
     "reset": "Reset",
     "download": "Download",
     "generating": "Generating..."
+  },
+  "timeSeries": {
+    "title": "Activity over time",
+    "subtitle": "RSVPs, impressions, and clicks across all events",
+    "rsvps": "RSVPs",
+    "impressions": "Impressions",
+    "clicks": "Clicks",
+    "range": {
+      "6hr": "6h",
+      "24hr": "24h",
+      "3d": "3d",
+      "7d": "7d"
+    },
+    "loading": "Loading chart...",
+    "error": "Failed to load chart data.",
+    "empty": "No activity in this range yet."
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
@@ -17,6 +17,7 @@ interface EventTableProps {
   onBulkAction?: () => void;
   onTelegramBroadcast?: (cities: string[]) => void;
   partnerTags?: string[];
+  onFilteredEventsChange?: (events: UnderbossEvent[]) => void;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
@@ -87,7 +88,7 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [] }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange }: EventTableProps) {
   const { t } = useTranslation('partner');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
@@ -241,6 +242,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
     return result;
   }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold]);
+
+  useEffect(() => {
+    onFilteredEventsChange?.(filteredEvents);
+  }, [filteredEvents, onFilteredEventsChange]);
 
   const availableTags = useMemo(
     () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),

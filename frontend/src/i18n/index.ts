@@ -79,6 +79,17 @@ import deCheckin from './locales/de/checkin.json';
 import deHost from './locales/de/host.json';
 import deAdmin from './locales/de/admin.json';
 import dePartner from './locales/de/partner.json';
+import koCommon from './locales/ko/common.json';
+import koRsvp from './locales/ko/rsvp.json';
+import koEvent from './locales/ko/event.json';
+import koAuth from './locales/ko/auth.json';
+import koDonation from './locales/ko/donation.json';
+import koGpp from './locales/ko/gpp.json';
+import koAccount from './locales/ko/account.json';
+import koCheckin from './locales/ko/checkin.json';
+import koHost from './locales/ko/host.json';
+import koAdmin from './locales/ko/admin.json';
+import koPartner from './locales/ko/partner.json';
 
 i18n
   .use(LanguageDetector)
@@ -175,6 +186,19 @@ i18n
         host: deHost,
         admin: deAdmin,
         partner: dePartner,
+      },
+      ko: {
+        common: koCommon,
+        rsvp: koRsvp,
+        event: koEvent,
+        auth: koAuth,
+        donation: koDonation,
+        gpp: koGpp,
+        account: koAccount,
+        checkin: koCheckin,
+        host: koHost,
+        admin: koAdmin,
+        partner: koPartner,
       },
     },
     fallbackLng: 'en',
