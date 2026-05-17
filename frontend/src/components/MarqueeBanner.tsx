@@ -2,8 +2,8 @@ import React from 'react';
 
 const CONTENT = (
   <>
-    <span className="text-white/80">find other cities at </span>
-    <span className="text-white">globalpizza.party</span>
+    <span style={{ color: '#FFFFFF', opacity: 0.8 }}>find other cities at </span>
+    <span style={{ color: '#FFFFFF' }}>globalpizza.party</span>
   </>
 );
 
