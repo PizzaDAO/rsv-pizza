@@ -20,6 +20,7 @@ import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
+import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { PostComposerPage } from './pages/PostComposerPage';
@@ -55,6 +56,8 @@ function App() {
             <Route path="/map" element={<EventsMapPage />} />
             {/* /partners must come before /:slug */}
             <Route path="/partners" element={<PartnersPage />} />
+            {/* /payments must come before /:slug */}
+            <Route path="/payments" element={<PaymentsAdminPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
