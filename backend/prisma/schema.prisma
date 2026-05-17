@@ -1295,6 +1295,20 @@ model AppConfig {
 }
 
 // ============================================
+// Experiment Flags (kill switches)
+// ============================================
+
+model ExperimentFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  updatedBy   String?  @map("updated_by")
+
+  @@map("experiment_flags")
+}
+
+// ============================================
 // Quiz Models
 // ============================================
 

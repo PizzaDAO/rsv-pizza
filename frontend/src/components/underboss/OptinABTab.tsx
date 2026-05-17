@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { fetchOptinABResults } from '../../lib/api';
-import type { OptinABResults, OptinABArm } from '../../lib/api';
+import { fetchOptinABResults, fetchExperimentFlags, setExperimentFlag } from '../../lib/api';
+import type { OptinABResults, OptinABArm, ExperimentFlag } from '../../lib/api';
+import { Checkbox } from '../Checkbox';
+
+const FLAG_KEY = 'optin_ab_pizzadao_partners';
 
 // MDE sample-size targets (per arm).
 const N_10PP = 330;
@@ -99,6 +102,10 @@ export function OptinABTab() {
   const [data, setData] = useState<OptinABResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [flag, setFlag] = useState<ExperimentFlag | null>(null);
+  const [flagLoading, setFlagLoading] = useState(true);
+  const [showConfirm, setShowConfirm] = useState<null | { nextEnabled: boolean }>(null);
+  const [flipping, setFlipping] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -115,6 +122,17 @@ export function OptinABTab() {
 
   useEffect(() => {
     void load();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setFlagLoading(true);
+      const flags = await fetchExperimentFlags();
+      if (flags) {
+        setFlag(flags.find((f) => f.key === FLAG_KEY) ?? null);
+      }
+      setFlagLoading(false);
+    })();
   }, []);
 
   const control = data?.arms.find((a) => a.arm === 'control');
@@ -163,6 +181,73 @@ export function OptinABTab() {
 
       {error && !loading && (
         <p className="text-theme-text-muted text-center py-8">{error}</p>
+      )}
+
+      <div className="mt-6 mb-6 p-4 border border-theme-stroke rounded-xl bg-theme-surface">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-theme-text">Experiment kill switch</div>
+            <div className="text-xs text-theme-text-muted mt-1">
+              {flagLoading ? 'Loading…' : flag?.description ?? 'Flag not found'}
+            </div>
+            {flag && (
+              <div className="text-[11px] text-theme-text-faint mt-2">
+                Last changed {new Date(flag.updatedAt).toLocaleString()}
+                {flag.updatedBy ? ` by ${flag.updatedBy}` : ''}
+              </div>
+            )}
+          </div>
+          <Checkbox
+            checked={!!flag?.enabled}
+            onChange={() => {
+              if (!flag || flagLoading || flipping) return;
+              setShowConfirm({ nextEnabled: !flag.enabled });
+            }}
+            label={flag?.enabled ? 'ON' : 'OFF'}
+            labelClassName={`text-sm font-semibold ${flag?.enabled ? 'text-[#E52828]' : 'text-theme-text-muted'}`}
+            disabled={!flag || flagLoading || flipping}
+          />
+        </div>
+      </div>
+
+      {showConfirm && flag && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !flipping && setShowConfirm(null)}
+        >
+          <div className="card p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-theme-text mb-2">
+              Turn experiment {showConfirm.nextEnabled ? 'ON' : 'OFF'}?
+            </h3>
+            <p className="text-sm text-theme-text-secondary mb-4">
+              {showConfirm.nextEnabled
+                ? 'Variant arm will start receiving traffic on US (swc) RSVPs. ~50% of new RSVPs on swc-tagged events will see the combined PizzaDAO + partners checkbox.'
+                : 'All US (swc) RSVPs revert to the two-checkbox baseline. Existing variant-bucketed guests keep their assignment for edit-RSVP and analytics.'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowConfirm(null)}
+                disabled={flipping}
+                className="px-4 py-2 text-sm text-theme-text-secondary hover:bg-white/40 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setFlipping(true);
+                  const updated = await setExperimentFlag(FLAG_KEY, showConfirm.nextEnabled);
+                  if (updated) setFlag(updated);
+                  setFlipping(false);
+                  setShowConfirm(null);
+                }}
+                disabled={flipping}
+                className="px-4 py-2 text-sm font-medium bg-[#E52828] text-white rounded-lg hover:bg-[#CC2020] disabled:opacity-50"
+              >
+                {flipping ? 'Saving…' : `Turn ${showConfirm.nextEnabled ? 'ON' : 'OFF'}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {data && control && variant && (

@@ -2033,4 +2033,18 @@ export async function saveUserPreferences(
   }
 }
 
+export async function getExperimentFlag(key: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('experiment_flags')
+      .select('enabled')
+      .eq('key', key)
+      .single();
+    if (error || !data) return false;
+    return data.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
 // ============================================
