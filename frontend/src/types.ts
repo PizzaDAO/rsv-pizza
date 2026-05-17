@@ -1362,3 +1362,77 @@ export interface UnifiedPartner {
   website: string | null;
   sortOrder: number;
 }
+
+// ============================================
+// Host Payouts (arugula-38633)
+// ============================================
+export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed';
+export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
+
+export interface PayoutDocument {
+  id: string;
+  kind: 'pizza' | 'receipt';
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  ocrError: string | null;
+  sortOrder: number;
+}
+
+export interface BankDetails {
+  accountHolderName: string;
+  bankName: string;
+  bankAddress?: string;
+  // US bank
+  routingNumber?: string;
+  accountNumber?: string;
+  // International
+  iban?: string;
+  swift?: string;
+  // Free-form notes (e.g. intermediary bank)
+  notes?: string;
+}
+
+export interface Payout {
+  id: string;
+  partyId: string;
+  hostUserId: string;
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  extractedAmountUsd: number;
+  finalAmountUsd: number;
+  status: PayoutStatus;
+  payoutMethod: PayoutMethod;
+  payoutWalletAddress: string | null;
+  payoutBankDetails: BankDetails | null;
+  mercuryCardId: string | null;
+  mercuryCardLast4: string | null;
+  hostNotes: string | null;
+  adminNotes: string | null;
+  rejectionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  paidAt: string | null;
+  transactionHash: string | null;
+  wireReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documents: PayoutDocument[];
+}
+
+export interface OcrPreviewResult {
+  amount: number;             // USD-converted total
+  currency: 'USD';
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  confidence: number;
+  items?: string[];
+  fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
+  conversionNote?: string;
+}

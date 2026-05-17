@@ -32,6 +32,7 @@ import venueReportRoutes from './routes/venue-report.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import payoutRoutes from './routes/payout.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
@@ -140,6 +141,7 @@ app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake form routes
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
