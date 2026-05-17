@@ -933,3 +933,123 @@ sponsorDashboardRouter.post('/checklist/:itemId/toggle', requireAuth, requireSpo
     next(error);
   }
 });
+
+// GET /api/sponsor/events/timeseries - Admin-only time-series data (RSVPs / impressions / clicks per hour)
+// Buckets hour-by-hour across one of four ranges: 6hr / 24hr / 3d / 7d (default 24hr).
+sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    // Admin-only — partners do not see this chart
+    if (!req.isAdminViewing) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    // Range gating
+    const rangeParam = (req.query.range as string | undefined)?.trim().toLowerCase();
+    const validRanges = ['6hr', '24hr', '3d', '7d'] as const;
+    type RangeKey = typeof validRanges[number];
+    const range: RangeKey = (validRanges as readonly string[]).includes(rangeParam || '')
+      ? (rangeParam as RangeKey)
+      : '24hr';
+
+    const rangeHoursMap: Record<RangeKey, number> = {
+      '6hr': 6,
+      '24hr': 24,
+      '3d': 72,
+      '7d': 168,
+    };
+    const hoursBack = rangeHoursMap[range];
+    const sinceDate = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+
+    // Resolve which events the chart should cover, using the same logic as GET /events
+    const queryTag = req.query.tag as string | undefined;
+    const tag = queryTag?.trim().toLowerCase() || undefined;
+
+    const where: any = {};
+    if (tag && tag !== 'pizzadao') {
+      where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      where.eventType = 'gpp';
+    } else {
+      // Admin with no tag filter — all GPP events that have at least one eventTag
+      where.eventType = 'gpp';
+      where.NOT = { eventTags: { equals: [] } };
+    }
+
+    const events = await prisma.party.findMany({
+      where,
+      select: { id: true },
+    });
+    const eventIds = events.map(e => e.id);
+
+    if (eventIds.length === 0) {
+      return res.json({
+        range,
+        bucket: 'hour' as const,
+        since: sinceDate.toISOString(),
+        points: [],
+      });
+    }
+
+    // Three hour-bucketed aggregations
+    const pageViewRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', viewed_at) as bucket, COUNT(*)::bigint as count
+      FROM page_views
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND viewed_at >= ${sinceDate}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const linkClickRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', clicked_at) as bucket, COUNT(*)::bigint as count
+      FROM link_clicks
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND clicked_at >= ${sinceDate}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const rsvpRows = await prisma.$queryRaw<{ bucket: Date; count: bigint }[]>`
+      SELECT date_trunc('hour', submitted_at) as bucket, COUNT(*)::bigint as count
+      FROM guests
+      WHERE party_id::text IN (${Prisma.join(eventIds)})
+      AND submitted_at >= ${sinceDate}
+      AND status != 'INVITED'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    // Build a dense hour-aligned series so the chart has zero-value points (avoids visual gaps)
+    const startHour = new Date(sinceDate);
+    startHour.setMinutes(0, 0, 0);
+    const nowHour = new Date();
+    nowHour.setMinutes(0, 0, 0);
+
+    const rsvpMap = new Map<string, number>();
+    for (const r of rsvpRows) rsvpMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+    const viewsMap = new Map<string, number>();
+    for (const r of pageViewRows) viewsMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+    const clicksMap = new Map<string, number>();
+    for (const r of linkClickRows) clicksMap.set(new Date(r.bucket).toISOString(), Number(r.count));
+
+    const points: { timestamp: string; rsvps: number; impressions: number; clicks: number }[] = [];
+    for (let t = startHour.getTime(); t <= nowHour.getTime(); t += 60 * 60 * 1000) {
+      const iso = new Date(t).toISOString();
+      points.push({
+        timestamp: iso,
+        rsvps: rsvpMap.get(iso) || 0,
+        impressions: viewsMap.get(iso) || 0,
+        clicks: clicksMap.get(iso) || 0,
+      });
+    }
+
+    res.json({
+      range,
+      bucket: 'hour' as const,
+      since: sinceDate.toISOString(),
+      points,
+    });
+  } catch (error) {
+    next(error);
+  }
+});

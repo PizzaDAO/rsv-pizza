@@ -432,5 +432,21 @@
     "reset": "Reset",
     "download": "Download",
     "generating": "Generating..."
+  },
+  "timeSeries": {
+    "title": "Activity over time",
+    "subtitle": "RSVPs, impressions, and clicks across all events",
+    "rsvps": "RSVPs",
+    "impressions": "Impressions",
+    "clicks": "Clicks",
+    "range": {
+      "6hr": "6h",
+      "24hr": "24h",
+      "3d": "3d",
+      "7d": "7d"
+    },
+    "loading": "Loading chart...",
+    "error": "Failed to load chart data.",
+    "empty": "No activity in this range yet."
   }
 }
