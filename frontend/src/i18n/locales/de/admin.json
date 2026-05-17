@@ -29,6 +29,8 @@
     "noAdmins": "Keine Admins gefunden",
     "superAdmin": "Super-Admin",
     "admin": "Admin",
+    "paymentAdmin": "Payment Admin",
+    "paymentAdminDesc": "Manages host reimbursements only — cannot edit parties or other admins.",
     "removeAdmin": "Admin entfernen",
     "tableHeaders": {
       "email": "E-Mail",
