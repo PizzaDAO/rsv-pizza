@@ -47,6 +47,12 @@ export interface FakeDetectionLinkClick {
   clickedAt: Date;
 }
 
+export interface FakeDetectionFunnelEvent {
+  visitorHash: string;
+  step: string;
+  createdAt: Date;
+}
+
 export interface FlagResult {
   id: string;
   name: string;
@@ -94,6 +100,8 @@ export const WEIGHTS = {
   low_hour_entropy: 7,
   rapid_intersubmission: 8,
   cross_event_wallet: 15,
+  low_funnel_coverage: 10,
+  high_per_visitor_rsvp_saturation: 15,
 } as const;
 
 // ============================================
@@ -541,6 +549,74 @@ export function checkCrossEventWallet(
   );
 }
 
+/**
+ * 15. low_funnel_coverage — unique `rsvp_opened` visitors are too few relative to direct RSVPs.
+ * Indicates RSVPs were not preceded by real page-open events (bot/scripted submissions).
+ */
+export function checkLowFunnelCoverage(
+  guests: FakeDetectionGuest[],
+  funnelEvents: FakeDetectionFunnelEvent[],
+): FlagResult {
+  const id = 'low_funnel_coverage';
+  const n = guests.length;
+  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  const opened = funnelEvents.filter(e => e.step === 'rsvp_opened');
+  const uniqueVisitors = new Set(opened.map(e => e.visitorHash)).size;
+  const ratio = uniqueVisitors / n;
+  const fired = ratio < 0.15;
+  return flag(
+    id,
+    fired,
+    `coverage=${uniqueVisitors}/${n} (${(ratio * 100).toFixed(1)}%)`,
+    { uniqueVisitors, linkRsvpCount: n, ratio },
+  );
+}
+
+/**
+ * 16. high_per_visitor_rsvp_saturation — one visitor's funnel timestamps temporally match many guest submissions.
+ * Temporal join: for each visitorHash's funnel `createdAt` values, count distinct guests whose
+ * `submittedAt` is within ±10 min of any of that visitor's funnel timestamps. Fires if max ≥ 5.
+ * (Needed because the unique index on (partyId, visitorHash, step) caps naive per-visitor row counts at 2.)
+ */
+export function checkHighPerVisitorRsvpSaturation(
+  guests: FakeDetectionGuest[],
+  funnelEvents: FakeDetectionFunnelEvent[],
+): FlagResult {
+  const id = 'high_per_visitor_rsvp_saturation';
+  if (funnelEvents.length === 0 || guests.length === 0) {
+    return flag(id, false, 'no funnel data');
+  }
+  const TEN_MIN = 10 * 60 * 1000;
+  const byVisitor = new Map<string, number[]>();
+  for (const e of funnelEvents) {
+    const arr = byVisitor.get(e.visitorHash) ?? [];
+    arr.push(e.createdAt.getTime());
+    byVisitor.set(e.visitorHash, arr);
+  }
+  let max = 0;
+  let worstVisitor = '';
+  for (const [visitor, timestamps] of byVisitor) {
+    const matched = new Set<string>();
+    for (const g of guests) {
+      const gms = g.submittedAt.getTime();
+      if (timestamps.some(t => Math.abs(t - gms) <= TEN_MIN)) {
+        matched.add(g.id ?? `${g.email ?? g.name}-${gms}`);
+      }
+    }
+    if (matched.size > max) {
+      max = matched.size;
+      worstVisitor = visitor;
+    }
+  }
+  const fired = max >= 5;
+  return flag(
+    id,
+    fired,
+    `max=${max} guests matched to one device`,
+    { max, visitorHash: worstVisitor.slice(0, 8) },
+  );
+}
+
 // ============================================
 // Aggregator
 // ============================================
@@ -558,6 +634,7 @@ export function scoreEvent(
   linkClicks: FakeDetectionLinkClick[],
   sybilWallets: Set<string>,
   maxGuests: number | null,
+  funnelEvents: FakeDetectionFunnelEvent[] = [],
 ): FakeDetectionRow {
   const guests = filterDirectRsvps(allGuests);
 
@@ -577,6 +654,8 @@ export function scoreEvent(
     checkLowHourEntropy(guests, party),
     checkRapidIntersubmission(guests),
     checkCrossEventWallet(guests, sybilWallets),
+    checkLowFunnelCoverage(guests, funnelEvents),
+    checkHighPerVisitorRsvpSaturation(guests, funnelEvents),
   ];
 
   const score = Math.min(
