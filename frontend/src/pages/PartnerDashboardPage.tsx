@@ -1121,62 +1121,61 @@ function EventCard({ event, onToggleChecklist, cityChats, isAdmin = false }: Eve
                 </div>
               )}
             </div>
-            {((event.impressions && event.impressions.totalViews > 0) || (event.clickStats && event.clickStats.totalClicks > 0)) && (
-              <div className="flex items-center gap-3 text-xs text-theme-text-muted">
-                {event.impressions && event.impressions.totalViews > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Eye size={12} />
-                    <span>{t('dashboard.viewsCount', { count: event.impressions.totalViews.toLocaleString() })}</span>
-                    <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.impressions.uniqueVisitors.toLocaleString() })}</span>
-                  </div>
-                )}
-                {event.clickStats && event.clickStats.totalClicks > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <MousePointerClick size={12} />
-                    <span>{t('dashboard.clicksCount', { count: event.clickStats.totalClicks })}</span>
-                    {event.clickStats.uniqueClickers > 0 && (
-                      <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.clickStats.uniqueClickers })}</span>
-                    )}
-                    {event.clickStats.byLink && event.clickStats.byLink.length > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        {(() => {
-                          const platformCounts: Record<string, number> = {};
-                          for (const link of event.clickStats.byLink!) {
-                            const p = detectPlatform(link.url);
-                            platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
-                          }
-                          return Object.entries(platformCounts)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([platform, clicks]) => (
-                              <span
-                                key={platform}
-                                className="inline-flex items-center gap-0.5 text-theme-text-muted"
-                                title={`${platform}: ${clicks}`}
-                              >
-                                <PlatformIcon platform={platform} size={11} />
-                                <span className="font-semibold text-[10px]">{clicks}</span>
-                              </span>
-                            ));
-                        })()}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            {isAdmin && event.newsletterSignups && (() => {
-              const n = event.newsletterSignups;
-              const swcSum = n.swc + n.swcCa + n.swcAu + n.swcEu + n.swcUk + n.swcBr;
-              if (n.pizzadao === 0 && swcSum === 0) return null;
+            {(() => {
+              const hasViews = !!(event.impressions && event.impressions.totalViews > 0);
+              const hasClicks = !!(event.clickStats && event.clickStats.totalClicks > 0);
+              const n = isAdmin ? event.newsletterSignups : undefined;
+              const swcSum = n ? (n.swc + n.swcCa + n.swcAu + n.swcEu + n.swcUk + n.swcBr) : 0;
+              const hasNewsletter = !!n && (n.pizzadao > 0 || swcSum > 0);
+              if (!hasViews && !hasClicks && !hasNewsletter) return null;
               return (
-                <div className="flex items-center gap-3 text-xs text-theme-text-muted">
-                  {n.pizzadao > 0 && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-theme-text-muted">
+                  {hasViews && (
+                    <div className="flex items-center gap-1.5">
+                      <Eye size={12} />
+                      <span>{t('dashboard.viewsCount', { count: event.impressions!.totalViews.toLocaleString() })}</span>
+                      <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.impressions!.uniqueVisitors.toLocaleString() })}</span>
+                    </div>
+                  )}
+                  {hasClicks && (
+                    <div className="flex items-center gap-1.5">
+                      <MousePointerClick size={12} />
+                      <span>{t('dashboard.clicksCount', { count: event.clickStats!.totalClicks })}</span>
+                      {event.clickStats!.uniqueClickers > 0 && (
+                        <span className="text-theme-text-muted/50">{t('dashboard.uniqueParen', { count: event.clickStats!.uniqueClickers })}</span>
+                      )}
+                      {event.clickStats!.byLink && event.clickStats!.byLink.length > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          {(() => {
+                            const platformCounts: Record<string, number> = {};
+                            for (const link of event.clickStats!.byLink!) {
+                              const p = detectPlatform(link.url);
+                              platformCounts[p] = (platformCounts[p] || 0) + link.clicks;
+                            }
+                            return Object.entries(platformCounts)
+                              .sort((a, b) => b[1] - a[1])
+                              .map(([platform, clicks]) => (
+                                <span
+                                  key={platform}
+                                  className="inline-flex items-center gap-0.5 text-theme-text-muted"
+                                  title={`${platform}: ${clicks}`}
+                                >
+                                  <PlatformIcon platform={platform} size={11} />
+                                  <span className="font-semibold text-[10px]">{clicks}</span>
+                                </span>
+                              ));
+                          })()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {hasNewsletter && n!.pizzadao > 0 && (
                     <span className="flex items-center gap-1.5">
                       <Mail size={12} />
-                      <span>{t('eventCard.newsletterPizzadao')}: <span className="font-semibold text-theme-text">{n.pizzadao}</span></span>
+                      <span>{t('eventCard.newsletterPizzadao')}: <span className="font-semibold text-theme-text">{n!.pizzadao}</span></span>
                     </span>
                   )}
-                  {swcSum > 0 && (
+                  {hasNewsletter && swcSum > 0 && (
                     <span className="flex items-center gap-1.5">
                       <Send size={12} />
                       <span>{t('eventCard.newsletterSwc')}: <span className="font-semibold text-theme-text">{swcSum}</span></span>
