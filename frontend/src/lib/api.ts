@@ -2434,14 +2434,14 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+export async function createUnderboss(data: { name: string; email: string; regions: string[]; cities?: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
   });
 }
 
-export async function updateUnderboss(id: string, data: { regions: string[] }): Promise<UnderbossAdmin> {
+export async function updateUnderboss(id: string, data: { regions?: string[]; cities?: string[] }): Promise<UnderbossAdmin> {
   const result = await apiRequest<{ underboss: UnderbossAdmin }>(`/api/underboss/admin/${id}`, {
     method: 'PATCH',
     body: data,
@@ -2508,6 +2508,7 @@ export interface UnderbossMeResponse {
   isGraphicsAdmin?: boolean;
   region: string | null;
   regions: string[];
+  cities: string[];
   name: string | null;
   email: string;
 }
