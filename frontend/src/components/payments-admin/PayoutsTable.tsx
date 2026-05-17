@@ -13,6 +13,8 @@ interface PayoutsTableProps {
   onReject: (id: string) => void;
   onEdit: (payout: AdminPayout) => void;
   onMarkPaid: (payout: AdminPayout) => void;
+  /** Opens the modal so the admin can execute via the method-specific confirmation form. */
+  onExecute: (payout: AdminPayout) => void;
   busyRowId?: string | null;
   loading?: boolean;
   loadingMore?: boolean;
@@ -28,6 +30,7 @@ function ActionsCell({
   onReject,
   onEdit,
   onMarkPaid,
+  onExecute,
 }: {
   payout: AdminPayout;
   busy: boolean;
@@ -35,6 +38,7 @@ function ActionsCell({
   onReject: (id: string) => void;
   onEdit: (payout: AdminPayout) => void;
   onMarkPaid: (payout: AdminPayout) => void;
+  onExecute: (payout: AdminPayout) => void;
 }) {
   const status: PayoutStatus = payout.status;
   return (
@@ -85,11 +89,12 @@ function ActionsCell({
         <>
           <button
             type="button"
-            disabled
-            className="p-1.5 rounded-md text-theme-text-faint cursor-not-allowed"
-            title="Execute Payout — wired in PR 5"
+            onClick={() => onExecute(payout)}
+            disabled={busy}
+            className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
+            title="Execute Payout"
           >
-            <Send size={15} />
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
           <button
             type="button"
@@ -116,6 +121,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onReject,
   onEdit,
   onMarkPaid,
+  onExecute,
   busyRowId,
   loading,
   loadingMore,
@@ -182,6 +188,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                     onReject={onReject}
                     onEdit={onEdit}
                     onMarkPaid={onMarkPaid}
+                    onExecute={onExecute}
                   />
                 }
               />

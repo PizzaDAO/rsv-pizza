@@ -23,6 +23,10 @@ import {
   isFullAdmin,
 } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import {
+  sendUsdcPayment,
+  getUsdcDailyCapStatus,
+} from '../services/usdc-base.service.js';
 
 const router = Router();
 
@@ -634,18 +638,60 @@ router.post(
         return row;
       });
 
-      // autoExecute is plumbed through but execution itself lands in PR 5.
-      // For now we just log the intent — no payout rail fires.
+      // autoExecute (PR 5): synchronously execute after approval — only for
+      // usdc_base, since wire + mercury_card require body refs (wireReference,
+      // mercuryCardLast4) which the approve call doesn't carry. For those two,
+      // we log + no-op (the admin will hit execute separately with refs).
+      let autoExecuted = false;
+      let autoExecuteSkippedReason: string | null = null;
+      let result = updated;
+
       if (autoExecute) {
-        console.log(
-          `[admin-payout] approve+autoExecute requested for payout=${existing.id} ` +
-            `actor=${actor.email} — execution wired in PR 5, no-op for now`,
-        );
+        if (updated.payoutMethod === 'usdc_base') {
+          try {
+            result = await executePayout({
+              payoutId: existing.id,
+              actor: { email: actor.email, actorKind: actor.actorKind },
+              body: {},
+            });
+            autoExecuted = true;
+          } catch (err: any) {
+            // Execution failed but approval already happened — surface the
+            // error to the client. executePayout already wrote audit + flipped
+            // status to failed for usdc_base.
+            console.error(
+              `[admin-payout] autoExecute after approve failed for ${existing.id}: ` +
+                (err?.message || err),
+            );
+            // Re-fetch so client sees the failed state.
+            const refreshed = await prisma.payout.findUnique({
+              where: { id: existing.id },
+              include: {
+                party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+                host: { select: { id: true, name: true, email: true } },
+                documents: { orderBy: { sortOrder: 'asc' } },
+                audits: { orderBy: { createdAt: 'desc' } },
+              },
+            });
+            if (refreshed) result = refreshed;
+            autoExecuteSkippedReason = err?.message || 'execution failed';
+          }
+        } else {
+          autoExecuteSkippedReason =
+            `autoExecute not supported for ${updated.payoutMethod} — ` +
+            `requires admin-supplied refs at execute time`;
+          console.log(
+            `[admin-payout] approve+autoExecute for payout=${existing.id} ` +
+              `method=${updated.payoutMethod}: ${autoExecuteSkippedReason}`,
+          );
+        }
       }
 
       res.json({
-        payout: serializePayout(updated),
-        autoExecuteDeferred: !!autoExecute,
+        payout: serializePayout(result),
+        autoExecuteDeferred: !!autoExecute && !autoExecuted,
+        autoExecuted,
+        autoExecuteSkippedReason,
       });
     } catch (error) {
       next(error);
@@ -807,11 +853,245 @@ router.post(
 );
 
 // ============================================
-// POST /api/admin/payouts/:id/execute — STUB (PR 5 will implement)
+// GET /api/admin/payouts/usdc-daily-cap-remaining
+//   - Used by the UI to show "Daily cap remaining: $Y" before USDC execute.
+//   - Must be declared BEFORE POST /:id/execute (literal path) but it's a GET
+//     so route order doesn't actually collide; declaring it here keeps the
+//     "USDC execution" section coherent.
+// ============================================
+router.get(
+  '/usdc-daily-cap-remaining',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const status = await getUsdcDailyCapStatus();
+      res.json(status);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * Shared executor used by both the explicit POST /:id/execute route and the
+ * `autoExecute: true` branch of POST /:id/approve. Branches on payoutMethod
+ * and writes the success/failure status + audit row in a single Prisma
+ * transaction (so we can't leave status updated without an audit trail or
+ * vice versa).
+ *
+ * For `usdc_base` the on-chain send happens BEFORE the DB transaction
+ * (because waiting for a Base receipt can take 10-30s and we don't want to
+ * hold a Postgres tx open that long). On send-failure we still open a tiny
+ * tx to flip status -> failed + write the audit row, so the operator sees
+ * the failure in the UI.
+ *
+ * Wire + Mercury are pure DB writes (admin has already executed the payment
+ * out-of-band via bank portal / Mercury dashboard).
+ */
+async function executePayout(params: {
+  payoutId: string;
+  actor: {
+    email: string;
+    actorKind: AdminActorKind;
+  };
+  body: any;
+}) {
+  const { payoutId, actor, body } = params;
+
+  const existing = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: {
+      id: true,
+      status: true,
+      hostUserId: true,
+      payoutMethod: true,
+      finalAmountUsd: true,
+      payoutWalletAddress: true,
+    },
+  });
+  if (!existing) {
+    throw new AppError('Payout not found', 404, 'NOT_FOUND');
+  }
+  if (existing.status !== 'approved') {
+    throw new AppError(
+      `Can only execute an approved payout (current status: ${existing.status})`,
+      400,
+      'INVALID_STATE',
+    );
+  }
+
+  const finalAmountUsd = Number(existing.finalAmountUsd);
+
+  if (existing.payoutMethod === 'usdc_base') {
+    if (!existing.payoutWalletAddress) {
+      throw new AppError(
+        'USDC payout has no recipient wallet address set',
+        400,
+        'MISSING_WALLET_ADDRESS',
+      );
+    }
+
+    try {
+      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd);
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: {
+            status: 'paid',
+            paidAt: new Date(),
+            transactionHash: result.txHash,
+          },
+          include: {
+            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            host: { select: { id: true, name: true, email: true } },
+            documents: { orderBy: { sortOrder: 'asc' } },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'mark_paid',
+            oldStatus: 'approved',
+            newStatus: 'paid',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: `USDC on Base sent: tx ${result.txHash}, ` +
+              `from ${result.fromAddress} to ${result.toAddress}, ` +
+              `$${result.amountUsd.toFixed(2)}`,
+          },
+        });
+        return row;
+      });
+      return updated;
+    } catch (err: any) {
+      // Flip to failed + record the error so the admin UI shows what happened.
+      const errMsg = err?.message || String(err);
+      console.error(`[admin-payout] USDC execute failed for ${existing.id}: ${errMsg}`);
+      await prisma.$transaction(async (tx) => {
+        await tx.payout.update({
+          where: { id: existing.id },
+          data: { status: 'failed' },
+        });
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'mark_failed',
+            oldStatus: 'approved',
+            newStatus: 'failed',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: `USDC send failed: ${errMsg.slice(0, 500)}`,
+          },
+        });
+      });
+      throw new AppError(`USDC payout failed: ${errMsg}`, 502, 'USDC_SEND_FAILED');
+    }
+  }
+
+  if (existing.payoutMethod === 'wire') {
+    const wireRef = typeof body?.wireReference === 'string' ? body.wireReference.trim() : '';
+    if (!wireRef) {
+      throw new AppError('wireReference is required for wire payouts', 400, 'MISSING_WIRE_REFERENCE');
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.payout.update({
+        where: { id: existing.id },
+        data: {
+          status: 'paid',
+          paidAt: new Date(),
+          wireReference: wireRef,
+        },
+        include: {
+          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          host: { select: { id: true, name: true, email: true } },
+          documents: { orderBy: { sortOrder: 'asc' } },
+          audits: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+      await tx.payoutAudit.create({
+        data: {
+          payoutId: existing.id,
+          action: 'mark_paid',
+          oldStatus: 'approved',
+          newStatus: 'paid',
+          actorEmail: actor.email,
+          actorKind: actor.actorKind,
+          note: `Wire executed out-of-band, reference: ${wireRef}` +
+            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : ''),
+        },
+      });
+      return row;
+    });
+    return updated;
+  }
+
+  if (existing.payoutMethod === 'mercury_card') {
+    const last4Raw = typeof body?.mercuryCardLast4 === 'string' ? body.mercuryCardLast4.trim() : '';
+    if (!/^\d{4}$/.test(last4Raw)) {
+      throw new AppError(
+        'mercuryCardLast4 must be exactly 4 digits',
+        400,
+        'INVALID_MERCURY_LAST4',
+      );
+    }
+    const cardId = typeof body?.mercuryCardId === 'string' && body.mercuryCardId.trim()
+      ? body.mercuryCardId.trim()
+      : null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.payout.update({
+        where: { id: existing.id },
+        data: {
+          status: 'paid',
+          paidAt: new Date(),
+          mercuryCardLast4: last4Raw,
+          mercuryCardId: cardId,
+        },
+        include: {
+          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          host: { select: { id: true, name: true, email: true } },
+          documents: { orderBy: { sortOrder: 'asc' } },
+          audits: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+      await tx.payoutAudit.create({
+        data: {
+          payoutId: existing.id,
+          action: 'mark_paid',
+          oldStatus: 'approved',
+          newStatus: 'paid',
+          actorEmail: actor.email,
+          actorKind: actor.actorKind,
+          note: `Mercury card issued via dashboard, last4=${last4Raw}` +
+            (cardId ? `, id=${cardId}` : '') +
+            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : ''),
+        },
+      });
+      return row;
+    });
+    return updated;
+  }
+
+  throw new AppError(
+    `Unknown payout method: ${existing.payoutMethod}`,
+    400,
+    'INVALID_PAYOUT_METHOD',
+  );
+}
+
+// ============================================
+// POST /api/admin/payouts/:id/execute — REAL execution (PR 5)
 //
-// Validates role + payout state, then returns 501 Not Implemented. PR 5 will
-// replace the body of this handler with the actual Mercury / wire / USDC
-// (Privy server-wallet) execution logic.
+// Idempotent: rejects unless status === 'approved' (already-paid payouts get
+// 400, not a double-send). Branches on payoutMethod:
+//   - usdc_base    → sendUsdcPayment via Privy server-wallet
+//   - wire         → body.wireReference REQUIRED, status -> paid
+//   - mercury_card → body.mercuryCardLast4 REQUIRED (4 digits), status -> paid
+// All paths write a payout_audit row atomically with the status update.
 // ============================================
 router.post(
   '/:id/execute',
@@ -822,9 +1102,8 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true, payoutMethod: true },
+        select: { id: true, status: true, hostUserId: true },
       });
-
       if (!existing) {
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
@@ -835,18 +1114,15 @@ router.post(
           'INVALID_STATE',
         );
       }
-
       assertNotSelfPayout(actor, existing.hostUserId);
 
-      // Intentional stub — full implementation lands in PR 5.
-      res.status(501).json({
-        error: {
-          code: 'NOT_IMPLEMENTED',
-          message:
-            'Payout execution is wired in PR 5 (Mercury / wire / USDC-via-Privy). ' +
-            'Use POST /:id/mark-paid for manual overrides in the meantime.',
-        },
+      const updated = await executePayout({
+        payoutId: existing.id,
+        actor: { email: actor.email, actorKind: actor.actorKind },
+        body: req.body || {},
       });
+
+      res.json({ payout: serializePayout(updated) });
     } catch (error) {
       next(error);
     }
