@@ -20,8 +20,8 @@
     "selectCity": "Please select a city from the dropdown suggestions."
   },
   "map": {
-    "title": "Last Year's Global Pizza Party",
-    "subtitle": "See where communities around the world came together for pizza",
+    "title": "This Year's Global Pizza Party",
+    "subtitle": "Find a free pizza party near you on May 22, 2026",
     "openFullMap": "Open Full Map"
   },
   "success": {
