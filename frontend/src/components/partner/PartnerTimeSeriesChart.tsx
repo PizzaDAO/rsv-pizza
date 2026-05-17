@@ -73,12 +73,15 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
   );
 }
 
+type SeriesKey = 'impressions' | 'clicks' | 'rsvps';
+
 export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
   const { t } = useTranslation('partner');
   const [range, setRange] = useState<PartnerTimeSeriesRange>('24hr');
   const [points, setPoints] = useState<PartnerTimeSeriesPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +109,27 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
     () => points.some((p) => p.rsvps > 0 || p.impressions > 0 || p.clicks > 0),
     [points]
   );
+
+  const yMax = useMemo(() => {
+    let max = 0;
+    for (const row of points) {
+      (['impressions', 'clicks', 'rsvps'] as const).forEach((k) => {
+        if (!hidden.has(k)) max = Math.max(max, row[k]);
+      });
+    }
+    return max || 1; // avoid degenerate [0,0] domain
+  }, [points, hidden]);
+
+  const toggleSeries = (e: any) => {
+    const key = e?.dataKey as SeriesKey | undefined;
+    if (!key) return;
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <div className="bg-theme-card border border-theme-stroke rounded-xl p-4 mb-6">
@@ -161,11 +185,13 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
                 tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.6)' }}
                 stroke="rgba(255,255,255,0.2)"
                 width={36}
+                domain={[0, yMax]}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend
-                wrapperStyle={{ fontSize: 12 }}
+                wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
                 iconType="circle"
+                onClick={toggleSeries}
               />
               <Line
                 type="monotone"
@@ -175,6 +201,7 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hidden.has('rsvps')}
               />
               <Line
                 type="monotone"
@@ -184,6 +211,7 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hidden.has('impressions')}
               />
               <Line
                 type="monotone"
@@ -193,6 +221,7 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hidden.has('clicks')}
               />
             </LineChart>
           </ResponsiveContainer>
