@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, Check, X, ArrowRight, AlertCircle } from 'lucide-react';
+import { Loader2, Shield, Check, X, ArrowRight, AlertCircle, Upload } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchUnderbossMe,
   fetchLogoBgAudit,
   applyLogoBgFix,
+  applyLogoBgFixUpload,
   fetchLogoBgPreviewBlob,
   type LogoCleanupItem,
 } from '../lib/api';
@@ -78,6 +79,168 @@ function PreviewImage({ logoUrl }: { logoUrl: string }) {
       alt="Suggested stripped logo"
       className="max-h-40 max-w-full object-contain"
     />
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+interface CleanupCardProps {
+  item: LogoCleanupItem;
+  isApplying: boolean;
+  onApprove: (item: LogoCleanupItem) => void;
+  onApproveUpload: (item: LogoCleanupItem, file: File) => void;
+  onSkip: (item: LogoCleanupItem) => void;
+}
+
+function CleanupCard({ item, isApplying, onApprove, onApproveUpload, onSkip }: CleanupCardProps) {
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Manage object URL lifecycle for the staged-file preview.
+  useEffect(() => {
+    if (!stagedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const obj = URL.createObjectURL(stagedFile);
+    setPreviewUrl(obj);
+    return () => {
+      URL.revokeObjectURL(obj);
+    };
+  }, [stagedFile]);
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) setStagedFile(f);
+    // Reset the input so picking the same file twice re-triggers onChange.
+    e.target.value = '';
+  };
+
+  const handleClearStaged = () => {
+    setStagedFile(null);
+  };
+
+  const syncLabel = item.sponsorUserId
+    ? `Sync: master record${item.sponsorUserName ? ` (${item.sponsorUserName})` : ''}`
+    : 'Sync: one-off';
+  const partnerNames = Array.from(
+    new Set(item.sponsors.map((s) => s.partnerName).filter(Boolean))
+  );
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+        <div
+          className="flex-1 rounded-xl overflow-hidden flex items-center justify-center min-h-[140px] p-3"
+          style={CHECKERBOARD_STYLE}
+        >
+          <img
+            src={item.logoUrl}
+            alt="Original logo"
+            className="max-h-40 max-w-full object-contain"
+          />
+        </div>
+        <div className="flex items-center justify-center text-white/40">
+          <ArrowRight size={20} />
+        </div>
+        <div
+          className="flex-1 rounded-xl overflow-hidden flex items-center justify-center min-h-[140px] p-3 relative"
+          style={CHECKERBOARD_STYLE}
+        >
+          {stagedFile && previewUrl ? (
+            <>
+              <img
+                src={previewUrl}
+                alt="Replacement upload preview"
+                className="max-h-40 max-w-full object-contain"
+              />
+              <button
+                onClick={handleClearStaged}
+                disabled={isApplying}
+                title="Discard upload"
+                className="absolute top-1 right-1 rounded-full bg-black/60 hover:bg-black/80 text-white/80 p-1 disabled:opacity-40"
+              >
+                <X size={12} />
+              </button>
+            </>
+          ) : (
+            <PreviewImage logoUrl={item.logoUrl} />
+          )}
+        </div>
+      </div>
+
+      {stagedFile && (
+        <div className="mt-2 text-xs text-white/50">
+          Uploaded: <span className="text-white/80">{stagedFile.name}</span>{' '}
+          <span className="text-white/40">({formatBytes(stagedFile.size)})</span>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="text-sm">
+          <div className="font-medium text-white">
+            {partnerNames.join(', ') || '(unnamed)'}
+          </div>
+          <div className="text-white/50 mt-0.5">
+            {item.eventCount} event{item.eventCount === 1 ? '' : 's'}
+            {item.eventCount > 0 && (
+              <span className="text-white/30">
+                {' '}
+                &middot; {item.sponsors.slice(0, 4).map((s) => s.partyCity || s.partyName).join(', ')}
+                {item.sponsors.length > 4 ? `, +${item.sponsors.length - 4} more` : ''}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-white/40 mt-1">
+            {syncLabel}
+            <span className="ml-2 inline-block rounded bg-white/[0.04] px-1.5 py-0.5 border border-white/10">
+              {item.classification === 'white_bg_png' ? 'white-bg PNG' : 'JPEG white'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={handleFilePick}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isApplying}
+            className="px-3 py-2 rounded-lg text-sm bg-white/[0.04] text-white/70 border border-white/10 hover:bg-white/[0.07] disabled:opacity-40 transition-colors inline-flex items-center gap-1.5"
+          >
+            <Upload size={14} /> {stagedFile ? 'Change file' : 'Upload replacement'}
+          </button>
+          <button
+            onClick={() => onSkip(item)}
+            disabled={isApplying}
+            className="px-3 py-2 rounded-lg text-sm bg-white/[0.04] text-white/70 border border-white/10 hover:bg-white/[0.07] disabled:opacity-40 transition-colors inline-flex items-center gap-1.5"
+          >
+            <X size={14} /> Skip
+          </button>
+          <button
+            onClick={() => (stagedFile ? onApproveUpload(item, stagedFile) : onApprove(item))}
+            disabled={isApplying}
+            className="px-3 py-2 rounded-lg text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          >
+            {isApplying ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Check size={14} />
+            )}
+            {stagedFile ? 'Approve uploaded file' : 'Approve & replace'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -187,6 +350,29 @@ export function AdminLogoCleanup() {
     }
   };
 
+  const handleApproveUpload = async (item: LogoCleanupItem, file: File) => {
+    if (applying.has(item.logoUrl)) return;
+    setApplying((prev) => new Set(prev).add(item.logoUrl));
+    try {
+      const res = await applyLogoBgFixUpload(item.logoUrl, file);
+      pushToast(
+        `Replaced with upload. ${res.sponsorsUpdated} sponsor${res.sponsorsUpdated === 1 ? '' : 's'} updated${
+          res.sponsorUserUpdated ? ' (master record synced)' : ''
+        }.`,
+        'success'
+      );
+      setRemoved((prev) => new Set(prev).add(item.logoUrl));
+    } catch (e: any) {
+      pushToast(e?.message || 'Failed to upload replacement', 'error');
+    } finally {
+      setApplying((prev) => {
+        const next = new Set(prev);
+        next.delete(item.logoUrl);
+        return next;
+      });
+    }
+  };
+
   const handleSkip = (item: LogoCleanupItem) => {
     setRemoved((prev) => new Set(prev).add(item.logoUrl));
   };
@@ -258,89 +444,16 @@ export function AdminLogoCleanup() {
               </div>
             ) : (
               <div className="space-y-4">
-                {visibleItems.map((item) => {
-                  const isApplying = applying.has(item.logoUrl);
-                  const syncLabel = item.sponsorUserId
-                    ? `Sync: master record${item.sponsorUserName ? ` (${item.sponsorUserName})` : ''}`
-                    : 'Sync: one-off';
-                  const partnerNames = Array.from(
-                    new Set(item.sponsors.map((s) => s.partnerName).filter(Boolean))
-                  );
-                  return (
-                    <div
-                      key={item.logoUrl}
-                      className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5"
-                    >
-                      <div className="flex flex-col sm:flex-row gap-4 items-stretch">
-                        <div
-                          className="flex-1 rounded-xl overflow-hidden flex items-center justify-center min-h-[140px] p-3"
-                          style={CHECKERBOARD_STYLE}
-                        >
-                          <img
-                            src={item.logoUrl}
-                            alt="Original logo"
-                            className="max-h-40 max-w-full object-contain"
-                          />
-                        </div>
-                        <div className="flex items-center justify-center text-white/40">
-                          <ArrowRight size={20} />
-                        </div>
-                        <div
-                          className="flex-1 rounded-xl overflow-hidden flex items-center justify-center min-h-[140px] p-3"
-                          style={CHECKERBOARD_STYLE}
-                        >
-                          <PreviewImage logoUrl={item.logoUrl} />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                        <div className="text-sm">
-                          <div className="font-medium text-white">
-                            {partnerNames.join(', ') || '(unnamed)'}
-                          </div>
-                          <div className="text-white/50 mt-0.5">
-                            {item.eventCount} event{item.eventCount === 1 ? '' : 's'}
-                            {item.eventCount > 0 && (
-                              <span className="text-white/30">
-                                {' '}
-                                &middot; {item.sponsors.slice(0, 4).map((s) => s.partyCity || s.partyName).join(', ')}
-                                {item.sponsors.length > 4 ? `, +${item.sponsors.length - 4} more` : ''}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-white/40 mt-1">
-                            {syncLabel}
-                            <span className="ml-2 inline-block rounded bg-white/[0.04] px-1.5 py-0.5 border border-white/10">
-                              {item.classification === 'white_bg_png' ? 'white-bg PNG' : 'JPEG white'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSkip(item)}
-                            disabled={isApplying}
-                            className="px-3 py-2 rounded-lg text-sm bg-white/[0.04] text-white/70 border border-white/10 hover:bg-white/[0.07] disabled:opacity-40 transition-colors inline-flex items-center gap-1.5"
-                          >
-                            <X size={14} /> Skip
-                          </button>
-                          <button
-                            onClick={() => handleApprove(item)}
-                            disabled={isApplying}
-                            className="px-3 py-2 rounded-lg text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
-                          >
-                            {isApplying ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Check size={14} />
-                            )}
-                            Approve & replace
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {visibleItems.map((item) => (
+                  <CleanupCard
+                    key={item.logoUrl}
+                    item={item}
+                    isApplying={applying.has(item.logoUrl)}
+                    onApprove={handleApprove}
+                    onApproveUpload={handleApproveUpload}
+                    onSkip={handleSkip}
+                  />
+                ))}
               </div>
             )}
           </>

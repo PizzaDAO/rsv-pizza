@@ -3550,6 +3550,49 @@ export async function applyLogoBgFix(
 }
 
 /**
+ * Manual replacement: upload a graphics-admin-supplied file from disk to
+ * replace the original logo, instead of auto-stripping the white background.
+ * Reads the File via FileReader, strips the data-URL prefix, and POSTs the
+ * raw base64 to the backend.
+ */
+export async function applyLogoBgFixUpload(
+  originalUrl: string,
+  file: File
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  const fileBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Failed to read file as data URL'));
+        return;
+      }
+      const commaIdx = result.indexOf(',');
+      if (commaIdx < 0) {
+        reject(new Error('Unexpected FileReader output'));
+        return;
+      }
+      resolve(result.slice(commaIdx + 1));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply-upload',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: {
+        logoUrl: originalUrl,
+        fileBase64,
+        contentType: file.type,
+      },
+    }
+  );
+}
+
+/**
  * Fetch the stripped-background preview PNG as a Blob. Use URL.createObjectURL()
  * on the result to bind it to an <img src>. We can't use a raw URL because the
  * endpoint requires Bearer auth, and <img> won't send Authorization headers.
