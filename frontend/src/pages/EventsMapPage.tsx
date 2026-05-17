@@ -11,6 +11,16 @@ const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 const STATUS_FILTER_KEYS = ['approved', 'pending', 'listed', 'rejected'] as const;
 type StatusFilterKey = (typeof STATUS_FILTER_KEYS)[number];
 
+// Semantic colors used by the marker icons + legend, keyed on underbossStatus.
+// Keep in sync with STATUS_COLORS in GPPEventsMap.tsx.
+const STATUS_LEGEND: { key: string; label: string; color: string }[] = [
+  { key: 'approved', label: 'Approved', color: '#22c55e' },
+  { key: 'listed', label: 'Listed', color: '#3b82f6' },
+  { key: 'pending', label: 'Pending', color: '#eab308' },
+  { key: 'rejected', label: 'Rejected', color: '#ef4444' },
+  { key: 'hidden', label: 'Hidden', color: '#6b7280' },
+];
+
 export function EventsMapPage() {
   const { user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState<GPPEventMapItem[]>([]);
@@ -19,6 +29,9 @@ export function EventsMapPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [canModerate, setCanModerate] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Moderator-only: toggle between curated (approved+listed) and all-events
+  // (including rejected/hidden). Drives the backend `?statuses=all` request.
+  const [showAll, setShowAll] = useState(false);
 
   // Filter state (only renders for moderators, but declared unconditionally for hook rules)
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -29,10 +42,13 @@ export function EventsMapPage() {
   const [tagFilter, setTagFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
 
-  const loadEvents = (moderator: boolean) => {
+  const loadEvents = (moderator: boolean, includeAll: boolean) => {
     setLoading(true);
     setError(null);
-    fetchGppEventsForMap(false, !moderator, moderator)
+    // Non-moderators always get the curated (approved+listed) view.
+    // Moderators see the filtered (non-rejected/hidden) view by default and
+    // can opt into the all-events view via the "Show all events" toggle.
+    fetchGppEventsForMap(false, !moderator, moderator && includeAll)
       .then((data) => {
         setEvents(data);
         setLoading(false);
@@ -48,7 +64,11 @@ export function EventsMapPage() {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const data = await fetchGppEventsForMap(true, !canModerate, !!canModerate);
+      const data = await fetchGppEventsForMap(
+        true,
+        !canModerate,
+        !!canModerate && showAll
+      );
       setEvents(data);
     } catch (err) {
       console.error('Failed to refresh events:', err);
@@ -62,7 +82,7 @@ export function EventsMapPage() {
 
     if (!user) {
       setCanModerate(false);
-      loadEvents(false);
+      loadEvents(false, false);
       return;
     }
 
@@ -71,16 +91,27 @@ export function EventsMapPage() {
         const me = await fetchUnderbossMe();
         const isMod = !!(me.isAdmin || me.isUnderboss);
         setCanModerate(isMod);
-        loadEvents(isMod);
+        loadEvents(isMod, showAll);
       } catch (err) {
         console.error('Failed to check moderator status:', err);
         setCanModerate(false);
-        loadEvents(false);
+        loadEvents(false, false);
       }
     }
 
     resolveModeratorStatus();
+    // showAll intentionally omitted — toggle handled by separate effect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
+
+  // Re-fetch when the moderator toggles "Show all events" on/off.
+  // Skips the initial mount (handled by the auth effect above) and any
+  // non-moderator render (toggle is hidden for non-mods).
+  useEffect(() => {
+    if (canModerate === null || !canModerate) return;
+    loadEvents(true, showAll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll]);
 
   // Debounce search input (200ms) — mirrors EventTable behavior.
   useEffect(() => {
@@ -248,12 +279,47 @@ export function EventsMapPage() {
               <div className="flex flex-col items-center gap-3 bg-white rounded-2xl p-8 shadow-lg">
                 <p className="text-red-600 font-medium">{error}</p>
                 <button
-                  onClick={() => loadEvents(!!canModerate)}
+                  onClick={() => loadEvents(!!canModerate, !!canModerate && showAll)}
                   className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-all hover:-translate-y-0.5"
                   style={{ background: '#E52828' }}
                 >
                   Retry
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* "Show all events" toggle — moderators only */}
+          {canModerate && !loading && !error && (
+            <div className="absolute top-3 right-3 z-10">
+              <button
+                onClick={() => setShowAll((v) => !v)}
+                className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-white/50 text-sm font-semibold text-gray-800 hover:bg-white transition"
+                aria-pressed={showAll}
+              >
+                {showAll ? 'Show approved only' : 'Show all events'}
+              </button>
+            </div>
+          )}
+
+          {/* Status legend — moderator-only, shown when viewing all events */}
+          {canModerate && showAll && !loading && !error && (
+            <div className="absolute bottom-3 left-3 z-10">
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-white/50">
+                <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">
+                  Status
+                </div>
+                <div className="flex flex-col gap-1">
+                  {STATUS_LEGEND.map((s) => (
+                    <div key={s.key} className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-full border border-white"
+                        style={{ background: s.color }}
+                      />
+                      <span className="text-xs text-gray-800">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -433,6 +499,7 @@ export function EventsMapPage() {
                 events={canModerate ? filteredEvents : events}
                 height="calc(100vh - 64px)"
                 canModerate={canModerate}
+                isModerator={!!canModerate}
               />
             )}
           </Suspense>
