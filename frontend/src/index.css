@@ -8,6 +8,31 @@
   font-display: swap;
 }
 
+/* MarqueeBanner — right-to-left infinite scroll */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: inline-flex;
+  gap: 3rem;
+  padding-left: 3rem;
+  animation: marquee 25s linear infinite;
+  will-change: transform;
+}
+.marquee-item {
+  flex-shrink: 0;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+    transform: translateX(0);
+  }
+}
+
 :root {
   /* Backgrounds */
   --bg-main: #0b0b10;

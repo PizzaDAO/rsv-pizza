@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Header } from './Header';
+import { MarqueeBanner } from './MarqueeBanner';
 import { Footer } from './Footer';
 import { CornerLinks } from './CornerLinks';
 import { GPPClouds } from './GPPClouds';
@@ -21,6 +22,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, className = '', style 
       {theme === 'gpp' && <GPPClouds />}
 
       <Header />
+      <MarqueeBanner />
 
       {/* Main content */}
       <main className="flex-1 relative z-[1]">
