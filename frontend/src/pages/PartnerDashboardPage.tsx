@@ -409,9 +409,7 @@ export function PartnerDashboardPage() {
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'date-asc':
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         case 'rsvps':
           return (b.rsvpCount || 0) - (a.rsvpCount || 0);
         case 'clicks':
@@ -420,9 +418,7 @@ export function PartnerDashboardPage() {
           return (a.name || '').localeCompare(b.name || '');
         case 'date-desc':
         default:
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
 
