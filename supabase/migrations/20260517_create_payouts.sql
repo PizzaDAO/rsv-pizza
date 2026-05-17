@@ -82,7 +82,7 @@ CREATE TABLE payout_audit (
   old_amount  NUMERIC(12, 2),
   new_amount  NUMERIC(12, 2),
   actor_email TEXT NOT NULL,
-  actor_kind  TEXT NOT NULL CHECK (actor_kind IN ('admin','superadmin','payment_admin','host','system')),
+  actor_kind  TEXT NOT NULL CHECK (actor_kind IN ('admin','super_admin','payment_admin','host','system')),
   note        TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
