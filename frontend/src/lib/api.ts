@@ -419,6 +419,7 @@ export interface PublicEvent {
   longitude?: number | null;
   placeId?: string | null;
   venueName: string | null;
+  country?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
