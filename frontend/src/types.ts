@@ -1253,6 +1253,7 @@ export interface SponsorDashboardEvent {
   slug: string;
   reportPublicSlug: string | null;
   date: string | null;
+  createdAt: string;
   timezone: string | null;
   address: string | null;
   venueName: string | null;
