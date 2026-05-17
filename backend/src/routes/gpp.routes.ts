@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 
 const router = Router();
@@ -645,12 +647,38 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
 // GET /api/gpp/events - List all GPP events (for admin/public listing)
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '500', offset = '0', city, country, region } = req.query;
+    const { limit = '500', offset = '0', city, country, region, statuses } = req.query;
+
+    // Determine whether to include rejected/hidden statuses.
+    // The `?statuses=all` and legacy `?includeAll=1` params both request all-statuses,
+    // but the request is only honored when the caller is an authenticated
+    // underboss/admin. Unauthenticated callers silently fall back to the
+    // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
+    const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    let includeAllStatuses = false;
+    if (requestedAllStatuses) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          try {
+            const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+            const email = decoded.email;
+            if (email && (await isAdmin(email) || await isUnderboss(email))) {
+              includeAllStatuses = true;
+            }
+          } catch {
+            // Bad/expired token — silently fall back to the filtered view
+          }
+        }
+      }
+    }
 
     const where: any = { eventType: 'gpp' };
     if (req.query.curated === '1') {
       where.underbossStatus = { in: ['approved', 'listed'] };
-    } else if (req.query.includeAll === '1') {
+    } else if (includeAllStatuses) {
       // moderator view — no underbossStatus filter; returns rejected/hidden too
     } else {
       where.underbossStatus = { notIn: ['rejected', 'hidden'] };

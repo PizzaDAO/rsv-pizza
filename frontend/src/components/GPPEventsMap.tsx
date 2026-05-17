@@ -8,6 +8,35 @@ interface GPPEventsMapProps {
   canModerate?: boolean;
 }
 
+// Semantic colors keyed on underbossStatus. Keep in sync with STATUS_LEGEND
+// in EventsMapPage.tsx so the legend matches the marker colors.
+const STATUS_COLORS: Record<string, string> = {
+  approved: '#22c55e',
+  listed: '#3b82f6',
+  pending: '#eab308',
+  rejected: '#ef4444',
+  hidden: '#6b7280',
+};
+
+function statusColor(status?: string | null): string {
+  if (!status) return STATUS_COLORS.pending;
+  return STATUS_COLORS[status] || STATUS_COLORS.pending;
+}
+
+function makeMarkerIcon(status?: string | null): google.maps.Icon {
+  const color = statusColor(status);
+  const svg = encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">` +
+      `<circle cx="16" cy="16" r="11" fill="${color}" stroke="white" stroke-width="3"/>` +
+      `</svg>`
+  );
+  return {
+    url: `data:image/svg+xml;utf8,${svg}`,
+    scaledSize: new google.maps.Size(32, 32),
+    anchor: new google.maps.Point(16, 16),
+  };
+}
+
 export default function GPPEventsMap({
   events,
   height = '100%',
@@ -147,18 +176,24 @@ export default function GPPEventsMap({
 
         let actionsHtml = '';
         if (canModerate) {
-          if (event.underbossStatus === 'approved') {
+          // Status pill — shown for every moderator-visible event so the
+          // marker color is interpretable in the InfoWindow too.
+          const statusKey = event.underbossStatus || 'pending';
+          const statusColorHex = statusColor(statusKey);
+          const statusPillHtml = `<span style="background:${statusColorHex}1a;color:${statusColorHex};font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600;text-transform:capitalize">${statusKey}</span>`;
+          if (statusKey === 'approved') {
             actionsHtml = `
-              <span style="background:#dcfce7;color:#16a34a;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Approved</span>
+              ${statusPillHtml}
               <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
             `;
-          } else if (event.underbossStatus === 'rejected') {
+          } else if (statusKey === 'rejected') {
             actionsHtml = `
-              <span style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600">Rejected</span>
+              ${statusPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
             `;
           } else {
             actionsHtml = `
+              ${statusPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
               <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
             `;
@@ -225,14 +260,10 @@ export default function GPPEventsMap({
 
         infoWindow.setContent(buildInfoContent(updated));
 
-        if (action === 'reject') {
-          const marker = markerByEventIdRef.current.get(eventId);
-          if (marker) {
-            clustererRef.current?.removeMarker(marker);
-            marker.setMap(null);
-            markerByEventIdRef.current.delete(eventId);
-            markersRef.current = markersRef.current.filter((m) => m !== marker);
-          }
+        const marker = markerByEventIdRef.current.get(eventId);
+        if (marker) {
+          // Update the marker icon to reflect the new status color
+          marker.setIcon(makeMarkerIcon(updated.underbossStatus));
         }
       }
 
@@ -271,11 +302,7 @@ export default function GPPEventsMap({
         const marker = new google.maps.Marker({
           position,
           title: event.name,
-          icon: {
-            url: '/molto-benny-btc.svg',
-            scaledSize: new google.maps.Size(38, 38),
-            anchor: new google.maps.Point(19, 38),
-          },
+          icon: makeMarkerIcon(event.underbossStatus),
         });
 
         const eventId = event.id;
