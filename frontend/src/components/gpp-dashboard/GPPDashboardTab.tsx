@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, Lock, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
@@ -6,6 +6,7 @@ import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
+import { FindVenueModal } from '../checklist/FindVenueModal';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -19,28 +20,28 @@ export const GPPDashboardTab: React.FC = () => {
   const [showCompleted, setShowCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [findVenueOpen, setFindVenueOpen] = useState(false);
+
+  const loadChecklist = useCallback(async () => {
+    if (!party?.id) return;
+    let data = await getChecklist(party.id);
+    // If not yet seeded, seed defaults so due dates propagate from checklist_defaults
+    if (data && !data.seeded) {
+      const seedResult = await seedChecklist(party.id);
+      if (seedResult) {
+        const refreshed = await getChecklist(party.id);
+        if (refreshed) data = refreshed;
+      }
+    }
+    setAutoStates(data?.autoCompleteStates ?? null);
+    setDbItems(data?.items ?? []);
+    setLoading(false);
+  }, [party?.id]);
 
   useEffect(() => {
     if (!party?.id) return;
-    let cancelled = false;
-    (async () => {
-      let data = await getChecklist(party.id);
-      // If not yet seeded, seed defaults so due dates propagate from checklist_defaults
-      if (data && !data.seeded) {
-        const seedResult = await seedChecklist(party.id);
-        if (seedResult) {
-          const refreshed = await getChecklist(party.id);
-          if (refreshed) data = refreshed;
-        }
-      }
-      if (!cancelled) {
-        setAutoStates(data?.autoCompleteStates ?? null);
-        setDbItems(data?.items ?? []);
-        setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [party?.id]);
+    loadChecklist();
+  }, [party?.id, loadChecklist]);
 
   // Map known item names to Lucide icons
   const ICON_MAP: Record<string, LucideIcon> = {
@@ -93,7 +94,8 @@ export const GPPDashboardTab: React.FC = () => {
         done,
         tab: item.linkTab,
         onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
-                 item.name === 'Find Partners' ? () => goToTab('partners') : undefined,
+                 item.name === 'Find Partners' ? () => goToTab('partners') :
+                 item.name === 'Find a Venue' ? () => setFindVenueOpen(true) : undefined,
         icon: ICON_MAP[item.name] ?? ClipboardCheck,
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
@@ -352,6 +354,12 @@ export const GPPDashboardTab: React.FC = () => {
           </div>
         )}
       </div>
+
+      <FindVenueModal
+        open={findVenueOpen}
+        onClose={() => setFindVenueOpen(false)}
+        onSaved={loadChecklist}
+      />
 
       {/* Host Resources */}
       <HostResources />
