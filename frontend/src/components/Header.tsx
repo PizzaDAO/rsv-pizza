@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="absolute left-1/2 -translate-x-1/2 hidden sm:block transition-opacity hover:opacity-80 text-xl md:text-3xl lg:text-4xl"
           style={{
             fontFamily: '"Hub 191 Display", "Comic Sans MS", cursive',
-            color: '#FE332C',
+            color: '#0497C1',
           }}
         >
           global pizza party
