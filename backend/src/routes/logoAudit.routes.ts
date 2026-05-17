@@ -1,5 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
+import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
@@ -8,6 +10,11 @@ import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents } from '../helpers/
 import crypto from 'crypto';
 
 const router = Router();
+
+// The global JSON body parser in index.ts uses the default 100kb limit, which
+// is too small for the base64-encoded replacement upload. Bump just this
+// router to 8mb (raw file capped at 5mb below; base64 inflates ~33%).
+router.use(express.json({ limit: '8mb' }));
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
@@ -390,6 +397,122 @@ router.post('/apply', requireAuth, requireGraphicsAdminAuth, async (req: AuthReq
         } catch (err) {
           console.error('partnerSync failed after logo cleanup for SponsorUser', su.id, err);
           // Continue — the direct Sponsor.logoUrl updates above still applied.
+        }
+      }
+    }
+
+    invalidateAuditCache();
+
+    res.json({
+      newUrl,
+      sponsorsUpdated: sponsorUpdate.count,
+      sponsorUserUpdated,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/logo-bg-audit/apply-upload
+ * Body: { logoUrl: string, fileBase64: string, contentType: 'image/png' | 'image/jpeg' }
+ *
+ * Manual override: instead of auto-stripping the white background, the
+ * graphics admin uploads a replacement file from disk. Validates the file,
+ * uploads to Supabase storage, and updates every Sponsor.logoUrl AND every
+ * SponsorUser.coHostLogoUrl matching the original URL. If a SponsorUser was
+ * updated, re-syncs to linked events.
+ */
+router.post('/apply-upload', requireAuth, requireGraphicsAdminAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { logoUrl, fileBase64, contentType } = req.body || {};
+
+    if (typeof logoUrl !== 'string' || !logoUrl) {
+      throw new AppError('logoUrl is required', 400, 'VALIDATION_ERROR');
+    }
+    if (typeof fileBase64 !== 'string' || !fileBase64) {
+      throw new AppError('fileBase64 is required', 400, 'VALIDATION_ERROR');
+    }
+    if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
+      throw new AppError(
+        'contentType must be image/png or image/jpeg',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    // Decode base64
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(fileBase64, 'base64');
+    } catch {
+      throw new AppError('Invalid base64 payload', 400, 'VALIDATION_ERROR');
+    }
+    if (buffer.length === 0) {
+      throw new AppError('Empty file payload', 400, 'VALIDATION_ERROR');
+    }
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (buffer.length > MAX_BYTES) {
+      throw new AppError('File exceeds 5 MB limit', 413, 'PAYLOAD_TOO_LARGE');
+    }
+
+    // Sanity-check the image actually parses
+    try {
+      await sharp(buffer).metadata();
+    } catch {
+      throw new AppError('Invalid image', 400, 'INVALID_IMAGE');
+    }
+
+    // Upload to Supabase storage
+    const ext = contentType === 'image/png' ? 'png' : 'jpg';
+    const fileName = `sponsor-logos/${Date.now()}-manual-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(fileName, buffer, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType,
+      });
+    if (uploadError) {
+      console.error('Supabase upload failed:', uploadError);
+      throw new AppError(`Storage upload failed: ${uploadError.message}`, 500, 'UPLOAD_FAILED');
+    }
+
+    const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(fileName);
+    const newUrl = urlData.publicUrl;
+    if (!newUrl) {
+      throw new AppError('Failed to get public URL for uploaded logo', 500, 'UPLOAD_NO_URL');
+    }
+
+    // Update Sponsor rows
+    const sponsorUpdate = await prisma.sponsor.updateMany({
+      where: { logoUrl },
+      data: { logoUrl: newUrl },
+    });
+
+    // Update SponsorUser rows (master records)
+    const sponsorUsers = await prisma.sponsorUser.findMany({
+      where: { coHostLogoUrl: logoUrl },
+    });
+    let sponsorUserUpdated = false;
+    for (const su of sponsorUsers) {
+      await prisma.sponsorUser.update({
+        where: { id: su.id },
+        data: { coHostLogoUrl: newUrl },
+      });
+      sponsorUserUpdated = true;
+
+      const updated = await prisma.sponsorUser.findUnique({ where: { id: su.id } });
+      if (updated) {
+        try {
+          if (updated.autoCoHost) {
+            await syncPartnerToAllEvents(updated as any);
+          } else if (updated.autoSponsor) {
+            await syncAutoSponsorsToAllEvents(updated as any);
+          }
+        } catch (err) {
+          console.error('partnerSync failed after logo upload for SponsorUser', su.id, err);
+          // Continue — direct Sponsor.logoUrl updates still applied.
         }
       }
     }
