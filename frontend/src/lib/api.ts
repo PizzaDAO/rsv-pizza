@@ -3057,6 +3057,33 @@ export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboard
   return apiRequest<SponsorDashboardData>(`/api/sponsor/events${params}`);
 }
 
+// Admin-only time-series for partner dashboard chart
+export type PartnerTimeSeriesRange = '6hr' | '24hr' | '3d' | '7d';
+
+export interface PartnerTimeSeriesPoint {
+  timestamp: string;
+  rsvps: number;
+  impressions: number;
+  clicks: number;
+}
+
+export interface PartnerTimeSeriesResponse {
+  range: PartnerTimeSeriesRange;
+  bucket: 'hour';
+  since: string;
+  points: PartnerTimeSeriesPoint[];
+}
+
+export async function fetchSponsorEventsTimeSeries(
+  range: PartnerTimeSeriesRange = '24hr',
+  tag?: string
+): Promise<PartnerTimeSeriesResponse> {
+  const params = new URLSearchParams();
+  params.set('range', range);
+  if (tag) params.set('tag', tag);
+  return apiRequest<PartnerTimeSeriesResponse>(`/api/sponsor/events/timeseries?${params.toString()}`);
+}
+
 export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
   return apiRequest<{ item: SponsorChecklistItem }>(`/api/sponsor/checklist/${itemId}/toggle`, {
     method: 'POST',

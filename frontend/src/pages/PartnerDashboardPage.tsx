@@ -22,6 +22,7 @@ import { fetchSheetCities } from '../lib/cities';
 import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
+import { PartnerTimeSeriesChart } from '../components/partner/PartnerTimeSeriesChart';
 
 interface DisplayPhoto {
   id: string;
@@ -756,6 +757,11 @@ export function PartnerDashboardPage() {
             </div>
           );
         })()}
+
+        {/* Admin-only time-series chart */}
+        {dashboardData?.isAdmin && (
+          <PartnerTimeSeriesChart tag={dashboardData?.tag} />
+        )}
 
         {/* Filters */}
         {allEvents.length > 0 && (
