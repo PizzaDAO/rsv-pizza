@@ -259,8 +259,8 @@ export function PartnersPage() {
                   >
                     {partner.name}
                   </div>
-                  <div className="mt-1 flex justify-center">
-                    {canClick ? (
+                  {canClick && (
+                    <div className="mt-1 flex justify-center">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -272,12 +272,8 @@ export function PartnersPage() {
                       >
                         {pillText}
                       </button>
-                    ) : (
-                      <span className="inline-block text-[10px] font-bold rounded-full px-2 py-0.5 bg-[#E52828]/20 text-[#E52828]">
-                        {pillText}
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
