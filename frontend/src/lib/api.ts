@@ -3510,3 +3510,60 @@ export async function completeScorecardItem(
   });
 }
 
+// Logo cleanup (graphics admin)
+
+export interface LogoCleanupSponsor {
+  sponsorId: string;
+  partyId: string;
+  partySlug: string;
+  partyName: string;
+  partyCity: string;
+  partnerName: string;
+}
+
+export interface LogoCleanupItem {
+  logoUrl: string;
+  classification: 'white_bg_png' | 'jpeg_white';
+  sponsors: LogoCleanupSponsor[];
+  sponsorUserId: string | null;
+  sponsorUserName: string | null;
+  eventCount: number;
+}
+
+export async function fetchLogoBgAudit(): Promise<{ items: LogoCleanupItem[] }> {
+  return apiRequest<{ items: LogoCleanupItem[] }>('/api/admin/logo-bg-audit', {
+    requireAuth: true,
+  });
+}
+
+export async function applyLogoBgFix(
+  logoUrl: string
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: { logoUrl },
+    }
+  );
+}
+
+/**
+ * Fetch the stripped-background preview PNG as a Blob. Use URL.createObjectURL()
+ * on the result to bind it to an <img src>. We can't use a raw URL because the
+ * endpoint requires Bearer auth, and <img> won't send Authorization headers.
+ */
+export async function fetchLogoBgPreviewBlob(logoUrl: string): Promise<Blob> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('Not authenticated');
+  const url = `${API_URL}/api/admin/logo-bg-audit/preview?url=${encodeURIComponent(logoUrl)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Preview failed: ${res.status}`);
+  }
+  return res.blob();
+}
+
