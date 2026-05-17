@@ -16,8 +16,11 @@ const C = {
   darkText:  '#1a1a1a',
   mutedText: '#555',
   cardBg:    'rgba(255,255,255,0.92)',
-  // Logo tiles use a mid-gray so both white/cream and dark logos remain readable.
-  logoCardBg:'rgba(160,160,160,0.92)',
+  // Logo tiles use a slate-tinted translucent gray (Tailwind slate-300 @ 0.85) —
+  // lighter & prettier than the previous muddy mid-gray, with a gentle blue tint
+  // that harmonizes with the sky-blue gradient, while still dark enough that
+  // white/cream logos retain contrast.
+  logoCardBg:'rgba(203, 213, 225, 0.85)',
   cardBorder:'rgba(0,0,0,0.08)',
 };
 
@@ -146,7 +149,7 @@ export function PartnersPage() {
           className="max-w-2xl mx-auto text-base md:text-lg mb-6"
           style={{ color: C.mutedText }}
         >
-          The brands powering the 2026 Global Pizza Party — slinging slices in cities around the world.
+          The orgs powering the 2026 Global Pizza Party
         </p>
 
         {!loading && !error && partners.length > 0 && (
