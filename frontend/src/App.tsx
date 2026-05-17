@@ -26,6 +26,7 @@ import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 import { EventsMapPage } from './pages/EventsMapPage';
+import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -65,6 +66,7 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />
