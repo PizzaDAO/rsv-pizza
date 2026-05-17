@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`site-header border-b border-theme-stroke overflow-visible relative z-50 ${bgClass}`}>
-      <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between relative">
         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <img
             src="/logo.png"
@@ -70,6 +70,17 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           )}
         </Link>
+        <a
+          href="https://globalpizza.party"
+          className="absolute left-1/2 -translate-x-1/2 hidden sm:block transition-opacity hover:opacity-80"
+          style={{
+            fontFamily: '"Hub 191 Display", "Comic Sans MS", cursive',
+            color: '#FE332C',
+          }}
+        >
+          <span className="hidden md:inline">Find a different city's event</span>
+          <span className="md:hidden">Other cities</span>
+        </a>
         <div className="flex items-center gap-3">
           {rightContent}
           {/* Language Switcher */}
