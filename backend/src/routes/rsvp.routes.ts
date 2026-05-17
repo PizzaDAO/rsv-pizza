@@ -24,7 +24,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
         maxGuests: true,
         user: { select: { name: true } },
         guests: {
-          select: { status: true },
+          select: { status: true, approved: true },
         },
       },
     });
@@ -43,7 +43,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
           maxGuests: true,
           user: { select: { name: true } },
           guests: {
-            select: { status: true },
+            select: { status: true, approved: true },
           },
         },
       });
@@ -68,7 +68,7 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
             maxGuests: true,
             user: { select: { name: true } },
             guests: {
-              select: { status: true },
+              select: { status: true, approved: true },
             },
           },
         });
@@ -81,13 +81,16 @@ router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunctio
 
     const hostName = party.eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null);
 
-    // Count confirmed guests (CONFIRMED or PENDING status)
+    // Count confirmed guests (CONFIRMED or PENDING status). Rejected guests
+    // (approved === false, see mushroom-31723) do not count toward capacity.
     const confirmedCount = party.guests.filter(
-      g => g.status === 'CONFIRMED' || g.status === 'PENDING'
+      g => (g.status === 'CONFIRMED' || g.status === 'PENDING') && g.approved !== false
     ).length;
 
-    // Count waitlisted guests
-    const waitlistCount = party.guests.filter(g => g.status === 'WAITLISTED').length;
+    // Count waitlisted guests (excluding rejected — mushroom-31723)
+    const waitlistCount = party.guests.filter(
+      g => g.status === 'WAITLISTED' && g.approved !== false
+    ).length;
 
     // Check if at capacity
     const isAtCapacity = party.maxGuests ? confirmedCount >= party.maxGuests : false;
@@ -368,11 +371,13 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('RSVPs are closed for this party', 400, 'RSVP_CLOSED');
     }
 
-    // Count confirmed guests to check capacity
+    // Count confirmed guests to check capacity. Rejected guests
+    // (approved === false, see mushroom-31723) do not count toward capacity.
     const confirmedGuestCount = await prisma.guest.count({
       where: {
         partyId: party.id,
         status: { in: ['CONFIRMED', 'PENDING'] },
+        approved: { not: false },
       },
     });
 
@@ -389,6 +394,21 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       });
 
       if (existingGuest) {
+        // mushroom-31723: if the host has rejected this guest (approved=false),
+        // do NOT silently reactivate them. Return the generic "already RSVPd"
+        // response without mutating the row.
+        if (existingGuest.approved === false) {
+          return res.status(200).json({
+            success: true,
+            updated: false,
+            guest: {
+              id: existingGuest.id,
+              name: existingGuest.name,
+            },
+            message: 'Your RSVP has been updated!',
+          });
+        }
+
         // Determine new status for INVITED guests completing RSVP
         let newStatus = existingGuest.status;
         let newWaitlistPosition: number | null = null;
@@ -396,7 +416,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           if (isAtCapacity) {
             newStatus = 'WAITLISTED';
             const maxPos = await prisma.guest.aggregate({
-              where: { partyId: party.id, status: 'WAITLISTED' },
+              where: { partyId: party.id, status: 'WAITLISTED', approved: { not: false } },
               _max: { waitlistPosition: true },
             });
             newWaitlistPosition = (maxPos._max.waitlistPosition || 0) + 1;
@@ -449,13 +469,14 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       }
     }
 
-    // If at capacity, get next waitlist position
+    // If at capacity, get next waitlist position (excluding rejected — mushroom-31723)
     let waitlistPosition: number | null = null;
     if (isAtCapacity) {
       const maxPosition = await prisma.guest.aggregate({
         where: {
           partyId: party.id,
           status: 'WAITLISTED',
+          approved: { not: false },
         },
         _max: { waitlistPosition: true },
       });
