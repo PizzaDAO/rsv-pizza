@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2 } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar } from '../lib/supabase';
@@ -60,6 +60,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [editHostAvatarFile, setEditHostAvatarFile] = useState<File | null>(null);
   const [savingHost, setSavingHost] = useState(false);
   const [expandedPermissionsId, setExpandedPermissionsId] = useState<string | null>(null);
+  // Provenance: tracks the handle that produced the current avatar (null = user-set or unknown)
+  const [editHostAvatarFromX, setEditHostAvatarFromX] = useState<string | null>(null);
+  const [newCoHostAvatarFromX, setNewCoHostAvatarFromX] = useState<string | null>(null);
+  const [editXAvatarFetching, setEditXAvatarFetching] = useState(false);
+  const [newXAvatarFetching, setNewXAvatarFetching] = useState(false);
 
   const newAvatarInputRef = useRef<HTMLInputElement>(null);
   const editAvatarInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +99,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setNewCoHostAvatarFile(file);
     // Clear any URL-based avatar (file takes precedence)
     setNewCoHostAvatarUrl('');
+    // User is taking ownership of the avatar slot — drop X provenance
+    setNewCoHostAvatarFromX(null);
   };
 
   const handleEditAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,6 +110,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     if (file.size > 5 * 1024 * 1024) return;
     setEditHostAvatarFile(file);
     setEditHostAvatarUrl('');
+    // User is taking ownership of the avatar slot — drop X provenance
+    setEditHostAvatarFromX(null);
   };
 
   // Tabs available for permission assignment (exclude 'apps' which is always visible)
@@ -200,6 +209,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       setNewCoHostInstagram('');
       setNewCoHostAvatarUrl('');
       setNewCoHostAvatarFile(null);
+      setNewCoHostAvatarFromX(null);
+      setNewXAvatarFetching(false);
       setNewCoHostShowOnEvent(true);
       setNewCoHostCanEdit(false);
       setShowAddHostModal(false);
@@ -220,6 +231,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostInstagram(host.instagram || '');
     setEditHostAvatarUrl(host.avatar_url || '');
     setEditHostAvatarFile(null);
+    // Provenance of any saved avatar is unknown — treat as user-set
+    setEditHostAvatarFromX(null);
   };
 
   const cancelEditingHost = () => {
@@ -231,6 +244,8 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostInstagram('');
     setEditHostAvatarUrl('');
     setEditHostAvatarFile(null);
+    setEditHostAvatarFromX(null);
+    setEditXAvatarFetching(false);
   };
 
   const saveHostEdit = async () => {
@@ -538,7 +553,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   {(editAvatarFilePreview || editHostAvatarUrl) && (
                     <button
                       type="button"
-                      onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); }}
+                      onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); setEditHostAvatarFromX(null); }}
                       className="text-xs text-red-400 hover:text-red-300"
                     >
                       Clear
@@ -573,23 +588,46 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               />
 
               <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={editHostTwitter}
-                  onChange={(e) => setEditHostTwitter(e.target.value)}
-                  onBlur={async () => {
-                    const handle = stripToHandle(editHostTwitter);
-                    setEditHostTwitter(handle);
-                    if (!handle) return;
-                    // Only auto-fill if avatar slot is empty or holding a legacy unavatar URL
-                    if (editHostAvatarFile) return;
-                    if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
-                    const fetched = await fetchXAvatarToSupabase(handle);
-                    if (fetched) setEditHostAvatarUrl(fetched);
-                  }}
-                  placeholder="Twitter (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editHostTwitter}
+                    onChange={(e) => setEditHostTwitter(e.target.value)}
+                    onBlur={async () => {
+                      const handle = stripToHandle(editHostTwitter);
+                      setEditHostTwitter(handle);
+                      if (!handle) return;
+                      // Skip partial-handle lookups that resolve to wrong users
+                      if (handle.length < 4) return;
+                      if (editHostAvatarFile) return;
+                      // Already current for this handle — no-op
+                      if (editHostAvatarFromX === handle) return;
+                      // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+                      if (editHostAvatarFromX == null) {
+                        if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
+                      }
+                      setEditXAvatarFetching(true);
+                      try {
+                        const fetched = await fetchXAvatarToSupabase(handle);
+                        if (fetched) {
+                          setEditHostAvatarUrl(fetched);
+                          setEditHostAvatarFromX(handle);
+                        }
+                      } finally {
+                        setEditXAvatarFetching(false);
+                      }
+                    }}
+                    disabled={editXAvatarFetching}
+                    placeholder="Twitter (no @)"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-60"
+                  />
+                  {editXAvatarFetching && (
+                    <Loader2
+                      size={14}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
+                    />
+                  )}
+                </div>
                 <input
                   type="text"
                   value={editHostInstagram}
@@ -661,7 +699,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   {(newAvatarFilePreview || newCoHostAvatarUrl) && (
                     <button
                       type="button"
-                      onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); }}
+                      onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); setNewCoHostAvatarFromX(null); }}
                       className="text-xs text-red-400 hover:text-red-300"
                     >
                       Clear
@@ -696,22 +734,46 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               />
 
               <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={newCoHostTwitter}
-                  onChange={(e) => setNewCoHostTwitter(e.target.value)}
-                  onBlur={async () => {
-                    const handle = stripToHandle(newCoHostTwitter);
-                    setNewCoHostTwitter(handle);
-                    if (!handle) return;
-                    if (newCoHostAvatarFile) return;
-                    if (newCoHostAvatarUrl.trim() && !isAutoFilledXAvatar(newCoHostAvatarUrl)) return;
-                    const fetched = await fetchXAvatarToSupabase(handle);
-                    if (fetched) setNewCoHostAvatarUrl(fetched);
-                  }}
-                  placeholder="Twitter (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newCoHostTwitter}
+                    onChange={(e) => setNewCoHostTwitter(e.target.value)}
+                    onBlur={async () => {
+                      const handle = stripToHandle(newCoHostTwitter);
+                      setNewCoHostTwitter(handle);
+                      if (!handle) return;
+                      // Skip partial-handle lookups that resolve to wrong users
+                      if (handle.length < 4) return;
+                      if (newCoHostAvatarFile) return;
+                      // Already current for this handle — no-op
+                      if (newCoHostAvatarFromX === handle) return;
+                      // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+                      if (newCoHostAvatarFromX == null) {
+                        if (newCoHostAvatarUrl.trim() && !isAutoFilledXAvatar(newCoHostAvatarUrl)) return;
+                      }
+                      setNewXAvatarFetching(true);
+                      try {
+                        const fetched = await fetchXAvatarToSupabase(handle);
+                        if (fetched) {
+                          setNewCoHostAvatarUrl(fetched);
+                          setNewCoHostAvatarFromX(handle);
+                        }
+                      } finally {
+                        setNewXAvatarFetching(false);
+                      }
+                    }}
+                    disabled={newXAvatarFetching}
+                    placeholder="Twitter (no @)"
+                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-60"
+                  />
+                  {newXAvatarFetching && (
+                    <Loader2
+                      size={14}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
+                    />
+                  )}
+                </div>
                 <input
                   type="text"
                   value={newCoHostInstagram}
