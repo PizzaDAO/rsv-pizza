@@ -534,7 +534,8 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       // PizzaDAO: show all GPP events (created via /gpp flow)
       where.eventType = 'gpp';
     } else if (req.isAdminViewing) {
-      // Admin with no tag filter — show events that have at least one eventTag
+      // Admin with no tag filter — show all GPP events that have at least one eventTag
+      where.eventType = 'gpp';
       where.NOT = { eventTags: { equals: [] } };
     }
 
