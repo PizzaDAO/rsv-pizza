@@ -53,6 +53,7 @@ import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
+import zoomStreamRoutes from './routes/zoom-stream.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -141,6 +142,7 @@ app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
+app.use('/api/zoom-stream', zoomStreamRoutes); // Bitcoin Pizza Day livestream (underboss-only)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
