@@ -2,7 +2,7 @@ import React from 'react';
 
 const CONTENT = (
   <>
-    <span style={{ color: '#FFFFFF', opacity: 0.8 }}>find other cities at </span>
+    <span style={{ color: '#FFFFFF', opacity: 0.8 }}>Find other cities at </span>
     <span style={{ color: '#FFFFFF' }}>globalpizza.party</span>
   </>
 );
@@ -16,7 +16,7 @@ export const MarqueeBanner: React.FC = () => {
   return (
     <a
       href="https://globalpizza.party"
-      aria-label="find other cities at globalpizza.party"
+      aria-label="Find other cities at globalpizza.party"
       className="block w-full overflow-hidden whitespace-nowrap font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       style={{
         backgroundColor: '#0497C1',
