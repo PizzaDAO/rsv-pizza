@@ -8,11 +8,14 @@ export interface AuthRequest extends Request {
   userEmail?: string;
 }
 
-// Check if the user is any kind of admin (DB-backed)
+// Check if the user is a full admin (DB-backed): role IN ('admin', 'super_admin').
+// IMPORTANT: This was tightened on 2026-05-17 (arugula-38633 PR 2) to exclude the
+// new 'payment_admin' role. payment_admin gates ONLY the future /payments dashboard
+// and must NOT be treated as a regular admin anywhere else in the system.
 export async function isAdmin(email?: string): Promise<boolean> {
   if (!email) return false;
   const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
-  return !!admin;
+  return admin?.role === 'admin' || admin?.role === 'super_admin';
 }
 
 // Check if the user is a super admin (DB-backed)
@@ -20,6 +23,28 @@ export async function isSuperAdmin(email?: string): Promise<boolean> {
   if (!email) return false;
   const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
   return admin?.role === 'super_admin';
+}
+
+// Check if the user is allowed in the host-payments dashboard: returns true for
+// payment_admin, admin, OR super_admin. Full admins always get in too.
+export async function isPaymentAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
+  return (
+    admin?.role === 'payment_admin' ||
+    admin?.role === 'admin' ||
+    admin?.role === 'super_admin'
+  );
+}
+
+// Explicit "full admin powers needed" check: returns true ONLY for the two
+// legacy full-admin roles. Use this when you want to be unambiguous that
+// payment_admin should NOT qualify. Equivalent to the current isAdmin() but
+// semantically clearer at the callsite.
+export async function isFullAdmin(email?: string): Promise<boolean> {
+  if (!email) return false;
+  const admin = await prisma.admin.findUnique({ where: { email: email.toLowerCase() } });
+  return admin?.role === 'admin' || admin?.role === 'super_admin';
 }
 
 // Check if the user is an active underboss (DB-backed)

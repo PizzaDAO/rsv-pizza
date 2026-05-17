@@ -29,6 +29,8 @@
     "noAdmins": "관리자가 없습니다",
     "superAdmin": "슈퍼 관리자",
     "admin": "관리자",
+    "paymentAdmin": "Payment Admin",
+    "paymentAdminDesc": "Manages host reimbursements only — cannot edit parties or other admins.",
     "removeAdmin": "관리자 제거",
     "tableHeaders": {
       "email": "이메일",

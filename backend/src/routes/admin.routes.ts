@@ -71,7 +71,15 @@ router.post('/add', requireAuth, async (req: AuthRequest, res: Response, next: N
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const adminRole = role === 'super_admin' ? 'super_admin' : 'admin';
+    // Accepted role values: 'admin' (default), 'super_admin', 'payment_admin'.
+    // payment_admin (added arugula-38633 PR 2) gates the host-payments dashboard
+    // but is NOT treated as a regular admin elsewhere — see isAdmin() in auth.ts.
+    const adminRole =
+      role === 'super_admin'
+        ? 'super_admin'
+        : role === 'payment_admin'
+          ? 'payment_admin'
+          : 'admin';
 
     const existing = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
