@@ -44,7 +44,7 @@ export const MarqueeBanner: React.FC = () => {
         color: '#FFFFFF',
         height: '36px',
         lineHeight: '36px',
-        fontSize: '18px',
+        fontSize: '16px',
       }}
     >
       <div className="marquee-track">

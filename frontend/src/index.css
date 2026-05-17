@@ -21,7 +21,7 @@
   display: inline-flex;
   /* No padding, no gap between sets — the two sets must be perfectly
      contiguous so translating by -50% lands exactly on a copy boundary. */
-  animation: marquee 25s linear infinite;
+  animation: marquee 31.25s linear infinite;
   will-change: transform;
 }
 .marquee-set {
