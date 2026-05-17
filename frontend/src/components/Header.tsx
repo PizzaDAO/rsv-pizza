@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
         </Link>
         <a
           href="https://globalpizza.party"
-          className="absolute left-1/2 -translate-x-1/2 hidden sm:block transition-opacity hover:opacity-80 text-xl md:text-3xl lg:text-4xl"
+          className="absolute left-1/2 -translate-x-1/2 hidden sm:block transition-opacity hover:opacity-80 text-[15px] md:text-[22px] lg:text-[27px]"
           style={{
             fontFamily: '"Hub 191 Display", "Comic Sans MS", cursive',
             color: '#0497C1',
