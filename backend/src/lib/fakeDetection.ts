@@ -28,6 +28,7 @@ export interface FakeDetectionGuest {
   roles: string[];
   pizzeriaRankings: string[];
   suggestedPizzerias: unknown; // jsonb
+  mailingListOptIn: boolean;
 }
 
 export interface FakeDetectionCoHost {
@@ -95,7 +96,6 @@ export interface FakeDetectionRow {
 export const WEIGHTS = {
   cap_fill_no_waitlist: 15,
   low_domain_entropy: 10,
-  sig_collapse: 15,
   wallet_too_low: 8,
   wallet_too_high_reuse: 8,
   wallet_reuse: 10,
@@ -110,6 +110,10 @@ export const WEIGHTS = {
   cross_event_wallet: 15,
   low_funnel_coverage: 10,
   high_per_visitor_rsvp_saturation: 15,
+  mailing_list_opt_in_extreme: 7,
+  name_token_zscore: 8,
+  lsh_field_sig_cluster: 10,
+  email_digit_benford: 5,
   co_host_twitter_handles_missing: 12,
 } as const;
 
@@ -196,6 +200,70 @@ export function filterDirectRsvps(guests: FakeDetectionGuest[]): FakeDetectionGu
   return guests.filter(g => ['link', 'rsvp', 'api'].includes(g.submittedVia));
 }
 
+/**
+ * FNV-1a 32-bit hash. Stable, dependency-free, fast.
+ * Used as the per-token hash for SimHash.
+ */
+export function fnv32(input: string): number {
+  let h = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    // Multiply by FNV prime (0x01000193) using Math.imul for 32-bit overflow semantics
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0; // coerce to unsigned 32-bit
+}
+
+/**
+ * 32-bit SimHash over a token array.
+ * Per bit position, accumulate +1 if token-hash bit is set else -1; final bit
+ * = sign(accumulator). Empty input → 0.
+ */
+export function simhash32(tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  const v = new Int32Array(32);
+  for (const t of tokens) {
+    const h = fnv32(t);
+    for (let b = 0; b < 32; b++) {
+      v[b] += (h >>> b) & 1 ? 1 : -1;
+    }
+  }
+  let sig = 0;
+  for (let b = 0; b < 32; b++) {
+    if (v[b] > 0) sig |= 1 << b;
+  }
+  return sig >>> 0;
+}
+
+/** Hamming distance between two 32-bit unsigned integers. */
+export function hammingDistance(a: number, b: number): number {
+  let x = (a ^ b) >>> 0;
+  let count = 0;
+  while (x !== 0) {
+    count += x & 1;
+    x = x >>> 1;
+  }
+  return count;
+}
+
+/**
+ * Canonical Benford's-law expected probabilities for leading digit 1..9.
+ * P(d) = log10(1 + 1/d). Indexed [0] = digit 1, ... [8] = digit 9.
+ * Hard-coded to avoid floating-point recompute and to keep the constants
+ * inspectable. If empirical reference becomes preferable, swap this table.
+ */
+export const BENFORD_EXPECTED: readonly number[] = [
+  0.301, // 1
+  0.176, // 2
+  0.125, // 3
+  0.097, // 4
+  0.079, // 5
+  0.067, // 6
+  0.058, // 7
+  0.051, // 8
+  0.046, // 9
+] as const;
+
 // ============================================
 // Per-heuristic functions
 // All accept the already-filtered direct-RSVP guest array.
@@ -251,11 +319,21 @@ export function checkLowDomainEntropy(guests: FakeDetectionGuest[]): FlagResult 
   return flag(id, fired, `entropy=${h.toFixed(3)}`, { entropy: h, domainCount: domains.length });
 }
 
-/** 3. sig_collapse — field signatures collapse to ≤ a few distinct patterns. */
+/**
+ * 3. sig_collapse — field signatures collapse to ≤ a few distinct patterns.
+ *
+ * DEPRECATED in calzone-75655 — superseded by `lsh_field_sig_cluster` which
+ * tolerates 1–2 bit variations and catches the same pattern. No longer wired
+ * into `scoreEvent` and no longer in `WEIGHTS`. Kept exported because other
+ * code may still import it; uses a literal weight rather than `flag()`.
+ */
 export function checkSigCollapse(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'sig_collapse';
+  const SIG_COLLAPSE_WEIGHT = 15; // legacy weight — see lsh_field_sig_cluster for current behavior
   const n = guests.length;
-  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  if (n < 20) {
+    return { id, name: id, fired: false, weight: SIG_COLLAPSE_WEIGHT, detail: `n=${n} below 20` };
+  }
   const sigCounts = new Map<string, number>();
   for (const g of guests) {
     const s = fieldSignature(g);
@@ -267,12 +345,14 @@ export function checkSigCollapse(guests: FakeDetectionGuest[]): FlagResult {
   const uniqueRatio = unique / n;
   const top3Share = top3 / n;
   const fired = uniqueRatio < 0.2 || top3Share > 0.7;
-  return flag(
+  return {
     id,
+    name: id,
     fired,
-    `unique=${unique}/${n} (${(uniqueRatio * 100).toFixed(1)}%), top3=${(top3Share * 100).toFixed(1)}%`,
-    { unique, top3, uniqueRatio, top3Share, n },
-  );
+    weight: SIG_COLLAPSE_WEIGHT,
+    detail: `unique=${unique}/${n} (${(uniqueRatio * 100).toFixed(1)}%), top3=${(top3Share * 100).toFixed(1)}%`,
+    evidence: { unique, top3, uniqueRatio, top3Share, n },
+  };
 }
 
 /** 4a. wallet_too_low — almost nobody connected a wallet. */
@@ -627,6 +707,165 @@ export function checkHighPerVisitorRsvpSaturation(
 }
 
 /**
+ * #3 — mailing_list_opt_in_extreme. The mailing-list opt-in checkbox is
+ * always defaulted UNCHECKED, so both bounds (<5% AND >95%) are anomalous:
+ * one human ticking/unticking the default for every fake guest is the tell.
+ */
+export function checkMailingListOptInExtreme(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'mailing_list_opt_in_extreme';
+  const n = guests.length;
+  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  const optIns = guests.filter(g => g.mailingListOptIn === true).length;
+  const rate = optIns / n;
+  const fired = rate < 0.05 || rate > 0.95;
+  return flag(
+    id,
+    fired,
+    `optInRate=${(rate * 100).toFixed(1)}% (${optIns}/${n})`,
+    { optIns, n, rate },
+  );
+}
+
+/**
+ * #9 — name_token_zscore. Quantifies repetition of first-token names
+ * (lowercase) across guests. Real African events have repeating common names
+ * but the z-score of the *max* count over the per-event distribution is
+ * bounded; an Ilemela-like "John ×8 / Juma ×7" pushes the max well past 3σ.
+ *
+ * Both conditions required: `maxCount >= 5` filters out small-tail noise,
+ * `z > 3.0` filters out events where 5+ is the natural mode.
+ */
+export function checkNameTokenZscore(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'name_token_zscore';
+  const n = guests.length;
+  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  const counts = new Map<string, number>();
+  for (const g of guests) {
+    const first = (g.name ?? '').trim().toLowerCase().split(/\s+/)[0];
+    if (!first) continue;
+    counts.set(first, (counts.get(first) ?? 0) + 1);
+  }
+  if (counts.size === 0) return flag(id, false, 'no names');
+  const arr = [...counts.values()];
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length;
+  const stdev = Math.sqrt(variance);
+  let maxCount = 0;
+  let maxToken = '';
+  for (const [tok, c] of counts) {
+    if (c > maxCount) {
+      maxCount = c;
+      maxToken = tok;
+    }
+  }
+  const z = stdev > 0 ? (maxCount - mean) / stdev : 0;
+  const fired = maxCount >= 5 && z > 3.0;
+  return flag(
+    id,
+    fired,
+    `top first-token "${maxToken}" ×${maxCount}, z=${z.toFixed(2)} (mean=${mean.toFixed(2)}, stdev=${stdev.toFixed(2)})`,
+    { maxToken, maxCount, mean, stdev, z, tokenCount: counts.size, n },
+  );
+}
+
+/**
+ * #21 — lsh_field_sig_cluster. Locality-sensitive hash over the same fields
+ * `sig_collapse` watches, but tolerates 1–2 bit Hamming variations so it
+ * survives the anchovies-default-mutation bug and similar near-duplicates.
+ *
+ * Compute SimHash per guest over feature tokens; for each guest, count how
+ * many other guests are within Hamming distance ≤ 2. The largest such cluster
+ * indicates how many guests share an "almost identical" field profile.
+ * Fire if largest cluster > 40% of guests.
+ */
+export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'lsh_field_sig_cluster';
+  const n = guests.length;
+  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  const sigs: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const g = guests[i];
+    const tokens: string[] = [];
+    for (const t of g.likedToppings) tokens.push(`lt:${t}`);
+    for (const t of g.dislikedToppings) tokens.push(`dt:${t}`);
+    for (const t of g.likedBeverages) tokens.push(`lb:${t}`);
+    for (const t of g.dislikedBeverages) tokens.push(`db:${t}`);
+    for (const t of g.dietaryRestrictions) tokens.push(`dr:${t}`);
+    for (const t of g.roles) tokens.push(`r:${t}`);
+    sigs[i] = simhash32(tokens);
+  }
+  let maxCluster = 0;
+  for (let i = 0; i < n; i++) {
+    let cluster = 1; // count self
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      if (hammingDistance(sigs[i], sigs[j]) <= 2) cluster++;
+    }
+    if (cluster > maxCluster) maxCluster = cluster;
+  }
+  const share = maxCluster / n;
+  const fired = share > 0.4;
+  return flag(
+    id,
+    fired,
+    `largestCluster=${maxCluster}/${n} (${(share * 100).toFixed(1)}%) within Hamming ≤ 2`,
+    { maxCluster, n, share },
+  );
+}
+
+/**
+ * #22 — email_digit_benford. Padders generating fake "year suffix" emails
+ * (mario78@, mario83@, mario91@) skew leading digits toward 7–9. Real digit
+ * suffixes follow Benford-ish (leading digit 1 most common).
+ *
+ * Extract trailing digit run from each email's local-part; compute observed
+ * leading-digit distribution over digits 1..9; sum-absolute-deviation from
+ * canonical Benford. Fire if SAD > 0.40.
+ */
+export function checkEmailDigitBenford(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'email_digit_benford';
+  const counts = new Array<number>(9).fill(0);
+  let total = 0;
+  for (const g of guests) {
+    const e = (g.email ?? '').toLowerCase();
+    const at = e.indexOf('@');
+    if (at <= 0) continue;
+    const local = e.slice(0, at);
+    const m = local.match(/(\d+)$/);
+    if (!m) continue;
+    const digits = m[1];
+    // Leading digit, ignoring leading zeros (e.g. "007" → '7', "0" → skip)
+    let leadIdx = -1;
+    for (let i = 0; i < digits.length; i++) {
+      const d = digits.charCodeAt(i) - 48;
+      if (d >= 1 && d <= 9) {
+        leadIdx = d;
+        break;
+      }
+    }
+    if (leadIdx === -1) continue;
+    counts[leadIdx - 1]++;
+    total++;
+  }
+  if (total < 30) {
+    return flag(id, false, `emails-with-digit-suffix=${total} below 30`);
+  }
+  let sad = 0;
+  const observed: number[] = new Array<number>(9).fill(0);
+  for (let i = 0; i < 9; i++) {
+    observed[i] = counts[i] / total;
+    sad += Math.abs(observed[i] - BENFORD_EXPECTED[i]);
+  }
+  const fired = sad > 0.4;
+  return flag(
+    id,
+    fired,
+    `SAD=${sad.toFixed(3)} over ${total} digit-suffix emails`,
+    { sad, total, observed },
+  );
+}
+
+/**
  * 17. co_host_twitter_handles_missing — among "real" co-hosts (excluding internal
  * underboss entries and partner-brand entries), too many are missing a twitter
  * handle. Real volunteer co-hosts almost always have an X/Twitter handle attached;
@@ -695,7 +934,6 @@ export function scoreEvent(
   const flags: FlagResult[] = [
     checkCapFillNoWaitlist(guests, maxGuests),
     checkLowDomainEntropy(guests),
-    checkSigCollapse(guests),
     checkWalletTooLow(guests),
     checkWalletTooHighReuse(guests),
     checkWalletReuse(guests),
@@ -710,6 +948,10 @@ export function scoreEvent(
     checkCrossEventWallet(guests, sybilWallets),
     checkLowFunnelCoverage(guests, funnelEvents),
     checkHighPerVisitorRsvpSaturation(guests, funnelEvents),
+    checkMailingListOptInExtreme(guests),
+    checkNameTokenZscore(guests),
+    checkLshFieldSigCluster(guests),
+    checkEmailDigitBenford(guests),
     checkCoHostTwitterHandlesMissing(party),
   ];
 
