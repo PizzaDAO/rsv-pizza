@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, PayoutMethod, BankDetails, OcrPreviewResult } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -3590,6 +3590,111 @@ export async function applyLogoBgFixUpload(
       },
     }
   );
+}
+
+// ============================================
+// Admin Host Payouts (arugula-38633 — PR 4)
+// ============================================
+
+function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
+  if (!filters) return '';
+  const params = new URLSearchParams();
+  if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+  if (filters.payoutMethod && filters.payoutMethod !== 'all') params.set('payoutMethod', filters.payoutMethod);
+  if (filters.partyId) params.set('partyId', filters.partyId);
+  if (filters.hostEmail) params.set('hostEmail', filters.hostEmail);
+  if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
+  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+  if (filters.dateTo) params.set('dateTo', filters.dateTo);
+  if (filters.cursor) params.set('cursor', filters.cursor);
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export async function listAdminPayouts(filters?: AdminPayoutFilters): Promise<AdminPayoutsResponse> {
+  return apiRequest<AdminPayoutsResponse>(`/api/admin/payouts${buildPayoutQuery(filters)}`);
+}
+
+export async function getAdminPayout(id: string): Promise<AdminPayoutDetail> {
+  const res = await apiRequest<{ payout: AdminPayoutDetail }>(`/api/admin/payouts/${id}`);
+  return res.payout;
+}
+
+export async function updateAdminPayout(
+  id: string,
+  fields: {
+    finalAmountUsd?: number;
+    adminNotes?: string | null;
+    payoutMethod?: PayoutMethod;
+    payoutWalletAddress?: string | null;
+    payoutBankDetails?: BankDetails | null;
+    note?: string;
+  },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}`, {
+    method: 'PATCH',
+    body: fields,
+  });
+  return res.payout;
+}
+
+export async function approveAdminPayout(
+  id: string,
+  opts?: { note?: string; autoExecute?: boolean },
+): Promise<{ payout: AdminPayout; autoExecuteDeferred: boolean }> {
+  return apiRequest(`/api/admin/payouts/${id}/approve`, {
+    method: 'POST',
+    body: { note: opts?.note, autoExecute: opts?.autoExecute },
+  });
+}
+
+export async function rejectAdminPayout(id: string, rejectionReason: string): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/reject`, {
+    method: 'POST',
+    body: { rejectionReason },
+  });
+  return res.payout;
+}
+
+export async function markAdminPayoutPaid(
+  id: string,
+  refs: {
+    wireReference?: string;
+    transactionHash?: string;
+    mercuryCardLast4?: string;
+    mercuryCardId?: string;
+    note?: string;
+  },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/mark-paid`, {
+    method: 'POST',
+    body: refs,
+  });
+  return res.payout;
+}
+
+/**
+ * Triggers the CSV export endpoint and downloads the file to the browser.
+ * Returns nothing — fires a download via a temporary <a> element.
+ */
+export async function exportAdminPayoutsCsv(filters?: AdminPayoutFilters): Promise<void> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('Not authenticated');
+  const url = `${API_URL}/api/admin/payouts/export.csv${buildPayoutQuery(filters)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`CSV export failed: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = `host-payouts-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
 }
 
 /**

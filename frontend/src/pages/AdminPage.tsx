@@ -9,7 +9,7 @@ import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -582,7 +582,7 @@ export function AdminPage() {
           </div>
 
           {/* Export Events CSV */}
-          <div className="mb-6">
+          <div className="mb-6 flex items-center gap-2 flex-wrap">
             <button
               onClick={handleExportEventsCsv}
               disabled={exportingCsv}
@@ -591,6 +591,15 @@ export function AdminPage() {
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               {t('page.exportEventsCsv')}
             </button>
+            {/* Link to /payments (admin, super_admin, payment_admin) — arugula-38633 PR 4 */}
+            <a
+              href="/payments"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 text-emerald-800 text-sm font-medium hover:bg-emerald-100 border border-emerald-300"
+            >
+              <DollarSign size={16} />
+              Manage Host Payouts
+              <ArrowRight size={14} />
+            </a>
           </div>
 
           {/* Admin Management */}

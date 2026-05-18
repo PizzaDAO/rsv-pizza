@@ -1397,6 +1397,20 @@ export interface BankDetails {
   notes?: string;
 }
 
+export interface PayoutAuditEntry {
+  id: string;
+  action: 'create' | 'approve' | 'reject' | 'edit_amount' | 'mark_paid' | 'mark_failed' | 'retry' | 'cancel';
+  oldStatus: string | null;
+  newStatus: string | null;
+  oldAmount: number | null;
+  newAmount: number | null;
+  actorEmail: string;
+  actorKind: 'admin' | 'super_admin' | 'payment_admin' | 'host' | 'system';
+  note: string | null;
+  createdAt: string;
+}
+
+
 export interface Payout {
   id: string;
   partyId: string;
@@ -1423,6 +1437,53 @@ export interface Payout {
   createdAt: string;
   updatedAt: string;
   documents: PayoutDocument[];
+}
+
+// Admin-list payout: includes embedded party + host info
+export interface AdminPayout extends Payout {
+  party: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    customUrl: string | null;
+  };
+  host: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  };
+}
+
+export interface AdminPayoutDetail extends AdminPayout {
+  audits: PayoutAuditEntry[];
+}
+
+export interface AdminPayoutFilters {
+  status?: PayoutStatus | 'all';
+  payoutMethod?: PayoutMethod | 'all';
+  partyId?: string;
+  hostEmail?: string;
+  currency?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface AdminPayoutTotals {
+  byStatus: Record<string, number>;
+  byMethod: Record<string, number>;
+  totalUsdPending: number;
+  totalUsdPaid: number;
+  totalUsdThisMonth: number;
+  avgUsd: number;
+  awaitingReview: number;
+}
+
+export interface AdminPayoutsResponse {
+  payouts: AdminPayout[];
+  nextCursor: string | null;
+  totals: AdminPayoutTotals;
 }
 
 export interface OcrPreviewResult {
