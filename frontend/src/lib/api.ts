@@ -317,7 +317,7 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
-export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean) {
+export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean | null) {
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',
     body: { approved },
@@ -967,6 +967,29 @@ export interface CheckInResponse {
 export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
   return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
     method: 'POST',
+    requireAuth: true,
+  });
+}
+
+// Un-check-in: DELETE /api/checkin/:inviteCode/:guestId
+// Backend nulls checkedInAt/checkedInBy and emits guest.checkin_undone webhook.
+// Idempotent (200 if already unchecked). Returns 400 GUEST_REJECTED if guest is rejected.
+export interface UnCheckInResponse {
+  success: boolean;
+  notCheckedIn?: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: null;
+    checkedInBy: null;
+  };
+  message: string;
+}
+
+export async function uncheckInGuestApi(inviteCode: string, guestId: string): Promise<UnCheckInResponse> {
+  return apiRequest<UnCheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'DELETE',
     requireAuth: true,
   });
 }

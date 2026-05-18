@@ -72,7 +72,7 @@ function buildFallbackReport(party: any, guests: Guest[]): EventReport {
     notableAttendees: [],
     featuredPhotos: [],
     stats: {
-      totalRsvps: guests.length,
+      totalRsvps: guests.filter(g => g.approved !== false).length,
       approvedGuests,
       mailingListSignups,
       walletAddresses,
