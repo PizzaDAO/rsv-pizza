@@ -7,6 +7,7 @@ import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 import { findActiveRegion } from '../lib/optinAbRegions';
+import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
 
 // ---- Types ----
 
@@ -451,6 +452,18 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setSubmitting(true);
     setError(null);
 
+    // romana-30802: stamp the visitor session cookie ID on every submission.
+    // Cookie was already set on first RSVPPage mount but we read it again here
+    // to handle the modal entry point (RSVPModal) which doesn't trigger that
+    // useEffect.
+    let visitorSessionId: string | undefined;
+    try {
+      visitorSessionId = getOrCreateVisitorSessionId();
+    } catch (e) {
+      // Cookie failures (private mode, blocked) are non-fatal.
+      console.warn('visitor session cookie unavailable:', e);
+    }
+
     try {
       const result = await addGuestToParty(
         eventData.id,
@@ -475,6 +488,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         swcBrOptIn || undefined,
         ethconfOptIn || undefined,
         optinAbVariant ?? undefined,
+        visitorSessionId,
       );
 
       if (result) {

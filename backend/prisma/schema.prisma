@@ -286,6 +286,9 @@ model Guest {
   privyUserId  String? @map("privy_user_id") @db.VarChar
   walletSource String? @map("wallet_source") @db.VarChar
 
+  // romana-30802: cookie-based visitor session ID for duplicate-RSVP detection
+  visitorSessionId String? @map("visitor_session_id")
+
   // Check-in fields
   checkedInAt       DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy       String?   @map("checked_in_by")

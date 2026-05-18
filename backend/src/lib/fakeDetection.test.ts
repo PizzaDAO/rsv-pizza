@@ -29,6 +29,7 @@ import {
   checkLshFieldSigCluster,
   checkEmailDigitBenford,
   checkCoHostTwitterHandlesMissing,
+  checkRepeatSessionRsvpCount,
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
@@ -62,6 +63,7 @@ function makeGuest(overrides: Partial<FakeDetectionGuest> = {}): FakeDetectionGu
     pizzeriaRankings: ['da Michele', 'Sorbillo'],
     suggestedPizzerias: [{ name: 'da Michele' }],
     mailingListOptIn: false,
+    visitorSessionId: null,
     ...overrides,
   };
 }
@@ -917,6 +919,56 @@ describe('checkCoHostTwitterHandlesMissing', () => {
     expect(result.fired).toBe(false);
     expect(result.evidence?.filteredTotal).toBe(2);
     expect(result.evidence?.missingCount).toBe(0);
+  });
+});
+
+describe('checkRepeatSessionRsvpCount', () => {
+  // romana-30802: cookie-based padding detector. Min-n=20 non-null sessions;
+  // fires when max session repeat ≥ 5.
+
+  it('does not fire below min-n (only 10 guests with session_id)', () => {
+    const guests = Array.from({ length: 10 }, (_, i) =>
+      makeGuest({ visitorSessionId: `sess-${i}` }),
+    );
+    const result = checkRepeatSessionRsvpCount(guests);
+    expect(result.fired).toBe(false);
+    expect(result.detail).toMatch(/need ≥20/);
+  });
+
+  it('does not fire when all session IDs are distinct (no repeats)', () => {
+    const guests = Array.from({ length: 30 }, (_, i) =>
+      makeGuest({ visitorSessionId: `unique-sess-${i}` }),
+    );
+    const result = checkRepeatSessionRsvpCount(guests);
+    expect(result.fired).toBe(false);
+    expect(result.evidence?.maxRepeats).toBe(1);
+  });
+
+  it('fires when one session_id repeats 5+ times', () => {
+    // 5 guests share "padder-session"; 20 others are distinct → maxRepeats=5
+    const padder = Array.from({ length: 5 }, () =>
+      makeGuest({ visitorSessionId: 'padder-session-aaaa-bbbb-cccc' }),
+    );
+    const others = Array.from({ length: 20 }, (_, i) =>
+      makeGuest({ visitorSessionId: `legit-${i}` }),
+    );
+    const result = checkRepeatSessionRsvpCount([...padder, ...others]);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.maxRepeats).toBe(5);
+    expect(result.evidence?.sessionsWithData).toBe(25);
+  });
+
+  it('ignores null session IDs in the count', () => {
+    // 30 guests total, but only 10 have a session_id → below min-n, no fire
+    const withSession = Array.from({ length: 10 }, (_, i) =>
+      makeGuest({ visitorSessionId: `s-${i}` }),
+    );
+    const withoutSession = Array.from({ length: 20 }, () =>
+      makeGuest({ visitorSessionId: null }),
+    );
+    const result = checkRepeatSessionRsvpCount([...withSession, ...withoutSession]);
+    expect(result.fired).toBe(false);
+    expect(result.detail).toMatch(/10\/30/);
   });
 });
 
