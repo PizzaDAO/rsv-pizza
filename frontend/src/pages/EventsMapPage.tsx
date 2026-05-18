@@ -227,6 +227,15 @@ export function EventsMapPage() {
   // Count unique cities (use full events count for the non-moderator pill,
   // filteredEvents for the moderator "X of Y" pill).
   const cityCount = useMemo(() => new Set(events.map((e) => e.city)).size, [events]);
+  const countryCount = useMemo(
+    () =>
+      new Set(
+        events
+          .map((e) => e.country)
+          .filter((c): c is string => !!c && c.trim() !== '')
+      ).size,
+    [events]
+  );
 
   return (
     <>
@@ -354,6 +363,12 @@ export function EventsMapPage() {
                     <>
                       {events.length.toLocaleString()} events across{' '}
                       {cityCount} {cityCount === 1 ? 'city' : 'cities'}
+                      {countryCount > 0 && (
+                        <>
+                          {' '}in {countryCount}{' '}
+                          {countryCount === 1 ? 'country' : 'countries'}
+                        </>
+                      )}
                     </>
                   )}
                 </span>
