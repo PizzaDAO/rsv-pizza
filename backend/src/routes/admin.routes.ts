@@ -782,57 +782,84 @@ router.get('/funnel-stats', requireAuth, async (req: AuthRequest, res: Response,
   }
 });
 
-// GET /api/admin/experiments/optin-ab — parmesan-98989 combined opt-in A/B results (admin only)
+// mushroom-36006: regional opt-in A/B registry. Kept in sync with
+// frontend/src/lib/optinAbRegions.ts. Each entry pairs an event tag with the
+// per-region `swc_*_opt_in` boolean column on `guests`.
+const OPTIN_AB_REGIONS: Array<{ tag: string; label: string; optInColumn: string }> = [
+  { tag: 'swc',        label: 'US',        optInColumn: 'swc_opt_in'    },
+  { tag: 'swccanada',  label: 'Canada',    optInColumn: 'swc_ca_opt_in' },
+  { tag: 'swcau',      label: 'Australia', optInColumn: 'swc_au_opt_in' },
+  { tag: 'swceu',      label: 'EU',        optInColumn: 'swc_eu_opt_in' },
+  { tag: 'swcuk',      label: 'UK',        optInColumn: 'swc_uk_opt_in' },
+  { tag: 'swcbr',      label: 'Brazil',    optInColumn: 'swc_br_opt_in' },
+];
+
+// GET /api/admin/experiments/optin-ab — mushroom-36006 per-region combined opt-in A/B results (admin only)
 router.get('/experiments/optin-ab', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!(await isAdmin(req.userEmail))) {
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    const rows = await prisma.$queryRaw<Array<{
+    const valuesList = OPTIN_AB_REGIONS
+      .map((r) => `('${r.tag.replace(/'/g, "''")}')`)
+      .join(', ');
+    const swcOptinCases = OPTIN_AB_REGIONS
+      .map((r) => `(region.tag = '${r.tag.replace(/'/g, "''")}' AND g.${r.optInColumn})`)
+      .join(' OR ');
+
+    const sql = `
+      SELECT
+        region.tag                                                            AS region_tag,
+        g.optin_ab_variant                                                    AS arm,
+        COUNT(*)::int                                                         AS n,
+        COUNT(*) FILTER (WHERE g.mailing_list_opt_in)::int                    AS pizzadao_optins,
+        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE g.mailing_list_opt_in)
+                             / NULLIF(COUNT(*), 0), 2), 0)                    AS pizzadao_optin_pct,
+        COUNT(*) FILTER (WHERE ${swcOptinCases})::int                         AS swc_optins,
+        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE ${swcOptinCases})
+                             / NULLIF(COUNT(*), 0), 2), 0)                    AS swc_optin_pct
+      FROM (VALUES ${valuesList}) AS region(tag)
+      JOIN parties p ON region.tag = ANY(p.event_tags)
+      JOIN guests  g ON g.party_id = p.id
+      WHERE g.optin_ab_variant IN ('control', 'variant')
+        AND g.submitted_via = 'link'
+        AND (g.status IS NULL OR g.status != 'INVITED')
+      GROUP BY region.tag, g.optin_ab_variant
+      ORDER BY region.tag, g.optin_ab_variant
+    `;
+
+    const rows = await prisma.$queryRawUnsafe<Array<{
+      region_tag: string;
       arm: string;
       n: number;
       pizzadao_optins: number;
       pizzadao_optin_pct: number | string;
       swc_optins: number;
       swc_optin_pct: number | string;
-    }>>`
-      SELECT
-        g.optin_ab_variant AS arm,
-        COUNT(*)::int                                                        AS n,
-        COUNT(*) FILTER (WHERE g.mailing_list_opt_in)::int                   AS pizzadao_optins,
-        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE g.mailing_list_opt_in)
-                             / NULLIF(COUNT(*), 0), 2), 0)                   AS pizzadao_optin_pct,
-        COUNT(*) FILTER (WHERE g.swc_opt_in)::int                            AS swc_optins,
-        COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE g.swc_opt_in)
-                             / NULLIF(COUNT(*), 0), 2), 0)                   AS swc_optin_pct
-      FROM guests g
-      JOIN parties p ON p.id = g.party_id
-      WHERE 'swc' = ANY(p.event_tags)
-        AND g.optin_ab_variant IN ('control', 'variant')
-        AND g.submitted_via = 'link'
-        AND (g.status IS NULL OR g.status != 'INVITED')
-      GROUP BY g.optin_ab_variant
-      ORDER BY g.optin_ab_variant;
-    `;
+    }>>(sql);
 
-    const byArm = new Map<string, typeof rows[number]>();
-    for (const r of rows) byArm.set(r.arm, r);
+    const byKey = new Map<string, typeof rows[number]>();
+    for (const r of rows) byKey.set(`${r.region_tag}|${r.arm}`, r);
 
-    const arms = (['control', 'variant'] as const).map((arm) => {
-      const r = byArm.get(arm);
-      return {
-        arm,
-        n: r ? Number(r.n) : 0,
-        pizzadaoOptins: r ? Number(r.pizzadao_optins) : 0,
-        pizzadaoOptinPct: r ? Number(r.pizzadao_optin_pct) : 0,
-        swcOptins: r ? Number(r.swc_optins) : 0,
-        swcOptinPct: r ? Number(r.swc_optin_pct) : 0,
-      };
-    });
+    const regions = OPTIN_AB_REGIONS.map((region) => ({
+      tag: region.tag,
+      label: region.label,
+      arms: (['control', 'variant'] as const).map((arm) => {
+        const r = byKey.get(`${region.tag}|${arm}`);
+        return {
+          arm,
+          n: r ? Number(r.n) : 0,
+          pizzadaoOptins: r ? Number(r.pizzadao_optins) : 0,
+          pizzadaoOptinPct: r ? Number(r.pizzadao_optin_pct) : 0,
+          swcOptins: r ? Number(r.swc_optins) : 0,
+          swcOptinPct: r ? Number(r.swc_optin_pct) : 0,
+        };
+      }),
+    }));
 
     res.set('Cache-Control', 'no-store');
-    res.json({ arms });
+    res.json({ regions });
   } catch (error) {
     next(error);
   }
