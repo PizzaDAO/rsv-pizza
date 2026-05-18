@@ -182,6 +182,12 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   useEffect(() => {
     if (optinAbVariant !== null) return; // preservation path already set
     if (!activeRegionConfig) return;     // not an SWC event
+    // pizzaiolo-63884: pilot mode — only events explicitly tagged 'optin-ab-test'
+    // participate in the experiment, even when the region's kill-switch flag is ON.
+    // Remove this gate (or remove the tag from each pilot event) to fan out to all
+    // region-tagged events.
+    const tags = eventData.eventTags || [];
+    if (!tags.includes('optin-ab-test')) return;
     let cancelled = false;
     (async () => {
       const enabled = await getExperimentFlag(activeRegionConfig.flagKey);
