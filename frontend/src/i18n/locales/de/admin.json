@@ -167,7 +167,11 @@
     "subtitle": "Global Pizza Party · Versand-Dashboard",
     "signedInAdmin": "Angemeldet als Admin ({{email}})",
     "signedInAs": "Angemeldet als {{name}}",
-    "kitRequests": "Kit-Anfragen ({{count}})"
+    "kitRequests": "Kit-Anfragen ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

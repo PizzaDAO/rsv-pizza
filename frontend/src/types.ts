@@ -1163,7 +1163,11 @@ export interface ShippingKit {
   eventAddress: string | null;
   eventVenue: string | null;
   underbossStatus: UnderbossStatus;
-  requestedTier: KitTier;
+  /**
+   * Placeholder rows (events with no kit request) send an empty string here;
+   * widened from `KitTier` to allow that.
+   */
+  requestedTier: KitTier | '';
   allocatedTier: KitTier | null;
   recipientName: string;
   addressLine1: string;
@@ -1173,7 +1177,11 @@ export interface ShippingKit {
   postalCode: string;
   country: string;
   phone: string | null;
-  status: KitStatus;
+  /**
+   * Real kits use the `KitStatus` enum. Placeholder rows (events with no
+   * `party_kits` row) send the sentinel `'no_request'`.
+   */
+  status: KitStatus | 'no_request';
   trackingNumber: string | null;
   trackingUrl: string | null;
   notes: string | null;
@@ -1182,6 +1190,10 @@ export interface ShippingKit {
   approvedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  /** Non-declined, non-invited guest count for this kit's event. */
+  rsvpCount: number;
+  /** True when this row is a placeholder for an event with no kit request. */
+  isPlaceholder?: boolean;
 }
 
 export interface ShippingKitStats {
@@ -1191,6 +1203,8 @@ export interface ShippingKitStats {
   shipped: number;
   delivered: number;
   declined: number;
+  /** GPP-approved events in scope that have not submitted a kit request. */
+  noRequest: number;
   byCountry: Record<string, number>;
   byTier: Record<string, number>;
 }
