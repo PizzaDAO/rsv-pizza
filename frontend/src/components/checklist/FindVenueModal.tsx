@@ -4,6 +4,7 @@ import { Loader2, X } from 'lucide-react';
 import { LocationAutocomplete } from '../LocationAutocomplete';
 import { usePizza } from '../../contexts/PizzaContext';
 import { updateParty } from '../../lib/supabase';
+import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
 
 interface FindVenueModalProps {
   open: boolean;
@@ -63,6 +64,7 @@ export const FindVenueModal: React.FC<FindVenueModalProps> = ({ open, onClose, o
       if (party.inviteCode) {
         await loadParty(party.inviteCode);
       }
+      triggerFlyerRegen(party, loadParty);
       if (onSaved) {
         await onSaved();
       }
