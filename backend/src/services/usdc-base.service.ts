@@ -35,7 +35,7 @@ import { prisma } from '../config/database.js';
 
 const USDC_BASE_ADDRESS: Hex = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
-const HARD_PER_TX_CEILING_USD = 1000;
+const HARD_PER_TX_CEILING_USD = 625;
 const DEFAULT_PER_TX_CAP_USD = 200;
 const DEFAULT_DAILY_CAP_USD = 2000;
 const TX_RECEIPT_TIMEOUT_MS = 90_000;
