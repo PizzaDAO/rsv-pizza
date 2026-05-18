@@ -1244,7 +1244,7 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       const gppEvents = scopedWhere
         ? await prisma.party.findMany({
             where: { AND: [{ eventType: 'gpp' }, scopedWhere] },
-            select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+            select: { id: true, coHosts: true, region: true, city: true, name: true, eventType: true },
           })
         : [];
 
@@ -1506,7 +1506,7 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
             if (removeWhere) {
               const eventsToRemoveFrom = await prisma.party.findMany({
                 where: { AND: [{ eventType: 'gpp' }, removeWhere] },
-                select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+                select: { id: true, coHosts: true, region: true, city: true, name: true, eventType: true },
               });
               for (const event of eventsToRemoveFrom) {
                 if (partyMatchesScope(event, stillScope)) continue; // still in scope via region or remaining city
@@ -1531,7 +1531,7 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
             if (addWhere) {
               const eventsToAddTo = await prisma.party.findMany({
                 where: { AND: [{ eventType: 'gpp' }, addWhere] },
-                select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+                select: { id: true, coHosts: true, region: true, city: true, name: true, eventType: true },
               });
               for (const event of eventsToAddTo) {
                 if (!partyMatchesScope(event, addScope)) continue;
@@ -1634,7 +1634,7 @@ router.post('/admin/backfill-cohosts', requireAuth, async (req: AuthRequest, res
     // Get all GPP events (region may be null for city-only matches)
     const gppEvents = await prisma.party.findMany({
       where: { eventType: 'gpp' },
-      select: { id: true, region: true, name: true, eventType: true, coHosts: true },
+      select: { id: true, region: true, city: true, name: true, eventType: true, coHosts: true },
     });
 
     let eventsUpdated = 0;
