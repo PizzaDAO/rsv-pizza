@@ -3502,8 +3502,14 @@ export interface OptinABArm {
   swcOptinPct: number;
 }
 
-export interface OptinABResults {
+export interface OptinABRegion {
+  tag: string;
+  label: string;
   arms: OptinABArm[];
+}
+
+export interface OptinABResults {
+  regions: OptinABRegion[];
 }
 
 export async function fetchOptinABResults(): Promise<OptinABResults | null> {
