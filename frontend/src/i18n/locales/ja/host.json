@@ -299,7 +299,7 @@
     "pipeline": "パイプライン",
     "fundraisingSection": "資金調達",
     "contributionType": "貢献タイプ",
-    "sponsorshipDetails": "スポンサーシップ詳細",
+    "partnershipDetails": "パートナーシップ詳細",
     "messageFromSponsor": "スポンサーからのメッセージ",
     "logo": "ロゴ",
     "uploadLogo": "ロゴをアップロード",
@@ -348,6 +348,7 @@
     "venueType": "会場",
     "pizzaType": "ピザ",
     "drinksType": "ドリンク",
+    "communityType": "コミュニティ",
     "otherType": "その他",
     "brandDescription": "1〜2文のブランド説明（イベントページに表示）",
     "productService": "製品/サービス（非金銭の場合）"

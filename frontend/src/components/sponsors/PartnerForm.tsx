@@ -105,6 +105,7 @@ const TYPE_OPTIONS: { value: SponsorshipType; labelKey: string }[] = [
   { value: 'venue', labelKey: 'sponsors.venueType' },
   { value: 'pizza', labelKey: 'sponsors.pizzaType' },
   { value: 'drinks', labelKey: 'sponsors.drinksType' },
+  { value: 'community', labelKey: 'sponsors.communityType' },
   { value: 'other', labelKey: 'sponsors.otherType' },
 ];
 
@@ -749,12 +750,12 @@ export function PartnerForm({
         </div>
       )}
 
-      {/* Sponsorship Details — Intake mode only (CRM has it under Fundraising) */}
+      {/* Partnership Details — Intake mode only (CRM has it under Fundraising) */}
       {!logoOnly && isIntake && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-theme-text flex items-center gap-2">
             <FileText size={16} />
-            {t('sponsors.sponsorshipDetails')}
+            {t('sponsors.partnershipDetails')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="relative">

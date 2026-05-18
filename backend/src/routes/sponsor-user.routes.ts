@@ -539,6 +539,12 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       where.NOT = { eventTags: { equals: [] } };
     }
 
+    // Non-admin partners only see approved events.
+    // Admins (req.isAdminViewing) continue to see everything for debugging/tagging.
+    if (!req.isAdminViewing) {
+      where.underbossStatus = 'approved';
+    }
+
     // Find events
     const events = await prisma.party.findMany({
       where,

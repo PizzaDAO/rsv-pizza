@@ -382,7 +382,7 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
     }
 
     // Validate sponsorship type if provided
-    const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'other'];
+    const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'community', 'other'];
     if (sponsorshipType && !validTypes.includes(sponsorshipType)) {
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
@@ -594,7 +594,7 @@ router.patch('/:partyId/sponsors/:sponsorId', requireAuth, async (req: AuthReque
     }
 
     // Validate sponsorship type if provided
-    const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'other'];
+    const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'community', 'other'];
     if (sponsorshipType && !validTypes.includes(sponsorshipType)) {
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }

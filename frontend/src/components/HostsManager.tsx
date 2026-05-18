@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2, Send } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2, Send, Mail } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
+import { IconInput } from './IconInput';
 import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar } from '../lib/supabase';
 import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
+
+// X (Twitter) icon component
+const XIcon: React.FC<{ size?: number; className?: string }> = ({ size = 20, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
 
 interface HostsManagerProps {
   partyId: string;
@@ -581,89 +589,90 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 </div>
               </div>
 
-              <input
+              <IconInput
+                icon={User}
                 type="text"
                 value={editHostName}
                 onChange={(e) => setEditHostName(e.target.value)}
-                placeholder="Name *"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                placeholder="Name"
+                required
               />
 
-              <input
+              <IconInput
+                icon={Mail}
                 type="email"
                 value={editHostEmail}
                 onChange={(e) => setEditHostEmail(e.target.value)}
                 placeholder="Email (required to edit event)"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <input
+              <IconInput
+                icon={Globe}
                 type="url"
                 value={editHostWebsite}
                 onChange={(e) => setEditHostWebsite(e.target.value)}
                 onBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
                 placeholder="Website"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editHostTwitter}
-                    onChange={(e) => setEditHostTwitter(e.target.value)}
-                    onBlur={async () => {
-                      const handle = stripToHandle(editHostTwitter);
-                      setEditHostTwitter(handle);
-                      if (!handle) return;
-                      // Skip partial-handle lookups that resolve to wrong users
-                      if (handle.length < 4) return;
-                      if (editHostAvatarFile) return;
-                      // Already current for this handle — no-op
-                      if (editHostAvatarFromX === handle) return;
-                      // First-time fetch: only auto-fill empty slot or legacy unavatar URL
-                      if (editHostAvatarFromX == null) {
-                        if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
+              <div className="relative">
+                <IconInput
+                  customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
+                  type="text"
+                  value={editHostTwitter}
+                  onChange={(e) => setEditHostTwitter(e.target.value)}
+                  onBlur={async () => {
+                    const handle = stripToHandle(editHostTwitter);
+                    setEditHostTwitter(handle);
+                    if (!handle) return;
+                    // Skip partial-handle lookups that resolve to wrong users
+                    if (handle.length < 4) return;
+                    if (editHostAvatarFile) return;
+                    // Already current for this handle — no-op
+                    if (editHostAvatarFromX === handle) return;
+                    // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+                    if (editHostAvatarFromX == null) {
+                      if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
+                    }
+                    setEditXAvatarFetching(true);
+                    try {
+                      const fetched = await fetchXAvatarToSupabase(handle);
+                      if (fetched) {
+                        setEditHostAvatarUrl(fetched);
+                        setEditHostAvatarFromX(handle);
                       }
-                      setEditXAvatarFetching(true);
-                      try {
-                        const fetched = await fetchXAvatarToSupabase(handle);
-                        if (fetched) {
-                          setEditHostAvatarUrl(fetched);
-                          setEditHostAvatarFromX(handle);
-                        }
-                      } finally {
-                        setEditXAvatarFetching(false);
-                      }
-                    }}
-                    disabled={editXAvatarFetching}
-                    placeholder="Twitter (no @)"
-                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-60"
+                    } finally {
+                      setEditXAvatarFetching(false);
+                    }
+                  }}
+                  disabled={editXAvatarFetching}
+                  placeholder="Twitter (no @)"
+                />
+                {editXAvatarFetching && (
+                  <Loader2
+                    size={14}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
                   />
-                  {editXAvatarFetching && (
-                    <Loader2
-                      size={14}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
-                    />
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={editHostInstagram}
-                  onChange={(e) => setEditHostInstagram(e.target.value)}
-                  onBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
-                  placeholder="Instagram (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-                <input
-                  type="text"
-                  value={editHostTelegram}
-                  onChange={(e) => setEditHostTelegram(e.target.value)}
-                  onBlur={() => setEditHostTelegram(stripToHandle(editHostTelegram))}
-                  placeholder="Telegram (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
+                )}
               </div>
+
+              <IconInput
+                icon={Instagram}
+                type="text"
+                value={editHostInstagram}
+                onChange={(e) => setEditHostInstagram(e.target.value)}
+                onBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
+                placeholder="Instagram (no @)"
+              />
+
+              <IconInput
+                icon={Send}
+                type="text"
+                value={editHostTelegram}
+                onChange={(e) => setEditHostTelegram(e.target.value)}
+                onBlur={() => setEditHostTelegram(stripToHandle(editHostTelegram))}
+                placeholder="Telegram (no @)"
+              />
             </div>
 
             <div className="flex gap-3 mt-4">
