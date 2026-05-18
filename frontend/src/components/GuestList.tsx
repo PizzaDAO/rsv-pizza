@@ -488,7 +488,7 @@ export const GuestList: React.FC = () => {
                 guest={guest}
                 variant="waitlist"
                 onPromote={promoteGuest}
-                onRemove={removeGuest}
+                onRemove={rejectGuest}
                 isSelected={guest.id ? selectedIds.has(guest.id) : false}
                 onToggleSelect={toggleSelect}
               />

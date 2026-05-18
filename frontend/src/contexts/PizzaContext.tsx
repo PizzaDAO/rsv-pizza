@@ -338,22 +338,22 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  // Restore a previously-rejected guest. Backend `/approve` PATCH only accepts
-  // boolean (validates `typeof approved !== 'boolean'`), so we always restore
-  // with `approved=true`. For approval-required events this skips the PENDING
-  // state — but "Restore" is an explicit host action, so re-approving is the
-  // reasonable interpretation.
+  // Restore a previously-rejected guest by bumping them back to needs-approval
+  // (approved=null). They reappear in the visible list with the Approve/Decline
+  // pair, so the host has to click Approve to re-confirm — making restore a
+  // deliberate two-step action instead of a one-click un-do that re-confirms
+  // by side effect.
   const restoreGuest = async (id: string) => {
     if (!party?.inviteCode) return;
     const previousAll = allGuests;
     const restored = previousAll.find(g => g.id === id);
-    // Optimistic: flip approved=true → guest reappears in visible list.
-    setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: true } : g));
+    // Optimistic: flip approved=null → guest reappears in visible list as pending.
+    setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: null } : g));
     if (restored) {
-      const restoredGuest: Guest = { ...restored, approved: true };
+      const restoredGuest: Guest = { ...restored, approved: null };
       setParty(prev => prev ? { ...prev, guests: [...prev.guests, restoredGuest] } : null);
     }
-    const success = await db.updateGuestApproval(id, true, party.id);
+    const success = await db.updateGuestApproval(id, null, party.id);
     if (!success) {
       setAllGuests(previousAll);
       await loadParty(party.inviteCode);

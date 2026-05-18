@@ -295,14 +295,14 @@ export const TableRow: React.FC<TableRowProps> = ({
           </button>
         )}
 
-        {/* Delete */}
+        {/* Reject */}
         {onRemove && (
           <button
             onClick={() => guest.id && onRemove(guest.id)}
             className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-            aria-label="Remove guest"
+            aria-label="Reject guest"
           >
-            <Trash2 size={14} />
+            <UserRoundX size={14} />
           </button>
         )}
       </div>
