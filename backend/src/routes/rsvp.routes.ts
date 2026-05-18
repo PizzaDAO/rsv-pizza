@@ -224,6 +224,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
         walletSource: true,
         roles: true,
         mailingListOptIn: true,
+        optinAbVariant: true,
         dietaryRestrictions: true,
         likedToppings: true,
         dislikedToppings: true,
@@ -263,6 +264,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       swcUkOptIn,
       swcBrOptIn,
       ethconfOptIn,
+      optinAbVariant,
       dietaryRestrictions,
       likedToppings,
       dislikedToppings,
@@ -271,6 +273,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       pizzeriaRankings,
       suggestedPizzerias
     } = req.body;
+
+    const safeOptinAbVariant: 'control' | 'variant' | null =
+      optinAbVariant === 'control' || optinAbVariant === 'variant' ? optinAbVariant : null;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -441,6 +446,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             swcUkOptIn: swcUkOptIn || false,
             swcBrOptIn: swcBrOptIn || false,
             ethconfOptIn: ethconfOptIn || false,
+            optinAbVariant: safeOptinAbVariant,
             dietaryRestrictions: dietaryRestrictions || [],
             likedToppings: likedToppings || [],
             dislikedToppings: dislikedToppings || [],
@@ -507,6 +513,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         swcUkOptIn: swcUkOptIn || false,
         swcBrOptIn: swcBrOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
+        optinAbVariant: safeOptinAbVariant,
         dietaryRestrictions: dietaryRestrictions || [],
         likedToppings: likedToppings || [],
         dislikedToppings: dislikedToppings || [],

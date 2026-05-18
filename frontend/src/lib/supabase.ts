@@ -731,6 +731,7 @@ export interface DbGuest {
   swc_uk_opt_in?: boolean;
   swc_br_opt_in?: boolean;
   ethconf_opt_in?: boolean;
+  optin_ab_variant?: string | null;
   submitted_at: string;
   submitted_via: string;
   checked_in_at?: string | null;
@@ -1290,7 +1291,8 @@ export async function addGuestToParty(
   swcEuOptIn?: boolean,
   swcUkOptIn?: boolean,
   swcBrOptIn?: boolean,
-  ethconfOptIn?: boolean
+  ethconfOptIn?: boolean,
+  optinAbVariant?: 'control' | 'variant' | null
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -1321,6 +1323,7 @@ export async function addGuestToParty(
         swcUkOptIn: swcUkOptIn || false,
         swcBrOptIn: swcBrOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
+        optinAbVariant: optinAbVariant ?? null,
       }),
     });
 
@@ -1359,6 +1362,7 @@ export async function addGuestToParty(
       swc_uk_opt_in: swcUkOptIn || false,
       swc_br_opt_in: swcBrOptIn || false,
       ethconf_opt_in: ethconfOptIn || false,
+      optin_ab_variant: optinAbVariant ?? null,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
       status: data.guest.status || 'CONFIRMED',
@@ -1386,6 +1390,7 @@ export interface ExistingGuestData {
   ethereumAddress: string | null;
   roles: string[];
   mailingListOptIn: boolean;
+  optinAbVariant: 'control' | 'variant' | null;
   dietaryRestrictions: string[];
   likedToppings: string[];
   dislikedToppings: string[];
@@ -1423,6 +1428,7 @@ export async function getExistingGuest(
       ethereumAddress: guest.ethereumAddress,
       roles: guest.roles || [],
       mailingListOptIn: guest.mailingListOptIn || false,
+      optinAbVariant: guest.optinAbVariant === 'control' || guest.optinAbVariant === 'variant' ? guest.optinAbVariant : null,
       dietaryRestrictions: guest.dietaryRestrictions || [],
       likedToppings: guest.likedToppings || [],
       dislikedToppings: guest.dislikedToppings || [],

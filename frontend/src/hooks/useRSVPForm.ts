@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
+import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
+import { findActiveRegion } from '../lib/optinAbRegions';
 
 // ---- Types ----
 
@@ -166,7 +167,56 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isSwcBrEvent = (eventData.eventTags || []).includes('swcbr');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const isGppEvent = eventData.eventType === 'gpp';
+  const activeRegionConfig = findActiveRegion(eventData.eventTags);
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
+
+  const [optinAbVariant, setOptinAbVariant] = useState<'control' | 'variant' | null>(() => {
+    if (existingGuest?.optinAbVariant === 'control' || existingGuest?.optinAbVariant === 'variant') {
+      return existingGuest.optinAbVariant;
+    }
+    return null;
+  });
+
+  const [showRegionalOptinAbModal, setShowRegionalOptinAbModal] = useState(false);
+
+  useEffect(() => {
+    if (optinAbVariant !== null) return; // preservation path already set
+    if (!activeRegionConfig) return;     // not an SWC event
+    let cancelled = false;
+    (async () => {
+      const enabled = await getExperimentFlag(activeRegionConfig.flagKey);
+      if (cancelled) return;
+      if (!enabled) return;
+      setOptinAbVariant(Math.random() < 0.5 ? 'control' : 'variant');
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setCombinedOptIn = useCallback((v: boolean) => {
+    setMailingListOptIn(v);
+    if (!activeRegionConfig) return;
+    switch (activeRegionConfig.swcOptInField) {
+      case 'swcOptIn':   setSwcOptIn(v);   break;
+      case 'swcCaOptIn': setSwcCaOptIn(v); break;
+      case 'swcAuOptIn': setSwcAuOptIn(v); break;
+      case 'swcEuOptIn': setSwcEuOptIn(v); break;
+      case 'swcUkOptIn': setSwcUkOptIn(v); break;
+      case 'swcBrOptIn': setSwcBrOptIn(v); break;
+    }
+  }, [activeRegionConfig]);
+
+  const combinedOptIn = (() => {
+    if (!activeRegionConfig || !mailingListOptIn) return false;
+    switch (activeRegionConfig.swcOptInField) {
+      case 'swcOptIn':   return swcOptIn;
+      case 'swcCaOptIn': return swcCaOptIn;
+      case 'swcAuOptIn': return swcAuOptIn;
+      case 'swcEuOptIn': return swcEuOptIn;
+      case 'swcUkOptIn': return swcUkOptIn;
+      case 'swcBrOptIn': return swcBrOptIn;
+    }
+  })();
 
   // ---- Validate wallet address ----
   const validateWalletAddress = useCallback((address: string) => {
@@ -424,6 +474,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         swcUkOptIn || undefined,
         swcBrOptIn || undefined,
         ethconfOptIn || undefined,
+        optinAbVariant ?? undefined,
       );
 
       if (result) {
@@ -464,7 +515,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
-    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn,
+    dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn, optinAbVariant,
     saveToProfile, isEditing, onSuccess,
   ]);
 
@@ -514,6 +565,12 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setShowSwcBrInfoModal,
     ethconfOptIn,
     setEthconfOptIn,
+    optinAbVariant,
+    combinedOptIn,
+    setCombinedOptIn,
+    activeRegionConfig,
+    showRegionalOptinAbModal,
+    setShowRegionalOptinAbModal,
 
     // Step 2 fields
     dietaryRestrictions,
