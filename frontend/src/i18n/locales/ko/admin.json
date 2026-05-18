@@ -1,0 +1,185 @@
+{
+  "title": "관리자 패널",
+  "subtitle": "관리자 및 언더보스 관리",
+  "accessDenied": "접근 거부됨",
+  "accessDeniedDesc": "관리자 권한이 없습니다. 관리자 계정으로 로그인해 주세요.",
+  "page": {
+    "exportEventsCsv": "모든 이벤트 CSV로 내보내기",
+    "graphicsAdmins": "그래픽 관리자",
+    "addGraphicsAdmin": "그래픽 관리자 추가",
+    "removeGraphicsAdmin": "그래픽 관리자 제거",
+    "noGraphicsAdmins": "그래픽 관리자가 아직 없습니다",
+    "regions": "지역",
+    "analytics": "분석",
+    "remove": "제거",
+    "removeAdminTitle": "관리자 제거",
+    "deactivate": "비활성화",
+    "close": "닫기",
+    "graphicsAdminsTable": {
+      "email": "이메일",
+      "name": "이름",
+      "added": "추가됨"
+    }
+  },
+  "admins": {
+    "title": "관리자",
+    "emailPlaceholder": "이메일 주소",
+    "namePlaceholder": "이름 (선택)",
+    "addAdmin": "관리자 추가",
+    "noAdmins": "관리자가 없습니다",
+    "superAdmin": "슈퍼 관리자",
+    "admin": "관리자",
+    "removeAdmin": "관리자 제거",
+    "tableHeaders": {
+      "email": "이메일",
+      "name": "이름",
+      "role": "역할",
+      "added": "추가됨"
+    }
+  },
+  "underboss": {
+    "title": "언더보스",
+    "namePlaceholder": "이름",
+    "emailPlaceholder": "이메일",
+    "regions": "지역",
+    "addUnderboss": "언더보스 추가",
+    "noUnderbosses": "언더보스가 아직 없습니다",
+    "active": "활성",
+    "inactive": "비활성",
+    "deactivate": "비활성화",
+    "save": "저장",
+    "cancel": "취소",
+    "tableHeaders": {
+      "name": "이름",
+      "email": "이메일",
+      "regions": "지역",
+      "status": "상태",
+      "actions": "작업"
+    }
+  },
+  "partners": {
+    "title": "파트너",
+    "emailPlaceholder": "이메일 주소",
+    "tagPlaceholder": "파트너 태그 (예: swc)",
+    "namePlaceholder": "이름 (선택)",
+    "addPartner": "파트너 추가",
+    "noPartners": "파트너가 아직 없습니다",
+    "active": "활성",
+    "inactive": "비활성",
+    "deactivatePartner": "파트너 비활성화",
+    "tableHeaders": {
+      "email": "이메일",
+      "name": "이름",
+      "tag": "태그",
+      "status": "상태",
+      "added": "추가됨"
+    }
+  },
+  "checklist": {
+    "title": "이벤트 준비 체크리스트",
+    "auto": "(자동)",
+    "noItems": "체크리스트 항목이 없습니다. GPP 호스트가 처음으로 체크리스트를 볼 때 항목이 생성됩니다.",
+    "saving": "저장 중...",
+    "saveChecklistDates": "체크리스트 날짜 저장",
+    "newItemPlaceholder": "새 체크리스트 항목...",
+    "adding": "추가 중...",
+    "addItem": "항목 추가",
+    "linkTabPlaceholder": "탭으로 연결"
+  },
+  "gppDescription": {
+    "title": "GPP 기본 설명",
+    "statsText": "{{totalEvents}}개 이벤트 중 {{defaultCount}}개가 기본 설명을 사용 중",
+    "placeholder": "신규 GPP 이벤트의 기본 설명...",
+    "saving": "저장 중...",
+    "saveAndApply": "저장 및 기본 설명 이벤트에 적용",
+    "customDescriptions": "맞춤 설명을 사용하는 이벤트 {{count}}개",
+    "customDescriptions_other": "맞춤 설명을 사용하는 이벤트 {{count}}개"
+  },
+  "nft": {
+    "title": "GPP NFT 설정",
+    "enableNft": "모든 GPP 이벤트에서 NFT 발행 활성화",
+    "saving": "저장 중...",
+    "saveSettings": "GPP NFT 설정 저장"
+  },
+  "underbossDashboard": {
+    "title": "언더보스 대시보드",
+    "loginPrompt": "언더보스 대시보드에 접근하려면 로그인하세요.",
+    "logIn": "로그인",
+    "loadingDashboard": "대시보드 불러오는 중...",
+    "error": "오류",
+    "notAuthorized": "언더보스 대시보드에 접근할 권한이 없습니다.",
+    "gppSubtitle": "Global Pizza Party",
+    "underbossSubtitle": "언더보스 대시보드",
+    "signedInAdmin": "관리자로 로그인됨 ({{email}})",
+    "signedInAs": "{{name}}(으)로 로그인됨",
+    "addUnderboss": "언더보스 추가",
+    "noRegions": "지역 없음",
+    "allRegions": "모든 지역",
+    "regionsCount": "지역 {{count}}개",
+    "selectAll": "모든 지역",
+    "underbossCreated": "언더보스가 생성되었습니다!",
+    "creating": "생성 중...",
+    "createUnderboss": "언더보스 생성",
+    "namePlaceholder": "이름",
+    "emailPlaceholder": "이메일",
+    "regions": "지역",
+    "close": "닫기",
+    "tabs": {
+      "events": "이벤트",
+      "cities": "도시",
+      "partners": "파트너"
+    }
+  },
+  "graphics": {
+    "title": "그래픽 대시보드",
+    "loginPrompt": "이벤트 전단지를 검토하려면 로그인하세요.",
+    "logIn": "로그인",
+    "error": "오류",
+    "accessDenied": "접근 거부됨",
+    "accessDeniedDesc": "이 페이지를 보려면 언더보스 또는 관리자 권한이 필요합니다.",
+    "events": "이벤트 {{count}}개",
+    "showing": "{{count}}개 표시 중",
+    "searchPlaceholder": "이벤트, 호스트 검색...",
+    "regionAll": "지역: 전체",
+    "tagAll": "태그: 전체",
+    "staleFlyers": "오래된 전단지",
+    "generateMissing": "누락된 전단지 생성 ({{count}})",
+    "generating": "{{current}}/{{total}} 생성 중...",
+    "noEventsMatch": "필터에 일치하는 이벤트가 없습니다.",
+    "newPartners": "신규 파트너",
+    "viewEvent": "이벤트 보기"
+  },
+  "postComposer": {
+    "title": "포스트 작성기",
+    "accessDenied": "접근 거부됨",
+    "accessDeniedDesc": "관리자 권한이 없습니다. 관리자 계정으로 로그인해 주세요.",
+    "searchEvents": "이벤트 검색...",
+    "copyToClipboard": "클립보드에 복사",
+    "copied": "복사됨!"
+  },
+  "shipping": {
+    "title": "배송 대시보드",
+    "loginPrompt": "배송 대시보드에 접근하려면 로그인하세요.",
+    "logIn": "로그인",
+    "loading": "배송 대시보드 불러오는 중...",
+    "accessDenied": "접근 거부됨",
+    "allRegions": "모든 지역",
+    "subtitle": "Global Pizza Party · 배송 대시보드",
+    "signedInAdmin": "관리자로 로그인됨 ({{email}})",
+    "signedInAs": "{{name}}(으)로 로그인됨",
+    "kitRequests": "키트 요청 ({{count}})"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
+  }
+}

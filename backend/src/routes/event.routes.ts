@@ -33,6 +33,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         longitude: true,
         placeId: true,
         venueName: true,
+        country: true,
         maxGuests: true,
         hideGuests: true,
         eventImageUrl: true,
@@ -77,7 +78,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           },
         },
         _count: {
-          select: { guests: true },
+          // mushroom-31723: exclude rejected guests (approved=false) from the public count.
+          select: { guests: { where: { approved: { not: false } } } },
         },
       },
     });
@@ -103,6 +105,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           longitude: true,
           placeId: true,
           venueName: true,
+          country: true,
           maxGuests: true,
           hideGuests: true,
           eventImageUrl: true,
@@ -274,6 +277,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         longitude: party.longitude,
         placeId: party.placeId,
         venueName: party.venueName,
+        country: party.country,
         maxGuests: party.maxGuests,
         hideGuests: party.hideGuests,
         eventImageUrl: party.eventImageUrl,

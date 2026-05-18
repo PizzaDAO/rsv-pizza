@@ -48,7 +48,7 @@ export const POSTER_CONFIG: FormatConfig = {
   sponsorBox: {
     defaultX: 35,
     defaultY: 1080,
-    width: 800,
+    width: 640,
     height: 350,
     defaultRows: 3,
   },

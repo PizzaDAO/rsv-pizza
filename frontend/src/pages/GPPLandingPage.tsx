@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Loader2, ArrowRight, ExternalLink, MapPin, Globe, ChevronDown } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, MapPin, Globe, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CornerLinks } from '../components/CornerLinks';
 import { GPPClouds } from '../components/GPPClouds';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
-import { createGPPEvent } from '../lib/api';
+import { createGPPEvent, fetchGppEventsForMap, GPPEventMapItem } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfetti } from '../hooks/useConfetti';
-const GPPMap = lazy(() => import('../components/GPPMap'));
+const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -72,11 +72,35 @@ export function GPPLandingPage() {
     swaySpeed: number;
   }>>([]);
 
+  const [mapEvents, setMapEvents] = useState<GPPEventMapItem[]>([]);
+  const [mapEventsLoading, setMapEventsLoading] = useState(true);
+  const [mapEventsError, setMapEventsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMapEventsLoading(true);
+    setMapEventsError(null);
+    fetchGppEventsForMap(false, true, false)
+      .then((data) => {
+        if (cancelled) return;
+        setMapEvents(data);
+        setMapEventsLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load GPP events for landing map:', err);
+        setMapEventsError(err?.message || 'Failed to load events');
+        setMapEventsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const LANGUAGES = [
     { code: 'en', label: 'EN', name: 'English' },
     { code: 'es', label: 'ES', name: 'Español' },
     { code: 'fr', label: 'FR', name: 'Français' },
     { code: 'ja', label: 'JA', name: '日本語' },
+    { code: 'ko', label: 'KO', name: '한국어' },
     { code: 'pt', label: 'PT', name: 'Português' },
     { code: 'zh', label: '中文', name: '中文' },
   ];
@@ -175,6 +199,7 @@ export function GPPLandingPage() {
         ...(cd && {
           country: cd.country,
           countryCode: cd.countryCode,
+          cityFormattedName: cd.formattedName,
           cityLat: cd.lat,
           cityLng: cd.lng,
         }),
@@ -610,23 +635,31 @@ export function GPPLandingPage() {
             {t('map.subtitle')}
           </p>
 
-          <div className="rounded-2xl border shadow-lg" style={{ borderColor: C.cardBorder }}>
-            <Suspense fallback={<div style={{ height: 500 }} className="flex items-center justify-center bg-sky-100 rounded-2xl"><Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} /></div>}>
-              <GPPMap height={500} minZoom={3} maxZoom={12} initialZoom={3} />
-            </Suspense>
+          <div className="rounded-2xl border shadow-lg overflow-hidden" style={{ borderColor: C.cardBorder, height: 500 }}>
+            {mapEventsLoading ? (
+              <div className="h-full flex items-center justify-center bg-sky-100">
+                <Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} />
+              </div>
+            ) : mapEventsError ? (
+              <div className="h-full flex items-center justify-center bg-sky-100">
+                <p className="text-sm" style={{ color: C.mutedText }}>{mapEventsError}</p>
+              </div>
+            ) : (
+              <Suspense fallback={<div className="h-full flex items-center justify-center bg-sky-100"><Loader2 className="animate-spin" size={32} style={{ color: C.mutedText }} /></div>}>
+                <GPPEventsMap events={mapEvents} height="100%" canModerate={false} />
+              </Suspense>
+            )}
           </div>
 
           <div className="text-center mt-6 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="https://www.google.com/maps/d/u/0/viewer?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/map"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5"
               style={{ background: C.red, color: '#fff' }}
             >
               {t('map.openFullMap')}
-              <ExternalLink size={16} />
-            </a>
+              <ArrowRight size={16} />
+            </Link>
             <Link
               to="/gpp/pizzerias"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:-translate-y-0.5 border-2"

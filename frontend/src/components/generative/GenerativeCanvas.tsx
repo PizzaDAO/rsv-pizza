@@ -437,9 +437,16 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const renderFullRes = async (): Promise<HTMLCanvasElement> => {
     const scaleFactor = config.fullResWidth / config.canvasWidth;
 
-    // On mobile, cap to avoid canvas memory issues
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const maxWidth = isMobile ? 4000 : config.fullResWidth;
+    // Browser canvas-area limits cap how large the offscreen canvas can be.
+    // Chrome's hard limit is 2^28 = 268M px. The rollup at full res (10061×27392 = 275M)
+    // exceeds this, causing toDataURL to return empty or PNGs with a white bottom region.
+    const MAX_DESKTOP_WIDTH = 8000;
+    const MAX_MOBILE_WIDTH = 4000;
+    const maxWidth = Math.min(
+      config.fullResWidth,
+      isMobile ? MAX_MOBILE_WIDTH : MAX_DESKTOP_WIDTH,
+    );
     const effectiveScale = Math.min(scaleFactor, maxWidth / config.canvasWidth);
 
     // Pre-fetch the full-res template if not cached

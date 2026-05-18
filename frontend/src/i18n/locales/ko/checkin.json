@@ -1,0 +1,47 @@
+{
+  "title": "게스트 체크인",
+  "loading": "게스트 체크인 중...",
+  "vouching": "보증 중…",
+  "success": {
+    "title": "체크인 완료!",
+    "backToDashboard": "이벤트 대시보드로 돌아가기"
+  },
+  "alreadyCheckedIn": {
+    "title": "이미 체크인됨",
+    "checkedInAt": "{{time}}에 체크인됨"
+  },
+  "notCheckedIn": {
+    "title": "체크인되지 않음",
+    "message": "아직 체크인되지 않았습니다. 이벤트 현장에서 인증자를 찾아주세요."
+  },
+  "unauthorized": {
+    "title": "권한 없음",
+    "message": "이 이벤트의 게스트를 체크인할 권한이 없습니다. 호스트와 공동 호스트만 게스트를 체크인할 수 있습니다.",
+    "goHome": "홈으로 이동"
+  },
+  "notFound": {
+    "title": "찾을 수 없음",
+    "goHome": "홈으로 이동"
+  },
+  "error": {
+    "title": "체크인 실패",
+    "tryAgain": "다시 시도",
+    "goHome": "홈으로 이동"
+  },
+  "postCheckIn": {
+    "claim10Title": "10% 피자 할인 받기",
+    "claim10Desc": "참석해 주셔서 감사합니다! 인증된 게스트로서 할인을 받으실 수 있습니다.",
+    "claimDiscount": "할인 받기",
+    "claim10Button": "10% 할인 받기",
+    "oneTimeUse": "1회 사용 가능",
+    "discountClaimedTitle": "할인이 적용되었습니다!",
+    "discountClaimedSubtitle": "10% 피자 할인이 사용되었습니다.",
+    "discountClaimedAt": "{{date}}에 사용됨",
+    "discountUnavailable": "할인 사용 불가",
+    "discountUnavailableDesc": "이 할인은 인증된 참석자만 받을 수 있습니다.",
+    "showQrCode": "QR 코드 보기",
+    "qrDescription": "호스트나 체크인된 게스트에게 이 QR 코드를 보여주어 참석을 인증하세요",
+    "qrSubmsg": "체크인을 위해 호스트나 체크인된 게스트가 이 코드를 스캔해야 합니다",
+    "failedToClaim": "할인 받기에 실패했습니다"
+  }
+}

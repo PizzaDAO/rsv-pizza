@@ -49,7 +49,9 @@
     "uniqueClicks": "({{count}} únicos)",
     "privateNotes": "Notas privadas para este evento...",
     "notes": "Notas",
-    "done": "Pronto"
+    "done": "Pronto",
+    "newsletterPizzadao": "PizzaDAO",
+    "newsletterSwc": "SWC"
   },
   "empty": {
     "noEventsFiltered": "Nenhum evento corresponde aos seus filtros.",
@@ -221,7 +223,17 @@
     "showingCountOfTotal": "Mostrando {{count}} de {{total}} eventos",
     "showingCount": "Mostrando {{count}} eventos",
     "taggedSuffix": " marcado \"{{tag}}\"",
-    "photosCountOf": "{{current}} de {{total}}"
+    "photosCountOf": "{{current}} de {{total}}",
+    "newsletterPizzadao": "PizzaDAO Newsletter",
+    "newsletterSwc": "SWC Newsletter",
+    "newsletterSwcRegion": {
+      "global": "Global",
+      "canada": "Canada",
+      "australia": "Australia",
+      "europe": "Europe",
+      "uk": "UK",
+      "brazil": "Brazil"
+    }
   },
   "cities": {
     "loading": "Carregando cidades...",
@@ -325,7 +337,34 @@
       "country": "País",
       "underboss": "Underboss",
       "hostTg": "TG do Anfitrião",
-      "test": "Teste"
+      "test": "Teste",
+      "host": "Host",
+      "status": "Status"
+    },
+    "recipients": {
+      "label": "Recipients",
+      "groups": "Groups",
+      "hosts": "Hosts",
+      "both": "Both"
+    },
+    "hostsList": {
+      "title": "Select Hosts",
+      "noConnectedHosts": "No hosts have connected their Telegram yet",
+      "notConnected": "Not connected",
+      "connected": "Connected"
+    },
+    "unknownHost": "Unknown host",
+    "sendToHosts": "Send to {{count}} host",
+    "sendToHosts_other": "Send to {{count}} hosts",
+    "sendToBoth": "Send to {{groups}} group + {{hosts}} host",
+    "sendToBoth_other": "Send to {{groups}} groups + {{hosts}} hosts",
+    "confirmSendHosts": "Send this DM to {{count}} host?",
+    "confirmSendHosts_other": "Send this DM to {{count}} hosts?",
+    "results": {
+      "groupsSection": "Group chats",
+      "hostsSection": "Host DMs",
+      "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
     }
   },
   "eventRow": {
@@ -379,5 +418,13 @@
     "reset": "Restaurar",
     "download": "Baixar",
     "generating": "Gerando..."
+  },
+  "hostConnect": {
+    "buttonConnect": "Connect your Telegram to receive PizzaDAO DMs",
+    "helperConnect": "Click to open Telegram. Tap Start in the bot to confirm. We'll only DM you about your event.",
+    "connected": "Telegram connected",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting...",
+    "connectError": "Couldn't generate connect link — please try again"
   }
 }

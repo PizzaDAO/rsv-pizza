@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "Global Pizza Party 주최하기 | RSV.Pizza",
+    "description": "전 세계 피자 축제에 참여하세요! 여러분의 도시에서 Global Pizza Party를 주최하고 전 세계 피자 애호가들과 연결되세요."
+  },
+  "header": {
+    "logIn": "로그인 / 회원가입"
+  },
+  "form": {
+    "title": "이벤트 만들기",
+    "subtitle": "시작하려면 세부 정보를 입력하세요",
+    "cityPlaceholder": "어느 도시에서 주최하시나요?",
+    "namePlaceholder": "이름이 어떻게 되시나요?",
+    "telegramPlaceholder": "텔레그램 사용자명",
+    "telegramHint": "호스트 그룹 채팅에 추가해 드리기 위함입니다",
+    "emailPlaceholder": "이메일 주소",
+    "emailHint": "이벤트 관리를 위한 로그인 코드를 보내드립니다",
+    "submit": "이벤트 만들기",
+    "submitting": "이벤트 생성 중...",
+    "selectCity": "드롭다운 제안 목록에서 도시를 선택해 주세요."
+  },
+  "map": {
+    "title": "작년의 Global Pizza Party",
+    "subtitle": "전 세계 커뮤니티가 피자를 위해 모인 곳을 확인하세요",
+    "openFullMap": "전체 지도 열기"
+  },
+  "success": {
+    "pageTitle": "이벤트가 생성되었습니다! | Global Pizza Party",
+    "signedIn": "로그인되었습니다!",
+    "redirecting": "호스트 대시보드로 이동 중...",
+    "title": "당신의 Global Pizza Party가 공개되었습니다!",
+    "created": "{{eventName}}이(가) 생성되었습니다.",
+    "otpPrompt": "{{email}}(으)로 보낸 6자리 코드를 입력하세요",
+    "verifying": "확인 중...",
+    "returnHome": "홈으로 돌아가기",
+    "checkSpam": "코드를 받지 못하셨나요? 스팸 폴더를 확인해 주세요."
+  }
+}

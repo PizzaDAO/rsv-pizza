@@ -697,6 +697,9 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Host Telegram bot connection
+  host_telegram_chat_id?: string | null; // serialized as string from API (BigInt)
+  host_telegram_link_token?: string | null;
   // Underboss status
   underboss_status?: string | null;
   // Turtle role selection toggle
@@ -763,6 +766,7 @@ export const SAFE_PARTY_COLUMNS = `
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
   telegram_group,
+  host_telegram_chat_id, host_telegram_link_token,
   turtle_roles_enabled,
   underboss_status,
   flyer_config,
@@ -799,7 +803,8 @@ export async function createParty(
   timezone?: string,
   hostEmail?: string,
   hideGuests?: boolean,
-  placeId?: string
+  placeId?: string,
+  venueName?: string
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -812,6 +817,7 @@ export async function createParty(
         maxGuests: expectedGuests,
         address,
         placeId,
+        venueName,
         availableBeverages,
         duration,
         password,
@@ -886,6 +892,7 @@ export async function createParty(
       custom_url: customUrl || null,
       address: address || null,
       place_id: placeId || null,
+      venue_name: venueName || null,
       co_hosts: coHosts,
     })
     .select()
@@ -1717,6 +1724,7 @@ export async function updateParty(
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
     telegram_group?: string | null;
+    host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
   }
 ): Promise<boolean> {
@@ -1789,6 +1797,7 @@ export async function updateParty(
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
         telegramGroup: updates.telegram_group,
+        hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
       });
       return true;
@@ -2020,6 +2029,20 @@ export async function saveUserPreferences(
     return true;
   } catch (error) {
     console.error('Error saving user preferences:', error);
+    return false;
+  }
+}
+
+export async function getExperimentFlag(key: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('experiment_flags')
+      .select('enabled')
+      .eq('key', key)
+      .single();
+    if (error || !data) return false;
+    return data.enabled === true;
+  } catch {
     return false;
   }
 }

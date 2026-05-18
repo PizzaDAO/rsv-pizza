@@ -102,8 +102,13 @@ export function partyMatchesScope(
   if (scope.cities.length > 0) {
     const partyCityKey = cityKeyFromPartyName(party.name);
     if (partyCityKey) {
-      const cityKeys = scope.cities.map((c) => c.toLowerCase().trim());
-      if (cityKeys.includes(partyCityKey)) return true;
+      const normalizedCities = scope.cities.map((c) => c.toLowerCase().trim());
+      // Prefix match (with trailing space) to mirror the `contains: "Global Pizza Party {City}"`
+      // substring match in buildScopedWhereClause. The `startsWith(c + ' ')` (with the space)
+      // prevents `"Lago"` from matching `"Lagos"`.
+      if (normalizedCities.some((c) => partyCityKey === c || partyCityKey.startsWith(c + ' '))) {
+        return true;
+      }
     }
   }
 

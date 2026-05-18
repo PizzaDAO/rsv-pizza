@@ -7,6 +7,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
+import { OptinABTab } from '../components/underboss/OptinABTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
@@ -29,6 +30,14 @@ import { CityScopePicker } from '../components/underboss';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+// Allowed host-page tab targets for checklist `link_tab`.
+// Keep in sync with backend ALLOWED_LINK_TABS and HostPage TabType.
+const LINK_TAB_OPTIONS: readonly string[] = [
+  'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
+  'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
+  'flyer', 'print',
+];
 
 function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
   return [...items].sort((a, b) => {
@@ -86,10 +95,12 @@ export function AdminPage() {
   // Checklist defaults state
   const [checklistItems, setChecklistItems] = useState<ChecklistDefault[]>([]);
   const [checklistEdits, setChecklistEdits] = useState<Record<string, string>>({});
+  const [checklistLinkTabEdits, setChecklistLinkTabEdits] = useState<Record<string, string | null>>({});
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [checklistMessage, setChecklistMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemDate, setNewItemDate] = useState('');
+  const [newItemLinkTab, setNewItemLinkTab] = useState('');
   const [addingItem, setAddingItem] = useState(false);
 
   // Sponsor users state
@@ -109,6 +120,8 @@ export function AdminPage() {
   const [savingDesc, setSavingDesc] = useState(false);
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'admin' | 'experiments'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -317,11 +330,23 @@ export function AdminPage() {
     setChecklistMessage(null);
     try {
       const updates = checklistItems
-        .filter(item => checklistEdits[item.name] !== undefined)
-        .map(item => ({
-          name: item.name,
-          dueDate: checklistEdits[item.name] || null,
-        }));
+        .filter(item =>
+          checklistEdits[item.name] !== undefined ||
+          checklistLinkTabEdits[item.name] !== undefined
+        )
+        .map(item => {
+          const update: { name: string; dueDate?: string | null; linkTab?: string | null } = {
+            name: item.name,
+          };
+          if (checklistEdits[item.name] !== undefined) {
+            update.dueDate = checklistEdits[item.name] || null;
+          }
+          if (checklistLinkTabEdits[item.name] !== undefined) {
+            const raw = checklistLinkTabEdits[item.name];
+            update.linkTab = raw === '' || raw == null ? null : raw;
+          }
+          return update;
+        });
       if (updates.length === 0) {
         setChecklistMessage({ type: 'error', text: 'No changes to save' });
         setSavingChecklist(false);
@@ -330,6 +355,7 @@ export function AdminPage() {
       const result = await updateChecklistDefaults(updates);
       setChecklistMessage({ type: 'success', text: `Updated ${result.totalUpdated} checklist items across all GPP events` });
       setChecklistEdits({});
+      setChecklistLinkTabEdits({});
       // Refresh
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
@@ -346,10 +372,15 @@ export function AdminPage() {
     setAddingItem(true);
     setChecklistMessage(null);
     try {
-      const result = await addChecklistDefault({ name: newItemName.trim(), dueDate: newItemDate || null });
+      const result = await addChecklistDefault({
+        name: newItemName.trim(),
+        dueDate: newItemDate || null,
+        linkTab: newItemLinkTab || null,
+      });
       setChecklistMessage({ type: 'success', text: `Added "${newItemName.trim()}" to ${result.createdCount} GPP events` });
       setNewItemName('');
       setNewItemDate('');
+      setNewItemLinkTab('');
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
@@ -559,6 +590,37 @@ export function AdminPage() {
             </div>
           </div>
 
+          <div className="border-b border-theme-stroke mb-6 flex gap-6">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'admin'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Admin
+              {activeTab === 'admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('experiments')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'experiments'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Experiments
+              {activeTab === 'experiments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'admin' && (
+            <>
           {/* Export Events CSV */}
           <div className="mb-6">
             <button
@@ -1146,6 +1208,18 @@ export function AdminPage() {
                         onChange={(e) => setChecklistEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
                         className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-36"
                       />
+                      <select
+                        aria-label={t('checklist.linkTabPlaceholder')}
+                        title={t('checklist.linkTabPlaceholder')}
+                        value={checklistLinkTabEdits[item.name] ?? item.linkTab ?? ''}
+                        onChange={(e) => setChecklistLinkTabEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
+                        className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-28"
+                      >
+                        <option value="">—</option>
+                        {LINK_TAB_OPTIONS.map((tab) => (
+                          <option key={tab} value={tab}>{tab}</option>
+                        ))}
+                      </select>
                     </div>
                     <button
                       onClick={() => handleDeleteChecklistItem(item.name)}
@@ -1161,7 +1235,7 @@ export function AdminPage() {
                 )}
               </div>
 
-              {checklistItems.length > 0 && Object.keys(checklistEdits).length > 0 && (
+              {checklistItems.length > 0 && (Object.keys(checklistEdits).length > 0 || Object.keys(checklistLinkTabEdits).length > 0) && (
                 <button
                   onClick={handleSaveChecklist}
                   disabled={savingChecklist}
@@ -1187,6 +1261,18 @@ export function AdminPage() {
                   onChange={(e) => setNewItemDate(e.target.value)}
                   className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-36"
                 />
+                <select
+                  aria-label={t('checklist.linkTabPlaceholder')}
+                  title={t('checklist.linkTabPlaceholder')}
+                  value={newItemLinkTab}
+                  onChange={(e) => setNewItemLinkTab(e.target.value)}
+                  className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-28"
+                >
+                  <option value="">—</option>
+                  {LINK_TAB_OPTIONS.map((tab) => (
+                    <option key={tab} value={tab}>{tab}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={addingItem || !newItemName.trim()}
@@ -1333,6 +1419,14 @@ export function AdminPage() {
             </h2>
             <FunnelTab regions={[]} />
           </section>
+            </>
+          )}
+
+          {activeTab === 'experiments' && (
+            <section className="mb-10">
+              <OptinABTab />
+            </section>
+          )}
         </div>
       </main>
 

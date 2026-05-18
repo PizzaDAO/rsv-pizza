@@ -424,6 +424,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
       telegramGroup,
+      hostTelegramLinkToken,
+      // NOTE: hostTelegramChatId is intentionally NOT destructured here —
+      // the chat_id is webhook-only (set by /api/telegram/webhook when the host
+      // sends /start <token> to the bot). Allowing PATCH writes would let a host
+      // spoof another user's chat_id.
       turtleRolesEnabled
     } = req.body;
 
@@ -513,7 +518,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(duration !== undefined && { duration }),
         ...(timezone !== undefined && { timezone }),
         ...(pizzaStyle && { pizzaStyle }),
-        ...(address !== undefined && { address }),
+        ...(address !== undefined && { address, addressIsCityDefault: false }),
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
         ...(country !== undefined && { country: country || null }),
@@ -565,6 +570,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
+        ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
       },
       include: {
@@ -800,17 +806,18 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    if (approved !== null && typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean or null', 400, 'VALIDATION_ERROR');
     }
 
     // Only reconcile status when row is PENDING — avoid clobbering WAITLISTED.
+    // When approved===null (restore-to-pending), leave status alone.
     const existing = await prisma.guest.findUnique({
       where: { id: guestId, partyId },
       select: { status: true },
     });
-    const updateData: { approved: boolean; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
-    if (existing?.status === 'PENDING') {
+    const updateData: { approved: boolean | null; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
+    if (existing?.status === 'PENDING' && approved !== null) {
       updateData.status = approved ? 'CONFIRMED' : 'DECLINED';
     }
 
@@ -819,9 +826,12 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       data: updateData,
     });
 
-    // Trigger appropriate webhook
-    const event = approved ? 'guest.approved' : 'guest.declined';
-    await triggerWebhook(event, { guest, partyId }, req.userId!);
+    // Trigger appropriate webhook. Skip when approved===null (restore-to-pending
+    // is neither an approval nor a decline).
+    if (approved !== null) {
+      const event = approved ? 'guest.approved' : 'guest.declined';
+      await triggerWebhook(event, { guest, partyId }, req.userId!);
+    }
 
     // Send approval email with QR code if guest is approved and has an email
     if (approved && guest.email) {

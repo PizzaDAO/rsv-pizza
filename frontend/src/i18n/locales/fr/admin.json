@@ -83,7 +83,8 @@
     "saveChecklistDates": "Enregistrer les dates de la liste",
     "newItemPlaceholder": "Nouvel élément de liste...",
     "adding": "Ajout...",
-    "addItem": "Ajouter un élément"
+    "addItem": "Ajouter un élément",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "Description GPP par défaut",
@@ -167,5 +168,18 @@
     "signedInAdmin": "Connecté en tant qu'administrateur ({{email}})",
     "signedInAs": "Connecté en tant que {{name}}",
     "kitRequests": "Demandes de kit ({{count}})"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

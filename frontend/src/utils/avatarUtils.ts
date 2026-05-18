@@ -22,16 +22,26 @@ export function cleanXHandle(input: string): string | null {
  */
 export async function fetchXAvatarToSupabase(handleOrUrl: string): Promise<string | null> {
   const handle = cleanXHandle(handleOrUrl);
-  if (!handle) return null;
+  if (!handle) {
+    console.warn('fetchXAvatarToSupabase: invalid handle', handleOrUrl);
+    return null;
+  }
   try {
     const res = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn('fetchXAvatarToSupabase: fxtwitter HTTP', res.status, handle);
+      return null;
+    }
     const json = await res.json();
-    if (json.code !== 200 || !json.user?.avatar_url) return null;
+    if (json.code !== 200 || !json.user?.avatar_url) {
+      console.warn('fetchXAvatarToSupabase: fxtwitter no avatar', { code: json.code, handle });
+      return null;
+    }
     const big = String(json.user.avatar_url).replace(/_normal(\.[a-zA-Z0-9]+)$/, '_400x400$1');
     // Mirror twimg URL into Supabase storage
     return await proxyAvatarToStorage(big);
-  } catch {
+  } catch (err) {
+    console.warn('fetchXAvatarToSupabase: fetch threw', handle, err);
     return null;
   }
 }

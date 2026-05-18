@@ -83,7 +83,8 @@
     "saveChecklistDates": "チェックリストの日付を保存",
     "newItemPlaceholder": "新しいチェックリスト項目...",
     "adding": "追加中...",
-    "addItem": "項目を追加"
+    "addItem": "項目を追加",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPPデフォルト説明文",
@@ -167,5 +168,18 @@
     "signedInAdmin": "管理者としてログイン中（{{email}}）",
     "signedInAs": "{{name}}としてログイン中",
     "kitRequests": "キットリクエスト（{{count}}）"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }
