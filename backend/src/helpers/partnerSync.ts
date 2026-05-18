@@ -98,8 +98,15 @@ export async function addPartnerToParty(
   let updatedCoHosts: any[];
   if (existingIdx >= 0) {
     const existing = existingCoHosts[existingIdx];
+    // Strip undefined-valued keys so we don't clobber existing fields
+    // (e.g., avatar_url) when the SponsorUser has no value to provide.
+    // Boolean fields (showOnEvent, canEdit, isPartner) are always defined
+    // by buildPartnerCoHost, so they continue to overwrite as before.
+    const defined = Object.fromEntries(
+      Object.entries(partnerEntry).filter(([_, v]) => v !== undefined)
+    );
     updatedCoHosts = [...existingCoHosts];
-    updatedCoHosts[existingIdx] = { ...partnerEntry, id: existing.id };
+    updatedCoHosts[existingIdx] = { ...existing, ...defined, id: existing.id };
   } else {
     updatedCoHosts = [...existingCoHosts, partnerEntry];
   }
