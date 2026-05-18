@@ -6,6 +6,7 @@ import {
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
+  uncheckInGuestApi,
   promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
@@ -721,6 +722,7 @@ export interface DbParty {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  city?: string | null;
   place_id?: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
@@ -798,6 +800,7 @@ export interface DbGuest {
   swc_uk_opt_in?: boolean;
   swc_br_opt_in?: boolean;
   ethconf_opt_in?: boolean;
+  optin_ab_variant?: string | null;
   submitted_at: string;
   submitted_via: string;
   checked_in_at?: string | null;
@@ -814,7 +817,7 @@ export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
-  event_image_url, description, address, latitude, longitude, country, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
+  event_image_url, description, address, latitude, longitude, country, city, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
   donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
@@ -872,7 +875,8 @@ export async function createParty(
   hostEmail?: string,
   hideGuests?: boolean,
   placeId?: string,
-  venueName?: string
+  venueName?: string,
+  city?: string
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -886,6 +890,7 @@ export async function createParty(
         address,
         placeId,
         venueName,
+        city,
         availableBeverages,
         duration,
         password,
@@ -961,6 +966,7 @@ export async function createParty(
       address: address || null,
       place_id: placeId || null,
       venue_name: venueName || null,
+      city: city || null,
       co_hosts: coHosts,
     })
     .select()
@@ -1357,7 +1363,9 @@ export async function addGuestToParty(
   swcEuOptIn?: boolean,
   swcUkOptIn?: boolean,
   swcBrOptIn?: boolean,
-  ethconfOptIn?: boolean
+  ethconfOptIn?: boolean,
+  optinAbVariant?: 'control' | 'variant' | null,
+  visitorSessionId?: string,
 ): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
@@ -1388,6 +1396,8 @@ export async function addGuestToParty(
         swcUkOptIn: swcUkOptIn || false,
         swcBrOptIn: swcBrOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
+        optinAbVariant: optinAbVariant ?? null,
+        visitorSessionId: visitorSessionId ?? null,
       }),
     });
 
@@ -1426,6 +1436,7 @@ export async function addGuestToParty(
       swc_uk_opt_in: swcUkOptIn || false,
       swc_br_opt_in: swcBrOptIn || false,
       ethconf_opt_in: ethconfOptIn || false,
+      optin_ab_variant: optinAbVariant ?? null,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
       status: data.guest.status || 'CONFIRMED',
@@ -1453,6 +1464,7 @@ export interface ExistingGuestData {
   ethereumAddress: string | null;
   roles: string[];
   mailingListOptIn: boolean;
+  optinAbVariant: 'control' | 'variant' | null;
   dietaryRestrictions: string[];
   likedToppings: string[];
   dislikedToppings: string[];
@@ -1490,6 +1502,7 @@ export async function getExistingGuest(
       ethereumAddress: guest.ethereumAddress,
       roles: guest.roles || [],
       mailingListOptIn: guest.mailingListOptIn || false,
+      optinAbVariant: guest.optinAbVariant === 'control' || guest.optinAbVariant === 'variant' ? guest.optinAbVariant : null,
       dietaryRestrictions: guest.dietaryRestrictions || [],
       likedToppings: guest.likedToppings || [],
       dislikedToppings: guest.dislikedToppings || [],
@@ -1599,7 +1612,7 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
   return true;
 }
 
-export async function updateGuestApproval(guestId: string, approved: boolean, partyId?: string): Promise<boolean> {
+export async function updateGuestApproval(guestId: string, approved: boolean | null, partyId?: string): Promise<boolean> {
   // Use API if authenticated and partyId provided (secure path)
   if (isAuthenticated() && partyId) {
     try {
@@ -1622,6 +1635,22 @@ export async function updateGuestApproval(guestId: string, approved: boolean, pa
     return false;
   }
   return true;
+}
+
+// Un-check-in a guest (host-side undo). Resolves invite code from party and calls
+// DELETE /api/checkin/:inviteCode/:guestId. Idempotent on backend.
+export async function uncheckInGuest(guestId: string, party: { id: string; inviteCode: string } | null | undefined): Promise<boolean> {
+  if (!party?.inviteCode) {
+    console.error('uncheckInGuest: missing party invite code');
+    return false;
+  }
+  try {
+    await uncheckInGuestApi(party.inviteCode, guestId);
+    return true;
+  } catch (error) {
+    console.error('Error un-checking-in guest via API:', error);
+    return false;
+  }
 }
 
 export async function promoteGuest(guestId: string, partyId: string): Promise<boolean> {
@@ -1735,6 +1764,7 @@ export async function updateParty(
     latitude?: number | null;
     longitude?: number | null;
     country?: string | null;
+    city?: string | null;
     place_id?: string | null;
     venue_name?: string | null;
     // Venue tracking fields
@@ -1808,6 +1838,7 @@ export async function updateParty(
         latitude: updates.latitude,
         longitude: updates.longitude,
         country: updates.country,
+        city: updates.city,
         placeId: updates.place_id,
         venueName: updates.venue_name,
         // Venue tracking fields
@@ -2097,6 +2128,20 @@ export async function saveUserPreferences(
     return true;
   } catch (error) {
     console.error('Error saving user preferences:', error);
+    return false;
+  }
+}
+
+export async function getExperimentFlag(key: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('experiment_flags')
+      .select('enabled')
+      .eq('key', key)
+      .single();
+    if (error || !data) return false;
+    return data.enabled === true;
+  } catch {
     return false;
   }
 }

@@ -169,7 +169,11 @@
     "subtitle": "Global Pizza Party · 物流仪表盘",
     "signedInAdmin": "以管理员身份登录（{{email}}）",
     "signedInAs": "以 {{name}} 身份登录",
-    "kitRequests": "套装申请（{{count}}）"
+    "kitRequests": "套装申请（{{count}}）",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

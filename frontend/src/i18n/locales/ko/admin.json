@@ -169,7 +169,11 @@
     "subtitle": "Global Pizza Party · 배송 대시보드",
     "signedInAdmin": "관리자로 로그인됨 ({{email}})",
     "signedInAs": "{{name}}(으)로 로그인됨",
-    "kitRequests": "키트 요청 ({{count}})"
+    "kitRequests": "키트 요청 ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

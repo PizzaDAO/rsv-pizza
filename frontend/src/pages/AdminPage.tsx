@@ -7,6 +7,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
+import { OptinABTab } from '../components/underboss/OptinABTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight,
@@ -25,6 +26,7 @@ import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser, GraphicsAdmin } from '../types';
 import { fetchSheetCities } from '../lib/cities';
+import { CityScopePicker } from '../components/underboss';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -75,12 +77,14 @@ export function AdminPage() {
   const [ubName, setUbName] = useState('');
   const [ubEmail, setUbEmail] = useState('');
   const [ubRegions, setUbRegions] = useState<string[]>([]);
+  const [ubCities, setUbCities] = useState<string[]>([]);
   const [addingUb, setAddingUb] = useState(false);
   const [ubMessage, setUbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Edit regions state
+  // Edit regions+cities state (mozzarella-25815)
   const [editingUbId, setEditingUbId] = useState<string | null>(null);
   const [editRegions, setEditRegions] = useState<string[]>([]);
+  const [editCities, setEditCities] = useState<string[]>([]);
   const [savingRegions, setSavingRegions] = useState(false);
 
   // GPP NFT state
@@ -117,6 +121,8 @@ export function AdminPage() {
   const [savingDesc, setSavingDesc] = useState(false);
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'admin' | 'experiments'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -475,7 +481,8 @@ export function AdminPage() {
 
   async function handleAddUnderboss(e: React.FormEvent) {
     e.preventDefault();
-    if (!ubName.trim() || !ubEmail.trim() || ubRegions.length === 0) return;
+    // mozzarella-25815: require at least ONE of regions or cities
+    if (!ubName.trim() || !ubEmail.trim() || (ubRegions.length === 0 && ubCities.length === 0)) return;
     setAddingUb(true);
     setUbMessage(null);
     try {
@@ -483,11 +490,13 @@ export function AdminPage() {
         name: ubName.trim(),
         email: ubEmail.trim(),
         regions: ubRegions,
+        cities: ubCities,
       });
       setUnderbosses((prev) => [...prev, result.underboss]);
       setUbName('');
       setUbEmail('');
       setUbRegions([]);
+      setUbCities([]);
       setUbMessage({ type: 'success', text: `Created underboss ${result.underboss.name}. They can now log in at /underboss.` });
     } catch (err: any) {
       setUbMessage({ type: 'error', text: err.message || 'Failed to create underboss' });
@@ -511,21 +520,27 @@ export function AdminPage() {
 
   function startEditRegions(ub: UnderbossAdmin) {
     setEditingUbId(ub.id);
-    setEditRegions(ub.regions && ub.regions.length > 0 ? [...ub.regions] : [ub.region]);
+    setEditRegions(ub.regions && ub.regions.length > 0 ? [...ub.regions] : (ub.region ? [ub.region] : []));
+    setEditCities(ub.cities ? [...ub.cities] : []);
   }
 
   async function saveEditRegions() {
-    if (!editingUbId || editRegions.length === 0) return;
+    // mozzarella-25815: require at least ONE of regions or cities
+    if (!editingUbId || (editRegions.length === 0 && editCities.length === 0)) return;
     setSavingRegions(true);
     try {
-      const updated = await updateUnderboss(editingUbId, { regions: editRegions });
+      const updated = await updateUnderboss(editingUbId, { regions: editRegions, cities: editCities });
       setUnderbosses((prev) =>
-        prev.map((u) => (u.id === editingUbId ? { ...u, regions: updated.regions || editRegions } : u))
+        prev.map((u) =>
+          u.id === editingUbId
+            ? { ...u, regions: updated.regions || editRegions, cities: updated.cities || editCities }
+            : u
+        )
       );
-      setUbMessage({ type: 'success', text: 'Regions updated' });
+      setUbMessage({ type: 'success', text: 'Scope updated' });
       setEditingUbId(null);
     } catch (err: any) {
-      setUbMessage({ type: 'error', text: err.message || 'Failed to update regions' });
+      setUbMessage({ type: 'error', text: err.message || 'Failed to update scope' });
     } finally {
       setSavingRegions(false);
     }
@@ -581,6 +596,37 @@ export function AdminPage() {
             </div>
           </div>
 
+          <div className="border-b border-theme-stroke mb-6 flex gap-6">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'admin'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Admin
+              {activeTab === 'admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('experiments')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'experiments'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Experiments
+              {activeTab === 'experiments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'admin' && (
+            <>
           {/* Export Events CSV */}
           <div className="mb-6 flex items-center gap-2 flex-wrap">
             <button
@@ -921,9 +967,13 @@ export function AdminPage() {
                   ))}
                 </div>
               </div>
+              <div className="mb-3">
+                <p className="text-sm text-theme-text-secondary mb-2">{t('underboss.cities', 'Cities')}</p>
+                <CityScopePicker selected={ubCities} onChange={setUbCities} />
+              </div>
               <button
                 type="submit"
-                disabled={addingUb || !ubName.trim() || !ubEmail.trim() || ubRegions.length === 0}
+                disabled={addingUb || !ubName.trim() || !ubEmail.trim() || (ubRegions.length === 0 && ubCities.length === 0)}
                 className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
               >
                 {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
@@ -963,7 +1013,7 @@ export function AdminPage() {
                                   onClick={() => {
                                     setEditRegions(prev =>
                                       prev.includes(r.id)
-                                        ? prev.length > 1 ? prev.filter(id => id !== r.id) : prev
+                                        ? prev.filter(id => id !== r.id)
                                         : [...prev, r.id]
                                     );
                                   }}
@@ -977,10 +1027,13 @@ export function AdminPage() {
                                 </button>
                               ))}
                             </div>
+                            <div className="mb-2">
+                              <CityScopePicker selected={editCities} onChange={setEditCities} />
+                            </div>
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={saveEditRegions}
-                                disabled={savingRegions || editRegions.length === 0}
+                                disabled={savingRegions || (editRegions.length === 0 && editCities.length === 0)}
                                 className="text-green-500 hover:text-green-400 disabled:opacity-50 p-1"
                                 title={t('underboss.save')}
                               >
@@ -997,7 +1050,18 @@ export function AdminPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => startEditRegions(ub)}>
-                            <span>{(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}</span>
+                            <span>
+                              {(() => {
+                                const regions = (ub.regions && ub.regions.length > 0)
+                                  ? ub.regions.map(r => GPP_REGIONS.find(g => g.id === r)?.label || r)
+                                  : (ub.region ? [GPP_REGIONS.find(g => g.id === ub.region)?.label || ub.region] : []);
+                                const cities = ub.cities || [];
+                                const parts: string[] = [];
+                                if (regions.length > 0) parts.push(regions.join(', '));
+                                if (cities.length > 0) parts.push(`+ ${cities.length} ${cities.length === 1 ? t('underboss.cityLabelOne', 'city') : t('underboss.cityLabelMany', 'cities')}`);
+                                return parts.join(' ') || t('underboss.noScope', '—');
+                              })()}
+                            </span>
                             <Pencil size={12} className="text-theme-text-faint group-hover:text-theme-text-muted transition-colors flex-shrink-0" />
                           </div>
                         )}
@@ -1413,6 +1477,14 @@ export function AdminPage() {
             </h2>
             <FunnelTab regions={[]} />
           </section>
+            </>
+          )}
+
+          {activeTab === 'experiments' && (
+            <section className="mb-10">
+              <OptinABTab />
+            </section>
+          )}
         </div>
       </main>
 

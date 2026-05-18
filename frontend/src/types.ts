@@ -106,6 +106,7 @@ export interface CoHost {
   website?: string;
   twitter?: string;
   instagram?: string;
+  telegram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
   canEdit?: boolean;
@@ -238,6 +239,7 @@ export interface Party {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  city?: string | null;
   placeId?: string | null;
   venueName: string | null;
   // Venue tracking fields
@@ -970,6 +972,7 @@ export interface AutoCompleteStates {
   budget_submitted: boolean;
   team_built?: boolean;
   pizzerias_selected?: boolean;
+  underboss_reviewed?: boolean;
 }
 
 export interface ChecklistData {
@@ -1142,6 +1145,7 @@ export interface UnderbossAdmin {
   email: string;
   region: string;
   regions: string[];
+  cities: string[];
   isActive: boolean;
   notes: string | null;
   createdAt: string;
@@ -1160,7 +1164,11 @@ export interface ShippingKit {
   eventAddress: string | null;
   eventVenue: string | null;
   underbossStatus: UnderbossStatus;
-  requestedTier: KitTier;
+  /**
+   * Placeholder rows (events with no kit request) send an empty string here;
+   * widened from `KitTier` to allow that.
+   */
+  requestedTier: KitTier | '';
   allocatedTier: KitTier | null;
   recipientName: string;
   addressLine1: string;
@@ -1170,7 +1178,11 @@ export interface ShippingKit {
   postalCode: string;
   country: string;
   phone: string | null;
-  status: KitStatus;
+  /**
+   * Real kits use the `KitStatus` enum. Placeholder rows (events with no
+   * `party_kits` row) send the sentinel `'no_request'`.
+   */
+  status: KitStatus | 'no_request';
   trackingNumber: string | null;
   trackingUrl: string | null;
   notes: string | null;
@@ -1179,6 +1191,10 @@ export interface ShippingKit {
   approvedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  /** Non-declined, non-invited guest count for this kit's event. */
+  rsvpCount: number;
+  /** True when this row is a placeholder for an event with no kit request. */
+  isPlaceholder?: boolean;
 }
 
 export interface ShippingKitStats {
@@ -1188,6 +1204,8 @@ export interface ShippingKitStats {
   shipped: number;
   delivered: number;
   declined: number;
+  /** GPP-approved events in scope that have not submitted a kit request. */
+  noRequest: number;
   byCountry: Record<string, number>;
   byTier: Record<string, number>;
 }
@@ -1253,6 +1271,7 @@ export interface SponsorDashboardEvent {
   slug: string;
   reportPublicSlug: string | null;
   date: string | null;
+  createdAt: string;
   timezone: string | null;
   address: string | null;
   venueName: string | null;

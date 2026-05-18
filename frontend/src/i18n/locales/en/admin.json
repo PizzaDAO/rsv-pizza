@@ -44,6 +44,16 @@
     "namePlaceholder": "Name",
     "emailPlaceholder": "Email",
     "regions": "Regions",
+    "cities": "Cities",
+    "searchCitiesPlaceholder": "Search cities…",
+    "loadingCities": "Loading cities…",
+    "noCitiesMatch": "No cities match your search",
+    "noCitiesSelected": "No cities selected",
+    "cityScopeHint": "Cities are additive to regions.",
+    "cityLabelOne": "city",
+    "cityLabelMany": "cities",
+    "noScope": "—",
+    "outOfScope": "Out of scope",
     "addUnderboss": "Add Underboss",
     "noUnderbosses": "No underbosses yet",
     "active": "Active",
@@ -54,7 +64,7 @@
     "tableHeaders": {
       "name": "Name",
       "email": "Email",
-      "regions": "Regions",
+      "regions": "Scope",
       "status": "Status",
       "actions": "Actions"
     }
@@ -119,6 +129,9 @@
     "allRegions": "All Regions",
     "regionsCount": "{{count}} Regions",
     "selectAll": "All Regions",
+    "allCities": "All cities",
+    "citiesCount": "{{count}} cities",
+    "clearAll": "Clear",
     "underbossCreated": "Underboss created!",
     "creating": "Creating...",
     "createUnderboss": "Create Underboss",
@@ -200,6 +213,10 @@
     "subtitle": "Global Pizza Party · Shipping Dashboard",
     "signedInAdmin": "Signed in as Admin ({{email}})",
     "signedInAs": "Signed in as {{name}}",
-    "kitRequests": "Kit Requests ({{count}})"
+    "kitRequests": "Kit Requests ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   }
 }

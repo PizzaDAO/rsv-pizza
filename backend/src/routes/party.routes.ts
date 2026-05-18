@@ -230,7 +230,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, placeId, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, placeId, venueName, city, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -281,6 +281,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         address: address || null,
         placeId: placeId || null,
         venueName: venueName || null,
+        city: city || null,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
         requireApproval: requireApproval || false,
@@ -406,7 +407,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, placeId, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, city, placeId, venueName, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
@@ -522,6 +523,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
         ...(country !== undefined && { country: country || null }),
+        ...(city !== undefined && { city: city || null }),
         ...(placeId !== undefined && { placeId: placeId || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
@@ -806,17 +808,18 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    if (approved !== null && typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean or null', 400, 'VALIDATION_ERROR');
     }
 
     // Only reconcile status when row is PENDING — avoid clobbering WAITLISTED.
+    // When approved===null (restore-to-pending), leave status alone.
     const existing = await prisma.guest.findUnique({
       where: { id: guestId, partyId },
       select: { status: true },
     });
-    const updateData: { approved: boolean; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
-    if (existing?.status === 'PENDING') {
+    const updateData: { approved: boolean | null; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
+    if (existing?.status === 'PENDING' && approved !== null) {
       updateData.status = approved ? 'CONFIRMED' : 'DECLINED';
     }
 
@@ -825,9 +828,12 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       data: updateData,
     });
 
-    // Trigger appropriate webhook
-    const event = approved ? 'guest.approved' : 'guest.declined';
-    await triggerWebhook(event, { guest, partyId }, req.userId!);
+    // Trigger appropriate webhook. Skip when approved===null (restore-to-pending
+    // is neither an approval nor a decline).
+    if (approved !== null) {
+      const event = approved ? 'guest.approved' : 'guest.declined';
+      await triggerWebhook(event, { guest, partyId }, req.userId!);
+    }
 
     // Send approval email with QR code if guest is approved and has an email
     if (approved && guest.email) {

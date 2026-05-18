@@ -1,0 +1,21 @@
+{
+  "_README": "Pre-existing schema drift known to NOT cause runtime errors at this time, suppressed so the CI check can pass on master. Each entry should ideally be resolved (either drop the Prisma model or add a migration). Re-evaluate periodically and delete entries as they get fixed.",
+  "missingTables": [
+    {
+      "model": "Order",
+      "table": "Order",
+      "note": "Pre-existing: Prisma model declared but no DB table. prisma.order.create() is called in backend/src/services/blandAI.service.ts but the code path is gated. Resolve by either creating the table or removing the model + dependent code (Pre-pepperoni-94639 audit, 2026-05-17)."
+    },
+    {
+      "model": "OrderItem",
+      "table": "OrderItem",
+      "note": "Pre-existing: same situation as Order — relation child."
+    },
+    {
+      "model": "GuestPizzaMapping",
+      "table": "GuestPizzaMapping",
+      "note": "Pre-existing: same situation as Order — ML-training relation table never created in prod."
+    }
+  ],
+  "missingColumns": []
+}

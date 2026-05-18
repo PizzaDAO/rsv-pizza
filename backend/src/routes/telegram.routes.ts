@@ -1,82 +1,40 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
 
-// Extend Request to include underboss (same pattern as underboss.routes.ts)
-interface UnderbossRequest extends AuthRequest {
-  underboss?: {
-    id: string;
-    name: string;
-    email: string;
-    region: string;
-    regions: string[];
-    isActive: boolean;
-  };
-}
-
-// Login-based underboss middleware (duplicated from underboss.routes.ts to avoid refactoring)
-async function requireUnderbossAuth(
-  req: UnderbossRequest,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const email = req.userEmail;
-    if (!email) {
-      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
-    }
-
-    // Check if user is an admin first
-    if (await isAdmin(email)) {
-      req.underboss = {
-        id: 'admin',
-        name: 'Admin',
-        email,
-        region: '__admin__',
-        regions: ['__admin__'],
-        isActive: true,
-      };
-      return next();
-    }
-
-    // Look up underboss by email
-    const underboss = await prisma.underboss.findFirst({
-      where: { email: email.toLowerCase(), isActive: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        region: true,
-        regions: true,
-        isActive: true,
-      },
-    });
-
-    if (underboss) {
-      const regions = underboss.regions.length > 0 ? underboss.regions : [underboss.region];
-      req.underboss = {
-        id: underboss.id,
-        name: underboss.name,
-        email: underboss.email,
-        region: underboss.region,
-        regions,
-        isActive: underboss.isActive,
-      };
-      return next();
-    }
-
-    // Neither underboss nor admin
-    throw new AppError('Not authorized as underboss', 403, 'FORBIDDEN');
-  } catch (error) {
-    next(error);
-  }
-}
+// Alias to keep the routes that were ported in from master readable.
+type UnderbossRequest = UnderbossAuthRequest;
 
 const router = Router();
 
+/**
+ * Check whether a broadcast group is within the UB's city scope.
+ *
+ * Admins/graphics-admins (sentinel `__admin__` in regions) → always allowed.
+ * Region-scoped UBs → allowed (region->city mapping lives in the GPP sheet,
+ *   not in the backend; matches existing latitude in city-statuses endpoint).
+ * City-scoped UBs → only their explicit cities (case-insensitive trim match).
+ */
+function groupInBroadcastScope(
+  group: { city?: string },
+  underboss: { regions: string[]; cities: string[] }
+): boolean {
+  if (underboss.regions.includes('__admin__')) return true;
+  // If the UB has at least one region but no cities, we allow all groups —
+  // the city→region mapping is sheet-side and not available here. This
+  // mirrors the pragmatic v1 scope reduction noted on city-statuses.
+  if (underboss.regions.length > 0 && (underboss.cities?.length ?? 0) === 0) return true;
+  // City-scoped path
+  const allowed = (underboss.cities || []).map((c) => c.toLowerCase().trim());
+  const groupCity = (group.city || '').toLowerCase().trim();
+  if (!groupCity) return false;
+  return allowed.includes(groupCity);
+}
+
 // POST /broadcast — Send message to multiple Telegram groups
-router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
   try {
     const { groups, message, parseMode } = req.body;
 
@@ -100,6 +58,18 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     const validParseModes = ['HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
       throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
+    }
+
+    // mozzarella-25815: reject the entire request if any group is out of scope.
+    // Do not silently subset — caller must explicitly choose only in-scope cities.
+    const ub = req.underboss!;
+    const outOfScope = groups.filter((g: any) => !groupInBroadcastScope(g, { regions: ub.regions, cities: ub.cities || [] }));
+    if (outOfScope.length > 0) {
+      return res.status(400).json({
+        error: 'OUT_OF_SCOPE',
+        message: 'One or more groups are outside your assigned city scope',
+        outOfScopeCities: outOfScope.map((g: any) => g.city || ''),
+      });
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -444,7 +414,7 @@ router.post('/host-test', requireAuth, requireUnderbossAuth, async (req: Underbo
 });
 
 // POST /test — Send test message to single group
-router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
   try {
     const { chatId, message, parseMode } = req.body;
 

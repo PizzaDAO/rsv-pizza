@@ -15,6 +15,7 @@ export const WEBHOOK_EVENTS = [
   'guest.removed',
   'guest.waitlisted',
   'guest.promoted',
+  'guest.checkin_undone', // mushroom-31723: emitted when a host un-checks-in a guest
 ] as const;
 
 export type WebhookEvent = typeof WEBHOOK_EVENTS[number];

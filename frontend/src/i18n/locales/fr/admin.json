@@ -169,7 +169,11 @@
     "subtitle": "Global Pizza Party · Tableau de bord expédition",
     "signedInAdmin": "Connecté en tant qu'administrateur ({{email}})",
     "signedInAs": "Connecté en tant que {{name}}",
-    "kitRequests": "Demandes de kit ({{count}})"
+    "kitRequests": "Demandes de kit ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

@@ -169,7 +169,11 @@
     "subtitle": "Global Pizza Party · Panel de Envíos",
     "signedInAdmin": "Conectado como Admin ({{email}})",
     "signedInAs": "Conectado como {{name}}",
-    "kitRequests": "Solicitudes de Kit ({{count}})"
+    "kitRequests": "Solicitudes de Kit ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

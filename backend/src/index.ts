@@ -56,6 +56,7 @@ import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
+import citiesRoutes from './routes/cities.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -159,6 +160,7 @@ app.use('/api/events', onesheetRoutes); // One Sheet interest form (public, befo
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
+app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes

@@ -169,7 +169,11 @@
     "subtitle": "グローバルピザパーティー · 配送ダッシュボード",
     "signedInAdmin": "管理者としてログイン中（{{email}}）",
     "signedInAs": "{{name}}としてログイン中",
-    "kitRequests": "キットリクエスト（{{count}}）"
+    "kitRequests": "キットリクエスト（{{count}}）",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   },
   "fakeDetection": {
     "actions": {

@@ -82,6 +82,23 @@ export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
   return res.parties;
 }
 
+// Cities currently hosting a GPP event — drives underboss city scope picker.
+export interface EventCity {
+  city: string;
+  count: number;
+}
+
+export async function fetchEventCities(): Promise<EventCity[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/cities`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.cities || [];
+  } catch {
+    return [];
+  }
+}
+
 // Party API functions
 export interface CreatePartyData {
   name?: string;
@@ -93,6 +110,8 @@ export interface CreatePartyData {
   pizzaStyle?: string;
   address?: string;
   placeId?: string;
+  venueName?: string | null;
+  city?: string;
   maxGuests?: number;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -104,6 +123,8 @@ export interface CreatePartyData {
   description?: string;
   customUrl?: string;
   coHosts?: any[];
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 export interface UpdatePartyData {
@@ -172,6 +193,7 @@ export interface UpdatePartyData {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   country?: string | null;
+  city?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
@@ -192,6 +214,7 @@ export async function createPartyApi(data: CreatePartyData) {
       address: data.address,
       placeId: data.placeId,
       venueName: data.venueName,
+      city: data.city,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -278,6 +301,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       eventbriteUrl: data.eventbriteUrl,
       externalLinks: data.externalLinks,
       country: data.country,
+      city: data.city,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
@@ -317,7 +341,7 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
-export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean) {
+export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean | null) {
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',
     body: { approved },
@@ -420,6 +444,7 @@ export interface PublicEvent {
   placeId?: string | null;
   venueName: string | null;
   country?: string | null;
+  city?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
@@ -967,6 +992,29 @@ export interface CheckInResponse {
 export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
   return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
     method: 'POST',
+    requireAuth: true,
+  });
+}
+
+// Un-check-in: DELETE /api/checkin/:inviteCode/:guestId
+// Backend nulls checkedInAt/checkedInBy and emits guest.checkin_undone webhook.
+// Idempotent (200 if already unchecked). Returns 400 GUEST_REJECTED if guest is rejected.
+export interface UnCheckInResponse {
+  success: boolean;
+  notCheckedIn?: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: null;
+    checkedInBy: null;
+  };
+  message: string;
+}
+
+export async function uncheckInGuestApi(inviteCode: string, guestId: string): Promise<UnCheckInResponse> {
+  return apiRequest<UnCheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'DELETE',
     requireAuth: true,
   });
 }
@@ -2439,14 +2487,14 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+export async function createUnderboss(data: { name: string; email: string; regions: string[]; cities?: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
   });
 }
 
-export async function updateUnderboss(id: string, data: { regions: string[] }): Promise<UnderbossAdmin> {
+export async function updateUnderboss(id: string, data: { regions?: string[]; cities?: string[] }): Promise<UnderbossAdmin> {
   const result = await apiRequest<{ underboss: UnderbossAdmin }>(`/api/underboss/admin/${id}`, {
     method: 'PATCH',
     body: data,
@@ -2513,6 +2561,7 @@ export interface UnderbossMeResponse {
   isGraphicsAdmin?: boolean;
   region: string | null;
   regions: string[];
+  cities?: string[];
   name: string | null;
   email: string;
 }
@@ -3348,6 +3397,9 @@ export interface GPPEventMapItem {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
 }
 
 interface GPPEventApiResponse {
@@ -3365,6 +3417,9 @@ interface GPPEventApiResponse {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
 }
 
 interface GPPEventsApiPayload {
@@ -3400,6 +3455,9 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     country: e.country,
     underbossStatus: e.underbossStatus,
     eventTags: e.eventTags ?? [],
+    telegramGroup: e.telegramGroup ?? null,
+    hostTelegram: e.hostTelegram ?? null,
+    coHostTelegrams: e.coHostTelegrams ?? [],
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
@@ -3462,6 +3520,72 @@ export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats 
     });
   } catch (error) {
     console.error('Error fetching funnel stats:', error);
+    return null;
+  }
+}
+
+export interface OptinABArm {
+  arm: 'control' | 'variant';
+  n: number;
+  pizzadaoOptins: number;
+  pizzadaoOptinPct: number;
+  swcOptins: number;
+  swcOptinPct: number;
+}
+
+export interface OptinABRegion {
+  tag: string;
+  label: string;
+  arms: OptinABArm[];
+}
+
+export interface OptinABResults {
+  regions: OptinABRegion[];
+}
+
+export async function fetchOptinABResults(): Promise<OptinABResults | null> {
+  try {
+    return await apiRequest<OptinABResults>('/api/admin/experiments/optin-ab', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching opt-in A/B results:', error);
+    return null;
+  }
+}
+
+export interface ExperimentFlag {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export async function fetchExperimentFlags(): Promise<ExperimentFlag[] | null> {
+  try {
+    const res = await apiRequest<{ flags: ExperimentFlag[] }>('/api/admin/experiments/flags', {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return res.flags;
+  } catch (error) {
+    console.error('Error fetching experiment flags:', error);
+    return null;
+  }
+}
+
+export async function setExperimentFlag(key: string, enabled: boolean): Promise<ExperimentFlag | null> {
+  try {
+    const res = await apiRequest<{ flag: ExperimentFlag }>(`/api/admin/experiments/flags/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: { enabled },
+      requireAuth: true,
+    });
+    return res.flag;
+  } catch (error) {
+    console.error('Error setting experiment flag:', error);
     return null;
   }
 }

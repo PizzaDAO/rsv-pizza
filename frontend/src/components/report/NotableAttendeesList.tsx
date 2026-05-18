@@ -142,10 +142,12 @@ export function NotableAttendeesList({ attendees, guests = [], partyId, onAdd, o
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showBrowseModal, setShowBrowseModal] = useState(false);
 
-  // Count total RSVPs per domain from the full guest list
+  // Count total RSVPs per domain from the full guest list.
+  // Drop rejected (approved===false) defensively — they don't represent real RSVPs.
   const domainRsvpCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const g of guests) {
+      if (g.approved === false) continue;
       const domain = g.email ? extractEmailDomain(g.email, true) : null;
       if (domain) counts.set(domain, (counts.get(domain) || 0) + 1);
     }

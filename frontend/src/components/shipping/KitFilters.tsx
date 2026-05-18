@@ -3,13 +3,14 @@ import { Search, Download, Upload, Package } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { KitStatus } from '../../types';
 
-const STATUS_OPTIONS: { value: KitStatus | ''; label: string }[] = [
+const STATUS_OPTIONS: { value: KitStatus | 'no_request' | ''; label: string }[] = [
   { value: '', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'declined', label: 'Declined' },
+  { value: 'no_request', label: 'No request' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -18,6 +19,7 @@ const STATUS_COLORS: Record<string, string> = {
   shipped: 'bg-purple-500/20 text-purple-600 border-purple-500/30',
   delivered: 'bg-green-500/20 text-green-600 border-green-500/30',
   declined: 'bg-red-500/20 text-red-600 border-red-500/30',
+  no_request: 'bg-orange-500/20 text-orange-600 border-orange-500/30',
 };
 
 interface KitFiltersProps {

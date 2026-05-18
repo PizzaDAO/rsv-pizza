@@ -1,0 +1,44 @@
+name: Schema Drift Check
+
+# Runs on PRs that touch the Prisma schema or any SQL migration. Verifies that
+# every Prisma model field has a matching DB column in the simulated post-PR
+# schema. Catches the class of bug that broke prod on 2026-05-17 (PR #356):
+# Prisma schema field exists but the migration to add the column either failed
+# or targeted the wrong table. See scripts/check-schema-drift.js.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/prisma/schema.prisma'
+      - 'supabase/migrations/**'
+      - 'scripts/check-schema-drift.js'
+      - 'scripts/schema-drift-allowlist.json'
+      - '.github/workflows/schema-drift.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # No write permissions needed — script only does SELECT against the DB.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root deps
+        # pg + dotenv live in the root package.json (see scripts/ convention).
+        run: npm ci
+
+      - name: Run schema drift check
+        env:
+          # READ-ONLY use of the prod DATABASE_URL. The script only runs SELECT
+          # against information_schema. If you modify the script to do anything
+          # else, change this to a dedicated read-only role.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-schema-drift.js

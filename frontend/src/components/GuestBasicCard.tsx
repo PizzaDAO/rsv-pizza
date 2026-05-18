@@ -1,14 +1,14 @@
 import React from 'react';
 import { usePizza } from '../contexts/PizzaContext';
 import { Guest } from '../types';
-import { Trash2 } from 'lucide-react';
+import { UserRoundX } from 'lucide-react';
 
 interface GuestBasicCardProps {
   guest: Guest;
 }
 
 export const GuestBasicCard: React.FC<GuestBasicCardProps> = ({ guest }) => {
-  const { removeGuest } = usePizza();
+  const { rejectGuest } = usePizza();
 
   return (
     <div className="border border-theme-stroke rounded-lg p-3 bg-theme-surface hover:bg-theme-surface-hover hover:border-theme-stroke transition-all group">
@@ -42,11 +42,12 @@ export const GuestBasicCard: React.FC<GuestBasicCardProps> = ({ guest }) => {
           )}
         </div>
         <button
-          onClick={() => guest.id && removeGuest(guest.id)}
+          onClick={() => guest.id && rejectGuest(guest.id)}
           className="p-1 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-          aria-label="Remove guest"
+          aria-label="Reject guest"
+          title="Reject guest"
         >
-          <Trash2 size={14} />
+          <UserRoundX size={14} />
         </button>
       </div>
     </div>

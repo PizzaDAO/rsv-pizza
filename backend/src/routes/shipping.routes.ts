@@ -122,6 +122,19 @@ router.get('/stats', requireAuth, requireShippingAuth, async (req: ShippingReque
       },
     });
 
+    // Count GPP-approved events in scope that have NOT submitted a kit request.
+    const partyRegionFilter = req.shippingRegions!.includes('__admin__')
+      ? {}
+      : { region: { in: req.shippingRegions! } };
+    const noRequest = await prisma.party.count({
+      where: {
+        ...partyRegionFilter,
+        region: { not: null },
+        underbossStatus: 'approved',
+        partyKit: { is: null },
+      },
+    });
+
     const stats = {
       total: kits.length,
       pending: kits.filter(k => k.status === 'pending').length,
@@ -129,6 +142,7 @@ router.get('/stats', requireAuth, requireShippingAuth, async (req: ShippingReque
       shipped: kits.filter(k => k.status === 'shipped').length,
       delivered: kits.filter(k => k.status === 'delivered').length,
       declined: kits.filter(k => k.status === 'declined').length,
+      noRequest,
       byCountry: {} as Record<string, number>,
       byTier: {} as Record<string, number>,
     };
@@ -185,6 +199,13 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
             venueName: true,
             underbossStatus: true,
             user: { select: { name: true, email: true } },
+            _count: {
+              select: {
+                guests: {
+                  where: { status: { notIn: ['DECLINED', 'INVITED'] } },
+                },
+              },
+            },
           },
         },
       },
@@ -203,14 +224,72 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
       );
     }
 
+    // Include placeholder rows (GPP-approved events with no kit request) when
+    // none of status / tier / country are filtered — they have no shipping
+    // fields to match against.
+    const includePlaceholders = !status && !tier && !country;
+    let placeholderParties: Array<{
+      id: string;
+      name: string;
+      region: string | null;
+      date: Date | null;
+      address: string | null;
+      venueName: string | null;
+      underbossStatus: string | null;
+      user: { name: string | null; email: string | null } | null;
+      _count: { guests: number };
+    }> = [];
+    if (includePlaceholders) {
+      const partyRegionFilter = req.shippingRegions!.includes('__admin__')
+        ? {}
+        : { region: { in: req.shippingRegions! } };
+      const explicitRegion = region && typeof region === 'string' ? { region } : {};
+      placeholderParties = await prisma.party.findMany({
+        where: {
+          ...partyRegionFilter,
+          ...explicitRegion,
+          region: { not: null },
+          underbossStatus: 'approved',
+          partyKit: { is: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          region: true,
+          date: true,
+          address: true,
+          venueName: true,
+          underbossStatus: true,
+          user: { select: { name: true, email: true } },
+          _count: {
+            select: {
+              guests: {
+                where: { status: { notIn: ['DECLINED', 'INVITED'] } },
+              },
+            },
+          },
+        },
+        orderBy: { date: 'desc' },
+      });
+      if (search && typeof search === 'string') {
+        const term = search.toLowerCase();
+        placeholderParties = placeholderParties.filter(p =>
+          p.name.toLowerCase().includes(term) ||
+          (p.user?.name || '').toLowerCase().includes(term) ||
+          (p.user?.email || '').toLowerCase().includes(term)
+        );
+      }
+    }
+
     // Build CSV
-    const headers = ['Kit ID', 'Event Name', 'Region', 'Host Name', 'Host Email', 'Event Venue', 'Event Address', 'Event Approved', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes', 'Tracking Number', 'Tracking URL'];
+    const headers = ['Kit ID', 'Event Name', 'RSVPs', 'Region', 'Host Name', 'Host Email', 'Event Venue', 'Event Address', 'Event Approved', 'Recipient', 'Address 1', 'Address 2', 'City', 'State', 'Postal Code', 'Country', 'Phone', 'Requested Tier', 'Allocated Tier', 'Status', 'Notes', 'Tracking Number', 'Tracking URL'];
     const csvRows = [headers.join(',')];
 
     for (const kit of filtered) {
       const row = [
         escapeCSV(kit.id),
         escapeCSV(kit.party.name),
+        escapeCSV(String(kit.party._count.guests)),
         escapeCSV(kit.party.region || ''),
         escapeCSV(kit.party.user?.name || ''),
         escapeCSV(kit.party.user?.email || ''),
@@ -231,6 +310,35 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
         escapeCSV(kit.notes || ''),
         escapeCSV(kit.trackingNumber || ''),
         escapeCSV(kit.trackingUrl || ''),
+      ];
+      csvRows.push(row.join(','));
+    }
+
+    for (const p of placeholderParties) {
+      const row = [
+        escapeCSV(`placeholder:${p.id}`),
+        escapeCSV(p.name),
+        escapeCSV(String(p._count.guests)),
+        escapeCSV(p.region || ''),
+        escapeCSV(p.user?.name || ''),
+        escapeCSV(p.user?.email || ''),
+        escapeCSV(p.venueName || ''),
+        escapeCSV(p.address || ''),
+        escapeCSV('Approved'),
+        escapeCSV(''),  // Recipient
+        escapeCSV(''),  // Address 1
+        escapeCSV(''),  // Address 2
+        escapeCSV(''),  // City
+        escapeCSV(''),  // State
+        escapeCSV(''),  // Postal Code
+        escapeCSV(''),  // Country
+        escapeCSV(''),  // Phone
+        escapeCSV(''),  // Requested Tier
+        escapeCSV(''),  // Allocated Tier
+        escapeCSV('No request'),
+        escapeCSV(''),  // Notes
+        escapeCSV(''),  // Tracking Number
+        escapeCSV(''),  // Tracking URL
       ];
       csvRows.push(row.join(','));
     }
@@ -376,9 +484,12 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
     const { status, tier, country, region, search, sort } = req.query;
     const regionFilter = buildRegionFilter(req.shippingRegions!);
 
+    // status === 'no_request' is a pseudo-status: return placeholders only.
+    const placeholdersOnly = status === 'no_request';
+
     const where: any = { ...regionFilter };
 
-    if (status && typeof status === 'string') {
+    if (status && typeof status === 'string' && !placeholdersOnly) {
       where.status = status;
     }
     if (tier && typeof tier === 'string') {
@@ -409,24 +520,35 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
       }
     }
 
-    const kits = await prisma.partyKit.findMany({
-      where,
-      include: {
-        party: {
-          select: {
-            id: true,
-            name: true,
-            region: true,
-            date: true,
-            address: true,
-            venueName: true,
-            underbossStatus: true,
-            user: { select: { name: true, email: true } },
+    // Skip the real-kits query entirely when in placeholders-only mode.
+    let kits: any[] = [];
+    if (!placeholdersOnly) {
+      kits = await prisma.partyKit.findMany({
+        where,
+        include: {
+          party: {
+            select: {
+              id: true,
+              name: true,
+              region: true,
+              date: true,
+              address: true,
+              venueName: true,
+              underbossStatus: true,
+              user: { select: { name: true, email: true } },
+              _count: {
+                select: {
+                  guests: {
+                    where: { status: { notIn: ['DECLINED', 'INVITED'] } },
+                  },
+                },
+              },
+            },
           },
         },
-      },
-      orderBy,
-    });
+        orderBy,
+      });
+    }
 
     // Apply search filter in memory
     let filtered = kits;
@@ -441,7 +563,7 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
       );
     }
 
-    // Format response
+    // Format real kits
     const formattedKits = filtered.map(kit => ({
       id: kit.id,
       partyId: kit.partyId,
@@ -472,9 +594,96 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
       approvedAt: kit.approvedAt?.toISOString() || null,
       shippedAt: kit.shippedAt?.toISOString() || null,
       deliveredAt: kit.deliveredAt?.toISOString() || null,
+      rsvpCount: kit.party._count.guests,
+      isPlaceholder: false,
     }));
 
-    res.json({ kits: formattedKits });
+    // Placeholder rows: GPP-approved events with no PartyKit row.
+    // Included when (placeholdersOnly OR no status filter) and tier/country are
+    // empty (placeholders have no tier/country to match).
+    const shouldIncludePlaceholders =
+      (placeholdersOnly || !status) && !tier && !country;
+
+    let placeholders: any[] = [];
+    if (shouldIncludePlaceholders) {
+      const partyRegionFilter = req.shippingRegions!.includes('__admin__')
+        ? {}
+        : { region: { in: req.shippingRegions! } };
+      const explicitRegion = region && typeof region === 'string' ? { region } : {};
+
+      let placeholderParties = await prisma.party.findMany({
+        where: {
+          ...partyRegionFilter,
+          ...explicitRegion,
+          region: { not: null },
+          underbossStatus: 'approved',
+          partyKit: { is: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          region: true,
+          date: true,
+          address: true,
+          venueName: true,
+          underbossStatus: true,
+          user: { select: { name: true, email: true } },
+          _count: {
+            select: {
+              guests: {
+                where: { status: { notIn: ['DECLINED', 'INVITED'] } },
+              },
+            },
+          },
+        },
+        orderBy: { date: 'desc' },
+      });
+
+      if (search && typeof search === 'string') {
+        const term = search.toLowerCase();
+        placeholderParties = placeholderParties.filter(p =>
+          p.name.toLowerCase().includes(term) ||
+          (p.user?.name || '').toLowerCase().includes(term) ||
+          (p.user?.email || '').toLowerCase().includes(term)
+        );
+      }
+
+      placeholders = placeholderParties.map(p => ({
+        id: `placeholder:${p.id}`,
+        partyId: p.id,
+        partyName: p.name,
+        eventDate: p.date?.toISOString() || null,
+        region: p.region || null,
+        hostName: p.user?.name || null,
+        hostEmail: p.user?.email || null,
+        eventAddress: p.address || null,
+        eventVenue: p.venueName || null,
+        underbossStatus: p.underbossStatus || 'pending',
+        requestedTier: '',
+        allocatedTier: null,
+        recipientName: '',
+        addressLine1: '',
+        addressLine2: null,
+        city: '',
+        state: null,
+        postalCode: '',
+        country: '',
+        phone: null,
+        status: 'no_request',
+        trackingNumber: null,
+        trackingUrl: null,
+        notes: null,
+        adminNotes: null,
+        requestedAt: p.date?.toISOString() || new Date(0).toISOString(),
+        approvedAt: null,
+        shippedAt: null,
+        deliveredAt: null,
+        rsvpCount: p._count.guests,
+        isPlaceholder: true,
+      }));
+    }
+
+    res.json({ kits: [...formattedKits, ...placeholders] });
   } catch (error) {
     next(error);
   }

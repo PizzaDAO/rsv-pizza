@@ -108,6 +108,10 @@ export function buildInviteEmail(
  * /api/v1/parties/{partyId}/guests:
  *   get:
  *     summary: List all guests for a party
+ *     description: |
+ *       Rejected guests (`approved=false`) are excluded by default
+ *       (mushroom-31723). Pass `?approved=false` explicitly to include them,
+ *       or omit the filter to get all non-rejected guests.
  *     tags: [Guests]
  *     security:
  *       - ApiKeyAuth: []
@@ -131,7 +135,7 @@ export function buildInviteEmail(
  *         name: approved
  *         schema:
  *           type: boolean
- *         description: Filter by approval status
+ *         description: Filter by approval status. When omitted, rejected guests (approved=false) are excluded.
  *     responses:
  *       200:
  *         description: List of guests
@@ -148,6 +152,10 @@ router.get('/', requireApiKey(SCOPES.GUESTS_READ), async (req: ApiKeyRequest, re
     const whereClause: any = { partyId };
     if (approvedFilter !== undefined) {
       whereClause.approved = approvedFilter === 'true' ? true : approvedFilter === 'false' ? false : null;
+    } else {
+      // mushroom-31723: by default, exclude rejected guests (approved=false)
+      // so they don't leak into integrations that aren't aware of soft-reject.
+      whereClause.approved = { not: false };
     }
 
     const [guests, total] = await Promise.all([

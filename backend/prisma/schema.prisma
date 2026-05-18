@@ -176,6 +176,7 @@ model Party {
   // Region (for underboss dashboard)
   region  String?
   country String?
+  city    String?
 
   // Underboss dashboard fields
   hostStatus      String? @map("host_status")
@@ -258,6 +259,7 @@ model Guest {
   swcUkOptIn          Boolean  @default(false) @map("swc_uk_opt_in")
   swcBrOptIn          Boolean  @default(false) @map("swc_br_opt_in")
   ethconfOptIn        Boolean  @default(false) @map("ethconf_opt_in")
+  optinAbVariant      String?  @map("optin_ab_variant")
   dietaryRestrictions String[] @map("dietary_restrictions")
   likedToppings       String[] @map("liked_toppings")
   dislikedToppings    String[] @map("disliked_toppings")
@@ -284,6 +286,9 @@ model Guest {
   // Privy embedded wallet fields
   privyUserId  String? @map("privy_user_id") @db.VarChar
   walletSource String? @map("wallet_source") @db.VarChar
+
+  // romana-30802: cookie-based visitor session ID for duplicate-RSVP detection
+  visitorSessionId String? @map("visitor_session_id")
 
   // Check-in fields
   checkedInAt       DateTime? @map("checked_in_at") @db.Timestamptz
@@ -1134,6 +1139,7 @@ model Underboss {
   email       String
   region      String
   regions     String[] @default([])
+  cities      String[] @default([])
   accessToken String   @unique @map("access_token")
   isActive    Boolean  @default(true) @map("is_active")
   notes       String?
@@ -1292,6 +1298,20 @@ model AppConfig {
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   @@map("app_config")
+}
+
+// ============================================
+// Experiment Flags (kill switches)
+// ============================================
+
+model ExperimentFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  updatedBy   String?  @map("updated_by")
+
+  @@map("experiment_flags")
 }
 
 // ============================================

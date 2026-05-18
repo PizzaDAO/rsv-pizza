@@ -6,6 +6,8 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
+import { geocodeCity } from '../lib/geocode.js';
+import { haversineKm } from '../lib/distance.js';
 
 const router = Router();
 
@@ -312,6 +314,93 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       );
     }
 
+    // --- Proximity check: reject if within 80 km of an approved GPP city ---
+    // Resolve coordinates: prefer submitted values, fall back to geocoding.
+    let resolvedLat: number | null = null;
+    let resolvedLng: number | null = null;
+
+    const submittedLat = typeof cityLat === 'number' ? cityLat : null;
+    const submittedLng = typeof cityLng === 'number' ? cityLng : null;
+
+    if (
+      submittedLat !== null && submittedLng !== null &&
+      submittedLat >= -90 && submittedLat <= 90 &&
+      submittedLng >= -180 && submittedLng <= 180
+    ) {
+      resolvedLat = submittedLat;
+      resolvedLng = submittedLng;
+    } else {
+      try {
+        const geocoded = await geocodeCity(normalizedCity, country);
+        if (geocoded) {
+          resolvedLat = geocoded.lat;
+          resolvedLng = geocoded.lng;
+        }
+      } catch (geocodeErr) {
+        // Fail-open: geocoder error → skip proximity check
+        console.warn('[gpp/nearby-check] geocodeCity threw unexpectedly:', geocodeErr);
+      }
+    }
+
+    if (resolvedLat !== null && resolvedLng !== null) {
+      // Query all approved GPP cities that have coordinates
+      const approvedCities = await prisma.$queryRaw<Array<{
+        id: string;
+        name: string;
+        custom_url: string | null;
+        invite_code: string;
+        latitude: number;
+        longitude: number;
+      }>>`
+        SELECT id, name, custom_url, invite_code, latitude, longitude
+        FROM parties
+        WHERE event_type = 'gpp'
+          AND underboss_status = 'approved'
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+      `;
+
+      let nearestKm = Infinity;
+      let nearestCity: typeof approvedCities[number] | null = null;
+
+      for (const ac of approvedCities) {
+        const km = haversineKm(
+          { lat: resolvedLat, lng: resolvedLng },
+          { lat: ac.latitude, lng: ac.longitude }
+        );
+        if (km < nearestKm) {
+          nearestKm = km;
+          nearestCity = ac;
+        }
+      }
+
+      console.info('[gpp/nearby-check]', {
+        city: normalizedCity,
+        lat: resolvedLat,
+        lng: resolvedLng,
+        nearestKm: nearestCity ? Math.round(nearestKm) : null,
+        nearestId: nearestCity?.id ?? null,
+      });
+
+      if (nearestCity && nearestKm <= 80) {
+        const eventUrl = nearestCity.custom_url
+          ? `https://rsv.pizza/${nearestCity.custom_url}`
+          : `https://rsv.pizza/${nearestCity.invite_code}`;
+
+        // Strip 'Global Pizza Party ' prefix to get a friendly city name
+        const nearbyDisplayName = nearestCity.name.startsWith('Global Pizza Party ')
+          ? nearestCity.name.slice('Global Pizza Party '.length)
+          : nearestCity.name;
+
+        throw new AppError(
+          `There's already a Global Pizza Party near you in ${nearbyDisplayName} — it's about ${Math.round(nearestKm)} km away. Join them here: ${eventUrl}`,
+          409,
+          'NEARBY_CITY'
+        );
+      }
+    }
+    // --- End proximity check ---
+
     // Find or create user
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -409,10 +498,11 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         timezone: eventTimezone,
         region: inferredRegion,
         country: country || null,
+        city: normalizedCity,
         address: cityAddress,
         addressIsCityDefault: true,
-        latitude: typeof cityLat === 'number' ? cityLat : null,
-        longitude: typeof cityLng === 'number' ? cityLng : null,
+        latitude: resolvedLat,
+        longitude: resolvedLng,
         placeId: null,
         availableBeverages: [],
         availableToppings: [],
@@ -549,7 +639,9 @@ const gppEventSelect = {
   address: true,
   venueName: true,
   country: true,
+  city: true,
   region: true,
+  telegramGroup: true,
   latitude: true,
   longitude: true,
   eventImageUrl: true,
@@ -558,23 +650,40 @@ const gppEventSelect = {
   underbossStatus: true,
   rsvpClosedAt: true,
   createdAt: true,
+  coHosts: true,
   _count: {
     select: { guests: true },
   },
   user: {
-    select: { name: true },
+    select: { name: true, telegram: true },
   },
 } as const;
 
+async function resolveCallerIsModerator(req: Request): Promise<boolean> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return false;
+  try {
+    const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+    const email = decoded.email;
+    if (!email) return false;
+    return (await isAdmin(email)) || (await isUnderboss(email));
+  } catch {
+    return false;
+  }
+}
+
 // Format a Party record into the public GPP API response
-function formatGppEvent(event: any) {
+function formatGppEvent(event: any, callerIsModerator = false) {
   const baseUrl = 'https://rsv.pizza';
   const url = event.customUrl
     ? `${baseUrl}/${event.customUrl}`
     : `${baseUrl}/${event.inviteCode}`;
-  const city = event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
+  const city = event.city || event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
 
-  return {
+  const base = {
     id: event.id,
     name: event.name,
     city,
@@ -588,6 +697,7 @@ function formatGppEvent(event: any) {
     region: event.region,
     address: event.address,
     venueName: event.venueName,
+    telegramGroup: event.telegramGroup || null,
     latitude: event.latitude,
     longitude: event.longitude,
     eventImageUrl: event.eventImageUrl,
@@ -600,6 +710,20 @@ function formatGppEvent(event: any) {
     approved: event.underbossStatus === 'approved',
     community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
+  };
+
+  if (!callerIsModerator) return base;
+
+  const cohostArr: any[] = Array.isArray(event.coHosts) ? event.coHosts : [];
+  const firstCohostTelegram = cohostArr
+    .map((c) => (c && typeof c.telegram === 'string' ? c.telegram.trim() : ''))
+    .find((t) => t.length > 0) || null;
+  const hostTelegram = event.user?.telegram?.trim() || null;
+
+  return {
+    ...base,
+    hostTelegram: hostTelegram || null,
+    coHostTelegrams: firstCohostTelegram ? [firstCohostTelegram] : [],
   };
 }
 
@@ -637,8 +761,12 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
       return res.status(404).json({ error: 'GPP event not found for this city' });
     }
 
-    res.set('Cache-Control', 'public, max-age=300');
-    res.json({ event: formatGppEvent(event) });
+    const callerIsModerator = await resolveCallerIsModerator(req);
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
+    res.json({ event: formatGppEvent(event, callerIsModerator) });
   } catch (error) {
     next(error);
   }
@@ -655,24 +783,10 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     // underboss/admin. Unauthenticated callers silently fall back to the
     // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
     const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    const callerIsModerator = await resolveCallerIsModerator(req);
     let includeAllStatuses = false;
-    if (requestedAllStatuses) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7);
-        const secret = process.env.JWT_SECRET;
-        if (secret) {
-          try {
-            const decoded = jwt.verify(token, secret) as { userId: string; email: string };
-            const email = decoded.email;
-            if (email && (await isAdmin(email) || await isUnderboss(email))) {
-              includeAllStatuses = true;
-            }
-          } catch {
-            // Bad/expired token — silently fall back to the filtered view
-          }
-        }
-      }
+    if (requestedAllStatuses && callerIsModerator) {
+      includeAllStatuses = true;
     }
 
     const where: any = { eventType: 'gpp' };
@@ -707,9 +821,12 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
     res.json({
-      events: events.map(formatGppEvent),
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
       total,
       limit: parsedLimit,
       offset: parsedOffset,
