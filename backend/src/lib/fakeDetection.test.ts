@@ -452,7 +452,7 @@ describe('checkHighPerVisitorRsvpSaturation', () => {
     const guests = Array.from({ length: 10 }, () => makeGuest());
     expect(checkHighPerVisitorRsvpSaturation(guests, []).fired).toBe(false);
   });
-  it('fires when one visitor temporally matches 6 distinct guests within ±10 min', () => {
+  it('fires when one visitor temporally matches 6 distinct guests within ±10 min (only visitor → secondMax=0)', () => {
     const base = new Date('2026-04-01T12:00:00Z').getTime();
     const guests = Array.from({ length: 6 }, (_, i) =>
       makeGuest({
@@ -470,6 +470,7 @@ describe('checkHighPerVisitorRsvpSaturation', () => {
     const result = checkHighPerVisitorRsvpSaturation(guests, funnel);
     expect(result.fired).toBe(true);
     expect(result.evidence?.max).toBe(6);
+    expect(result.evidence?.secondMax).toBe(0);
     expect(result.evidence?.visitorHash).toBe('padder'.slice(0, 8));
   });
   it('does not fire when each visitor only matches 1-2 guests', () => {
@@ -501,6 +502,89 @@ describe('checkHighPerVisitorRsvpSaturation', () => {
       }),
     ];
     expect(checkHighPerVisitorRsvpSaturation(guests, funnel).fired).toBe(false);
+  });
+
+  // parmesan-67529: ratio-based refinement to suppress QR-kiosk false positives.
+  // Build N visitors, each with one funnel timestamp centered in its own 2-hour
+  // slot; place K guests 1 min apart inside that slot, centered on the funnel
+  // event, so the visitor temporally matches all K guests within the ±10-min
+  // window. The resulting per-visitor counts array = [K1, K2, K3, ...] which
+  // is what we test against the ratio rule. Slots are far enough apart that no
+  // cross-slot matching occurs. Requires each K ≤ 21 (the ±10-min window).
+  function buildMatchScenario(counts: number[]): {
+    guests: FakeDetectionGuest[];
+    funnel: FakeDetectionFunnelEvent[];
+  } {
+    const base = new Date('2026-04-01T12:00:00Z').getTime();
+    const SLOT = 2 * 60 * 60_000;
+    const guests: FakeDetectionGuest[] = [];
+    const funnel: FakeDetectionFunnelEvent[] = [];
+    counts.forEach((k, vIdx) => {
+      const slotMid = base + vIdx * SLOT + 30 * 60_000; // 30 min into slot
+      const visitorHash = vIdx === 0 ? 'padder00' : `kiosk${vIdx}`;
+      // Funnel event at slot midpoint
+      funnel.push(
+        makeFunnelEvent({
+          visitorHash,
+          step: 'rsvp_opened',
+          createdAt: new Date(slotMid),
+        }),
+      );
+      // K guests 1 min apart centered on slotMid so |guest - funnel| ≤ (K-1)/2 min
+      const startOffsetMin = -Math.floor((k - 1) / 2);
+      for (let i = 0; i < k; i++) {
+        guests.push(
+          makeGuest({
+            id: `g-v${vIdx}-${i}`,
+            submittedAt: new Date(slotMid + (startOffsetMin + i) * 60_000),
+          }),
+        );
+      }
+    });
+    return { guests, funnel };
+  }
+
+  it('[10,10,10] flat (kiosk) distribution does NOT fire', () => {
+    const { guests, funnel } = buildMatchScenario([10, 10, 10]);
+    const r = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(r.fired).toBe(false);
+    expect(r.evidence?.max).toBe(10);
+    expect(r.evidence?.secondMax).toBe(10);
+  });
+
+  it('[13,8,6] padder shape (Owerri) DOES fire — ratio 1.625', () => {
+    const { guests, funnel } = buildMatchScenario([13, 8, 6]);
+    const r = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(r.fired).toBe(true);
+    expect(r.evidence?.max).toBe(13);
+    expect(r.evidence?.secondMax).toBe(8);
+    expect(r.evidence?.ratio).toBeCloseTo(13 / 8, 2);
+  });
+
+  it('[17,4,3] clear padder (Bwejuu) fires hard — ratio 4.25', () => {
+    const { guests, funnel } = buildMatchScenario([17, 4, 3]);
+    const r = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(r.fired).toBe(true);
+    expect(r.evidence?.max).toBe(17);
+    expect(r.evidence?.secondMax).toBe(4);
+    expect(r.evidence?.ratio).toBeCloseTo(17 / 4, 2);
+  });
+
+  it('[17,12,9] Ilemela-shape — ratio 1.42 below threshold, does NOT fire', () => {
+    const { guests, funnel } = buildMatchScenario([17, 12, 9]);
+    const r = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(r.fired).toBe(false);
+    expect(r.evidence?.max).toBe(17);
+    expect(r.evidence?.secondMax).toBe(12);
+  });
+
+  it('edge case: only one visitor matched ≥1 guest (secondMax=0) → fires', () => {
+    const { guests, funnel } = buildMatchScenario([6]);
+    const r = checkHighPerVisitorRsvpSaturation(guests, funnel);
+    expect(r.fired).toBe(true);
+    expect(r.evidence?.max).toBe(6);
+    expect(r.evidence?.secondMax).toBe(0);
+    expect(r.evidence?.ratio).toBe(null);
   });
 });
 
@@ -935,9 +1019,15 @@ describe('scoreEvent — integration fixtures', () => {
     // Should fire: cap_fill, low_domain_entropy, wallet_too_low, host_self,
     // pizzeria_blank, wallet_source_null, one_word_name, firstname_digits,
     // low_hour_entropy, rapid_intersubmission, low_funnel_coverage,
-    // high_per_visitor_rsvp_saturation, mailing_list_opt_in_extreme (all default=false),
-    // lsh_field_sig_cluster (identical sigs).
+    // mailing_list_opt_in_extreme (all default=false), lsh_field_sig_cluster
+    // (identical sigs).
     // (sig_collapse no longer in scoreEvent list — replaced by lsh_field_sig_cluster.)
+    // parmesan-67529: high_per_visitor_rsvp_saturation no longer fires here
+    // because all 5 funnel visitors line up at the same `base` timestamp →
+    // each matches the same large set of RSVPs → max == secondMax (ratio 1.0,
+    // below 1.5 threshold). The remaining 13 heuristics still saturate the
+    // score above 70. This is the desired post-refinement behavior: kiosk-shape
+    // flat distributions don't trip saturation.
     expect(row.score).toBeGreaterThanOrEqual(70);
     expect(row.tier).toBe('high');
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
@@ -947,7 +1037,7 @@ describe('scoreEvent — integration fixtures', () => {
     expect(firedIds).toContain('mailing_list_opt_in_extreme');
     expect(firedIds).toContain('host_self_rsvp_mismatch');
     expect(firedIds).toContain('low_funnel_coverage');
-    expect(firedIds).toContain('high_per_visitor_rsvp_saturation');
+    expect(firedIds).not.toContain('high_per_visitor_rsvp_saturation');
   });
 
   it('"Lilongwe-like" clean event scores ≤10', () => {
