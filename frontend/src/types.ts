@@ -453,7 +453,7 @@ export interface PhotoStats {
 
 // Sponsor CRM types
 export type SponsorStatus = 'todo' | 'asked' | 'yes' | 'billed' | 'paid' | 'stuck' | 'alum' | 'skip';
-export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'other';
+export type SponsorshipType = 'cash' | 'in-kind' | 'venue' | 'pizza' | 'drinks' | 'community' | 'other';
 export type SponsorCategory = 'hardware_wallet' | 'software_wallet' | 'cex' | 'blockchain' | 'dex' | 'community' | 'custom';
 
 export const SPONSOR_CATEGORIES: { id: SponsorCategory; label: string }[] = [

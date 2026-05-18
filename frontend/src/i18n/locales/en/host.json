@@ -305,7 +305,7 @@
     "pipeline": "Pipeline",
     "fundraisingSection": "Fundraising",
     "contributionType": "Contribution Type",
-    "sponsorshipDetails": "Sponsorship Details",
+    "partnershipDetails": "Partnership Details",
     "messageFromSponsor": "Message from Sponsor",
     "logo": "Logo",
     "uploadLogo": "Upload Logo",
@@ -354,6 +354,7 @@
     "venueType": "Venue",
     "pizzaType": "Pizza",
     "drinksType": "Drinks",
+    "communityType": "Community",
     "otherType": "Other",
     "brandDescription": "1-2 sentence brand description (shown on event page)",
     "productService": "Product/Service (if non-monetary)"

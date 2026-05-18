@@ -299,7 +299,7 @@
     "pipeline": "进度管道",
     "fundraisingSection": "筹资",
     "contributionType": "贡献类型",
-    "sponsorshipDetails": "赞助详情",
+    "partnershipDetails": "合作详情",
     "messageFromSponsor": "赞助商留言",
     "logo": "Logo",
     "uploadLogo": "上传 Logo",
@@ -348,6 +348,7 @@
     "venueType": "场地",
     "pizzaType": "披萨",
     "drinksType": "饮品",
+    "communityType": "社区",
     "otherType": "其他",
     "brandDescription": "1-2句品牌描述（显示在活动页面上）",
     "productService": "产品/服务（如为非资金赞助）"

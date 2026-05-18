@@ -299,7 +299,7 @@
     "pipeline": "Pipeline",
     "fundraisingSection": "Recaudación",
     "contributionType": "Tipo de Contribución",
-    "sponsorshipDetails": "Detalles del Patrocinio",
+    "partnershipDetails": "Detalles de la Asociación",
     "messageFromSponsor": "Mensaje del Patrocinador",
     "logo": "Logo",
     "uploadLogo": "Subir Logo",
@@ -348,6 +348,7 @@
     "venueType": "Lugar",
     "pizzaType": "Pizza",
     "drinksType": "Bebidas",
+    "communityType": "Comunidad",
     "otherType": "Otro",
     "brandDescription": "Descripción de marca de 1-2 oraciones (se muestra en la página del evento)",
     "productService": "Producto/Servicio (si no es monetario)"

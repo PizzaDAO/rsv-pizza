@@ -721,6 +721,7 @@ export function AccountPage() {
                       venue: 'Venue',
                       pizza: 'Pizza',
                       drinks: 'Drinks',
+                      community: 'Community',
                       other: 'Other',
                     };
 
