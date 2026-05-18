@@ -106,6 +106,7 @@ export interface CoHost {
   website?: string;
   twitter?: string;
   instagram?: string;
+  telegram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
   canEdit?: boolean;

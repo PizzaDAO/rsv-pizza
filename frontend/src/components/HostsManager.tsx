@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2 } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2, Send } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar } from '../lib/supabase';
@@ -44,6 +44,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [newCoHostWebsite, setNewCoHostWebsite] = useState('');
   const [newCoHostTwitter, setNewCoHostTwitter] = useState('');
   const [newCoHostInstagram, setNewCoHostInstagram] = useState('');
+  const [newCoHostTelegram, setNewCoHostTelegram] = useState('');
   const [newCoHostAvatarUrl, setNewCoHostAvatarUrl] = useState('');
   const [newCoHostAvatarFile, setNewCoHostAvatarFile] = useState<File | null>(null);
   const [newCoHostShowOnEvent, setNewCoHostShowOnEvent] = useState(true);
@@ -56,6 +57,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const [editHostWebsite, setEditHostWebsite] = useState('');
   const [editHostTwitter, setEditHostTwitter] = useState('');
   const [editHostInstagram, setEditHostInstagram] = useState('');
+  const [editHostTelegram, setEditHostTelegram] = useState('');
   const [editHostAvatarUrl, setEditHostAvatarUrl] = useState('');
   const [editHostAvatarFile, setEditHostAvatarFile] = useState<File | null>(null);
   const [savingHost, setSavingHost] = useState(false);
@@ -193,6 +195,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
         website: newCoHostWebsite.trim() || undefined,
         twitter: newCoHostTwitter.trim() || undefined,
         instagram: newCoHostInstagram.trim() || undefined,
+        telegram: newCoHostTelegram.trim() ? stripToHandle(newCoHostTelegram.trim()) : undefined,
         avatar_url: avatarUrl,
         showOnEvent: newCoHostShowOnEvent,
         canEdit: newCoHostCanEdit || undefined,
@@ -207,6 +210,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       setNewCoHostWebsite('');
       setNewCoHostTwitter('');
       setNewCoHostInstagram('');
+      setNewCoHostTelegram('');
       setNewCoHostAvatarUrl('');
       setNewCoHostAvatarFile(null);
       setNewCoHostAvatarFromX(null);
@@ -229,6 +233,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostWebsite(host.website || '');
     setEditHostTwitter(host.twitter || '');
     setEditHostInstagram(host.instagram || '');
+    setEditHostTelegram(host.telegram || '');
     setEditHostAvatarUrl(host.avatar_url || '');
     setEditHostAvatarFile(null);
     // Provenance of any saved avatar is unknown — treat as user-set
@@ -242,6 +247,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     setEditHostWebsite('');
     setEditHostTwitter('');
     setEditHostInstagram('');
+    setEditHostTelegram('');
     setEditHostAvatarUrl('');
     setEditHostAvatarFile(null);
     setEditHostAvatarFromX(null);
@@ -272,6 +278,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             website: editHostWebsite.trim() || undefined,
             twitter: editHostTwitter.trim() || undefined,
             instagram: editHostInstagram.trim() || undefined,
+            telegram: editHostTelegram.trim() ? stripToHandle(editHostTelegram.trim()) : undefined,
             avatar_url: avatarUrl,
           }
           : h
@@ -420,6 +427,18 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   {coHost.instagram && (
                     <a href={`https://instagram.com/${coHost.instagram}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white" onClick={(e) => e.stopPropagation()}>
                       <Instagram size={14} />
+                    </a>
+                  )}
+                  {coHost.telegram && (
+                    <a
+                      href={`https://t.me/${coHost.telegram.replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/50 hover:text-white"
+                      onClick={(e) => e.stopPropagation()}
+                      title="DM on Telegram"
+                    >
+                      <Send size={14} />
                     </a>
                   )}
                 </div>
@@ -587,7 +606,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="relative">
                   <input
                     type="text"
@@ -634,6 +653,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   onChange={(e) => setEditHostInstagram(e.target.value)}
                   onBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
                   placeholder="Instagram (no @)"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+                <input
+                  type="text"
+                  value={editHostTelegram}
+                  onChange={(e) => setEditHostTelegram(e.target.value)}
+                  onBlur={() => setEditHostTelegram(stripToHandle(editHostTelegram))}
+                  placeholder="Telegram (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
@@ -733,7 +760,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="relative">
                   <input
                     type="text"
@@ -780,6 +807,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   onChange={(e) => setNewCoHostInstagram(e.target.value)}
                   onBlur={() => setNewCoHostInstagram(stripToHandle(newCoHostInstagram))}
                   placeholder="Instagram (no @)"
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
+                />
+                <input
+                  type="text"
+                  value={newCoHostTelegram}
+                  onChange={(e) => setNewCoHostTelegram(e.target.value)}
+                  onBlur={() => setNewCoHostTelegram(stripToHandle(newCoHostTelegram))}
+                  placeholder="Telegram (no @)"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
