@@ -1,14 +1,12 @@
 /**
- * Quick USDC-on-Base balance check for the payout server-wallet
- * (arugula-38633, PR 5). Pure read — no transactions.
+ * Quick USDC-on-Base balance check for the rsv.pizza payout wallet
+ * (arugula-38633, PR 5, self-custodied variant). Pure read — no transactions.
  *
  * Usage:
  *   node scripts/check-payout-wallet-balance.js
  *
  * Required env (loaded from backend/.env):
- *   - PRIVY_APP_ID
- *   - PRIVY_APP_SECRET
- *   - USDC_PAYOUT_PRIVY_WALLET_ID (created by scripts/create-payout-server-wallet.js)
+ *   - USDC_PAYOUT_WALLET_PRIVATE_KEY (rsv.pizza-specific hot wallet)
  *   - BASE_RPC_URL (optional; defaults to https://mainnet.base.org)
  */
 
@@ -19,29 +17,25 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
 
 async function main() {
-  const PRIVY_APP_ID = process.env.PRIVY_APP_ID;
-  const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
-  const WALLET_ID = process.env.USDC_PAYOUT_PRIVY_WALLET_ID;
+  const raw = process.env.USDC_PAYOUT_WALLET_PRIVATE_KEY;
   const RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
 
-  if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
-    console.error('ERROR: PRIVY_APP_ID and PRIVY_APP_SECRET must be set in backend/.env');
+  if (!raw) {
+    console.error('ERROR: USDC_PAYOUT_WALLET_PRIVATE_KEY not set in backend/.env');
     process.exit(1);
   }
-  if (!WALLET_ID) {
-    console.error('ERROR: USDC_PAYOUT_PRIVY_WALLET_ID not set. Run scripts/create-payout-server-wallet.js first.');
+  const normalized = (raw.startsWith('0x') ? raw : '0x' + raw).trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(normalized)) {
+    console.error('ERROR: USDC_PAYOUT_WALLET_PRIVATE_KEY is not a valid 32-byte hex private key');
     process.exit(1);
   }
 
-  const { PrivyClient } = require('@privy-io/server-auth');
+  const { privateKeyToAccount } = require('viem/accounts');
   const { createPublicClient, http } = require('viem');
   const { base } = require('viem/chains');
 
-  const client = new PrivyClient(PRIVY_APP_ID, PRIVY_APP_SECRET);
-  const wallet = await client.walletApi.getWallet({ id: WALLET_ID });
-
-  console.log('Wallet ID:      ' + wallet.id);
-  console.log('Wallet Address: ' + wallet.address);
+  const account = privateKeyToAccount(normalized);
+  console.log('Wallet Address: ' + account.address);
   console.log('RPC URL:        ' + RPC_URL);
   console.log('');
 
@@ -59,7 +53,7 @@ async function main() {
       },
     ],
     functionName: 'balanceOf',
-    args: [wallet.address],
+    args: [account.address],
   });
 
   const balance = Number(balanceRaw) / 10 ** USDC_DECIMALS;
@@ -67,6 +61,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('Failed to read wallet balance:', err);
+  console.error('Failed to read wallet balance:', err.message);
   process.exit(2);
 });

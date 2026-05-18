@@ -1,10 +1,9 @@
 /**
  * USDC-on-Base payment service (arugula-38633, PR 5).
  *
- * Sends USDC from a Privy server-wallet to a recipient on Base mainnet. The
- * wallet itself is provisioned out-of-band by `scripts/create-payout-server-wallet.js`;
- * this service only signs and broadcasts transfers against the existing wallet id
- * stored in `USDC_PAYOUT_PRIVY_WALLET_ID`.
+ * Sends USDC from a self-custodied hot wallet to a recipient on Base mainnet.
+ * The wallet private key lives in `USDC_PAYOUT_WALLET_PRIVATE_KEY` (Vercel env)
+ * and is loaded into a viem account on demand — never logged.
  *
  * Pre-flight safety (defense in depth — every check runs every time):
  *   1. recipient `toAddress` must be a valid 0x address (viem `isAddress`)
@@ -18,24 +17,24 @@
  * returning. Caller is responsible for updating the payout row to status=paid
  * with the returned `txHash`.
  *
- * NEVER logs private keys (Privy holds them); does log addresses + amounts +
- * tx hashes for auditability.
+ * Logs addresses + amounts + tx hashes for auditability; NEVER logs the
+ * private key.
  */
 import {
   createPublicClient,
+  createWalletClient,
   http,
   encodeFunctionData,
   parseUnits,
   isAddress,
   type Hex,
 } from 'viem';
+import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
-import { PrivyClient } from '@privy-io/server-auth';
 import { prisma } from '../config/database.js';
 
 const USDC_BASE_ADDRESS: Hex = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
-const BASE_CAIP2 = 'eip155:8453' as const;
 const HARD_PER_TX_CEILING_USD = 1000;
 const DEFAULT_PER_TX_CAP_USD = 200;
 const DEFAULT_DAILY_CAP_USD = 2000;
@@ -83,40 +82,35 @@ function getPublicClient() {
   return createPublicClient({ chain: base, transport: http(getRpcUrl()) });
 }
 
-let privyClient: PrivyClient | null = null;
-function getPrivyClient(): PrivyClient {
-  if (privyClient) return privyClient;
-  const id = process.env.PRIVY_APP_ID;
-  const secret = process.env.PRIVY_APP_SECRET;
-  if (!id || !secret) {
-    throw new Error('Privy credentials missing (PRIVY_APP_ID / PRIVY_APP_SECRET)');
-  }
-  privyClient = new PrivyClient(id, secret);
-  return privyClient;
-}
-
-function getPayoutWalletId(): string {
-  const id = process.env.USDC_PAYOUT_PRIVY_WALLET_ID;
-  if (!id) {
+let cachedAccount: PrivateKeyAccount | null = null;
+function getPayoutAccount(): PrivateKeyAccount {
+  if (cachedAccount) return cachedAccount;
+  const raw = process.env.USDC_PAYOUT_WALLET_PRIVATE_KEY;
+  if (!raw) {
     throw new Error(
-      'USDC_PAYOUT_PRIVY_WALLET_ID not set. Run scripts/create-payout-server-wallet.js and add the result to Vercel env.',
+      'USDC_PAYOUT_WALLET_PRIVATE_KEY not set. Generate a new key, add to Vercel env, and fund the address on Base.',
     );
   }
-  return id;
+  const normalized = (raw.startsWith('0x') ? raw : `0x${raw}`).trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(normalized)) {
+    throw new Error('USDC_PAYOUT_WALLET_PRIVATE_KEY is not a valid 32-byte hex private key');
+  }
+  cachedAccount = privateKeyToAccount(normalized as `0x${string}`);
+  return cachedAccount;
 }
 
-/** Fetch the payout server-wallet's on-chain address from Privy. */
-async function getPayoutWalletAddress(): Promise<`0x${string}`> {
-  const wallet = await getPrivyClient().walletApi.getWallet({ id: getPayoutWalletId() });
-  if (!wallet.address || !isAddress(wallet.address)) {
-    throw new Error(`Privy returned no/invalid address for wallet ${getPayoutWalletId()}`);
-  }
-  return wallet.address as `0x${string}`;
+function getWalletClient() {
+  return createWalletClient({ account: getPayoutAccount(), chain: base, transport: http(getRpcUrl()) });
+}
+
+/** Resolve the payout wallet's on-chain address (derived from the private key). */
+export function getPayoutWalletAddress(): `0x${string}` {
+  return getPayoutAccount().address;
 }
 
 /** Read the live USDC balance (in USD, decimal) of the payout wallet on Base. */
 export async function getPayoutWalletBalanceUsd(): Promise<{ address: `0x${string}`; balanceUsd: number }> {
-  const address = await getPayoutWalletAddress();
+  const address = getPayoutWalletAddress();
   const publicClient = getPublicClient();
   const balanceRaw = (await publicClient.readContract({
     address: USDC_BASE_ADDRESS,
@@ -161,7 +155,7 @@ export async function getUsdcDailyCapStatus(): Promise<UsdcDailyCapStatus> {
 }
 
 /**
- * Send `amountUsd` USDC from the payout server-wallet to `toAddress` on Base.
+ * Send `amountUsd` USDC from the payout wallet to `toAddress` on Base.
  * Throws on any pre-flight failure or on-chain revert. Caller must persist the
  * resulting `txHash` on the payout row.
  */
@@ -222,22 +216,17 @@ export async function sendUsdcPayment(toAddress: string, amountUsd: number): Pro
       `dailyUsed=$${usedUsd.toFixed(2)}/cap=$${dailyCapUsd.toFixed(2)} balance=$${balanceUsd.toFixed(2)}`,
   );
 
-  // Sign + send via Privy server-wallet (broadcasts onto Base for us)
-  const privy = getPrivyClient();
-  const sendResult = await privy.walletApi.ethereum.sendTransaction({
-    walletId: getPayoutWalletId(),
-    caip2: BASE_CAIP2,
-    transaction: {
-      to: USDC_BASE_ADDRESS,
-      data,
-      value: '0x0',
-    },
+  // Sign + send directly via viem walletClient (no Privy in the path)
+  const walletClient = getWalletClient();
+  const txHash = await walletClient.sendTransaction({
+    to: USDC_BASE_ADDRESS,
+    data,
+    value: 0n,
   });
 
-  const txHash = sendResult.hash as `0x${string}`;
   console.log(`[usdc-base] broadcast tx ${txHash}; waiting for receipt...`);
 
-  // Wait for confirmation via public Base RPC (Privy returns hash but not receipt)
+  // Wait for confirmation via public Base RPC
   const publicClient = getPublicClient();
   const receipt = await publicClient.waitForTransactionReceipt({
     hash: txHash,
