@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { countryNameToFlag } from '../utils/countryFlag';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -7,6 +8,7 @@ interface ShareRSVPProps {
   customUrl: string | null;
   inviteCode: string;
   twitterHandles?: string[];
+  country?: string | null;
   calendarSlot?: React.ReactNode;
 }
 
@@ -39,11 +41,10 @@ function buildShareText(base: string, handles: string[], maxLen: number): string
   return text;
 }
 
-export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [], calendarSlot }: ShareRSVPProps) {
+export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [], country, calendarSlot }: ShareRSVPProps) {
   const { t } = useTranslation('rsvp');
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
-  const eventUrl = `https://rsv.pizza/${customUrl || inviteCode}`;
-  const baseText = `\u{1F5FA}\uFE0F\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!`;
+  const baseText = `${countryNameToFlag(country)}\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!\nrsv.pizza/${customUrl || inviteCode}`;
 
   // Build deduplicated handles list, always starting with Pizza_DAO
   const allHandles = ['Pizza_DAO', ...twitterHandles];
@@ -59,7 +60,7 @@ export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twi
   const shareText = buildShareText(baseText, uniqueHandles, 250);
 
   const handleShareX = () => {
-    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(eventUrl)}`;
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
     window.open(intentUrl, '_blank');
   };
 

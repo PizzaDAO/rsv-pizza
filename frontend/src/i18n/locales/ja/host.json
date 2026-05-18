@@ -4,6 +4,7 @@
     "settings": "設定",
     "guests": "ゲスト",
     "pizzaAndDrinks": "ピザ＆ドリンク",
+    "pizza": "ピザ",
     "photos": "写真",
     "apps": "アプリ"
   },
@@ -207,6 +208,8 @@
     "venueOptions": "会場オプション",
     "addVenue": "会場を追加",
     "noVenueOptionsYet": "会場オプションはまだありません",
+    "iHaveMyVenue": "会場が決まっています",
+    "stillExploring": "まだ探しています",
     "addYourFirstVenue": "最初の会場を追加",
     "selected": "選択済み",
     "selectAsLocation": "会場として選択",

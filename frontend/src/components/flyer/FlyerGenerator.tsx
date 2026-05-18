@@ -1,14 +1,17 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors, createSponsor, updateSponsor, reorderSponsors } from '../../lib/api';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
-import { Sponsor } from '../../types';
+import { Sponsor, CoHost } from '../../types';
 import { Download, Loader2, RotateCcw, Move, Plus, ChevronLeft, ChevronRight, ImagePlus, Check, Pencil } from 'lucide-react';
 import { useFlyerDrag, DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 import { PartnerForm, extractSponsorData } from '../sponsors/PartnerForm';
 import type { PartnerFormData } from '../sponsors/PartnerForm';
-import { uploadEventImage, updateParty, cdnUrl } from '../../lib/supabase';
+import { uploadEventImage, updateParty, cdnUrl, proxyAvatarToStorage } from '../../lib/supabase';
+import { uuid } from '../../lib/utils';
+import { fetchXAvatarToSupabase } from '../../utils/avatarUtils';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime, getTemplateUrl,
   CITY_FONT, TEXT_FONT, CITY_COLOR, TIME_COLOR, VENUE_COLOR,
@@ -285,6 +288,17 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     loadSponsors();
   }, [loadSponsors]);
 
+  // Deep-link from /partners modal: ?openSponsor=<id> auto-opens that sponsor's edit modal
+  // once the sponsors list is loaded. Only fires when the URL param changes (or sponsors
+  // first arrive), not repeatedly.
+  const [searchParams] = useSearchParams();
+  const openSponsorId = searchParams.get('openSponsor');
+  useEffect(() => {
+    if (!openSponsorId || !sponsors.length) return;
+    const target = sponsors.find(s => s.id === openSponsorId);
+    if (target) setEditingSponsor(target);
+  }, [openSponsorId, sponsors]);
+
   /** Move a group logo left or right by swapping it with its neighbor in the group view. */
   const handleReorderLogo = useCallback(async (sponsorId: string, direction: -1 | 1, groupLogos: Sponsor[]) => {
     if (!party?.id) return;
@@ -341,6 +355,41 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     }
   };
 
+  const handleAddAsCoHost = async (data: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => {
+    if (!party) return;
+
+    let avatarUrl: string | undefined;
+    if (data.avatarUrl) {
+      avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
+    } else {
+      const xAvatar = data.twitter ? await fetchXAvatarToSupabase(data.twitter) : null;
+      if (xAvatar) {
+        avatarUrl = xAvatar;
+      } else if (data.instagram) {
+        const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
+        avatarUrl = await proxyAvatarToStorage(igAvatar);
+      }
+    }
+
+    const newCoHost: CoHost = {
+      id: uuid(),
+      name: data.name,
+      website: data.website || undefined,
+      twitter: data.twitter || undefined,
+      instagram: data.instagram || undefined,
+      avatar_url: avatarUrl,
+      showOnEvent: true,
+    };
+
+    const existing = party.coHosts || [];
+    const existingIdx = existing.findIndex(c => c.name?.toLowerCase() === data.name.toLowerCase());
+    const updated = existingIdx >= 0
+      ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
+      : [...existing, newCoHost];
+    await updateParty(party.id, { co_hosts: updated });
+    if (party.inviteCode) await loadParty(party.inviteCode);
+  };
+
   // Load both Hub 191 fonts, then trigger re-render for accurate fitText measurements
   useEffect(() => {
     const regular = new FontFace('Hub 191', 'url(/fonts/Hub-191-Regular.otf)');
@@ -375,22 +424,81 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
-  // One-time backfill: if DB has no flyerConfig but localStorage does, sync to DB
-  const backfillDone = useRef(false);
+  // One-time migration: legacy hosts customized their flyer in localStorage BEFORE
+  // calzone-91482 introduced DB persistence. The auto-regen gate in
+  // autoRegenFlyer.ts:68 skips regen for any party with no DB config but a
+  // localStorage key. Migrate the localStorage payload into DB on FlyerGenerator
+  // mount so future regens (billed sponsors, logo edits, timezone changes from
+  // napoletana-11413) preserve their customizations.
+  // jalapeno-32738
+  const migrationDone = useRef(false);
   useEffect(() => {
-    if (backfillDone.current || !party?.id || party.flyerConfig) return;
-    backfillDone.current = true;
+    if (migrationDone.current || !party?.id || !storageKey) return;
+
+    // Treat empty object {} as "no real config" — the regen gate uses a truthy
+    // check (`!party.flyerConfig`) so {} would block migration forever.
+    const dbConfig = party.flyerConfig as Record<string, any> | null | undefined;
+    const hasRealDbConfig = !!dbConfig && Object.keys(dbConfig).length > 0;
+    if (hasRealDbConfig) return;
+
+    migrationDone.current = true;
+
+    let raw: string | null = null;
     try {
-      const raw = storageKey ? localStorage.getItem(storageKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Only backfill if there's meaningful customization data
-        if (parsed && (parsed.positions || parsed.poppedLogos || parsed.logoSizes || parsed.editCity || parsed.editVenueName || parsed.editStreetAddress || parsed.editTime)) {
-          updateParty(party.id, { flyer_config: parsed }).catch(() => {});
+      raw = localStorage.getItem(storageKey);
+    } catch {
+      return; // localStorage unavailable — nothing to migrate
+    }
+    if (!raw) return; // no legacy data
+
+    let parsed: Record<string, any> | null = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      // Corrupt JSON — clear the key so the regen gate stops blocking this party.
+      console.warn('[jalapeno-32738] corrupt flyer localStorage, clearing:', err);
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      // Defensive: parsed null or a primitive — treat as corrupt.
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    // Only migrate if there's at least one customization field.
+    const hasContent =
+      parsed.positions || parsed.poppedLogos || parsed.logoSizes ||
+      parsed.sponsorBoxSize || parsed.editCity || parsed.editVenueName ||
+      parsed.editStreetAddress || parsed.editTime != null;
+    if (!hasContent) {
+      // Empty state — clear the stale key but don't waste a DB write.
+      try { localStorage.removeItem(storageKey); } catch {}
+      return;
+    }
+
+    updateParty(party.id, { flyer_config: parsed })
+      .then((ok) => {
+        if (ok) {
+          // DB write succeeded — clear localStorage so we don't drift.
+          try { localStorage.removeItem(storageKey); } catch {}
+          // Refresh party state so the regen gate now sees the DB config.
+          if (party.inviteCode) {
+            loadParty(party.inviteCode).catch(() => {});
+          }
+        } else {
+          // DB write failed — leave localStorage intact as fallback and
+          // allow a retry on next mount.
+          console.warn('[jalapeno-32738] updateParty returned false; preserving localStorage fallback');
+          migrationDone.current = false;
         }
-      }
-    } catch {}
-  }, [party?.id, party?.flyerConfig, storageKey]);
+      })
+      .catch((err) => {
+        console.warn('[jalapeno-32738] migration failed; preserving localStorage fallback:', err);
+        migrationDone.current = false;
+      });
+  }, [party?.id, party?.flyerConfig, party?.inviteCode, storageKey, loadParty]);
 
   if (!party) return null;
 
@@ -1599,6 +1707,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
           onClose={() => setShowAddSponsor(false)}
           isLoading={isSubmitting}
           defaultStatus="yes"
+          onAddAsCoHost={handleAddAsCoHost}
         />
       )}
       {editingSponsor && (

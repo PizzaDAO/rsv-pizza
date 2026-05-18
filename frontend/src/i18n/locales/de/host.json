@@ -4,6 +4,7 @@
     "settings": "Einstellungen",
     "guests": "Gäste",
     "pizzaAndDrinks": "Pizza & Getränke",
+    "pizza": "Pizza",
     "photos": "Fotos",
     "apps": "Apps"
   },
@@ -207,6 +208,8 @@
     "venueOptions": "Veranstaltungsort-Optionen",
     "addVenue": "Veranstaltungsort hinzufügen",
     "noVenueOptionsYet": "Noch keine Veranstaltungsort-Optionen",
+    "iHaveMyVenue": "Ich habe meinen Veranstaltungsort",
+    "stillExploring": "Noch auf der Suche",
     "addYourFirstVenue": "Ersten Veranstaltungsort hinzufügen",
     "selected": "Ausgewählt",
     "selectAsLocation": "Als Veranstaltungsort auswählen",

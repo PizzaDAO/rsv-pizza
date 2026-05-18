@@ -2,10 +2,11 @@
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle, Send, Check } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
+import { mintHostTelegramConnectToken, disconnectHostTelegram } from '../lib/api';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TimePickerInput } from './TimePickerInput';
@@ -50,6 +51,40 @@ export const EventDetailsTab: React.FC = () => {
   const [telegramGroup, setTelegramGroup] = useState('');
   const [turtleRolesEnabled, setTurtleRolesEnabled] = useState(false);
 
+  // Host Telegram bot connection (sausage-24183)
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const isHostTelegramConnected = !!party?.hostTelegramChatId;
+
+  const handleConnectHostTelegram = async () => {
+    if (!party) return;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const response = await mintHostTelegramConnectToken(party.id);
+      window.open(response.deeplink, '_blank', 'noopener');
+    } catch (err: any) {
+      setConnectError(t('partner:hostConnect.connectError') as string);
+      console.error('Failed to mint host telegram connect token', err);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnectHostTelegram = async () => {
+    if (!party) return;
+    setDisconnecting(true);
+    try {
+      await disconnectHostTelegram(party.id);
+      await loadParty(party.inviteCode);
+    } catch (err) {
+      console.error('Failed to disconnect host telegram', err);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -68,6 +103,9 @@ export const EventDetailsTab: React.FC = () => {
   const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   // Pending country from LocationAutocomplete (fires before onPlaceSelected)
   const pendingCountryRef = useRef<string | null>(null);
+  // Pending Google place_id from LocationAutocomplete (set in onPlaceSelected just
+  // before saveLocation is called; null when user is editing venue name only)
+  const pendingPlaceIdRef = useRef<string | null>(null);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
@@ -491,7 +529,14 @@ export const EventDetailsTab: React.FC = () => {
         timezone,
       }));
       if (party?.inviteCode) await loadParty(party.inviteCode);
-      if (party) triggerFlyerRegen(party, loadParty);
+      if (party) {
+        // Pass a party-shaped object with the just-saved timezone/date/duration so the
+        // regen doesn't race the React context refresh and render with stale values.
+        triggerFlyerRegen(
+          { ...party, timezone: timezone || null, date: startDateTime, duration: calculatedDuration },
+          loadParty,
+        );
+      }
     }
   };
 
@@ -509,12 +554,17 @@ export const EventDetailsTab: React.FC = () => {
     pendingCoordsRef.current = null;
     const country = pendingCountryRef.current;
     pendingCountryRef.current = null;
+    // Only include place_id in the payload when a new place was actually picked
+    // from the autocomplete dropdown — otherwise leave it untouched on the server
+    const placeId = pendingPlaceIdRef.current;
+    pendingPlaceIdRef.current = null;
     const success = await saveField('location', {
       address: newAddress.trim() || null,
       venue_name: newVenueName || null,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
       country: country || null,
+      ...(placeId !== null && { place_id: placeId }),
     });
     if (success) {
       setOriginalValues((prev: any) => ({
@@ -613,7 +663,8 @@ export const EventDetailsTab: React.FC = () => {
             onCitySelected={(cityData) => {
               pendingCountryRef.current = cityData.country || null;
             }}
-            onPlaceSelected={(newAddress, newVenueName) => {
+            onPlaceSelected={(newAddress, newVenueName, placeId) => {
+              pendingPlaceIdRef.current = placeId;
               saveLocation(newAddress, newVenueName);
             }}
             placeholder="Add Event Location"
@@ -869,6 +920,44 @@ export const EventDetailsTab: React.FC = () => {
                 placeholder="Telegram group link (e.g. https://t.me/+abc123)"
               />
 
+              {/* Host Telegram bot connection (sausage-24183) */}
+              <div>
+                {!isHostTelegramConnected ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleConnectHostTelegram}
+                      disabled={connecting}
+                      className="flex items-center gap-2 bg-[#E52828] hover:bg-[#cc2222] disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      {connecting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      {t('partner:hostConnect.buttonConnect')}
+                    </button>
+                    <p className="text-xs text-white/40 mt-1.5">
+                      {t('partner:hostConnect.helperConnect')}
+                    </p>
+                    {connectError && (
+                      <p className="text-xs text-red-400 mt-1.5">{connectError}</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 py-2">
+                    <div className="flex items-center gap-2 text-sm text-green-500">
+                      <Check size={16} />
+                      <span>{t('partner:hostConnect.connected')}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDisconnectHostTelegram}
+                      disabled={disconnecting}
+                      className="text-xs text-white/40 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {disconnecting ? t('partner:hostConnect.disconnecting') : t('partner:hostConnect.disconnect')}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <Checkbox
                 checked={turtleRolesEnabled}
                 onChange={() => {
@@ -993,7 +1082,20 @@ export const EventDetailsTab: React.FC = () => {
 
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowDateTimeModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={async () => {
+          if (
+            originalValues && (
+              startDate !== originalValues.startDate ||
+              startTime !== originalValues.startTime ||
+              endDate !== originalValues.endDate ||
+              endTime !== originalValues.endTime ||
+              timezone !== originalValues.timezone
+            )
+          ) {
+            await saveDateTime();
+          }
+          setShowDateTimeModal(false);
+        }}>
           <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-theme-text mb-4">Event Time</h2>
 

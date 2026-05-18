@@ -230,7 +230,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, placeId, venueName, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -279,6 +279,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         availableToppings: availableToppings || [],
         availableDietaryOptions: availableDietaryOptions || [],
         address: address || null,
+        placeId: placeId || null,
         venueName: venueName || null,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
@@ -405,7 +406,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const {
-      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, venueName, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, placeId, venueName, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
@@ -417,10 +418,17 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       region,
       venueReportTitle, venueReportNotes,
       flyerGeneratedAt, flyerConfig,
+      posterImageUrl, posterGeneratedAt,
+      rollupImageUrl, rollupGeneratedAt,
       hiddenGppPhotos, extraGppPhotos,
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
       telegramGroup,
+      hostTelegramLinkToken,
+      // NOTE: hostTelegramChatId is intentionally NOT destructured here —
+      // the chat_id is webhook-only (set by /api/telegram/webhook when the host
+      // sends /start <token> to the bot). Allowing PATCH writes would let a host
+      // spoof another user's chat_id.
       turtleRolesEnabled
     } = req.body;
 
@@ -510,10 +518,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(duration !== undefined && { duration }),
         ...(timezone !== undefined && { timezone }),
         ...(pizzaStyle && { pizzaStyle }),
-        ...(address !== undefined && { address }),
+        ...(address !== undefined && { address, addressIsCityDefault: false }),
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
         ...(country !== undefined && { country: country || null }),
+        ...(placeId !== undefined && { placeId: placeId || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(maxGuests !== undefined && { maxGuests }),
         ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),
@@ -549,6 +558,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(venueReportNotes !== undefined && { venueReportNotes: venueReportNotes || null }),
         ...(flyerGeneratedAt !== undefined && { flyerGeneratedAt: flyerGeneratedAt ? new Date(flyerGeneratedAt) : null }),
         ...(flyerConfig !== undefined && { flyerConfig }),
+        ...(posterImageUrl !== undefined && { posterImageUrl: posterImageUrl || null }),
+        ...(posterGeneratedAt !== undefined && { posterGeneratedAt: posterGeneratedAt ? new Date(posterGeneratedAt) : null }),
+        ...(rollupImageUrl !== undefined && { rollupImageUrl: rollupImageUrl || null }),
+        ...(rollupGeneratedAt !== undefined && { rollupGeneratedAt: rollupGeneratedAt ? new Date(rollupGeneratedAt) : null }),
         ...(hiddenGppPhotos !== undefined && { hiddenGppPhotos }),
         ...(extraGppPhotos !== undefined && { extraGppPhotos }),
         ...(lumaUrl !== undefined && { lumaUrl: lumaUrl || null }),
@@ -557,6 +570,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
+        ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
       },
       include: {
@@ -792,18 +806,32 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
       throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    if (typeof approved !== 'boolean') {
-      throw new AppError('approved must be a boolean', 400, 'VALIDATION_ERROR');
+    if (approved !== null && typeof approved !== 'boolean') {
+      throw new AppError('approved must be a boolean or null', 400, 'VALIDATION_ERROR');
+    }
+
+    // Only reconcile status when row is PENDING — avoid clobbering WAITLISTED.
+    // When approved===null (restore-to-pending), leave status alone.
+    const existing = await prisma.guest.findUnique({
+      where: { id: guestId, partyId },
+      select: { status: true },
+    });
+    const updateData: { approved: boolean | null; status?: 'CONFIRMED' | 'DECLINED' } = { approved };
+    if (existing?.status === 'PENDING' && approved !== null) {
+      updateData.status = approved ? 'CONFIRMED' : 'DECLINED';
     }
 
     const guest = await prisma.guest.update({
       where: { id: guestId, partyId },
-      data: { approved },
+      data: updateData,
     });
 
-    // Trigger appropriate webhook
-    const event = approved ? 'guest.approved' : 'guest.declined';
-    await triggerWebhook(event, { guest, partyId }, req.userId!);
+    // Trigger appropriate webhook. Skip when approved===null (restore-to-pending
+    // is neither an approval nor a decline).
+    if (approved !== null) {
+      const event = approved ? 'guest.approved' : 'guest.declined';
+      await triggerWebhook(event, { guest, partyId }, req.userId!);
+    }
 
     // Send approval email with QR code if guest is approved and has an email
     if (approved && guest.email) {
@@ -945,6 +973,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
           select: {
             name: true,
             date: true,
+            timezone: true,
             address: true,
             inviteCode: true,
             customUrl: true,
@@ -958,6 +987,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             guestId: guest.id,
             partyName: party.name,
             partyDate: party.date,
+            partyTimezone: party.timezone,
             partyAddress: party.address,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,

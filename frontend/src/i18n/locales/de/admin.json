@@ -3,6 +3,24 @@
   "subtitle": "Admins und Underbosses verwalten",
   "accessDenied": "Zugriff verweigert",
   "accessDeniedDesc": "Sie haben keinen Admin-Zugriff. Bitte melden Sie sich mit einem Admin-Konto an.",
+  "page": {
+    "exportEventsCsv": "Alle Events als CSV exportieren",
+    "graphicsAdmins": "Grafik-Admins",
+    "addGraphicsAdmin": "Grafik-Admin hinzufügen",
+    "removeGraphicsAdmin": "Grafik-Admin entfernen",
+    "noGraphicsAdmins": "Noch keine Grafik-Admins",
+    "regions": "Regionen",
+    "analytics": "Analysen",
+    "remove": "Entfernen",
+    "removeAdminTitle": "Admin entfernen",
+    "deactivate": "Deaktivieren",
+    "close": "Schließen",
+    "graphicsAdminsTable": {
+      "email": "E-Mail",
+      "name": "Name",
+      "added": "Hinzugefügt"
+    }
+  },
   "admins": {
     "title": "Admins",
     "emailPlaceholder": "E-Mail-Adresse",
@@ -29,6 +47,8 @@
     "active": "Aktiv",
     "inactive": "Inaktiv",
     "deactivate": "Deaktivieren",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
     "tableHeaders": {
       "name": "Name",
       "email": "E-Mail",
@@ -63,7 +83,8 @@
     "saveChecklistDates": "Checklisten-Termine speichern",
     "newItemPlaceholder": "Neuer Checklisten-Eintrag...",
     "adding": "Wird hinzugefügt...",
-    "addItem": "Eintrag hinzufügen"
+    "addItem": "Eintrag hinzufügen",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPP-Standardbeschreibung",
@@ -72,7 +93,7 @@
     "saving": "Wird gespeichert...",
     "saveAndApply": "Speichern & auf Standard-Events anwenden",
     "customDescriptions": "{{count}} Event mit eigener Beschreibung",
-    "customDescriptions_plural": "{{count}} Events mit eigenen Beschreibungen"
+    "customDescriptions_other": "{{count}} Events mit eigenen Beschreibungen"
   },
   "nft": {
     "title": "GPP-NFT-Einstellungen",
@@ -99,6 +120,10 @@
     "underbossCreated": "Underboss erstellt!",
     "creating": "Wird erstellt...",
     "createUnderboss": "Underboss erstellen",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "E-Mail",
+    "regions": "Regionen",
+    "close": "Schließen",
     "tabs": {
       "events": "Events",
       "cities": "Städte",
@@ -116,6 +141,7 @@
     "showing": "{{count}} angezeigt",
     "searchPlaceholder": "Events, Gastgeber suchen...",
     "regionAll": "Region: Alle",
+    "tagAll": "Tag: Alle",
     "staleFlyers": "Veraltete Flyer",
     "generateMissing": "Fehlende generieren ({{count}})",
     "generating": "{{current}}/{{total}} wird generiert...",
@@ -141,6 +167,23 @@
     "subtitle": "Global Pizza Party · Versand-Dashboard",
     "signedInAdmin": "Angemeldet als Admin ({{email}})",
     "signedInAs": "Angemeldet als {{name}}",
-    "kitRequests": "Kit-Anfragen ({{count}})"
+    "kitRequests": "Kit-Anfragen ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

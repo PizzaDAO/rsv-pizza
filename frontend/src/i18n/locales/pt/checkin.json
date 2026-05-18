@@ -1,6 +1,7 @@
 {
   "title": "Check-in de Convidados",
   "loading": "Fazendo check-in do convidado...",
+  "vouching": "Verificando…",
   "success": {
     "title": "Check-in Realizado!",
     "backToDashboard": "Voltar ao Painel do Evento"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "Já Realizou Check-in",
     "checkedInAt": "Check-in realizado às {{time}}"
+  },
+  "notCheckedIn": {
+    "title": "Sem check-in",
+    "message": "Ainda não fizeste check-in. Procura um organizador no evento."
   },
   "unauthorized": {
     "title": "Não Autorizado",
@@ -22,5 +27,21 @@
     "title": "Falha no Check-in",
     "tryAgain": "Tentar Novamente",
     "goHome": "Ir para Início"
+  },
+  "postCheckIn": {
+    "claim10Title": "Resgate seu Desconto de 10% em Pizza",
+    "claim10Desc": "Obrigado por comparecer! Como convidado verificado, você ganhou um desconto.",
+    "claimDiscount": "Resgatar Desconto",
+    "claim10Button": "Resgatar 10% de Desconto",
+    "oneTimeUse": "Uso único",
+    "discountClaimedTitle": "Desconto Resgatado!",
+    "discountClaimedSubtitle": "Seu desconto de 10% em pizza foi utilizado.",
+    "discountClaimedAt": "Resgatado em {{date}}",
+    "discountUnavailable": "Desconto Indisponível",
+    "discountUnavailableDesc": "Este desconto é apenas para participantes verificados.",
+    "showQrCode": "Mostre seu Código QR",
+    "qrDescription": "Mostre este código QR a um organizador ou convidado registrado para verificar sua presença",
+    "qrSubmsg": "Um organizador ou convidado registrado precisa escanear isso para fazer seu check-in",
+    "failedToClaim": "Falha ao resgatar o desconto"
   }
 }

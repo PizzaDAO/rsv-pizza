@@ -183,7 +183,7 @@ export function CheckInPage() {
       setState('discount-claimed');
     } catch (err) {
       setState('error');
-      setErrorMessage('Failed to claim discount');
+      setErrorMessage(t('postCheckIn.failedToClaim'));
     }
   };
 
@@ -215,13 +215,13 @@ export function CheckInPage() {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="text-6xl mb-4">🍕</div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Claim Your 10% Pizza Discount</h2>
-          <p className="text-theme-text-secondary mb-6">Thanks for attending! As a verified guest, you earned a discount.</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('postCheckIn.claim10Title')}</h2>
+          <p className="text-theme-text-secondary mb-6">{t('postCheckIn.claim10Desc')}</p>
           <button
             onClick={handleClaimDiscount}
             className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors"
           >
-            Claim Discount
+            {t('postCheckIn.claimDiscount')}
           </button>
         </div>
       );
@@ -233,10 +233,10 @@ export function CheckInPage() {
           <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
             <CheckCircle2 size={48} className="text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-green-400 mb-2">Discount Claimed!</h2>
-          <p className="text-theme-text-secondary mb-2">Your 10% pizza discount has been used.</p>
+          <h2 className="text-2xl font-bold text-green-400 mb-2">{t('postCheckIn.discountClaimedTitle')}</h2>
+          <p className="text-theme-text-secondary mb-2">{t('postCheckIn.discountClaimedSubtitle')}</p>
           <p className="text-theme-text-muted text-sm">
-            Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
+            {t('postCheckIn.discountClaimedAt', { date: new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString() })}
           </p>
         </div>
       );
@@ -246,8 +246,8 @@ export function CheckInPage() {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="text-6xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-theme-text mb-2">Discount Unavailable</h2>
-          <p className="text-theme-text-secondary">This discount is for verified attendees only.</p>
+          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('postCheckIn.discountUnavailable')}</h2>
+          <p className="text-theme-text-secondary">{t('postCheckIn.discountUnavailableDesc')}</p>
         </div>
       );
     }
@@ -258,9 +258,9 @@ export function CheckInPage() {
           <div className="w-16 h-16 rounded-full bg-[#ff393a]/20 flex items-center justify-center mb-4">
             <QrCode size={32} className="text-[#ff393a]" />
           </div>
-          <h2 className="text-xl font-bold text-theme-text mb-2">Show Your QR Code</h2>
+          <h2 className="text-xl font-bold text-theme-text mb-2">{t('postCheckIn.showQrCode')}</h2>
           <p className="text-theme-text-secondary text-sm mb-6 max-w-xs">
-            Show this QR code to a host or checked-in guest to verify your attendance
+            {t('postCheckIn.qrDescription')}
           </p>
           <div className="bg-white rounded-xl p-4 inline-block mb-4">
             <img
@@ -273,7 +273,7 @@ export function CheckInPage() {
           </div>
           <p className="text-theme-text-muted text-xs">
             {guestName && <span className="block text-theme-text-secondary mb-1">{guestName}</span>}
-            A host or checked-in guest needs to scan this to check you in
+            {t('postCheckIn.qrSubmsg')}
           </p>
         </div>
       );
@@ -384,9 +384,9 @@ export function CheckInPage() {
             className="w-full max-w-xs md:max-w-md mx-auto flex items-center justify-center gap-2 py-4 md:py-5 text-lg md:text-xl font-semibold text-white rounded-xl transition-all hover:-translate-y-0.5"
             style={{ background: C.red }}
           >
-            Claim 10% Discount
+            {t('postCheckIn.claim10Button')}
           </button>
-          <p className="text-sm md:text-base mt-4" style={{ color: C.mutedText }}>One-time Use</p>
+          <p className="text-sm md:text-base mt-4" style={{ color: C.mutedText }}>{t('postCheckIn.oneTimeUse')}</p>
         </>
       );
     }
@@ -398,10 +398,10 @@ export function CheckInPage() {
           <div className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${C.green}22` }}>
             <CheckCircle2 className="w-9 h-9 md:w-12 md:h-12" style={{ color: C.green }} />
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.green }}>Discount Claimed!</h2>
-          <p className="text-sm md:text-base mb-2" style={{ color: C.darkText }}>Your 10% pizza discount has been used.</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.green }}>{t('postCheckIn.discountClaimedTitle')}</h2>
+          <p className="text-sm md:text-base mb-2" style={{ color: C.darkText }}>{t('postCheckIn.discountClaimedSubtitle')}</p>
           <p className="text-xs md:text-sm" style={{ color: C.mutedText }}>
-            Claimed {new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString()}
+            {t('postCheckIn.discountClaimedAt', { date: new Date(discountData?.discountClaimedAt || discountData?.claimedAt).toLocaleDateString() })}
           </p>
         </>
       );
@@ -411,8 +411,8 @@ export function CheckInPage() {
       return (
         <>
           <img src="/gpp-discount.png" alt="10% Discount" className="w-full max-w-xs md:max-w-md mx-auto mb-6 md:mb-8 rounded-2xl shadow-lg opacity-50" />
-          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.darkText }}>Discount Unavailable</h2>
-          <p className="text-sm md:text-base" style={{ color: C.mutedText }}>This discount is for verified attendees only.</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.darkText }}>{t('postCheckIn.discountUnavailable')}</h2>
+          <p className="text-sm md:text-base" style={{ color: C.mutedText }}>{t('postCheckIn.discountUnavailableDesc')}</p>
         </>
       );
     }

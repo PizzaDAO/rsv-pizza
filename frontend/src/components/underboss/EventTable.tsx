@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
@@ -17,20 +17,22 @@ interface EventTableProps {
   onBulkAction?: () => void;
   onTelegramBroadcast?: (cities: string[]) => void;
   partnerTags?: string[];
+  onFilteredEventsChange?: (events: UnderbossEvent[]) => void;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
 type SortDir = 'asc' | 'desc';
 
 // Filterable progress keys (skip "Event" always-true and "Prep" always-false)
-const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; label: string }[] = [
-  { key: 'hasPartyKit', label: 'Kit' },
-  { key: 'hasCoHosts', label: 'Team' },
-  { key: 'hasVenue', label: 'Venue' },
-  { key: 'hasBudget', label: 'Budget' },
-  { key: 'hasSponsors', label: 'Partners' },
-  { key: 'hasSocialPosts', label: 'Social' },
-  { key: 'hasThrown', label: 'Thrown' },
+// Labels resolved at render via t('progress.*')
+const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; labelKey: string }[] = [
+  { key: 'hasPartyKit', labelKey: 'progress.kit' },
+  { key: 'hasCoHosts', labelKey: 'progress.team' },
+  { key: 'hasVenue', labelKey: 'progress.venue' },
+  { key: 'hasBudget', labelKey: 'progress.budget' },
+  { key: 'hasSponsors', labelKey: 'progress.partners' },
+  { key: 'hasSocialPosts', labelKey: 'progress.social' },
+  { key: 'hasThrown', labelKey: 'progress.thrown' },
 ];
 
 function countProgress(event: UnderbossEvent): number {
@@ -86,13 +88,15 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [] }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange }: EventTableProps) {
   const { t } = useTranslation('partner');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [rsvpComparator, setRsvpComparator] = useState<'>' | '<'>('>');
+  const [rsvpThreshold, setRsvpThreshold] = useState<string>('');
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -202,6 +206,18 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       result = result.filter((e) => e.eventTags?.includes(tagFilter));
     }
 
+    // RSVP count filter — only applied when threshold has a non-empty value
+    if (rsvpThreshold.trim() !== '') {
+      const threshold = Number(rsvpThreshold);
+      if (Number.isFinite(threshold)) {
+        result = result.filter((e) =>
+          rsvpComparator === '>'
+            ? e.guestCount > threshold
+            : e.guestCount < threshold
+        );
+      }
+    }
+
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -225,7 +241,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold]);
+
+  useEffect(() => {
+    onFilteredEventsChange?.(filteredEvents);
+  }, [filteredEvents, onFilteredEventsChange]);
 
   const availableTags = useMemo(
     () => Array.from(new Set(events.flatMap((e) => e.eventTags ?? []))).sort(),
@@ -271,7 +291,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     );
   }
 
-  const hasActiveFilters = progressIncludes.length > 0 || progressExcludes.length > 0 || regionFilter !== 'all' || tagFilter !== 'all';
+  const hasActiveFilters =
+    progressIncludes.length > 0 ||
+    progressExcludes.length > 0 ||
+    regionFilter !== 'all' ||
+    tagFilter !== 'all' ||
+    rsvpThreshold.trim() !== '';
 
   return (
     <div className="space-y-3">
@@ -295,10 +320,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
       {/* Filters — topping-style pills */}
       <div className="flex flex-wrap items-center gap-2">
-        {PROGRESS_FILTER_KEYS.map(({ key, label }) => (
+        {PROGRESS_FILTER_KEYS.map(({ key, labelKey }) => (
           <FilterPill
             key={key}
-            label={label}
+            label={t(labelKey)}
             state={getFilterState(key)}
             onToggle={(newState) => setFilterState(key, newState)}
           />
@@ -306,28 +331,28 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
         {/* Approved filter */}
         <FilterPill
-          label="Approved"
+          label={t('eventTable.approved')}
           state={getFilterState('approved')}
           onToggle={(newState) => setFilterState('approved', newState)}
         />
 
         {/* Rejected filter */}
         <FilterPill
-          label="Rejected"
+          label={t('eventRow.statusRejected')}
           state={getFilterState('rejected')}
           onToggle={(newState) => setFilterState('rejected', newState)}
         />
 
         {/* Hidden filter */}
         <FilterPill
-          label="Hidden"
+          label={t('eventRow.statusHidden')}
           state={getFilterState('hidden')}
           onToggle={(newState) => setFilterState('hidden', newState)}
         />
 
         {/* Listed filter */}
         <FilterPill
-          label="Listed"
+          label={t('eventRow.statusCommunityListed')}
           state={getFilterState('listed')}
           onToggle={(newState) => setFilterState('listed', newState)}
         />
@@ -360,6 +385,28 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           </select>
         )}
 
+        {/* RSVP count filter */}
+        <div className="flex items-center gap-1">
+          <select
+            value={rsvpComparator}
+            onChange={(e) => setRsvpComparator(e.target.value as '>' | '<')}
+            className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
+            aria-label={t('eventTable.rsvpFilterLabel')}
+          >
+            <option value=">">{t('eventTable.rsvpGreaterThan')}</option>
+            <option value="<">{t('eventTable.rsvpLessThan')}</option>
+          </select>
+          <input
+            type="number"
+            min={0}
+            value={rsvpThreshold}
+            onChange={(e) => setRsvpThreshold(e.target.value)}
+            placeholder={t('eventTable.rsvpThresholdPlaceholder')}
+            className="w-20 bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+            aria-label={t('eventTable.rsvpFilterLabel')}
+          />
+        </div>
+
         {/* Clear filters link */}
         {hasActiveFilters && (
           <button
@@ -368,6 +415,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setProgressExcludes([]);
               setRegionFilter('all');
               setTagFilter('all');
+              setRsvpThreshold('');
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >
@@ -453,7 +501,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                       >
-                        {allApproved ? 'Unapprove' : 'Approve'}
+                        {allApproved ? t('eventTable.unapprove') : t('eventTable.approve')}
                       </button>
                     );
                   })()}
@@ -470,7 +518,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
                   >
-                    Reject
+                    {t('eventTable.reject')}
                   </button>
                   <button
                     onClick={async () => {
@@ -535,7 +583,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       onClick={() => setShowTagSubmenu(showTagSubmenu === 'add' ? null : 'add')}
                       className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                     >
-                      Add Tag &rarr;
+                      {t('eventTable.addTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'add' && (
                       <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
@@ -600,7 +648,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                 setCustomTag('');
                               }
                             }}
-                            placeholder="Custom tag..."
+                            placeholder={t('eventTable.customTagPlaceholder')}
                             className="w-full bg-transparent border-b border-theme-stroke text-xs text-theme-text focus:outline-none placeholder:text-theme-text-faint"
                           />
                         </div>
@@ -614,7 +662,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       onClick={() => setShowTagSubmenu(showTagSubmenu === 'remove' ? null : 'remove')}
                       className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
                     >
-                      Remove Tag &rarr;
+                      {t('eventTable.removeTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'remove' && (
                       <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
@@ -623,7 +671,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                           const selectedEvents = events.filter(e => selectedIds.has(e.id));
                           const allTags = [...new Set(selectedEvents.flatMap(e => e.eventTags || []))];
                           if (allTags.length === 0) {
-                            return <div className="px-4 py-2 text-xs text-theme-text-faint">No tags to remove</div>;
+                            return <div className="px-4 py-2 text-xs text-theme-text-faint">{t('eventTable.noTagsToRemove')}</div>;
                           }
                           return allTags.map((tag) => (
                             <button
@@ -742,7 +790,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                 onClick={() => setShowCopyCitiesModal(false)}
                 className="px-4 py-2 text-sm text-theme-text-muted hover:text-theme-text transition-colors"
               >
-                Close
+                {t('eventTable.close')}
               </button>
               <button
                 onClick={async () => {
@@ -812,28 +860,28 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                         ? 'bg-[#ff393a]/10 border-[#ff393a]/30 text-[#ff393a]'
                         : 'border-theme-stroke text-transparent hover:border-theme-stroke-hover'
                   }`}
-                  title="Select all"
+                  title={t('eventTable.selectAll')}
                 >
                   {selectedIds.size > 0 && <Check size={12} />}
                 </button>
               </th>
-              <SortHeader field="name">Event</SortHeader>
+              <SortHeader field="name">{t('eventTable.tableHeaders.event')}</SortHeader>
               {showRegion && (
                 <th className="py-2 px-3 text-left">
-                  <span className="text-xs text-theme-text-faint uppercase tracking-wider">Country</span>
+                  <span className="text-xs text-theme-text-faint uppercase tracking-wider">{t('eventTable.tableHeaders.country')}</span>
                 </th>
               )}
               <th className="py-2 px-3 text-left">
-                <span className="text-xs text-theme-text-faint uppercase tracking-wider">Host</span>
+                <span className="text-xs text-theme-text-faint uppercase tracking-wider">{t('eventTable.tableHeaders.host')}</span>
               </th>
               <th className="py-2 px-3 text-left">
-                <span className="text-xs text-theme-text-faint uppercase tracking-wider">Location</span>
+                <span className="text-xs text-theme-text-faint uppercase tracking-wider">{t('eventTable.tableHeaders.location')}</span>
               </th>
-              <SortHeader field="guestCount">RSVPs</SortHeader>
+              <SortHeader field="guestCount">{t('eventTable.tableHeaders.rsvps')}</SortHeader>
               <th className="py-2 px-3 text-center">
-                <span className="text-xs text-theme-text-faint uppercase tracking-wider">Photos</span>
+                <span className="text-xs text-theme-text-faint uppercase tracking-wider">{t('eventTable.tableHeaders.photos')}</span>
               </th>
-              <SortHeader field="progress">Progress</SortHeader>
+              <SortHeader field="progress">{t('eventTable.tableHeaders.progress')}</SortHeader>
             </tr>
           </thead>
           <tbody>

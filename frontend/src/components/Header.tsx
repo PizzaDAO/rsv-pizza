@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, LogIn, Globe, ChevronDown } from 'lucide-react';
 import { LoginModal } from './LoginModal';
+import { MarqueeBanner } from './MarqueeBanner';
 import { useTranslation } from 'react-i18next';
 
 const LANGUAGES = [
@@ -11,6 +12,7 @@ const LANGUAGES = [
   { code: 'es', label: 'ES', name: 'Español' },
   { code: 'fr', label: 'FR', name: 'Français' },
   { code: 'ja', label: 'JA', name: '日本語' },
+  { code: 'ko', label: 'KO', name: '한국어' },
   { code: 'pt', label: 'PT', name: 'Português' },
   { code: 'zh', label: '中文', name: '中文' },
 ];
@@ -52,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [langMenuOpen]);
 
   return (
+    <>
     <header className={`site-header border-b border-theme-stroke overflow-visible relative z-50 ${bgClass}`}>
       <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -126,5 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
       <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </header>
+    <MarqueeBanner />
+    </>
   );
 };

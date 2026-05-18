@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
+import { triggerWebhook } from '../services/webhook.service.js';
 
 const router = Router();
 
@@ -242,6 +243,156 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
         checkedInAt: updatedGuest.checkedInAt,
       },
       message: `${updatedGuest.name} has been checked in!`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/checkin/:inviteCode/:guestId — Manual host/co-host check-in
+router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheckIn) {
+      throw new AppError('You are not authorized to check in guests for this event', 403, 'UNAUTHORIZED');
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, partyId: party.id },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // mushroom-31723: refuse to check in a guest the host has rejected.
+    if (guest.approved === false) {
+      throw new AppError('Guest was rejected', 400, 'GUEST_REJECTED');
+    }
+
+    if (guest.checkedInAt) {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        guest: {
+          id: guest.id,
+          name: guest.name,
+          email: guest.email,
+          checkedInAt: guest.checkedInAt,
+          checkedInBy: guest.checkedInBy,
+        },
+        message: `${guest.name} was already checked in`,
+      });
+    }
+
+    const updatedGuest = await prisma.guest.update({
+      where: { id: guestId },
+      data: {
+        checkedInAt: new Date(),
+        checkedInBy: req.userId, // CUID string; `checkedInBy` column is text, not uuid
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      alreadyCheckedIn: false,
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        email: updatedGuest.email,
+        checkedInAt: updatedGuest.checkedInAt,
+        checkedInBy: updatedGuest.checkedInBy,
+      },
+      message: `${updatedGuest.name} has been checked in!`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/checkin/:inviteCode/:guestId — Host/co-host un-check-in (mushroom-31723)
+router.delete('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode, guestId } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const canCheckIn = await canUserCheckIn(party.id, req.userId, req.userEmail);
+    if (!canCheckIn) {
+      throw new AppError('You are not authorized to check in guests for this event', 403, 'UNAUTHORIZED');
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, partyId: party.id },
+    });
+
+    if (!guest) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Defense in depth: don't let a rejected guest's check-in state be toggled.
+    if (guest.approved === false) {
+      throw new AppError('Guest was rejected', 400, 'GUEST_REJECTED');
+    }
+
+    // Idempotent: if guest is not currently checked in, just report that and exit.
+    if (!guest.checkedInAt) {
+      return res.status(200).json({
+        success: true,
+        notCheckedIn: true,
+        guest: {
+          id: guest.id,
+          name: guest.name,
+          email: guest.email,
+          checkedInAt: null,
+          checkedInBy: null,
+        },
+        message: `${guest.name} was not checked in`,
+      });
+    }
+
+    const updatedGuest = await prisma.guest.update({
+      where: { id: guestId },
+      data: {
+        checkedInAt: null,
+        checkedInBy: null,
+      },
+    });
+
+    // Fire-and-forget webhook for guest.checkin_undone (mushroom-31723).
+    // The event type was added to WEBHOOK_EVENTS; subscribers must opt in
+    // via the existing webhook subscription UI/API.
+    try {
+      await triggerWebhook(
+        'guest.checkin_undone',
+        { guest: updatedGuest, partyId: party.id },
+        party.userId!
+      );
+    } catch (webhookErr) {
+      console.error('Webhook trigger failed (non-fatal):', webhookErr);
+    }
+
+    res.status(200).json({
+      success: true,
+      notCheckedIn: false,
+      guest: {
+        id: updatedGuest.id,
+        name: updatedGuest.name,
+        email: updatedGuest.email,
+        checkedInAt: updatedGuest.checkedInAt,
+        checkedInBy: updatedGuest.checkedInBy,
+      },
+      message: `${updatedGuest.name} has been un-checked in`,
     });
   } catch (error) {
     next(error);

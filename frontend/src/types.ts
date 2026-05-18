@@ -106,6 +106,7 @@ export interface CoHost {
   website?: string;
   twitter?: string;
   instagram?: string;
+  telegram?: string;
   avatar_url?: string;
   showOnEvent?: boolean;
   canEdit?: boolean;
@@ -238,6 +239,7 @@ export interface Party {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  placeId?: string | null;
   venueName: string | null;
   // Venue tracking fields
   venueStatus: VenueStatus | null;
@@ -275,6 +277,10 @@ export interface Party {
   region?: string | null;
   flyerGeneratedAt?: string | null;
   flyerConfig?: Record<string, any> | null;
+  posterImageUrl?: string | null;
+  posterGeneratedAt?: string | null;
+  rollupImageUrl?: string | null;
+  rollupGeneratedAt?: string | null;
   canEdit?: boolean;
   allowedTabs?: string[];
   hiddenGppPhotos?: string[];
@@ -285,6 +291,8 @@ export interface Party {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   telegramGroup?: string | null;
+  hostTelegramChatId?: string | null;
+  hostTelegramLinkToken?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
 }
@@ -962,6 +970,8 @@ export interface AutoCompleteStates {
   venue_added: boolean;
   budget_submitted: boolean;
   team_built?: boolean;
+  pizzerias_selected?: boolean;
+  underboss_reviewed?: boolean;
 }
 
 export interface ChecklistData {
@@ -1019,6 +1029,8 @@ export interface UnderbossEvent {
   duration: number | null;
   country?: string | null;
   host: { name: string | null; email: string | null };
+  hostTelegram?: string | null;
+  hostTelegramConnected?: boolean;
   coHosts: any[];
   progress: UnderbossEventProgress;
   guestCount: number;
@@ -1066,6 +1078,47 @@ export interface UnderbossDashboardData {
   events: UnderbossEvent[];
 }
 
+// ============================================
+// Fake-event detection (blackolive-74932)
+// ============================================
+
+export type FakeDetectionTier = 'high' | 'medium' | 'low' | 'clean';
+
+export interface FakeFlag {
+  id: string;
+  name: string;
+  fired: boolean;
+  weight: number;
+  detail: string;
+  evidence?: Record<string, unknown>;
+}
+
+export interface FakeDetectionRow {
+  id: string;
+  name: string;
+  customUrl: string | null;
+  country: string | null;
+  region: string | null;
+  underbossStatus: string | null;
+  hostName: string | null;
+  hostEmail: string | null;
+  rsvpCount: number;
+  maxGuests: number | null;
+  score: number;
+  tier: FakeDetectionTier;
+  flags: FakeFlag[];
+}
+
+export interface FakeDetectionResponse {
+  rows: FakeDetectionRow[];
+  meta: {
+    totalEvents: number;
+    sybilWalletCount: number;
+    scope: 'admin' | 'regions';
+    regions: string[] | null;
+  };
+}
+
 // Admin Management types
 
 export interface AdminUser {
@@ -1091,6 +1144,7 @@ export interface UnderbossAdmin {
   email: string;
   region: string;
   regions: string[];
+  cities: string[];
   isActive: boolean;
   notes: string | null;
   createdAt: string;
@@ -1109,7 +1163,11 @@ export interface ShippingKit {
   eventAddress: string | null;
   eventVenue: string | null;
   underbossStatus: UnderbossStatus;
-  requestedTier: KitTier;
+  /**
+   * Placeholder rows (events with no kit request) send an empty string here;
+   * widened from `KitTier` to allow that.
+   */
+  requestedTier: KitTier | '';
   allocatedTier: KitTier | null;
   recipientName: string;
   addressLine1: string;
@@ -1119,7 +1177,11 @@ export interface ShippingKit {
   postalCode: string;
   country: string;
   phone: string | null;
-  status: KitStatus;
+  /**
+   * Real kits use the `KitStatus` enum. Placeholder rows (events with no
+   * `party_kits` row) send the sentinel `'no_request'`.
+   */
+  status: KitStatus | 'no_request';
   trackingNumber: string | null;
   trackingUrl: string | null;
   notes: string | null;
@@ -1128,6 +1190,10 @@ export interface ShippingKit {
   approvedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  /** Non-declined, non-invited guest count for this kit's event. */
+  rsvpCount: number;
+  /** True when this row is a placeholder for an event with no kit request. */
+  isPlaceholder?: boolean;
 }
 
 export interface ShippingKitStats {
@@ -1137,6 +1203,8 @@ export interface ShippingKitStats {
   shipped: number;
   delivered: number;
   declined: number;
+  /** GPP-approved events in scope that have not submitted a kit request. */
+  noRequest: number;
   byCountry: Record<string, number>;
   byTier: Record<string, number>;
 }
@@ -1202,6 +1270,7 @@ export interface SponsorDashboardEvent {
   slug: string;
   reportPublicSlug: string | null;
   date: string | null;
+  createdAt: string;
   timezone: string | null;
   address: string | null;
   venueName: string | null;
@@ -1258,6 +1327,16 @@ export interface SponsorDashboardEvent {
   partnerNotes: string | null;
   photoCount: number;
   checklist: SponsorChecklistItem[];
+  // Admin-only: newsletter signup counts per event. Field is absent for non-admins.
+  newsletterSignups?: {
+    pizzadao: number;
+    swc: number;
+    swcCa: number;
+    swcAu: number;
+    swcEu: number;
+    swcUk: number;
+    swcBr: number;
+  };
 }
 
 export interface SponsorMeResponse {

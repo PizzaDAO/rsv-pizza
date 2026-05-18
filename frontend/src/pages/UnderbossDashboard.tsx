@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -69,7 +69,9 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection'>('events');
+
+  const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
@@ -82,25 +84,68 @@ export function UnderbossDashboard() {
   const [showAddUnderboss, setShowAddUnderboss] = useState(false);
   const [addUbForm, setAddUbForm] = useState({ name: '', email: '' });
   const [newUbRegions, setNewUbRegions] = useState<string[]>([]);
+  const [newUbCities, setNewUbCities] = useState<string[]>([]);
   const [addUbLoading, setAddUbLoading] = useState(false);
   const [addUbError, setAddUbError] = useState<string | null>(null);
   const [addUbSuccess, setAddUbSuccess] = useState(false);
 
-  // Filter events and recompute stats based on selected regions
+  // Cities filter (mozzarella-25815): only shown for city-scoped underbosses
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+
+  // Extract a city key from an event name ("Global Pizza Party {City}")
+  // Mirrors backend `cityKeyFromPartyName` + frontend `CitiesTable` regex.
+  function cityFromEvent(event: { name: string }): string | null {
+    const match = event.name.match(/Global Pizza Party\s+(.+)/i);
+    if (!match) return null;
+    return match[1].trim().toLowerCase();
+  }
+
+  // mozzarella-25815: city-scoped UBs may have NO regions, so the
+  // "regions.length === availableRegions.length" allSelected check needs
+  // to consider that no-region UBs simply have nothing to filter via region.
+  const hasCitiesFilter = (meData?.cities?.length ?? 0) > 0;
+
+  // Filter events and recompute stats based on selected regions + cities
   const filteredData = useMemo(() => {
     if (!allData) return null;
-    const allSelected = selectedRegions.length === availableRegions.length;
-    if (allSelected) return allData;
+    const allRegionsSelected = availableRegions.length === 0 || selectedRegions.length === availableRegions.length;
+    const allCitiesSelected = !hasCitiesFilter || selectedCities.length === (meData?.cities?.length ?? 0);
+    if (allRegionsSelected && allCitiesSelected) return allData;
 
-    const filteredEvents = allData.events.filter(
-      (e) => e.region && selectedRegions.includes(e.region)
-    );
+    const selectedCityKeys = selectedCities.map((c) => c.toLowerCase().trim());
+    const filteredEvents = allData.events.filter((e) => {
+      // Region match
+      const regionMatch = !!(e.region && selectedRegions.includes(e.region));
+      // City match (additive)
+      const cityKey = cityFromEvent(e);
+      const cityMatch = hasCitiesFilter && !!cityKey && selectedCityKeys.includes(cityKey);
+      return regionMatch || cityMatch;
+    });
     return {
       ...allData,
       stats: recomputeStats(filteredEvents),
       events: filteredEvents,
     };
-  }, [allData, selectedRegions, availableRegions.length]);
+  }, [allData, selectedRegions, availableRegions.length, selectedCities, hasCitiesFilter, meData?.cities?.length]);
+
+  const displayData = useMemo(() => {
+    if (!filteredData) return null;
+    if (activeTab !== 'events' || !tableFilteredEvents) return filteredData;
+    return {
+      ...filteredData,
+      stats: recomputeStats(tableFilteredEvents),
+      events: tableFilteredEvents,
+    };
+  }, [filteredData, activeTab, tableFilteredEvents]);
+
+  useEffect(() => {
+    if (activeTab !== 'events') setTableFilteredEvents(null);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setTableFilteredEvents(null);
+  }, [allData]);
 
   // Derive the region label for the header
   const regionLabel = useMemo(() => {
@@ -112,8 +157,8 @@ export function UnderbossDashboard() {
     return t('underbossDashboard.regionsCount', { count: selectedRegions.length });
   }, [selectedRegions, availableRegions.length, t]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const result = await fetchUnderbossDashboard('all');
@@ -130,9 +175,10 @@ export function UnderbossDashboard() {
         // Non-critical — partner tags indicator won't show
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard');
+      if (!silent) setError(err.message || 'Failed to load dashboard');
+      else console.error('Silent dashboard refetch failed:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -160,13 +206,19 @@ export function UnderbossDashboard() {
         } else if (me.isUnderboss) {
           setIsAdmin(false);
           const assignedRegions = (me.regions && me.regions.length > 0) ? me.regions : (me.region ? [me.region] : []);
-          if (assignedRegions.length === 0) {
+          const assignedCities = me.cities || [];
+          // mozzarella-25815: allow access if EITHER regions OR cities are assigned.
+          if (assignedRegions.length === 0 && assignedCities.length === 0) {
             setLoading(false);
             setError('You are not authorized to access the underboss dashboard.');
             return;
           }
           setAvailableRegions(assignedRegions);
           setSelectedRegions(assignedRegions);
+          // For city-scoped UBs, pre-select all assigned cities in the cities filter
+          if (assignedCities.length > 0) {
+            setSelectedCities(assignedCities);
+          }
           loadDashboard();
         } else {
           setLoading(false);
@@ -271,7 +323,7 @@ export function UnderbossDashboard() {
     );
   }
 
-  if (!filteredData) return null;
+  if (!filteredData || !displayData) return null;
 
   const showMultiSelect = availableRegions.length > 1;
   const showRegionColumn = selectedRegions.length > 1;
@@ -385,11 +437,74 @@ export function UnderbossDashboard() {
               </button>
             )}
           </div>
+
+          {/* Cities filter pill — only shown for city-scoped UBs (mozzarella-25815) */}
+          {hasCitiesFilter && meData && (
+            <div className="mt-3 relative">
+              <button
+                onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-theme-surface border border-theme-stroke text-sm text-theme-text-secondary hover:bg-theme-surface-hover transition-colors"
+              >
+                <span>
+                  {selectedCities.length === (meData.cities?.length ?? 0)
+                    ? t('underbossDashboard.allCities', 'All cities')
+                    : t('underbossDashboard.citiesCount', { count: selectedCities.length, defaultValue: '{{count}} cities' })}
+                </span>
+                <ChevronDown size={14} className={`transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {cityDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setCityDropdownOpen(false)} />
+                  <div className="absolute top-full left-0 mt-2 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-2 min-w-[240px] max-h-[60vh] overflow-y-auto">
+                    <button
+                      onClick={() => setSelectedCities(meData.cities || [])}
+                      className="w-full text-left px-4 py-2 text-sm text-theme-text-secondary hover:bg-theme-surface transition-colors"
+                    >
+                      {t('underbossDashboard.selectAll')}
+                    </button>
+                    <button
+                      onClick={() => setSelectedCities([])}
+                      className="w-full text-left px-4 py-2 text-sm text-theme-text-faint hover:bg-theme-surface transition-colors"
+                    >
+                      {t('underbossDashboard.clearAll', 'Clear')}
+                    </button>
+                    <div className="border-b border-theme-stroke my-1" />
+                    {(meData.cities || []).map((c) => {
+                      const isSel = selectedCities.some((s) => s.toLowerCase().trim() === c.toLowerCase().trim());
+                      return (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            const key = c.toLowerCase().trim();
+                            if (isSel) {
+                              setSelectedCities((prev) => prev.filter((s) => s.toLowerCase().trim() !== key));
+                            } else {
+                              setSelectedCities((prev) => [...prev, c]);
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2 ${
+                            isSel ? 'text-red-500 font-medium' : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                            isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+                          }`}>
+                            {isSel && <Check size={12} className="text-theme-text" />}
+                          </div>
+                          {c}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Stats */}
         <section className="mb-8">
-          <RegionStats stats={filteredData.stats} />
+          <RegionStats stats={displayData.stats} />
         </section>
 
         {/* Events / Cities Tabs */}
@@ -403,7 +518,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              {t('underbossDashboard.tabs.events')} ({filteredData.events.length})
+              {t('underbossDashboard.tabs.events')} ({displayData.events.length})
               {activeTab === 'events' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
@@ -434,10 +549,25 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('fake-detection')}
+                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                  activeTab === 'fake-detection'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
+                }`}
+              >
+                {t('underbossDashboard.tabs.fakeDetection')}
+                {activeTab === 'fake-detection' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                )}
+              </button>
+            )}
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={loadDashboard} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} />
           )}
 
           {activeTab === 'cities' && (
@@ -445,9 +575,12 @@ export function UnderbossDashboard() {
           )}
 
           {activeTab === 'partners' && (
-            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={loadDashboard} onFlyerRegenNeeded={handleFlyerRegenForTag} />
+            <PartnerManager isAdmin={isAdmin} events={allData?.events} onSyncComplete={() => loadDashboard(true)} onFlyerRegenNeeded={handleFlyerRegenForTag} />
           )}
 
+          {isAdmin && activeTab === 'fake-detection' && (
+            <FakeDetectionTable />
+          )}
 
         </section>
         </div>
@@ -456,7 +589,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(
@@ -473,20 +606,21 @@ export function UnderbossDashboard() {
               <div className="text-center py-6">
                 <p className="text-green-400 font-medium mb-2">{t('underbossDashboard.underbossCreated')}</p>
                 <button
-                  onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); }}
+                  onClick={() => { setShowAddUnderboss(false); setAddUbSuccess(false); setAddUbForm({ name: '', email: '' }); setNewUbRegions([]); setNewUbCities([]); }}
                   className="text-sm text-theme-text-muted hover:text-theme-text-secondary"
                 >
-                  Close
+                  {t('underbossDashboard.close')}
                 </button>
               </div>
             ) : (
               <form onSubmit={async (e) => {
                 e.preventDefault();
-                if (newUbRegions.length === 0) return;
+                // mozzarella-25815: require at least one region OR city
+                if (newUbRegions.length === 0 && newUbCities.length === 0) return;
                 setAddUbLoading(true);
                 setAddUbError(null);
                 try {
-                  await createUnderboss({ ...addUbForm, regions: newUbRegions });
+                  await createUnderboss({ ...addUbForm, regions: newUbRegions, cities: newUbCities });
                   setAddUbSuccess(true);
                 } catch (err: any) {
                   setAddUbError(err.message || 'Failed to create underboss');
@@ -497,7 +631,7 @@ export function UnderbossDashboard() {
                 <div>
                   <input
                     type="text"
-                    placeholder="Name"
+                    placeholder={t('underbossDashboard.namePlaceholder')}
                     value={addUbForm.name}
                     onChange={(e) => setAddUbForm({ ...addUbForm, name: e.target.value })}
                     required
@@ -507,7 +641,7 @@ export function UnderbossDashboard() {
                 <div>
                   <input
                     type="email"
-                    placeholder="Email"
+                    placeholder={t('underbossDashboard.emailPlaceholder')}
                     value={addUbForm.email}
                     onChange={(e) => setAddUbForm({ ...addUbForm, email: e.target.value })}
                     required
@@ -515,7 +649,7 @@ export function UnderbossDashboard() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
+                  <p className="text-sm text-theme-text-secondary mb-2">{t('underbossDashboard.regions')}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {GPP_REGIONS.map(r => (
                       <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">
@@ -536,10 +670,14 @@ export function UnderbossDashboard() {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <p className="text-sm text-theme-text-secondary mb-2">{t('underboss.cities', 'Cities')}</p>
+                  <CityScopePicker selected={newUbCities} onChange={setNewUbCities} />
+                </div>
                 {addUbError && <p className="text-sm text-red-400">{addUbError}</p>}
                 <button
                   type="submit"
-                  disabled={addUbLoading || newUbRegions.length === 0}
+                  disabled={addUbLoading || (newUbRegions.length === 0 && newUbCities.length === 0)}
                   className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   {addUbLoading ? t('underbossDashboard.creating') : t('underbossDashboard.createUnderboss')}

@@ -19,6 +19,9 @@ export const BeverageSettings: React.FC = () => {
   });
   const [customInput, setCustomInput] = useState('');
 
+  const isGppEvent = party?.eventType === 'gpp';
+  if (isGppEvent) return null;
+
   const toggleBeverage = (beverageId: string) => {
     const newSelection = selectedBeverages.includes(beverageId)
       ? selectedBeverages.filter(id => id !== beverageId)

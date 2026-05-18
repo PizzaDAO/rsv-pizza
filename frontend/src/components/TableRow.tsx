@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star, UserRoundX } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -33,11 +33,14 @@ interface TableRowProps {
   onDecline?: (id: string) => void;
   onRemove?: (id: string) => void;
   onCheckIn?: (id: string) => void;
+  onUncheckIn?: (id: string) => void;
   isCheckingIn?: boolean;
   onPromote?: (id: string) => void;
   // For requests variant - lookup functions
   toppingNameById?: (id: string) => string;
   beverageNameById?: (id: string) => string;
+  // Hide beverage chips in the requests variant (used for GPP events)
+  hideBeverages?: boolean;
   // Edit functionality
   editable?: boolean;
   onQuantityChange?: (id: string, newQuantity: number) => void;
@@ -62,10 +65,12 @@ export const TableRow: React.FC<TableRowProps> = ({
   onDecline,
   onRemove,
   onCheckIn,
+  onUncheckIn,
   isCheckingIn = false,
   onPromote,
   toppingNameById = (id) => id,
   beverageNameById = (id) => id,
+  hideBeverages = false,
   editable = false,
   onQuantityChange,
   onRemovePizza,
@@ -290,14 +295,14 @@ export const TableRow: React.FC<TableRowProps> = ({
           </button>
         )}
 
-        {/* Delete */}
+        {/* Reject */}
         {onRemove && (
           <button
             onClick={() => guest.id && onRemove(guest.id)}
             className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-            aria-label="Remove guest"
+            aria-label="Reject guest"
           >
-            <Trash2 size={14} />
+            <UserRoundX size={14} />
           </button>
         )}
       </div>
@@ -364,7 +369,7 @@ export const TableRow: React.FC<TableRowProps> = ({
                 </span>
               );
             })}
-            {guest.likedBeverages?.map(beverageId => {
+            {!hideBeverages && guest.likedBeverages?.map(beverageId => {
               const name = beverageNameById(beverageId);
               return (
                 <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded">
@@ -372,7 +377,7 @@ export const TableRow: React.FC<TableRowProps> = ({
                 </span>
               );
             })}
-            {guest.dislikedBeverages?.map(beverageId => {
+            {!hideBeverages && guest.dislikedBeverages?.map(beverageId => {
               const name = beverageNameById(beverageId);
               return (
                 <span key={beverageId} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] rounded line-through">
@@ -384,7 +389,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         </>
       )}
 
-      {/* Approve/Decline buttons */}
+      {/* Approve/Reject buttons */}
       {requireApproval && guest.approved === null && onApprove && onDecline && (
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
@@ -399,17 +404,17 @@ export const TableRow: React.FC<TableRowProps> = ({
             className="flex items-center gap-1 text-[#ff393a] hover:bg-[#ff393a]/10 px-2 py-1 rounded transition-colors text-sm"
           >
             <X size={14} />
-            <span>Decline</span>
+            <span>Reject</span>
           </button>
         </div>
       )}
 
-      {/* Status badge for approved/declined */}
+      {/* Status badge for approved/rejected */}
       {requireApproval && guest.approved === true && (
         <span className="text-[#39d98a] text-xs flex-shrink-0">Approved</span>
       )}
       {requireApproval && guest.approved === false && (
-        <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+        <span className="text-[#ff393a] text-xs flex-shrink-0">Rejected</span>
       )}
 
       {/* Notable attendee star toggle */}
@@ -435,12 +440,24 @@ export const TableRow: React.FC<TableRowProps> = ({
       {/* Check-in status badge or button */}
       {variant === 'basic' && onCheckIn && (
         guest.checkedInAt ? (
-          <div
-            className="flex items-center gap-1 text-green-400 text-xs flex-shrink-0 cursor-help"
-            title={`Checked in: ${format(new Date(guest.checkedInAt), 'MMM d, h:mm a')}`}
-          >
-            <CheckCircle2 size={14} />
-            <span className="hidden sm:inline">Checked in</span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <div
+              className="flex items-center gap-1 text-green-400 text-xs cursor-help"
+              title={`Checked in: ${format(new Date(guest.checkedInAt), 'MMM d, h:mm a')}`}
+            >
+              <CheckCircle2 size={14} />
+              <span className="hidden sm:inline">Checked in</span>
+            </div>
+            {onUncheckIn && (
+              <button
+                onClick={() => guest.id && onUncheckIn(guest.id)}
+                className="p-0.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors"
+                title="Undo check-in"
+                aria-label="Undo check-in"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         ) : (
           <button
@@ -466,14 +483,16 @@ export const TableRow: React.FC<TableRowProps> = ({
         </span>
       )}
 
-      {/* Delete */}
+      {/* Reject (soft-delete via approved=false). Reversible via "Rejected (N)"
+          modal in GuestList — no confirm prompt needed. */}
       {onRemove && (
         <button
           onClick={() => guest.id && onRemove(guest.id)}
           className="p-1.5 text-theme-text-faint hover:text-[#ff393a] hover:bg-[#ff393a]/10 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-          aria-label="Remove guest"
+          aria-label="Reject guest"
+          title="Reject guest"
         >
-          <Trash2 size={14} />
+          <UserRoundX size={14} />
         </button>
       )}
     </div>

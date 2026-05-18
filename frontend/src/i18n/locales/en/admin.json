@@ -3,6 +3,24 @@
   "subtitle": "Manage admins and underbosses",
   "accessDenied": "Access Denied",
   "accessDeniedDesc": "You do not have admin access. Please log in with an admin account.",
+  "page": {
+    "exportEventsCsv": "Export All Events CSV",
+    "graphicsAdmins": "Graphics Admins",
+    "addGraphicsAdmin": "Add Graphics Admin",
+    "removeGraphicsAdmin": "Remove graphics admin",
+    "noGraphicsAdmins": "No graphics admins yet",
+    "regions": "Regions",
+    "analytics": "Analytics",
+    "remove": "Remove",
+    "removeAdminTitle": "Remove admin",
+    "deactivate": "Deactivate",
+    "close": "Close",
+    "graphicsAdminsTable": {
+      "email": "Email",
+      "name": "Name",
+      "added": "Added"
+    }
+  },
   "admins": {
     "title": "Admins",
     "emailPlaceholder": "Email address",
@@ -24,15 +42,27 @@
     "namePlaceholder": "Name",
     "emailPlaceholder": "Email",
     "regions": "Regions",
+    "cities": "Cities",
+    "searchCitiesPlaceholder": "Search cities…",
+    "loadingCities": "Loading cities…",
+    "noCitiesMatch": "No cities match your search",
+    "noCitiesSelected": "No cities selected",
+    "cityScopeHint": "Cities are additive to regions.",
+    "cityLabelOne": "city",
+    "cityLabelMany": "cities",
+    "noScope": "—",
+    "outOfScope": "Out of scope",
     "addUnderboss": "Add Underboss",
     "noUnderbosses": "No underbosses yet",
     "active": "Active",
     "inactive": "Inactive",
     "deactivate": "Deactivate",
+    "save": "Save",
+    "cancel": "Cancel",
     "tableHeaders": {
       "name": "Name",
       "email": "Email",
-      "regions": "Regions",
+      "regions": "Scope",
       "status": "Status",
       "actions": "Actions"
     }
@@ -63,7 +93,8 @@
     "saveChecklistDates": "Save Checklist Dates",
     "newItemPlaceholder": "New checklist item...",
     "adding": "Adding...",
-    "addItem": "Add Item"
+    "addItem": "Add Item",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPP Default Description",
@@ -72,7 +103,7 @@
     "saving": "Saving...",
     "saveAndApply": "Save & Apply to Default Events",
     "customDescriptions": "{{count}} event with custom descriptions",
-    "customDescriptions_plural": "{{count}} events with custom descriptions"
+    "customDescriptions_other": "{{count}} events with custom descriptions"
   },
   "nft": {
     "title": "GPP NFT Settings",
@@ -96,13 +127,51 @@
     "allRegions": "All Regions",
     "regionsCount": "{{count}} Regions",
     "selectAll": "All Regions",
+    "allCities": "All cities",
+    "citiesCount": "{{count}} cities",
+    "clearAll": "Clear",
     "underbossCreated": "Underboss created!",
     "creating": "Creating...",
     "createUnderboss": "Create Underboss",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Email",
+    "regions": "Regions",
+    "close": "Close",
     "tabs": {
       "events": "Events",
       "cities": "Cities",
-      "partners": "Partners"
+      "partners": "Partners",
+      "fakeDetection": "Fake Detection"
+    }
+  },
+  "fakeDetection": {
+    "loading": "Computing risk scores…",
+    "searchPlaceholder": "Search event, city, host…",
+    "showingOf": "{{filtered}} of {{total}} events",
+    "sybilWallets": "{{count}} sybil wallets",
+    "tier": "Tier",
+    "country": "Country",
+    "allCountries": "All",
+    "onlyFlagged": "Only flagged",
+    "noResults": "No events match the current filters.",
+    "openEvent": "Open event page",
+    "columns": {
+      "event": "Event",
+      "slug": "Slug",
+      "rsvps": "RSVPs",
+      "score": "Score",
+      "flags": "Fired flags",
+      "status": "Status",
+      "actions": "Actions",
+      "details": "Details"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
     }
   },
   "graphics": {
@@ -142,6 +211,10 @@
     "subtitle": "Global Pizza Party · Shipping Dashboard",
     "signedInAdmin": "Signed in as Admin ({{email}})",
     "signedInAs": "Signed in as {{name}}",
-    "kitRequests": "Kit Requests ({{count}})"
+    "kitRequests": "Kit Requests ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
   }
 }

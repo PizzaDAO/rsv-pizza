@@ -13,13 +13,14 @@ import {
   getUnifiedSponsors,
   ensureUnderbossSponsors,
   updateSponsorUser,
+  fetchUnderbossMe,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
 import { PartnerForm, extractSponsorData } from './PartnerForm';
 import type { PartnerFormData } from './PartnerForm';
 import { usePizza } from '../../contexts/PizzaContext';
-import { triggerFlyerRegen } from '../flyer/autoRegenFlyer';
+import { triggerFlyerRegen, FLYER_SPONSOR_STATUSES } from '../flyer/autoRegenFlyer';
 import { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
 
 interface SponsorCRMProps {
@@ -35,6 +36,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPrivileged, setIsPrivileged] = useState(false);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -100,6 +102,26 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
     loadUnifiedPartners();
   }, [loadData, loadUnifiedPartners]);
 
+  // Detect whether the current user can manage underboss-added partners
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await fetchUnderbossMe();
+        if (!cancelled) {
+          setIsPrivileged(!!me?.isAdmin || !!me?.isUnderboss);
+        }
+      } catch {
+        if (!cancelled) {
+          setIsPrivileged(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Reload unified partners when sponsors change
   useEffect(() => {
     loadUnifiedPartners();
@@ -107,7 +129,15 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle form submission
   const handleFormSubmit = async (formData: PartnerFormData, coHostData?: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string }) => {
+    // Block edits to underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (editingSponsor?.addedByUnderboss && !isPrivileged) {
+      setShowForm(false);
+      setEditingSponsor(null);
+      return;
+    }
     const data = extractSponsorData(formData);
+    // Capture pre-edit snapshot for flyer-regen decision (only matters when editing)
+    const previousSponsor = editingSponsor;
     setIsSubmitting(true);
     try {
       if (editingSponsor) {
@@ -152,10 +182,22 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       const statsResult = await getSponsorStats(partyId);
       if (statsResult) setStats(statsResult);
 
-      // Auto-regenerate flyer if sponsor has yes/paid status and a logo
-      const FLYER_STATUSES = new Set(['yes', 'paid']);
-      if (party && data.status && FLYER_STATUSES.has(data.status) && data.logoUrl) {
-        triggerFlyerRegen(party, loadParty);
+      // Auto-regenerate flyer if the change affects the flyer:
+      //  - new/edited sponsor with a flyer status + logo
+      //  - existing sponsor transitioned into or out of flyer status
+      //  - existing sponsor still on flyer AND its logoUrl changed
+      if (party && data.status) {
+        const willBeOnFlyer = FLYER_SPONSOR_STATUSES.has(data.status) && !!data.logoUrl;
+        const wasOnFlyer = !!previousSponsor
+          && FLYER_SPONSOR_STATUSES.has(previousSponsor.status)
+          && !!previousSponsor.logoUrl;
+        const logoChanged = !!previousSponsor
+          && (previousSponsor.logoUrl || null) !== (data.logoUrl || null);
+
+        if (willBeOnFlyer || wasOnFlyer !== willBeOnFlyer || (wasOnFlyer && logoChanged)) {
+          if (party.inviteCode) await loadParty(party.inviteCode);
+          triggerFlyerRegen(party, loadParty);
+        }
       }
 
       // Close form
@@ -170,6 +212,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const handleDelete = async (sponsorId: string) => {
     // Capture sponsor before removing it so we can check if flyer needs regen
     const deletedSponsor = sponsors.find(s => s.id === sponsorId);
+    // Block deletes of underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (deletedSponsor?.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     const success = await deleteSponsor(partyId, sponsorId);
     if (success) {
       setSponsors(prev => prev.filter(s => s.id !== sponsorId));
@@ -178,8 +224,8 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       if (statsResult) setStats(statsResult);
 
       // Auto-regenerate flyer if deleted sponsor was on the flyer
-      const FLYER_STATUSES = new Set(['yes', 'paid']);
-      if (party && deletedSponsor && FLYER_STATUSES.has(deletedSponsor.status) && deletedSponsor.logoUrl) {
+      if (party && deletedSponsor && FLYER_SPONSOR_STATUSES.has(deletedSponsor.status) && deletedSponsor.logoUrl) {
+        if (party.inviteCode) await loadParty(party.inviteCode);
         triggerFlyerRegen(party, loadParty);
       }
     }
@@ -187,6 +233,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle editing
   const handleEdit = (sponsor: Sponsor) => {
+    // Block edits to underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (sponsor.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     setEditingSponsor(sponsor);
     setShowForm(true);
   };
@@ -207,6 +257,10 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
   // Handle inline status change with optimistic update
   const handleStatusChange = async (sponsor: Sponsor, newStatus: SponsorStatus) => {
+    // Block status changes on underboss-added partners for non-privileged users (belt-and-suspenders)
+    if (sponsor.addedByUnderboss && !isPrivileged) {
+      return;
+    }
     const oldStatus = sponsor.status;
 
     // Optimistic update
@@ -226,9 +280,9 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       const statsResult = await getSponsorStats(partyId);
       if (statsResult) setStats(statsResult);
 
-      // Auto-regenerate flyer when a sponsor transitions to/from yes/paid
-      const FLYER_STATUSES = new Set(['yes', 'paid']);
-      if (party && (FLYER_STATUSES.has(oldStatus) || FLYER_STATUSES.has(newStatus))) {
+      // Auto-regenerate flyer when a sponsor transitions to/from a flyer status
+      if (party && (FLYER_SPONSOR_STATUSES.has(oldStatus) || FLYER_SPONSOR_STATUSES.has(newStatus))) {
+        if (party.inviteCode) await loadParty(party.inviteCode);
         triggerFlyerRegen(party, loadParty);
       }
     } catch {
@@ -363,6 +417,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         onStatusChange={handleStatusChange}
         isLoading={isRefreshing}
         avatarUrls={sponsorAvatarUrls}
+        isPrivileged={isPrivileged}
       />
 
       {/* Brand Description Order (Unified) */}

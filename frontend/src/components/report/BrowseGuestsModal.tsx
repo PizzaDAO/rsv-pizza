@@ -62,12 +62,14 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
     });
   }, [isOpen, partyId]);
 
-  // Group guests by non-provider domain
+  // Group guests by non-provider domain. Drop rejected (approved===false)
+  // defensively in case the context-level filter ever bypasses this surface.
   const domainGroups = useMemo(() => {
     const map = new Map<string, Guest[]>();
 
     for (const g of guests) {
       if (!g.email || !g.id) continue;
+      if (g.approved === false) continue;
       const domain = extractEmailDomain(g.email);
       if (!domain || isEmailProvider(domain)) continue;
       const list = map.get(domain) || [];

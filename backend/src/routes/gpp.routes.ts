@@ -1,9 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
+import { geocodeCity } from '../lib/geocode.js';
+import { haversineKm } from '../lib/distance.js';
 
 const router = Router();
 
@@ -243,7 +247,7 @@ async function sendGPPWelcomeEmail(
 // POST /api/gpp/events - Create a GPP event (simplified flow, no auth required)
 router.post('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, telegram, country, countryCode, cityLat, cityLng, timezone } = req.body;
+    const { city, hostName, email, telegram, country, countryCode, cityFormattedName, cityLat, cityLng, timezone } = req.body;
 
     // Validate required fields
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
@@ -264,31 +268,44 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
     const normalizedHostName = hostName.trim();
     const normalizedTelegram = telegram?.trim().replace(/^@/, '') || null;
 
-    // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars)
-    const customUrl = normalizedCity
+    // Pre-fill address with the formatted city name (Google Places result) so the
+    // public event page has a location immediately. Falls back to the raw city
+    // the user typed if the formatted name isn't available. The
+    // `addressIsCityDefault` flag below marks this as a city-level pre-fill so
+    // the venue checklist item stays unchecked until the host adds a real venue.
+    const cityAddress =
+      (typeof cityFormattedName === 'string' && cityFormattedName.trim()) ||
+      normalizedCity;
+
+    // Generate custom URL from city name (strip diacritics, lowercase, no spaces/special chars).
+    // NULL when the slug is empty (e.g. non-Latin scripts) so the unique constraint stays distinct.
+    const slug = normalizedCity
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '');
+    const customUrl = slug.length > 0 ? slug : null;
 
-    // Check for existing GPP event in this city
-    const existingEvent = await prisma.party.findFirst({
-      where: {
-        customUrl,
-        eventType: 'gpp',
-      },
-      select: {
-        id: true,
-        name: true,
-        customUrl: true,
-        inviteCode: true,
-      },
-    });
+    const eventName = `Global Pizza Party ${normalizedCity}`;
+
+    const existingRows = await prisma.$queryRaw<Array<{
+      id: string;
+      name: string;
+      custom_url: string | null;
+      invite_code: string;
+    }>>`
+      SELECT id, name, custom_url, invite_code
+      FROM parties
+      WHERE event_type = 'gpp'
+        AND lower(unaccent(name)) = lower(unaccent(${eventName}))
+      LIMIT 1
+    `;
+    const existingEvent = existingRows[0];
 
     if (existingEvent) {
-      const eventUrl = existingEvent.customUrl
-        ? `https://rsv.pizza/${existingEvent.customUrl}`
-        : `https://rsv.pizza/${existingEvent.inviteCode}`;
+      const eventUrl = existingEvent.custom_url
+        ? `https://rsv.pizza/${existingEvent.custom_url}`
+        : `https://rsv.pizza/${existingEvent.invite_code}`;
 
       throw new AppError(
         `This city's Global Pizza Party has already been created! Visit the event page: ${eventUrl}`,
@@ -296,6 +313,93 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         'DUPLICATE_CITY'
       );
     }
+
+    // --- Proximity check: reject if within 80 km of an approved GPP city ---
+    // Resolve coordinates: prefer submitted values, fall back to geocoding.
+    let resolvedLat: number | null = null;
+    let resolvedLng: number | null = null;
+
+    const submittedLat = typeof cityLat === 'number' ? cityLat : null;
+    const submittedLng = typeof cityLng === 'number' ? cityLng : null;
+
+    if (
+      submittedLat !== null && submittedLng !== null &&
+      submittedLat >= -90 && submittedLat <= 90 &&
+      submittedLng >= -180 && submittedLng <= 180
+    ) {
+      resolvedLat = submittedLat;
+      resolvedLng = submittedLng;
+    } else {
+      try {
+        const geocoded = await geocodeCity(normalizedCity, country);
+        if (geocoded) {
+          resolvedLat = geocoded.lat;
+          resolvedLng = geocoded.lng;
+        }
+      } catch (geocodeErr) {
+        // Fail-open: geocoder error → skip proximity check
+        console.warn('[gpp/nearby-check] geocodeCity threw unexpectedly:', geocodeErr);
+      }
+    }
+
+    if (resolvedLat !== null && resolvedLng !== null) {
+      // Query all approved GPP cities that have coordinates
+      const approvedCities = await prisma.$queryRaw<Array<{
+        id: string;
+        name: string;
+        custom_url: string | null;
+        invite_code: string;
+        latitude: number;
+        longitude: number;
+      }>>`
+        SELECT id, name, custom_url, invite_code, latitude, longitude
+        FROM parties
+        WHERE event_type = 'gpp'
+          AND underboss_status = 'approved'
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+      `;
+
+      let nearestKm = Infinity;
+      let nearestCity: typeof approvedCities[number] | null = null;
+
+      for (const ac of approvedCities) {
+        const km = haversineKm(
+          { lat: resolvedLat, lng: resolvedLng },
+          { lat: ac.latitude, lng: ac.longitude }
+        );
+        if (km < nearestKm) {
+          nearestKm = km;
+          nearestCity = ac;
+        }
+      }
+
+      console.info('[gpp/nearby-check]', {
+        city: normalizedCity,
+        lat: resolvedLat,
+        lng: resolvedLng,
+        nearestKm: nearestCity ? Math.round(nearestKm) : null,
+        nearestId: nearestCity?.id ?? null,
+      });
+
+      if (nearestCity && nearestKm <= 80) {
+        const eventUrl = nearestCity.custom_url
+          ? `https://rsv.pizza/${nearestCity.custom_url}`
+          : `https://rsv.pizza/${nearestCity.invite_code}`;
+
+        // Strip 'Global Pizza Party ' prefix to get a friendly city name
+        const nearbyDisplayName = nearestCity.name.startsWith('Global Pizza Party ')
+          ? nearestCity.name.slice('Global Pizza Party '.length)
+          : nearestCity.name;
+
+        throw new AppError(
+          `There's already a Global Pizza Party near you in ${nearbyDisplayName} — it's about ${Math.round(nearestKm)} km away. Join them here: ${eventUrl}`,
+          409,
+          'NEARBY_CITY'
+        );
+      }
+    }
+    // --- End proximity check ---
 
     // Find or create user
     let user = await prisma.user.findUnique({
@@ -318,9 +422,6 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         data: { telegram: normalizedTelegram },
       });
     }
-
-    // Generate event name with city (no dash, just space)
-    const eventName = `Global Pizza Party ${normalizedCity}`;
 
     // Calculate default date: May 22 of current or next year, 6-9 PM in event timezone
     const now = new Date();
@@ -397,6 +498,11 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         timezone: eventTimezone,
         region: inferredRegion,
         country: country || null,
+        address: cityAddress,
+        addressIsCityDefault: true,
+        latitude: resolvedLat,
+        longitude: resolvedLng,
+        placeId: null,
         availableBeverages: [],
         availableToppings: [],
         coHosts: [
@@ -533,6 +639,7 @@ const gppEventSelect = {
   venueName: true,
   country: true,
   region: true,
+  telegramGroup: true,
   latitude: true,
   longitude: true,
   eventImageUrl: true,
@@ -541,23 +648,40 @@ const gppEventSelect = {
   underbossStatus: true,
   rsvpClosedAt: true,
   createdAt: true,
+  coHosts: true,
   _count: {
     select: { guests: true },
   },
   user: {
-    select: { name: true },
+    select: { name: true, telegram: true },
   },
 } as const;
 
+async function resolveCallerIsModerator(req: Request): Promise<boolean> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return false;
+  try {
+    const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+    const email = decoded.email;
+    if (!email) return false;
+    return (await isAdmin(email)) || (await isUnderboss(email));
+  } catch {
+    return false;
+  }
+}
+
 // Format a Party record into the public GPP API response
-function formatGppEvent(event: any) {
+function formatGppEvent(event: any, callerIsModerator = false) {
   const baseUrl = 'https://rsv.pizza';
   const url = event.customUrl
     ? `${baseUrl}/${event.customUrl}`
     : `${baseUrl}/${event.inviteCode}`;
   const city = event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
 
-  return {
+  const base = {
     id: event.id,
     name: event.name,
     city,
@@ -571,6 +695,7 @@ function formatGppEvent(event: any) {
     region: event.region,
     address: event.address,
     venueName: event.venueName,
+    telegramGroup: event.telegramGroup || null,
     latitude: event.latitude,
     longitude: event.longitude,
     eventImageUrl: event.eventImageUrl,
@@ -583,6 +708,20 @@ function formatGppEvent(event: any) {
     approved: event.underbossStatus === 'approved',
     community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
+  };
+
+  if (!callerIsModerator) return base;
+
+  const cohostArr: any[] = Array.isArray(event.coHosts) ? event.coHosts : [];
+  const firstCohostTelegram = cohostArr
+    .map((c) => (c && typeof c.telegram === 'string' ? c.telegram.trim() : ''))
+    .find((t) => t.length > 0) || null;
+  const hostTelegram = event.user?.telegram?.trim() || null;
+
+  return {
+    ...base,
+    hostTelegram: hostTelegram || null,
+    coHostTelegrams: firstCohostTelegram ? [firstCohostTelegram] : [],
   };
 }
 
@@ -620,8 +759,12 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
       return res.status(404).json({ error: 'GPP event not found for this city' });
     }
 
-    res.set('Cache-Control', 'public, max-age=300');
-    res.json({ event: formatGppEvent(event) });
+    const callerIsModerator = await resolveCallerIsModerator(req);
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
+    res.json({ event: formatGppEvent(event, callerIsModerator) });
   } catch (error) {
     next(error);
   }
@@ -630,9 +773,28 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
 // GET /api/gpp/events - List all GPP events (for admin/public listing)
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '500', offset = '0', city, country, region } = req.query;
+    const { limit = '500', offset = '0', city, country, region, statuses } = req.query;
 
-    const where: any = { eventType: 'gpp', underbossStatus: { notIn: ['rejected', 'hidden'] } };
+    // Determine whether to include rejected/hidden statuses.
+    // The `?statuses=all` and legacy `?includeAll=1` params both request all-statuses,
+    // but the request is only honored when the caller is an authenticated
+    // underboss/admin. Unauthenticated callers silently fall back to the
+    // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
+    const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    const callerIsModerator = await resolveCallerIsModerator(req);
+    let includeAllStatuses = false;
+    if (requestedAllStatuses && callerIsModerator) {
+      includeAllStatuses = true;
+    }
+
+    const where: any = { eventType: 'gpp' };
+    if (req.query.curated === '1') {
+      where.underbossStatus = { in: ['approved', 'listed'] };
+    } else if (includeAllStatuses) {
+      // moderator view — no underbossStatus filter; returns rejected/hidden too
+    } else {
+      where.underbossStatus = { notIn: ['rejected', 'hidden'] };
+    }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }
@@ -643,7 +805,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
-    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 500);
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
     const [events, total] = await Promise.all([
@@ -657,9 +819,12 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
     res.json({
-      events: events.map(formatGppEvent),
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
       total,
       limit: parsedLimit,
       offset: parsedOffset,
@@ -761,6 +926,189 @@ router.patch('/pizzerias/:partyId/photo', async (req: Request, res: Response, ne
   } catch (err) {
     console.error('Error caching pizzeria photo:', err);
     res.status(500).json({ error: 'Failed to cache photo' });
+  }
+});
+
+// GET /api/gpp/partners - Aggregated partners across all approved GPP events
+// Cross-event logo aggregation for the marketing site (globalpizza.party) and
+// the public partners page at rsv.pizza/partners. Sponsor rows are deduped
+// in-memory by normalized logoUrl (primary) then normalized name (fallback).
+router.get('/partners', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        party: {
+          eventType: 'gpp',
+          underbossStatus: 'approved', // strict — curated logo wall
+        },
+        status: { in: ['yes', 'billed', 'paid'] },
+        logoUrl: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        website: true,
+        brandDescription: true,
+        brandTwitter: true,
+        brandInstagram: true,
+        category: true,
+        sortOrder: true,
+        createdAt: true,
+        party: {
+          select: {
+            customUrl: true,
+            inviteCode: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Normalize logoUrl: trim, lowercase, strip protocol, strip trailing slash.
+    const normalizeUrl = (raw: string): string => {
+      return raw
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/+$/, '');
+    };
+
+    // Normalize name: strip diacritics, lowercase, alphanum only (same as city slug code above).
+    const normalizeName = (raw: string): string => {
+      return raw
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    interface Aggregate {
+      name: string;
+      logoUrl: string;
+      website: string | null;
+      brandDescription: string | null;
+      brandTwitter: string | null;
+      brandInstagram: string | null;
+      category: string | null;
+      eventCount: number;
+      events: { slug: string; city: string; sponsorId: string }[];
+      // tie-break tracking
+      bestSortOrder: number;
+      bestCreatedAt: Date;
+    }
+
+    const byLogoKey = new Map<string, Aggregate>();
+    const byNameKey = new Map<string, Aggregate>();
+
+    for (const s of sponsors) {
+      if (!s.logoUrl) continue;
+
+      const logoKey = normalizeUrl(s.logoUrl);
+      const nameKey = normalizeName(s.name);
+
+      // Derive city by stripping "Global Pizza Party " prefix; fallback to full party name.
+      const partyName = s.party?.name || '';
+      const city =
+        partyName.replace(/^Global Pizza Party\s*/i, '').trim() || partyName || 'Unknown';
+      const slug = s.party?.customUrl || s.party?.inviteCode || '';
+
+      // Find existing aggregate via logoKey first, then nameKey fallback.
+      let agg = byLogoKey.get(logoKey);
+      if (!agg && nameKey) {
+        agg = byNameKey.get(nameKey);
+      }
+
+      if (agg) {
+        // Dedupe within this partner's events: if the same event already
+        // appears in this aggregate's list (e.g. duplicate sponsor rows for
+        // the same partner on one party), skip the push AND don't bump
+        // eventCount. First-seen wins.
+        const alreadyHasEvent = slug
+          ? agg.events.some((e) => e.slug === slug)
+          : false;
+        if (!alreadyHasEvent) {
+          agg.eventCount += 1;
+          // Cap events array at 500 to defend against pathological payload size.
+          if (agg.events.length < 500 && slug) {
+            agg.events.push({ slug, city, sponsorId: s.id });
+          }
+        }
+        // Tie-break: prefer the representative row with lowest sortOrder; if tied,
+        // prefer the more recent createdAt.
+        const isBetter =
+          s.sortOrder < agg.bestSortOrder ||
+          (s.sortOrder === agg.bestSortOrder && s.createdAt > agg.bestCreatedAt);
+        if (isBetter) {
+          agg.name = s.name;
+          agg.logoUrl = s.logoUrl;
+          agg.website = s.website;
+          agg.brandDescription = s.brandDescription;
+          agg.brandTwitter = s.brandTwitter;
+          agg.brandInstagram = s.brandInstagram;
+          agg.category = s.category;
+          agg.bestSortOrder = s.sortOrder;
+          agg.bestCreatedAt = s.createdAt;
+        }
+        // Ensure both maps point at the same aggregate even after a fallback merge.
+        byLogoKey.set(logoKey, agg);
+        if (nameKey) byNameKey.set(nameKey, agg);
+      } else {
+        const fresh: Aggregate = {
+          name: s.name,
+          logoUrl: s.logoUrl,
+          website: s.website,
+          brandDescription: s.brandDescription,
+          brandTwitter: s.brandTwitter,
+          brandInstagram: s.brandInstagram,
+          category: s.category,
+          eventCount: 1,
+          events: slug ? [{ slug, city, sponsorId: s.id }] : [],
+          bestSortOrder: s.sortOrder,
+          bestCreatedAt: s.createdAt,
+        };
+        byLogoKey.set(logoKey, fresh);
+        if (nameKey) byNameKey.set(nameKey, fresh);
+      }
+    }
+
+    // Collect unique aggregates (some may be present in both maps).
+    const uniqueAggregates = Array.from(new Set(byLogoKey.values()));
+
+    // Final safety: keep eventCount strictly in sync with the deduped events
+    // array. The push-time check above already does this, but recomputing
+    // here guards against future edits drifting the two apart.
+    for (const a of uniqueAggregates) {
+      a.eventCount = a.events.length;
+    }
+
+    // Sort by popularity (eventCount DESC), then name ASC.
+    uniqueAggregates.sort((a, b) => {
+      if (b.eventCount !== a.eventCount) return b.eventCount - a.eventCount;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Strip tie-break tracking fields from the response.
+    const partners = uniqueAggregates.map((a) => ({
+      name: a.name,
+      logoUrl: a.logoUrl,
+      website: a.website,
+      brandDescription: a.brandDescription,
+      brandTwitter: a.brandTwitter,
+      brandInstagram: a.brandInstagram,
+      category: a.category,
+      eventCount: a.eventCount,
+      events: a.events,
+    }));
+
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json({
+      partners,
+      total: partners.length,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -19,7 +19,7 @@ import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery } from '../components/photos';
 import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
 import { uuid } from '../lib/utils';
-import { getXAvatarUrl } from '../utils/avatarUtils';
+import { fetchXAvatarToSupabase } from '../utils/avatarUtils';
 import { CoHost } from '../types';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM } from '../components/sponsors';
@@ -161,7 +161,7 @@ function HostPageContent() {
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
       { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
-      { id: 'pizza' as TabType, label: t('tabs.pizzaAndDrinks'), icon: Pizza },
+      { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
       { id: 'photos' as TabType, label: t('tabs.photos'), icon: Camera },
     ];
 
@@ -271,9 +271,9 @@ function HostPageContent() {
               if (data.avatarUrl) {
                 avatarUrl = await proxyAvatarToStorage(data.avatarUrl);
               } else {
-                const xAvatar = data.twitter ? getXAvatarUrl(data.twitter) : null;
+                const xAvatar = data.twitter ? await fetchXAvatarToSupabase(data.twitter) : null;
                 if (xAvatar) {
-                  avatarUrl = await proxyAvatarToStorage(xAvatar);
+                  avatarUrl = xAvatar;
                 } else if (data.instagram) {
                   const igAvatar = `https://unavatar.io/instagram/${data.instagram}`;
                   avatarUrl = await proxyAvatarToStorage(igAvatar);

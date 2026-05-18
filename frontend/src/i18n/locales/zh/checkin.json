@@ -1,6 +1,7 @@
 {
   "title": "来宾签到",
   "loading": "正在签到...",
+  "vouching": "验证中…",
   "success": {
     "title": "签到成功！",
     "backToDashboard": "返回活动面板"
@@ -8,6 +9,10 @@
   "alreadyCheckedIn": {
     "title": "已签到",
     "checkedInAt": "签到时间：{{time}}"
+  },
+  "notCheckedIn": {
+    "title": "尚未签到",
+    "message": "您尚未签到。请在活动现场找到主办方。"
   },
   "unauthorized": {
     "title": "未授权",
@@ -22,5 +27,21 @@
     "title": "签到失败",
     "tryAgain": "重试",
     "goHome": "返回首页"
+  },
+  "postCheckIn": {
+    "claim10Title": "领取您的披萨10%折扣",
+    "claim10Desc": "感谢您的参与！作为已验证的来宾，您获得了折扣。",
+    "claimDiscount": "领取折扣",
+    "claim10Button": "领取10%折扣",
+    "oneTimeUse": "限用一次",
+    "discountClaimedTitle": "折扣已领取！",
+    "discountClaimedSubtitle": "您的披萨10%折扣已使用。",
+    "discountClaimedAt": "{{date}}领取",
+    "discountUnavailable": "折扣不可用",
+    "discountUnavailableDesc": "此折扣仅供已验证的参与者使用。",
+    "showQrCode": "显示您的二维码",
+    "qrDescription": "向主办方或已签到的来宾出示此二维码以验证您的出席",
+    "qrSubmsg": "主办方或已签到的来宾需要扫描此码为您签到",
+    "failedToClaim": "领取折扣失败"
   }
 }

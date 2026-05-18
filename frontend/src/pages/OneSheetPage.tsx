@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import {
   User, Mail, Building2, MessageCircle, MapPin, Calendar,
   Users, Eye, Handshake, CheckCircle, Loader2,
@@ -17,6 +18,7 @@ const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
 
 export function OneSheetPage() {
+  const { t } = useTranslation('partner');
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -61,9 +63,9 @@ export function OneSheetPage() {
       setSubmitted(true);
     } catch (err: any) {
       if (err.status === 409) {
-        setError("You've already expressed interest in partnering with this event.");
+        setError(t('oneSheet.alreadyInterested'));
       } else {
-        setError(err.message || 'Something went wrong. Please try again.');
+        setError(err.message || t('oneSheet.somethingWrong'));
       }
     } finally {
       setSubmitting(false);
@@ -109,8 +111,8 @@ export function OneSheetPage() {
       <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />
         <div className="flex flex-col items-center justify-center py-32 text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Event Not Found</h1>
-          <p className="text-white/50">The event you're looking for doesn't exist or has been removed.</p>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('oneSheet.eventNotFound')}</h1>
+          <p className="text-white/50">{t('oneSheet.eventNotFoundDesc')}</p>
         </div>
         <Footer />
       </div>
@@ -183,24 +185,24 @@ export function OneSheetPage() {
           <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Users size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{rsvpCount.toLocaleString()}</div>
-            <div className="text-xs text-white/40 mt-0.5">RSVPs</div>
+            <div className="text-xs text-white/40 mt-0.5">{t('oneSheet.stats.rsvps')}</div>
           </div>
           <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Eye size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{totalViews.toLocaleString()}</div>
-            <div className="text-xs text-white/40 mt-0.5">Page Views</div>
+            <div className="text-xs text-white/40 mt-0.5">{t('oneSheet.stats.pageViews')}</div>
           </div>
           <div className="bg-white/80 border border-black/10 rounded-xl p-4 text-center">
             <Handshake size={20} className="mx-auto mb-1 text-white/40" />
             <div className="text-2xl font-bold text-white">{partnerCount.toLocaleString()}</div>
-            <div className="text-xs text-white/40 mt-0.5">Partners</div>
+            <div className="text-xs text-white/40 mt-0.5">{t('oneSheet.stats.partners')}</div>
           </div>
         </div>
 
         {/* Partner Logos */}
         {sponsorsWithLogos.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-white/80">Partners</h2>
+            <h2 className="text-lg font-semibold text-white/80">{t('oneSheet.partnersHeader')}</h2>
             <div className="flex flex-wrap items-center gap-4">
               {sponsorsWithLogos.map((sponsor) => {
                 const img = (
@@ -244,26 +246,26 @@ export function OneSheetPage() {
           {submitted ? (
             <div className="flex flex-col items-center py-8 text-center space-y-3">
               <CheckCircle size={48} className="text-green-400" />
-              <h2 className="text-xl font-bold text-white">Thank you!</h2>
+              <h2 className="text-xl font-bold text-white">{t('oneSheet.thankYou')}</h2>
               <p className="text-white/60">
-                We've received your interest and will be in touch soon.
+                {t('oneSheet.thankYouDesc')}
               </p>
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-semibold text-white">Interested in Partnering?</h2>
+              <h2 className="text-xl font-semibold text-white">{t('oneSheet.interestedInPartnering')}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <IconInput
                   icon={User}
                   type="text"
-                  placeholder="Your name"
+                  placeholder={t('oneSheet.form.yourName')}
                   required
                   value={name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                 />
                 <IconInput
                   icon={Mail}
-                  placeholder="Email address"
+                  placeholder={t('oneSheet.form.emailAddress')}
                   type="email"
                   required
                   value={email}
@@ -272,14 +274,14 @@ export function OneSheetPage() {
                 <IconInput
                   icon={Building2}
                   type="text"
-                  placeholder="Organization"
+                  placeholder={t('oneSheet.form.organization')}
                   required
                   value={company}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCompany(e.target.value)}
                 />
                 <IconInput
                   icon={MessageCircle}
-                  placeholder="Message (optional)"
+                  placeholder={t('oneSheet.form.messageOptional')}
                   multiline
                   rows={3}
                   value={message}
@@ -298,10 +300,10 @@ export function OneSheetPage() {
                   {submitting ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Submitting...
+                      {t('oneSheet.submitting')}
                     </>
                   ) : (
-                    'Submit Interest'
+                    t('oneSheet.submitInterest')
                   )}
                 </button>
               </form>

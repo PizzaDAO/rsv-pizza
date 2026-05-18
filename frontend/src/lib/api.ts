@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -92,6 +92,7 @@ export interface CreatePartyData {
   pizzaSize?: string;
   pizzaStyle?: string;
   address?: string;
+  placeId?: string;
   maxGuests?: number;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -114,6 +115,7 @@ export interface UpdatePartyData {
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  placeId?: string | null;
   venueName?: string | null;
   // Venue tracking fields
   venueStatus?: VenueStatus | null;
@@ -159,6 +161,10 @@ export interface UpdatePartyData {
   region?: string | null;
   flyerGeneratedAt?: string | null;
   flyerConfig?: Record<string, any> | null;
+  posterImageUrl?: string | null;
+  posterGeneratedAt?: string | null;
+  rollupImageUrl?: string | null;
+  rollupGeneratedAt?: string | null;
   hiddenGppPhotos?: string[];
   extraGppPhotos?: string[];
   lumaUrl?: string | null;
@@ -168,6 +174,7 @@ export interface UpdatePartyData {
   country?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
+  hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
 }
 
@@ -183,6 +190,8 @@ export async function createPartyApi(data: CreatePartyData) {
       pizzaSize: data.pizzaSize || 'large',
       pizzaStyle: data.pizzaStyle || 'new-york',
       address: data.address,
+      placeId: data.placeId,
+      venueName: data.venueName,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -212,6 +221,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       address: data.address,
       latitude: data.latitude,
       longitude: data.longitude,
+      placeId: data.placeId,
       venueName: data.venueName,
       // Venue tracking fields
       venueStatus: data.venueStatus,
@@ -257,6 +267,10 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       region: data.region,
       flyerGeneratedAt: data.flyerGeneratedAt,
       flyerConfig: data.flyerConfig,
+      posterImageUrl: data.posterImageUrl,
+      posterGeneratedAt: data.posterGeneratedAt,
+      rollupImageUrl: data.rollupImageUrl,
+      rollupGeneratedAt: data.rollupGeneratedAt,
       hiddenGppPhotos: data.hiddenGppPhotos,
       extraGppPhotos: data.extraGppPhotos,
       lumaUrl: data.lumaUrl,
@@ -266,6 +280,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       country: data.country,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
+      hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
     },
   });
@@ -302,7 +317,7 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
-export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean) {
+export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean | null) {
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',
     body: { approved },
@@ -402,7 +417,9 @@ export interface PublicEvent {
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  placeId?: string | null;
   venueName: string | null;
+  country?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
@@ -416,6 +433,7 @@ export interface PublicEvent {
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null;
+  underbossStatus?: string | null;
   eventTags?: string[];
   donationEnabled?: boolean;
   donationRecipient?: string | null;
@@ -896,6 +914,7 @@ export interface CreateGPPEventData {
   telegram?: string;
   country?: string;
   countryCode?: string;
+  cityFormattedName?: string;
   cityLat?: number;
   cityLng?: number;
   timezone?: string;
@@ -948,6 +967,29 @@ export interface CheckInResponse {
 export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
   return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
     method: 'POST',
+    requireAuth: true,
+  });
+}
+
+// Un-check-in: DELETE /api/checkin/:inviteCode/:guestId
+// Backend nulls checkedInAt/checkedInBy and emits guest.checkin_undone webhook.
+// Idempotent (200 if already unchecked). Returns 400 GUEST_REJECTED if guest is rejected.
+export interface UnCheckInResponse {
+  success: boolean;
+  notCheckedIn?: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: null;
+    checkedInBy: null;
+  };
+  message: string;
+}
+
+export async function uncheckInGuestApi(inviteCode: string, guestId: string): Promise<UnCheckInResponse> {
+  return apiRequest<UnCheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'DELETE',
     requireAuth: true,
   });
 }
@@ -2420,14 +2462,14 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+export async function createUnderboss(data: { name: string; email: string; regions: string[]; cities?: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
   });
 }
 
-export async function updateUnderboss(id: string, data: { regions: string[] }): Promise<UnderbossAdmin> {
+export async function updateUnderboss(id: string, data: { regions?: string[]; cities?: string[] }): Promise<UnderbossAdmin> {
   const result = await apiRequest<{ underboss: UnderbossAdmin }>(`/api/underboss/admin/${id}`, {
     method: 'PATCH',
     body: data,
@@ -2465,14 +2507,14 @@ export async function fetchChecklistDefaults(): Promise<{ items: ChecklistDefaul
   return apiRequest<{ items: ChecklistDefault[] }>('/api/admin/checklist-defaults');
 }
 
-export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string }>): Promise<{ totalUpdated: number }> {
+export async function updateChecklistDefaults(items: Array<{ name: string; dueDate?: string | null; sortOrder?: number; newName?: string; linkTab?: string | null }>): Promise<{ totalUpdated: number }> {
   return apiRequest<{ totalUpdated: number }>('/api/admin/checklist-defaults', {
     method: 'PATCH',
     body: { items },
   });
 }
 
-export async function addChecklistDefault(data: { name: string; dueDate?: string | null }): Promise<{ createdCount: number }> {
+export async function addChecklistDefault(data: { name: string; dueDate?: string | null; linkTab?: string | null }): Promise<{ createdCount: number }> {
   return apiRequest<{ createdCount: number }>('/api/admin/checklist-defaults', {
     method: 'POST',
     body: data,
@@ -2494,6 +2536,7 @@ export interface UnderbossMeResponse {
   isGraphicsAdmin?: boolean;
   region: string | null;
   regions: string[];
+  cities?: string[];
   name: string | null;
   email: string;
 }
@@ -2507,6 +2550,11 @@ export async function fetchUnderbossDashboard(
   region: GPPRegion | 'all'
 ): Promise<UnderbossDashboardData> {
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
+}
+
+// Fetch fake-event detection review queue (blackolive-74932)
+export async function fetchFakeDetection(): Promise<FakeDetectionResponse> {
+  return apiRequest<FakeDetectionResponse>('/api/underboss/fake-detection');
 }
 
 // Update host status on an event (underboss auth)
@@ -2595,7 +2643,7 @@ export async function bulkUpdateEventTags(
 // City Status API (Underboss)
 
 export interface CityStatusMap {
-  [cityKey: string]: { status: string; updatedBy: string | null; updatedAt: string };
+  [cityKey: string]: { status: string; priority: boolean; updatedBy: string | null; updatedAt: string };
 }
 
 export async function fetchCityStatuses(): Promise<CityStatusMap> {
@@ -2604,11 +2652,11 @@ export async function fetchCityStatuses(): Promise<CityStatusMap> {
 
 export async function updateCityStatus(
   cityKey: string,
-  status: 'created' | 'skip' | 'todo'
+  patch: { status?: 'created' | 'skip' | 'todo'; priority?: boolean }
 ): Promise<void> {
   await apiRequest('/api/underboss/city-statuses', {
     method: 'PATCH',
-    body: { cityKey, status },
+    body: { cityKey, ...patch },
   });
 }
 
@@ -2977,6 +3025,52 @@ export async function sendTelegramTest(
   });
 }
 
+// Host Telegram (bot-DM) API functions — backed by sausage-24183 backend routes.
+
+export interface BroadcastHost {
+  partyId: string;
+  city: string;
+  hostName: string;
+}
+
+export async function sendHostTelegramBroadcast(
+  hosts: BroadcastHost[],
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResponse> {
+  return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
+    method: 'POST',
+    body: { hosts, message, parseMode },
+  });
+}
+
+export async function sendHostTelegramTest(
+  partyId: string,
+  message: string,
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+): Promise<BroadcastResult> {
+  return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
+    method: 'POST',
+    body: { partyId, message, parseMode },
+  });
+}
+
+export async function mintHostTelegramConnectToken(
+  partyId: string
+): Promise<{ token: string; deeplink: string }> {
+  return apiRequest<{ token: string; deeplink: string }>(`/api/parties/${partyId}/connect-token`, {
+    method: 'POST',
+  });
+}
+
+export async function disconnectHostTelegram(
+  partyId: string
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/parties/${partyId}/host-telegram`, {
+    method: 'DELETE',
+  });
+}
+
 // Sponsor Dashboard API
 
 export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
@@ -2986,6 +3080,33 @@ export async function fetchSponsorMe(): Promise<SponsorMeResponse> {
 export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboardData> {
   const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
   return apiRequest<SponsorDashboardData>(`/api/sponsor/events${params}`);
+}
+
+// Admin-only time-series for partner dashboard chart
+export type PartnerTimeSeriesRange = '6hr' | '24hr' | '3d' | '7d';
+
+export interface PartnerTimeSeriesPoint {
+  timestamp: string;
+  rsvps: number;
+  impressions: number;
+  clicks: number;
+}
+
+export interface PartnerTimeSeriesResponse {
+  range: PartnerTimeSeriesRange;
+  bucket: 'hour';
+  since: string;
+  points: PartnerTimeSeriesPoint[];
+}
+
+export async function fetchSponsorEventsTimeSeries(
+  range: PartnerTimeSeriesRange = '24hr',
+  tag?: string
+): Promise<PartnerTimeSeriesResponse> {
+  const params = new URLSearchParams();
+  params.set('range', range);
+  if (tag) params.set('tag', tag);
+  return apiRequest<PartnerTimeSeriesResponse>(`/api/sponsor/events/timeseries?${params.toString()}`);
 }
 
 export async function toggleSponsorChecklistItem(itemId: string): Promise<{ item: SponsorChecklistItem }> {
@@ -3236,6 +3357,112 @@ export async function saveGppPizzeriaPhoto(eventId: string, placeId: string, pho
   });
 }
 
+// GPP Events Map
+export interface GPPEventMapItem {
+  id: string;
+  name: string;
+  city: string;
+  slug: string;
+  date: string | null;
+  venueName: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  rsvpCount: number;
+  country: string | null;
+  underbossStatus?: string | null;
+  eventTags?: string[];
+  telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
+}
+
+interface GPPEventApiResponse {
+  id: string;
+  name: string;
+  city: string;
+  customUrl: string | null;
+  inviteCode: string;
+  date: string | null;
+  venueName: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  guestCount: number;
+  country: string | null;
+  underbossStatus?: string | null;
+  eventTags?: string[];
+  telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
+}
+
+interface GPPEventsApiPayload {
+  events: GPPEventApiResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
+  const params: string[] = ['limit=2000'];
+  if (curated) params.push('curated=1');
+  // `statuses=all` is the auth-gated path on the backend — only returns
+  // rejected/hidden events when the caller is an authenticated underboss/admin.
+  // Unauthenticated callers silently fall back to the filtered view.
+  if (includeAll) params.push('statuses=all');
+  if (force) params.push(`_t=${Date.now()}`);
+  const url = `/api/gpp/events?${params.join('&')}`;
+  const data = await apiRequest<GPPEventsApiPayload>(url, {
+    requireAuth: false,
+  });
+  let events = (data.events || []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    city: e.city,
+    slug: e.customUrl || e.inviteCode,
+    date: e.date,
+    venueName: e.venueName,
+    address: e.address,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    rsvpCount: e.guestCount ?? 0,
+    country: e.country,
+    underbossStatus: e.underbossStatus,
+    eventTags: e.eventTags ?? [],
+    telegramGroup: e.telegramGroup ?? null,
+    hostTelegram: e.hostTelegram ?? null,
+    coHostTelegrams: e.coHostTelegrams ?? [],
+  }));
+  if (curated) {
+    events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
+  }
+  return events;
+}
+
+// GPP Partners (aggregated across approved GPP events)
+export interface GPPPartner {
+  name: string;
+  logoUrl: string;
+  website: string | null;
+  brandDescription: string | null;
+  brandTwitter: string | null;
+  brandInstagram: string | null;
+  category: string | null;
+  eventCount: number;
+  events: { slug: string; city: string; sponsorId: string }[];
+}
+
+export interface GPPPartnersResponse {
+  partners: GPPPartner[];
+  total: number;
+  generatedAt: string;
+}
+
+export async function fetchGppPartners(): Promise<GPPPartnersResponse> {
+  return apiRequest<GPPPartnersResponse>('/api/gpp/partners', { requireAuth: false });
+}
+
 // RSVP Funnel Stats (Underboss dashboard)
 
 export interface FunnelEventStats {
@@ -3268,6 +3495,72 @@ export async function fetchFunnelStats(regions?: string[]): Promise<FunnelStats 
     });
   } catch (error) {
     console.error('Error fetching funnel stats:', error);
+    return null;
+  }
+}
+
+export interface OptinABArm {
+  arm: 'control' | 'variant';
+  n: number;
+  pizzadaoOptins: number;
+  pizzadaoOptinPct: number;
+  swcOptins: number;
+  swcOptinPct: number;
+}
+
+export interface OptinABRegion {
+  tag: string;
+  label: string;
+  arms: OptinABArm[];
+}
+
+export interface OptinABResults {
+  regions: OptinABRegion[];
+}
+
+export async function fetchOptinABResults(): Promise<OptinABResults | null> {
+  try {
+    return await apiRequest<OptinABResults>('/api/admin/experiments/optin-ab', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  } catch (error) {
+    console.error('Error fetching opt-in A/B results:', error);
+    return null;
+  }
+}
+
+export interface ExperimentFlag {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export async function fetchExperimentFlags(): Promise<ExperimentFlag[] | null> {
+  try {
+    const res = await apiRequest<{ flags: ExperimentFlag[] }>('/api/admin/experiments/flags', {
+      method: 'GET',
+      requireAuth: true,
+    });
+    return res.flags;
+  } catch (error) {
+    console.error('Error fetching experiment flags:', error);
+    return null;
+  }
+}
+
+export async function setExperimentFlag(key: string, enabled: boolean): Promise<ExperimentFlag | null> {
+  try {
+    const res = await apiRequest<{ flag: ExperimentFlag }>(`/api/admin/experiments/flags/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: { enabled },
+      requireAuth: true,
+    });
+    return res.flag;
+  } catch (error) {
+    console.error('Error setting experiment flag:', error);
     return null;
   }
 }
@@ -3314,5 +3607,105 @@ export async function completeScorecardItem(
     method: 'POST',
     body: { itemKey, proofUrl, proofType },
   });
+}
+
+// Logo cleanup (graphics admin)
+
+export interface LogoCleanupSponsor {
+  sponsorId: string;
+  partyId: string;
+  partySlug: string;
+  partyName: string;
+  partyCity: string;
+  partnerName: string;
+}
+
+export interface LogoCleanupItem {
+  logoUrl: string;
+  classification: 'white_bg_png' | 'jpeg_white';
+  sponsors: LogoCleanupSponsor[];
+  sponsorUserId: string | null;
+  sponsorUserName: string | null;
+  eventCount: number;
+}
+
+export async function fetchLogoBgAudit(): Promise<{ items: LogoCleanupItem[] }> {
+  return apiRequest<{ items: LogoCleanupItem[] }>('/api/admin/logo-bg-audit', {
+    requireAuth: true,
+  });
+}
+
+export async function applyLogoBgFix(
+  logoUrl: string
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: { logoUrl },
+    }
+  );
+}
+
+/**
+ * Manual replacement: upload a graphics-admin-supplied file from disk to
+ * replace the original logo, instead of auto-stripping the white background.
+ * Reads the File via FileReader, strips the data-URL prefix, and POSTs the
+ * raw base64 to the backend.
+ */
+export async function applyLogoBgFixUpload(
+  originalUrl: string,
+  file: File
+): Promise<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }> {
+  const fileBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Failed to read file as data URL'));
+        return;
+      }
+      const commaIdx = result.indexOf(',');
+      if (commaIdx < 0) {
+        reject(new Error('Unexpected FileReader output'));
+        return;
+      }
+      resolve(result.slice(commaIdx + 1));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+
+  return apiRequest<{ newUrl: string; sponsorsUpdated: number; sponsorUserUpdated: boolean }>(
+    '/api/admin/logo-bg-audit/apply-upload',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: {
+        logoUrl: originalUrl,
+        fileBase64,
+        contentType: file.type,
+      },
+    }
+  );
+}
+
+/**
+ * Fetch the stripped-background preview PNG as a Blob. Use URL.createObjectURL()
+ * on the result to bind it to an <img src>. We can't use a raw URL because the
+ * endpoint requires Bearer auth, and <img> won't send Authorization headers.
+ */
+export async function fetchLogoBgPreviewBlob(logoUrl: string): Promise<Blob> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('Not authenticated');
+  const url = `${API_URL}/api/admin/logo-bg-audit/preview?url=${encodeURIComponent(logoUrl)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Preview failed: ${res.status}`);
+  }
+  return res.blob();
 }
 

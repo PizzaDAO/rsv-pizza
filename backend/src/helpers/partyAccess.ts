@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { isSuperAdmin, isAdmin, isUnderboss } from '../middleware/auth.js';
+import { getUnderbossScope, partyMatchesScope } from './underbossScope.js';
 
 /**
  * Emails that automatically get editor access to ALL GPP events.
@@ -32,6 +33,7 @@ export const VALID_TAB_IDS = [
   'gpp',
   'promo',
   'flyer',
+  'print',
   'apps',
 ] as const;
 
@@ -75,10 +77,15 @@ export async function canUserEditParty(
     }
   }
 
-  // For GPP events, admins, underbosses, and graphics admins can edit
+  // For GPP events, admins, scoped underbosses, and graphics admins can edit.
+  // Underbosses are scoped: their assigned regions OR cities (mozzarella-25815).
+  // `isUnderboss(userEmail)` alone is NOT sufficient — they must match scope.
   if (userEmail && (party as any).eventType === 'gpp') {
     if (await isAdmin(userEmail)) return true;
-    if (await isUnderboss(userEmail)) return true;
+    if (await isUnderboss(userEmail)) {
+      const scope = await getUnderbossScope(userEmail);
+      if (partyMatchesScope(party as any, scope)) return true;
+    }
     const gfxAdmin = await prisma.graphicsAdmin.findUnique({
       where: { email: userEmail.toLowerCase() },
     });
@@ -125,9 +132,10 @@ export async function canUserAccessTab(
   }
 
   // Fetch the party to check ownership and co-host permissions
+  // `region` + `name` are needed for the underboss city/region scope check below.
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    select: { userId: true, coHosts: true, eventType: true },
+    select: { userId: true, coHosts: true, eventType: true, region: true, name: true },
   });
 
   if (!party) {
@@ -146,10 +154,14 @@ export async function canUserAccessTab(
     }
   }
 
-  // For GPP events, admins, underbosses, and graphics admins can access all tabs
+  // For GPP events, admins, scoped underbosses, and graphics admins can access all tabs.
+  // Underbosses are scoped: their assigned regions OR cities (mozzarella-25815).
   if (userEmail && party.eventType === 'gpp') {
     if (await isAdmin(userEmail)) return true;
-    if (await isUnderboss(userEmail)) return true;
+    if (await isUnderboss(userEmail)) {
+      const scope = await getUnderbossScope(userEmail);
+      if (partyMatchesScope(party, scope)) return true;
+    }
     const gfxAdmin = await prisma.graphicsAdmin.findUnique({
       where: { email: userEmail.toLowerCase() },
     });

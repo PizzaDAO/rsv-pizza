@@ -220,15 +220,23 @@ function AppCard({
   navigate,
   isPinned,
   onTogglePin,
+  isGppEvent,
 }: {
   app: AppItem;
   inviteCode: string;
   navigate: ReturnType<typeof useNavigate>;
   isPinned: boolean;
   onTogglePin?: (appId: string, pin: boolean) => void;
+  isGppEvent: boolean;
 }) {
   const isClickable = app.status !== 'coming-soon';
   const canPin = isPinnable(app.id) && app.status === 'live';
+
+  // GPP events hide drinks UI — relabel the pizza tile so the tile copy doesn't reference drinks.
+  const displayName = isGppEvent && app.id === 'pizzeria-selection' ? 'Pizza' : app.name;
+  const displayDescription = isGppEvent && app.id === 'pizzeria-selection'
+    ? 'Find and select nearby pizzerias'
+    : app.description;
 
   const iconBg = {
     live: 'bg-[#39d98a]/15',
@@ -298,7 +306,7 @@ function AppCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-theme-text truncate">{app.name}</span>
+            <span className="text-sm font-medium text-theme-text truncate">{displayName}</span>
             {isPinned && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#ff393a]/15 text-[#ff393a]">
                 Pinned
@@ -308,7 +316,7 @@ function AppCard({
               <ExternalLink size={12} className="text-[#5c7cfa] flex-shrink-0" />
             )}
           </div>
-          <p className="text-xs text-theme-text-muted leading-relaxed">{app.description}</p>
+          <p className="text-xs text-theme-text-muted leading-relaxed">{displayDescription}</p>
           <div className="mt-2">
             <StatusBadge status={app.status} />
           </div>
@@ -325,6 +333,7 @@ function AppSection({
   navigate,
   pinnedApps,
   onTogglePin,
+  isGppEvent,
 }: {
   title: string;
   apps: AppItem[];
@@ -332,6 +341,7 @@ function AppSection({
   navigate: ReturnType<typeof useNavigate>;
   pinnedApps: string[];
   onTogglePin: (appId: string, pin: boolean) => void;
+  isGppEvent: boolean;
 }) {
   return (
     <div>
@@ -347,6 +357,7 @@ function AppSection({
             navigate={navigate}
             isPinned={pinnedApps.includes(app.id)}
             onTogglePin={onTogglePin}
+            isGppEvent={isGppEvent}
           />
         ))}
       </div>
@@ -364,8 +375,9 @@ export function AppsHub({
   partyId: string;
 }) {
   const navigate = useNavigate();
-  const { loadParty } = usePizza();
+  const { loadParty, party } = usePizza();
   const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
+  const isGppEvent = party?.eventType === 'gpp';
 
   const handleTogglePin = async (appId: string, pin: boolean) => {
     // Optimistic update
@@ -406,6 +418,7 @@ export function AppsHub({
             navigate={navigate}
             pinnedApps={pinnedApps}
             onTogglePin={handleTogglePin}
+            isGppEvent={isGppEvent}
           />
         );
       })}

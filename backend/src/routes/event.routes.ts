@@ -31,7 +31,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         address: true,
         latitude: true,
         longitude: true,
+        placeId: true,
         venueName: true,
+        country: true,
         maxGuests: true,
         hideGuests: true,
         eventImageUrl: true,
@@ -60,6 +62,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         extraGppPhotos: true,
         telegramGroup: true,
         turtleRolesEnabled: true,
+        underbossStatus: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -75,7 +78,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           },
         },
         _count: {
-          select: { guests: true },
+          // mushroom-31723: exclude rejected guests (approved=false) from the public count.
+          select: { guests: { where: { approved: { not: false } } } },
         },
       },
     });
@@ -99,7 +103,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           address: true,
           latitude: true,
           longitude: true,
+          placeId: true,
           venueName: true,
+          country: true,
           maxGuests: true,
           hideGuests: true,
           eventImageUrl: true,
@@ -128,6 +134,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           extraGppPhotos: true,
           telegramGroup: true,
           turtleRolesEnabled: true,
+          underbossStatus: true,
           password: true,
           userId: true,
           user: {
@@ -268,7 +275,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         address: party.address,
         latitude: party.latitude,
         longitude: party.longitude,
+        placeId: party.placeId,
         venueName: party.venueName,
+        country: party.country,
         maxGuests: party.maxGuests,
         hideGuests: party.hideGuests,
         eventImageUrl: party.eventImageUrl,
@@ -277,6 +286,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         coHosts: sanitizedCoHosts,
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
+        underbossStatus: party.underbossStatus,
         eventTags: party.eventTags,
         donationEnabled: party.donationEnabled,
         donationRecipient: party.donationRecipient,

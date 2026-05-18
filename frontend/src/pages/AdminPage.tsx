@@ -7,6 +7,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { IconInput } from '../components/IconInput';
 import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
+import { OptinABTab } from '../components/underboss/OptinABTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette,
@@ -25,9 +26,18 @@ import type { ChecklistDefault, GppDescriptionData } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser, GraphicsAdmin } from '../types';
 import { fetchSheetCities } from '../lib/cities';
+import { CityScopePicker } from '../components/underboss';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
+
+// Allowed host-page tab targets for checklist `link_tab`.
+// Keep in sync with backend ALLOWED_LINK_TABS and HostPage TabType.
+const LINK_TAB_OPTIONS: readonly string[] = [
+  'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
+  'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
+  'flyer', 'print',
+];
 
 function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {
   return [...items].sort((a, b) => {
@@ -66,12 +76,14 @@ export function AdminPage() {
   const [ubName, setUbName] = useState('');
   const [ubEmail, setUbEmail] = useState('');
   const [ubRegions, setUbRegions] = useState<string[]>([]);
+  const [ubCities, setUbCities] = useState<string[]>([]);
   const [addingUb, setAddingUb] = useState(false);
   const [ubMessage, setUbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Edit regions state
+  // Edit regions+cities state (mozzarella-25815)
   const [editingUbId, setEditingUbId] = useState<string | null>(null);
   const [editRegions, setEditRegions] = useState<string[]>([]);
+  const [editCities, setEditCities] = useState<string[]>([]);
   const [savingRegions, setSavingRegions] = useState(false);
 
   // GPP NFT state
@@ -83,10 +95,12 @@ export function AdminPage() {
   // Checklist defaults state
   const [checklistItems, setChecklistItems] = useState<ChecklistDefault[]>([]);
   const [checklistEdits, setChecklistEdits] = useState<Record<string, string>>({});
+  const [checklistLinkTabEdits, setChecklistLinkTabEdits] = useState<Record<string, string | null>>({});
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [checklistMessage, setChecklistMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemDate, setNewItemDate] = useState('');
+  const [newItemLinkTab, setNewItemLinkTab] = useState('');
   const [addingItem, setAddingItem] = useState(false);
 
   // Sponsor users state
@@ -106,6 +120,8 @@ export function AdminPage() {
   const [savingDesc, setSavingDesc] = useState(false);
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'admin' | 'experiments'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -314,11 +330,23 @@ export function AdminPage() {
     setChecklistMessage(null);
     try {
       const updates = checklistItems
-        .filter(item => checklistEdits[item.name] !== undefined)
-        .map(item => ({
-          name: item.name,
-          dueDate: checklistEdits[item.name] || null,
-        }));
+        .filter(item =>
+          checklistEdits[item.name] !== undefined ||
+          checklistLinkTabEdits[item.name] !== undefined
+        )
+        .map(item => {
+          const update: { name: string; dueDate?: string | null; linkTab?: string | null } = {
+            name: item.name,
+          };
+          if (checklistEdits[item.name] !== undefined) {
+            update.dueDate = checklistEdits[item.name] || null;
+          }
+          if (checklistLinkTabEdits[item.name] !== undefined) {
+            const raw = checklistLinkTabEdits[item.name];
+            update.linkTab = raw === '' || raw == null ? null : raw;
+          }
+          return update;
+        });
       if (updates.length === 0) {
         setChecklistMessage({ type: 'error', text: 'No changes to save' });
         setSavingChecklist(false);
@@ -327,6 +355,7 @@ export function AdminPage() {
       const result = await updateChecklistDefaults(updates);
       setChecklistMessage({ type: 'success', text: `Updated ${result.totalUpdated} checklist items across all GPP events` });
       setChecklistEdits({});
+      setChecklistLinkTabEdits({});
       // Refresh
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
@@ -343,10 +372,15 @@ export function AdminPage() {
     setAddingItem(true);
     setChecklistMessage(null);
     try {
-      const result = await addChecklistDefault({ name: newItemName.trim(), dueDate: newItemDate || null });
+      const result = await addChecklistDefault({
+        name: newItemName.trim(),
+        dueDate: newItemDate || null,
+        linkTab: newItemLinkTab || null,
+      });
       setChecklistMessage({ type: 'success', text: `Added "${newItemName.trim()}" to ${result.createdCount} GPP events` });
       setNewItemName('');
       setNewItemDate('');
+      setNewItemLinkTab('');
       const clDefaults = await fetchChecklistDefaults();
       setChecklistItems(sortByDueDate(clDefaults.items));
     } catch (err: any) {
@@ -441,7 +475,8 @@ export function AdminPage() {
 
   async function handleAddUnderboss(e: React.FormEvent) {
     e.preventDefault();
-    if (!ubName.trim() || !ubEmail.trim() || ubRegions.length === 0) return;
+    // mozzarella-25815: require at least ONE of regions or cities
+    if (!ubName.trim() || !ubEmail.trim() || (ubRegions.length === 0 && ubCities.length === 0)) return;
     setAddingUb(true);
     setUbMessage(null);
     try {
@@ -449,11 +484,13 @@ export function AdminPage() {
         name: ubName.trim(),
         email: ubEmail.trim(),
         regions: ubRegions,
+        cities: ubCities,
       });
       setUnderbosses((prev) => [...prev, result.underboss]);
       setUbName('');
       setUbEmail('');
       setUbRegions([]);
+      setUbCities([]);
       setUbMessage({ type: 'success', text: `Created underboss ${result.underboss.name}. They can now log in at /underboss.` });
     } catch (err: any) {
       setUbMessage({ type: 'error', text: err.message || 'Failed to create underboss' });
@@ -477,21 +514,27 @@ export function AdminPage() {
 
   function startEditRegions(ub: UnderbossAdmin) {
     setEditingUbId(ub.id);
-    setEditRegions(ub.regions && ub.regions.length > 0 ? [...ub.regions] : [ub.region]);
+    setEditRegions(ub.regions && ub.regions.length > 0 ? [...ub.regions] : (ub.region ? [ub.region] : []));
+    setEditCities(ub.cities ? [...ub.cities] : []);
   }
 
   async function saveEditRegions() {
-    if (!editingUbId || editRegions.length === 0) return;
+    // mozzarella-25815: require at least ONE of regions or cities
+    if (!editingUbId || (editRegions.length === 0 && editCities.length === 0)) return;
     setSavingRegions(true);
     try {
-      const updated = await updateUnderboss(editingUbId, { regions: editRegions });
+      const updated = await updateUnderboss(editingUbId, { regions: editRegions, cities: editCities });
       setUnderbosses((prev) =>
-        prev.map((u) => (u.id === editingUbId ? { ...u, regions: updated.regions || editRegions } : u))
+        prev.map((u) =>
+          u.id === editingUbId
+            ? { ...u, regions: updated.regions || editRegions, cities: updated.cities || editCities }
+            : u
+        )
       );
-      setUbMessage({ type: 'success', text: 'Regions updated' });
+      setUbMessage({ type: 'success', text: 'Scope updated' });
       setEditingUbId(null);
     } catch (err: any) {
-      setUbMessage({ type: 'error', text: err.message || 'Failed to update regions' });
+      setUbMessage({ type: 'error', text: err.message || 'Failed to update scope' });
     } finally {
       setSavingRegions(false);
     }
@@ -547,6 +590,37 @@ export function AdminPage() {
             </div>
           </div>
 
+          <div className="border-b border-theme-stroke mb-6 flex gap-6">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'admin'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Admin
+              {activeTab === 'admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('experiments')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'experiments'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              Experiments
+              {activeTab === 'experiments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'admin' && (
+            <>
           {/* Export Events CSV */}
           <div className="mb-6">
             <button
@@ -555,7 +629,7 @@ export function AdminPage() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 text-gray-700 text-sm font-medium hover:bg-white border border-gray-300 disabled:opacity-50"
             >
               {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              Export All Events CSV
+              {t('page.exportEventsCsv')}
             </button>
           </div>
 
@@ -585,7 +659,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Mail}
                       type="email"
-                      placeholder="Email address"
+                      placeholder={t('admins.emailPlaceholder')}
                       value={newEmail}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEmail(e.target.value)}
                       required
@@ -595,7 +669,7 @@ export function AdminPage() {
                     <IconInput
                       icon={User}
                       type="text"
-                      placeholder="Name (optional)"
+                      placeholder={t('admins.namePlaceholder')}
                       value={newName}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
                     />
@@ -616,10 +690,10 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.role')}</th>
+                    <th className="px-4 py-3 font-medium">{t('admins.tableHeaders.added')}</th>
                     {isSuperAdmin && <th className="px-4 py-3 font-medium w-20"></th>}
                   </tr>
                 </thead>
@@ -653,7 +727,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleRemoveAdmin(admin.id, admin.email)}
                               className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                              title="Remove admin"
+                              title={t('page.removeAdminTitle')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -678,7 +752,7 @@ export function AdminPage() {
           <section className="mb-10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Palette size={18} className="text-theme-text-secondary" />
-              Graphics Admins ({graphicsAdmins.length})
+              {t('page.graphicsAdmins')} ({graphicsAdmins.length})
             </h2>
 
             {gaMessage && (
@@ -699,7 +773,7 @@ export function AdminPage() {
                   <IconInput
                     icon={Mail}
                     type="email"
-                    placeholder="Email address"
+                    placeholder={t('admins.emailPlaceholder')}
                     value={gaEmail}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaEmail(e.target.value)}
                     required
@@ -709,7 +783,7 @@ export function AdminPage() {
                   <IconInput
                     icon={User}
                     type="text"
-                    placeholder="Name (optional)"
+                    placeholder={t('admins.namePlaceholder')}
                     value={gaName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGaName(e.target.value)}
                   />
@@ -720,7 +794,7 @@ export function AdminPage() {
                   className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
                 >
                   {addingGa ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  Add Graphics Admin
+                  {t('page.addGraphicsAdmin')}
                 </button>
               </div>
             </form>
@@ -729,9 +803,9 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('page.graphicsAdminsTable.added')}</th>
                     <th className="px-4 py-3 font-medium w-20"></th>
                   </tr>
                 </thead>
@@ -752,7 +826,7 @@ export function AdminPage() {
                         <button
                           onClick={() => handleRemoveGraphicsAdmin(ga.id, ga.email)}
                           className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                          title="Remove graphics admin"
+                          title={t('page.removeGraphicsAdmin')}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -762,7 +836,7 @@ export function AdminPage() {
                   {graphicsAdmins.length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-theme-text-faint">
-                        No graphics admins yet
+                        {t('page.noGraphicsAdmins')}
                       </td>
                     </tr>
                   )}
@@ -796,7 +870,7 @@ export function AdminPage() {
                   <IconInput
                     icon={User}
                     type="text"
-                    placeholder="Name"
+                    placeholder={t('underboss.namePlaceholder')}
                     value={ubName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUbName(e.target.value)}
                     required
@@ -806,7 +880,7 @@ export function AdminPage() {
                   <IconInput
                     icon={Mail}
                     type="email"
-                    placeholder="Email"
+                    placeholder={t('underboss.emailPlaceholder')}
                     value={ubEmail}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUbEmail(e.target.value)}
                     required
@@ -814,7 +888,7 @@ export function AdminPage() {
                 </div>
               </div>
               <div className="mb-3">
-                <p className="text-sm text-theme-text-secondary mb-2">Regions</p>
+                <p className="text-sm text-theme-text-secondary mb-2">{t('underboss.regions')}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {GPP_REGIONS.map(r => (
                     <label key={r.id} className="flex items-center gap-2 text-sm text-theme-text cursor-pointer">
@@ -835,9 +909,13 @@ export function AdminPage() {
                   ))}
                 </div>
               </div>
+              <div className="mb-3">
+                <p className="text-sm text-theme-text-secondary mb-2">{t('underboss.cities', 'Cities')}</p>
+                <CityScopePicker selected={ubCities} onChange={setUbCities} />
+              </div>
               <button
                 type="submit"
-                disabled={addingUb || !ubName.trim() || !ubEmail.trim() || ubRegions.length === 0}
+                disabled={addingUb || !ubName.trim() || !ubEmail.trim() || (ubRegions.length === 0 && ubCities.length === 0)}
                 className="flex items-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
               >
                 {addingUb ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
@@ -849,11 +927,11 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Regions</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium text-right">Actions</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.regions')}</th>
+                    <th className="px-4 py-3 font-medium">{t('underboss.tableHeaders.status')}</th>
+                    <th className="px-4 py-3 font-medium text-right">{t('underboss.tableHeaders.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -877,7 +955,7 @@ export function AdminPage() {
                                   onClick={() => {
                                     setEditRegions(prev =>
                                       prev.includes(r.id)
-                                        ? prev.length > 1 ? prev.filter(id => id !== r.id) : prev
+                                        ? prev.filter(id => id !== r.id)
                                         : [...prev, r.id]
                                     );
                                   }}
@@ -891,19 +969,22 @@ export function AdminPage() {
                                 </button>
                               ))}
                             </div>
+                            <div className="mb-2">
+                              <CityScopePicker selected={editCities} onChange={setEditCities} />
+                            </div>
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={saveEditRegions}
-                                disabled={savingRegions || editRegions.length === 0}
+                                disabled={savingRegions || (editRegions.length === 0 && editCities.length === 0)}
                                 className="text-green-500 hover:text-green-400 disabled:opacity-50 p-1"
-                                title="Save"
+                                title={t('underboss.save')}
                               >
                                 {savingRegions ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                               </button>
                               <button
                                 onClick={() => setEditingUbId(null)}
                                 className="text-theme-text-muted hover:text-theme-text-secondary p-1"
-                                title="Cancel"
+                                title={t('underboss.cancel')}
                               >
                                 <X size={14} />
                               </button>
@@ -911,7 +992,18 @@ export function AdminPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => startEditRegions(ub)}>
-                            <span>{(ub.regions && ub.regions.length > 0 ? ub.regions : [ub.region]).map(r => GPP_REGIONS.find(g => g.id === r)?.label || r).join(', ')}</span>
+                            <span>
+                              {(() => {
+                                const regions = (ub.regions && ub.regions.length > 0)
+                                  ? ub.regions.map(r => GPP_REGIONS.find(g => g.id === r)?.label || r)
+                                  : (ub.region ? [GPP_REGIONS.find(g => g.id === ub.region)?.label || ub.region] : []);
+                                const cities = ub.cities || [];
+                                const parts: string[] = [];
+                                if (regions.length > 0) parts.push(regions.join(', '));
+                                if (cities.length > 0) parts.push(`+ ${cities.length} ${cities.length === 1 ? t('underboss.cityLabelOne', 'city') : t('underboss.cityLabelMany', 'cities')}`);
+                                return parts.join(' ') || t('underboss.noScope', '—');
+                              })()}
+                            </span>
                             <Pencil size={12} className="text-theme-text-faint group-hover:text-theme-text-muted transition-colors flex-shrink-0" />
                           </div>
                         )}
@@ -933,7 +1025,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleDeactivate(ub.id, ub.name)}
                               className="text-theme-text-muted hover:text-red-400 transition-colors p-1"
-                              title="Deactivate"
+                              title={t('underboss.deactivate')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -980,7 +1072,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Mail}
                       type="email"
-                      placeholder="Email address"
+                      placeholder={t('partners.emailPlaceholder')}
                       value={spEmail}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpEmail(e.target.value)}
                       required
@@ -990,7 +1082,7 @@ export function AdminPage() {
                     <IconInput
                       icon={Tag}
                       type="text"
-                      placeholder="Partner tag (e.g. swc)"
+                      placeholder={t('partners.tagPlaceholder')}
                       value={spTag}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpTag(e.target.value)}
                       required
@@ -1000,7 +1092,7 @@ export function AdminPage() {
                     <IconInput
                       icon={User}
                       type="text"
-                      placeholder="Name (optional)"
+                      placeholder={t('partners.namePlaceholder')}
                       value={spName}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpName(e.target.value)}
                     />
@@ -1021,11 +1113,11 @@ export function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Tag</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.email')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.name')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.tag')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.status')}</th>
+                    <th className="px-4 py-3 font-medium">{t('partners.tableHeaders.added')}</th>
                     {isSuperAdmin && <th className="px-4 py-3 font-medium w-20"></th>}
                   </tr>
                 </thead>
@@ -1064,7 +1156,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleDeactivateSponsor(sp.id, sp.email)}
                               className="text-red-400/60 hover:text-red-400 transition-colors p-1"
-                              title="Deactivate partner"
+                              title={t('partners.deactivatePartner')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1116,22 +1208,34 @@ export function AdminPage() {
                         onChange={(e) => setChecklistEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
                         className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-36"
                       />
+                      <select
+                        aria-label={t('checklist.linkTabPlaceholder')}
+                        title={t('checklist.linkTabPlaceholder')}
+                        value={checklistLinkTabEdits[item.name] ?? item.linkTab ?? ''}
+                        onChange={(e) => setChecklistLinkTabEdits(prev => ({ ...prev, [item.name]: e.target.value }))}
+                        className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-1 text-theme-text w-28"
+                      >
+                        <option value="">—</option>
+                        {LINK_TAB_OPTIONS.map((tab) => (
+                          <option key={tab} value={tab}>{tab}</option>
+                        ))}
+                      </select>
                     </div>
                     <button
                       onClick={() => handleDeleteChecklistItem(item.name)}
                       className="text-red-400 hover:text-red-600 transition-colors p-1"
-                      title={`Remove ${item.name}`}
+                      title={`${t('page.remove')} ${item.name}`}
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 ))}
                 {checklistItems.length === 0 && (
-                  <p className="text-sm text-theme-text-faint py-4 text-center">No checklist items found. Items are created when a GPP host first views their checklist.</p>
+                  <p className="text-sm text-theme-text-faint py-4 text-center">{t('checklist.noItems')}</p>
                 )}
               </div>
 
-              {checklistItems.length > 0 && Object.keys(checklistEdits).length > 0 && (
+              {checklistItems.length > 0 && (Object.keys(checklistEdits).length > 0 || Object.keys(checklistLinkTabEdits).length > 0) && (
                 <button
                   onClick={handleSaveChecklist}
                   disabled={savingChecklist}
@@ -1147,7 +1251,7 @@ export function AdminPage() {
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    placeholder="New checklist item..."
+                    placeholder={t('checklist.newItemPlaceholder')}
                     className="w-full text-sm bg-white/50 border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
                   />
                 </div>
@@ -1157,6 +1261,18 @@ export function AdminPage() {
                   onChange={(e) => setNewItemDate(e.target.value)}
                   className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-36"
                 />
+                <select
+                  aria-label={t('checklist.linkTabPlaceholder')}
+                  title={t('checklist.linkTabPlaceholder')}
+                  value={newItemLinkTab}
+                  onChange={(e) => setNewItemLinkTab(e.target.value)}
+                  className="text-sm bg-white/50 border border-theme-stroke rounded-lg px-2 py-2 text-theme-text w-28"
+                >
+                  <option value="">—</option>
+                  {LINK_TAB_OPTIONS.map((tab) => (
+                    <option key={tab} value={tab}>{tab}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={addingItem || !newItemName.trim()}
@@ -1177,7 +1293,7 @@ export function AdminPage() {
               </div>
 
               <p className="text-sm text-theme-text-muted mb-4">
-                {gppDefaultCount} of {gppTotalEvents} events use the default
+                {t('gppDescription.statsText', { defaultCount: gppDefaultCount, totalEvents: gppTotalEvents })}
               </p>
 
               {descMessage && (
@@ -1192,7 +1308,7 @@ export function AdminPage() {
                 icon={FileText}
                 multiline
                 rows={8}
-                placeholder="Default description for new GPP events..."
+                placeholder={t('gppDescription.placeholder')}
                 value={gppDescription}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setGppDescription(e.target.value)}
               />
@@ -1213,7 +1329,7 @@ export function AdminPage() {
                     className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
                   >
                     {showCustomized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    {gppCustomEvents.length} event{gppCustomEvents.length !== 1 ? 's' : ''} with custom descriptions
+                    {t('gppDescription.customDescriptions', { count: gppCustomEvents.length })}
                   </button>
 
                   {showCustomized && (
@@ -1299,10 +1415,18 @@ export function AdminPage() {
           {/* Analytics — RSVP Funnel */}
           <section className="mb-10">
             <h2 className="text-xl font-bold text-theme-text mb-4 flex items-center gap-2">
-              Analytics
+              {t('page.analytics')}
             </h2>
             <FunnelTab regions={[]} />
           </section>
+            </>
+          )}
+
+          {activeTab === 'experiments' && (
+            <section className="mb-10">
+              <OptinABTab />
+            </section>
+          )}
         </div>
       </main>
 

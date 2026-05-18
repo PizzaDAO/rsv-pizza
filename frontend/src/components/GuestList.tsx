@@ -3,22 +3,33 @@ import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
 import { Guest } from '../types';
-import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2 } from 'lucide-react';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2, Ban } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
+import { RejectedGuestsModal } from './RejectedGuestsModal';
+import { InvitedGuestsModal } from './InvitedGuestsModal';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
   const { t } = useTranslation('host');
-  const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
+  const { guests, rejectedGuests, rejectGuest, restoreGuest, uncheckInGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
   const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [showInvitedModal, setShowInvitedModal] = useState(false);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
+
+  // Transient toast for check-in success/error
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -183,11 +194,16 @@ export const GuestList: React.FC = () => {
 
     setCheckingInId(guestId);
     try {
-      await checkInGuest(party.inviteCode, guestId);
+      const result = await checkInGuest(party.inviteCode, guestId);
       // Reload party data to get updated check-in status
       await loadParty(party.inviteCode);
+      if (!result.alreadyCheckedIn) {
+        showToast('success', result.message || 'Guest checked in');
+      }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check in guest';
       console.error('Failed to check in guest:', error);
+      showToast('error', message);
     } finally {
       setCheckingInId(null);
     }
@@ -214,15 +230,27 @@ export const GuestList: React.FC = () => {
   const handleBulkCheckIn = async () => {
     if (!party?.inviteCode) return;
     setBulkActionInProgress(true);
+    let successCount = 0;
+    const failures: string[] = [];
     try {
       const ids = [...selectedIds];
       const eligible = guests.filter(g => g.id && ids.includes(g.id) && (g.status === 'CONFIRMED' || g.status === 'INVITED') && !g.checkedInAt);
       for (const g of eligible) {
-        if (g.id) await checkInGuest(party.inviteCode, g.id);
+        if (!g.id) continue;
+        try {
+          await checkInGuest(party.inviteCode, g.id);
+          successCount++;
+        } catch (e) {
+          failures.push(g.name);
+          console.error(`Bulk check-in failed for ${g.name}:`, e);
+        }
       }
       await loadParty(party.inviteCode);
-    } catch (e) {
-      console.error('Bulk check-in failed:', e);
+      if (failures.length === 0 && successCount > 0) {
+        showToast('success', `Checked in ${successCount} guest${successCount === 1 ? '' : 's'}`);
+      } else if (failures.length > 0) {
+        showToast('error', `Failed to check in ${failures.length} guest${failures.length === 1 ? '' : 's'}: ${failures.slice(0, 3).join(', ')}${failures.length > 3 ? '…' : ''}`);
+      }
     } finally {
       clearSelection();
       setBulkActionInProgress(false);
@@ -278,7 +306,20 @@ export const GuestList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      {toast && (
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 text-sm font-medium px-4 py-2 rounded-xl shadow-lg animate-fade-in ${
+            toast.type === 'success'
+              ? 'bg-[#39d98a]/90 text-black'
+              : 'bg-red-500/90 text-white'
+          }`}
+          role="status"
+        >
+          {toast.text}
+        </div>
+      )}
+      <div className="space-y-6">
       {/* Confirmed Guests Section */}
       <div className="card p-6">
         <div className="flex justify-between items-center mb-4">
@@ -300,6 +341,17 @@ export const GuestList: React.FC = () => {
                 <CheckCircle2 size={14} />
                 {t('guests.checkedIn', { count: checkedInCount })}
               </span>
+            )}
+            {rejectedGuests.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRejectedModal(true)}
+                className="bg-red-500/10 text-red-300 border border-red-500/30 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 hover:bg-red-500/20 transition-colors"
+                title="View rejected guests"
+              >
+                <Ban size={12} />
+                <span>Rejected ({rejectedGuests.length})</span>
+              </button>
             )}
           </div>
           <button
@@ -357,8 +409,9 @@ export const GuestList: React.FC = () => {
                   requireApproval={requireApproval}
                   onApprove={approveGuest}
                   onDecline={declineGuest}
-                  onRemove={removeGuest}
+                  onRemove={rejectGuest}
                   onCheckIn={handleCheckIn}
+                  onUncheckIn={uncheckInGuest}
                   isCheckingIn={checkingInId === guest.id}
                   isNotable={guest.id ? notableGuestIds.has(guest.id) : false}
                   onToggleNotable={handleToggleNotable}
@@ -376,13 +429,18 @@ export const GuestList: React.FC = () => {
       {invitedGuests.length > 0 && (
         <div className="card p-6">
           <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowInvitedModal(true)}
+              className="flex items-center gap-3 rounded-lg -mx-2 px-2 py-1 hover:bg-theme-surface-hover transition-colors"
+              aria-label={`View ${invitedGuests.length} invited guests`}
+            >
               <Mail size={20} className="text-theme-text-secondary" />
               <h2 className="text-xl font-bold text-theme-text">Invited</h2>
               <span className="bg-blue-500/20 text-blue-400 text-sm font-medium px-3 py-1 rounded-full border border-blue-500/30">
                 {invitedGuests.length}
               </span>
-            </div>
+            </button>
           </div>
           <div className="flex items-center py-2 -mx-2 px-2">
             <Checkbox
@@ -399,7 +457,7 @@ export const GuestList: React.FC = () => {
                 key={guest.id}
                 guest={guest}
                 variant="basic"
-                onRemove={removeGuest}
+                onRemove={rejectGuest}
                 isSelected={guest.id ? selectedIds.has(guest.id) : false}
                 onToggleSelect={toggleSelect}
               />
@@ -437,7 +495,7 @@ export const GuestList: React.FC = () => {
                 guest={guest}
                 variant="waitlist"
                 onPromote={promoteGuest}
-                onRemove={removeGuest}
+                onRemove={rejectGuest}
                 isSelected={guest.id ? selectedIds.has(guest.id) : false}
                 onToggleSelect={toggleSelect}
               />
@@ -508,6 +566,23 @@ export const GuestList: React.FC = () => {
           </button>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Rejected Guests modal — opened from the "Rejected (N)" chip in the header. */}
+      <RejectedGuestsModal
+        isOpen={showRejectedModal}
+        onClose={() => setShowRejectedModal(false)}
+        rejectedGuests={rejectedGuests}
+        onRestore={restoreGuest}
+        party={party}
+      />
+
+      {/* Invited Guests modal — opened from the Invited section header. */}
+      <InvitedGuestsModal
+        isOpen={showInvitedModal}
+        onClose={() => setShowInvitedModal(false)}
+        invitedGuests={invitedGuests}
+      />
+    </>
   );
 };

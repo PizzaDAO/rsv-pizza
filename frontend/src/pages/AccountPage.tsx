@@ -8,7 +8,7 @@ import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { getUserSponsorships, UserSponsorshipEntry } from '../lib/api';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
-import { getXAvatarUrl, isAutoFilledXAvatar } from '../utils/avatarUtils';
+import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export function AccountPage() {
   const { user, loading: authLoading, signOut, updateProfile } = useAuth();
@@ -21,6 +21,9 @@ export function AccountPage() {
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  // Provenance: tracks the X handle that produced the current profile picture (null = user-set or unknown)
+  const [profilePictureFromX, setProfilePictureFromX] = useState<string | null>(null);
+  const [xAvatarFetching, setXAvatarFetching] = useState(false);
 
   // Social links
   const [instagram, setInstagram] = useState('');
@@ -188,6 +191,8 @@ export function AccountPage() {
     const objectUrl = URL.createObjectURL(file);
     setProfilePictureFile(file);
     setProfilePicture(objectUrl);
+    // User is taking ownership of the avatar slot — drop X provenance
+    setProfilePictureFromX(null);
   };
 
   // Pizza preference handlers
@@ -455,19 +460,45 @@ export function AccountPage() {
                     </svg>
                     <span className="text-theme-text-muted text-sm">x.com/</span>
                   </div>
-                  <input
-                    type="text"
-                    value={twitter}
-                    onChange={(e) => setTwitter(e.target.value)}
-                    onBlur={() => {
-                      if (twitter.trim() && !profilePictureFile && (!profilePicture || isAutoFilledXAvatar(profilePicture))) {
-                        const avatarUrl = getXAvatarUrl(twitter);
-                        if (avatarUrl) setProfilePicture(avatarUrl);
-                      }
-                    }}
-                    placeholder="username"
-                    className="flex-1 min-w-0"
-                  />
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={twitter}
+                      onChange={(e) => setTwitter(e.target.value)}
+                      onBlur={async () => {
+                        if (profilePictureFile) return;
+                        const handle = twitter.trim();
+                        if (!handle) return;
+                        // Skip partial-handle lookups that resolve to wrong users
+                        if (handle.length < 4) return;
+                        // Already current for this handle — no-op
+                        if (profilePictureFromX === handle) return;
+                        // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+                        if (profilePictureFromX == null) {
+                          if (profilePicture && !isAutoFilledXAvatar(profilePicture)) return;
+                        }
+                        setXAvatarFetching(true);
+                        try {
+                          const avatarUrl = await fetchXAvatarToSupabase(twitter);
+                          if (avatarUrl) {
+                            setProfilePicture(avatarUrl);
+                            setProfilePictureFromX(handle);
+                          }
+                        } finally {
+                          setXAvatarFetching(false);
+                        }
+                      }}
+                      disabled={xAvatarFetching}
+                      placeholder="username"
+                      className="w-full disabled:opacity-60"
+                    />
+                    {xAvatarFetching && (
+                      <Loader2
+                        size={14}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* YouTube */}

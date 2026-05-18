@@ -23,6 +23,7 @@ import {
 export const PizzaOrderSummary: React.FC = () => {
   const { t } = useTranslation('host');
   const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations, updatePizzaQuantity, removePizza } = usePizza();
+  const isGppEvent = party?.eventType === 'gpp';
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
   const [showPizzeriaSearch, setShowPizzeriaSearch] = useState(false);
@@ -310,7 +311,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     }).join('\n\n');
 
     // Add beverages as separate section (not per wave)
-    const beverageText = beverageRecommendations.length > 0
+    const beverageText = !isGppEvent && beverageRecommendations.length > 0
       ? '\n\n=== BEVERAGES (Order Once) ===\n' + beverageRecommendations.map(b => `${b.quantity}x ${b.beverage.name}`).join('\n')
       : '';
 
@@ -605,7 +606,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     ))}
                   </>
                 )}
-                {beverageRecommendations.length > 0 && (
+                {!isGppEvent && beverageRecommendations.length > 0 && (
                   <>
                     <p className="text-theme-text pt-1 border-t border-theme-stroke mt-2">
                       <span className="text-theme-text-secondary">{t('pizza.totalDrinks')}</span>{' '}
@@ -665,7 +666,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 ))}
 
                 {/* Beverage Order Section - Separate from waves */}
-                {beverageRecommendations.length > 0 && (
+                {!isGppEvent && beverageRecommendations.length > 0 && (
                   <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                     <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
                       <Beer size={16} />
@@ -708,7 +709,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                 </div>
 
                 {/* Beverage Order Section */}
-                {beverageRecommendations.length > 0 && (
+                {!isGppEvent && beverageRecommendations.length > 0 && (
                   <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                     <h3 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
                       <Beer size={16} />

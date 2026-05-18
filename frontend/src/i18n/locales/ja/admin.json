@@ -3,6 +3,24 @@
   "subtitle": "管理者とアンダーボスを管理",
   "accessDenied": "アクセス拒否",
   "accessDeniedDesc": "管理者権限がありません。管理者アカウントでログインしてください。",
+  "page": {
+    "exportEventsCsv": "すべてのイベントをCSVでエクスポート",
+    "graphicsAdmins": "グラフィックス管理者",
+    "addGraphicsAdmin": "グラフィックス管理者を追加",
+    "removeGraphicsAdmin": "グラフィックス管理者を削除",
+    "noGraphicsAdmins": "グラフィックス管理者はまだいません",
+    "regions": "地域",
+    "analytics": "分析",
+    "remove": "削除",
+    "removeAdminTitle": "管理者を削除",
+    "deactivate": "無効化",
+    "close": "閉じる",
+    "graphicsAdminsTable": {
+      "email": "メール",
+      "name": "名前",
+      "added": "追加日"
+    }
+  },
   "admins": {
     "title": "管理者",
     "emailPlaceholder": "メールアドレス",
@@ -29,6 +47,8 @@
     "active": "アクティブ",
     "inactive": "非アクティブ",
     "deactivate": "無効化",
+    "save": "保存",
+    "cancel": "キャンセル",
     "tableHeaders": {
       "name": "名前",
       "email": "メール",
@@ -63,7 +83,8 @@
     "saveChecklistDates": "チェックリストの日付を保存",
     "newItemPlaceholder": "新しいチェックリスト項目...",
     "adding": "追加中...",
-    "addItem": "項目を追加"
+    "addItem": "項目を追加",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "GPPデフォルト説明文",
@@ -72,7 +93,7 @@
     "saving": "保存中...",
     "saveAndApply": "保存してデフォルトイベントに適用",
     "customDescriptions": "{{count}}件のイベントがカスタム説明文を使用",
-    "customDescriptions_plural": "{{count}}件のイベントがカスタム説明文を使用"
+    "customDescriptions_other": "{{count}}件のイベントがカスタム説明文を使用"
   },
   "nft": {
     "title": "GPP NFT設定",
@@ -99,6 +120,10 @@
     "underbossCreated": "アンダーボスを作成しました！",
     "creating": "作成中...",
     "createUnderboss": "アンダーボスを作成",
+    "namePlaceholder": "名前",
+    "emailPlaceholder": "メール",
+    "regions": "地域",
+    "close": "閉じる",
     "tabs": {
       "events": "イベント",
       "cities": "都市",
@@ -142,6 +167,23 @@
     "subtitle": "グローバルピザパーティー · 配送ダッシュボード",
     "signedInAdmin": "管理者としてログイン中（{{email}}）",
     "signedInAs": "{{name}}としてログイン中",
-    "kitRequests": "キットリクエスト（{{count}}）"
+    "kitRequests": "キットリクエスト（{{count}}）",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

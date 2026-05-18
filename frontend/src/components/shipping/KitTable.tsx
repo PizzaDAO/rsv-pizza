@@ -31,7 +31,9 @@ export function KitTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState('');
 
-  const allSelected = kits.length > 0 && selectedIds.size === kits.length;
+  // Placeholder rows have no kit to update, so bulk actions skip them.
+  const realKits = useMemo(() => kits.filter((k) => !k.isPlaceholder), [kits]);
+  const allSelected = realKits.length > 0 && selectedIds.size === realKits.length;
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -49,7 +51,7 @@ export function KitTable({
     if (allSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(kits.map((k) => k.id)));
+      setSelectedIds(new Set(realKits.map((k) => k.id)));
     }
   };
 
@@ -140,6 +142,7 @@ export function KitTable({
                 />
               </th>
               <SortHeader field="eventDate">Event</SortHeader>
+              <SortHeader field="rsvpCount">RSVPs</SortHeader>
               {showRegion && <SortHeader field="region">Region</SortHeader>}
               <th className="px-3 py-3 text-left text-xs font-medium text-theme-text-muted hidden md:table-cell">Host</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-theme-text-muted">Recipient</th>
@@ -153,7 +156,7 @@ export function KitTable({
           <tbody>
             {kits.length === 0 ? (
               <tr>
-                <td colSpan={showRegion ? 10 : 9} className="px-6 py-12 text-center text-theme-text-muted text-sm">
+                <td colSpan={showRegion ? 11 : 10} className="px-6 py-12 text-center text-theme-text-muted text-sm">
                   No kit requests found matching your filters.
                 </td>
               </tr>

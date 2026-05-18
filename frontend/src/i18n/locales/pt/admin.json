@@ -3,6 +3,24 @@
   "subtitle": "Gerenciar admins e underbosses",
   "accessDenied": "Acesso Negado",
   "accessDeniedDesc": "Você não tem acesso de administrador. Por favor, faça login com uma conta de admin.",
+  "page": {
+    "exportEventsCsv": "Exportar Todos os Eventos em CSV",
+    "graphicsAdmins": "Administradores de Design",
+    "addGraphicsAdmin": "Adicionar Administrador de Design",
+    "removeGraphicsAdmin": "Remover administrador de design",
+    "noGraphicsAdmins": "Nenhum administrador de design ainda",
+    "regions": "Regiões",
+    "analytics": "Análises",
+    "remove": "Remover",
+    "removeAdminTitle": "Remover admin",
+    "deactivate": "Desativar",
+    "close": "Fechar",
+    "graphicsAdminsTable": {
+      "email": "E-mail",
+      "name": "Nome",
+      "added": "Adicionado"
+    }
+  },
   "admins": {
     "title": "Admins",
     "emailPlaceholder": "Endereço de e-mail",
@@ -29,6 +47,8 @@
     "active": "Ativo",
     "inactive": "Inativo",
     "deactivate": "Desativar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
     "tableHeaders": {
       "name": "Nome",
       "email": "E-mail",
@@ -63,7 +83,8 @@
     "saveChecklistDates": "Salvar Datas do Checklist",
     "newItemPlaceholder": "Novo item do checklist...",
     "adding": "Adicionando...",
-    "addItem": "Adicionar Item"
+    "addItem": "Adicionar Item",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "Descrição Padrão do GPP",
@@ -72,7 +93,7 @@
     "saving": "Salvando...",
     "saveAndApply": "Salvar e Aplicar aos Eventos Padrão",
     "customDescriptions": "{{count}} evento com descrições personalizadas",
-    "customDescriptions_plural": "{{count}} eventos com descrições personalizadas"
+    "customDescriptions_other": "{{count}} eventos com descrições personalizadas"
   },
   "nft": {
     "title": "Configurações de NFT do GPP",
@@ -99,6 +120,10 @@
     "underbossCreated": "Underboss criado!",
     "creating": "Criando...",
     "createUnderboss": "Criar Underboss",
+    "namePlaceholder": "Nome",
+    "emailPlaceholder": "E-mail",
+    "regions": "Regiões",
+    "close": "Fechar",
     "tabs": {
       "events": "Eventos",
       "cities": "Cidades",
@@ -142,6 +167,23 @@
     "subtitle": "Global Pizza Party · Painel de Envios",
     "signedInAdmin": "Conectado como Admin ({{email}})",
     "signedInAs": "Conectado como {{name}}",
-    "kitRequests": "Solicitações de Kit ({{count}})"
+    "kitRequests": "Solicitações de Kit ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }

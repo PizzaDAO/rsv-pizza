@@ -6,3 +6,5 @@ export { TelegramBroadcast } from './TelegramBroadcast';
 export { CitiesTable } from './CitiesTable';
 export { PartnerManager } from './PartnerManager';
 export { FunnelTab } from './FunnelTab';
+export { CityScopePicker } from './CityScopePicker';
+export { FakeDetectionTable } from './FakeDetectionTable';

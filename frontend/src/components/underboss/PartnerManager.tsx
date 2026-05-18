@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Handshake, Plus, Edit2, Trash2, RefreshCw, Check, AlertCircle, GripVertical, Image } from 'lucide-react';
 import { fetchSponsorUsers, createSponsorUser, updateSponsorUser, deleteSponsorUser, reorderSponsorUsers } from '../../lib/api';
 import { proxyAvatarToStorage } from '../../lib/supabase';
@@ -16,6 +17,7 @@ interface PartnerManagerProps {
 }
 
 export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNeeded }: PartnerManagerProps) {
+  const { t } = useTranslation('partner');
   const [partners, setPartners] = useState<SponsorUser[]>([]);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -27,16 +29,16 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [flyerPartnerId, setFlyerPartnerId] = useState<string | null>(null);
 
-  const loadPartners = useCallback(async () => {
+  const loadPartners = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const result = await fetchSponsorUsers();
       setPartners(result.sponsorUsers);
       setTagCounts(result.tagCounts);
     } catch (err: any) {
       setError(err.message || 'Failed to load partners');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -99,12 +101,12 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
       if (editingId) {
         const result = await updateSponsorUser(editingId, payload);
         if (result.syncedCount > 0) {
-          newSyncMessage = `Synced to ${result.syncedCount} event${result.syncedCount > 1 ? 's' : ''}`;
+          newSyncMessage = t('partnerManager.syncedToEvents', { count: result.syncedCount });
         }
       } else {
         const result = await createSponsorUser(payload);
         if (result.syncedCount > 0) {
-          newSyncMessage = `Synced to ${result.syncedCount} event${result.syncedCount > 1 ? 's' : ''}`;
+          newSyncMessage = t('partnerManager.syncedToEvents', { count: result.syncedCount });
         }
       }
 
@@ -114,7 +116,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
         onFlyerRegenNeeded?.(data.tag);
       }
 
-      await loadPartners();
+      await loadPartners(true);
       onSyncComplete?.();
 
       if (!newSyncMessage) {
@@ -152,15 +154,15 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
     } catch (err) {
       console.error('Failed to save partner order:', err);
       // Reload to get correct order from server
-      await loadPartners();
+      await loadPartners(true);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deactivate this partner? This will remove their co-host entries from all events.')) return;
+    if (!confirm(t('partnerManager.deactivateConfirm'))) return;
     try {
       await deleteSponsorUser(id);
-      await loadPartners();
+      await loadPartners(true);
       onSyncComplete?.();
     } catch (err: any) {
       setError(err.message || 'Failed to deactivate partner');
@@ -191,7 +193,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
         <div className="flex items-center gap-2">
           <Handshake size={18} className="text-theme-text-muted" />
           <h3 className="text-sm font-semibold text-theme-text">
-            Partners ({partners.length})
+            {t('partnerManager.title', { count: partners.length })}
           </h3>
         </div>
         <button
@@ -199,14 +201,14 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
           className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
         >
           <Plus size={14} />
-          Add Partner
+          {t('partnerManager.addPartner')}
         </button>
       </div>
 
       {/* Partners List */}
       {partners.length === 0 ? (
         <p className="text-sm text-theme-text-faint text-center py-8">
-          No partners configured. Add a partner to auto-add them as co-hosts on tagged events.
+          {t('partnerManager.noPartners')}
         </p>
       ) : (
         <div className="space-y-2">
@@ -255,7 +257,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
                     </span>
                     {!partner.isActive && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md border bg-red-500/20 text-red-400 border-red-500/30">
-                        inactive
+                        {t('partnerManager.inactive')}
                       </span>
                     )}
                   </div>
@@ -266,16 +268,16 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
                   <div className="flex items-center gap-3 mt-1">
                     {partner.autoCoHost && (
                       <span className="text-[10px] text-green-400 flex items-center gap-1">
-                        <Check size={10} /> Auto co-host
+                        <Check size={10} /> {t('partnerManager.autoCoHost')}
                       </span>
                     )}
                     {partner.autoSponsor && (
                       <span className="text-[10px] text-blue-400 flex items-center gap-1">
-                        <Check size={10} /> Auto sponsor
+                        <Check size={10} /> {t('partnerManager.autoSponsor')}
                       </span>
                     )}
                     <span className="text-[10px] text-theme-text-faint">
-                      {tagCounts[partner.tag] || 0} event{(tagCounts[partner.tag] || 0) !== 1 ? 's' : ''} tagged
+                      {t('partnerManager.eventsTagged', { count: tagCounts[partner.tag] || 0 })}
                     </span>
                   </div>
                 </div>
@@ -286,7 +288,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
                     <button
                       onClick={() => setFlyerPartnerId(partner.id)}
                       className="p-1.5 text-theme-text-faint hover:text-red-400 transition-colors"
-                      title="Generate partner flyer"
+                      title={t('partnerManager.generateFlyer')}
                     >
                       <Image size={14} />
                     </button>
@@ -294,7 +296,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
                   <button
                     onClick={() => openEditModal(partner)}
                     className="p-1.5 text-theme-text-faint hover:text-theme-text-muted transition-colors"
-                    title="Edit partner"
+                    title={t('partnerManager.editPartner')}
                   >
                     <Edit2 size={14} />
                   </button>
@@ -302,7 +304,7 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
                     <button
                       onClick={() => handleDelete(partner.id)}
                       className="p-1.5 text-theme-text-faint hover:text-red-400 transition-colors"
-                      title="Deactivate partner"
+                      title={t('partnerManager.deactivatePartner')}
                     >
                       <Trash2 size={14} />
                     </button>

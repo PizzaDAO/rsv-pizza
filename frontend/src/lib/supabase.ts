@@ -6,6 +6,7 @@ import {
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
+  uncheckInGuestApi,
   promoteGuestApi,
 } from './api';
 import { uuid } from './utils';
@@ -146,6 +147,31 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading sponsor logo:', error);
+    return null;
+  }
+}
+
+/**
+ * Upload a co-host avatar image directly to Supabase Storage and return the public URL.
+ * Used by the cohost editor's file-upload affordance.
+ */
+export async function uploadCoHostAvatar(file: File): Promise<string | null> {
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileName = `co-host-avatars/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (error) {
+      console.error('uploadCoHostAvatar:', error);
+      return null;
+    }
+    const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch (error) {
+    console.error('uploadCoHostAvatar:', error);
     return null;
   }
 }
@@ -628,6 +654,7 @@ export interface DbParty {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  place_id?: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
   selected_pizzerias: any[] | null;
@@ -656,6 +683,10 @@ export interface DbParty {
   event_tags?: string[];
   flyer_generated_at?: string | null;
   flyer_config?: Record<string, any> | null;
+  poster_image_url?: string | null;
+  poster_generated_at?: string | null;
+  rollup_image_url?: string | null;
+  rollup_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
   hidden_gpp_photos?: string[];
@@ -667,6 +698,9 @@ export interface DbParty {
   external_links?: Array<{label: string; url: string}>;
   // Telegram group
   telegram_group?: string | null;
+  // Host Telegram bot connection
+  host_telegram_chat_id?: string | null; // serialized as string from API (BigInt)
+  host_telegram_link_token?: string | null;
   // Underboss status
   underboss_status?: string | null;
   // Turtle role selection toggle
@@ -695,7 +729,9 @@ export interface DbGuest {
   swc_au_opt_in?: boolean;
   swc_eu_opt_in?: boolean;
   swc_uk_opt_in?: boolean;
+  swc_br_opt_in?: boolean;
   ethconf_opt_in?: boolean;
+  optin_ab_variant?: string | null;
   submitted_at: string;
   submitted_via: string;
   checked_in_at?: string | null;
@@ -712,7 +748,7 @@ export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
-  event_image_url, description, address, latitude, longitude, country, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
+  event_image_url, description, address, latitude, longitude, country, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
   donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
@@ -732,9 +768,12 @@ export const SAFE_PARTY_COLUMNS = `
   hidden_gpp_photos, extra_gpp_photos,
   quiz_enabled,
   telegram_group,
+  host_telegram_chat_id, host_telegram_link_token,
   turtle_roles_enabled,
   underboss_status,
-  flyer_config
+  flyer_config,
+  poster_image_url, poster_generated_at,
+  rollup_image_url, rollup_generated_at
 `;
 
 /**
@@ -765,7 +804,9 @@ export async function createParty(
   customUrl?: string,
   timezone?: string,
   hostEmail?: string,
-  hideGuests?: boolean
+  hideGuests?: boolean,
+  placeId?: string,
+  venueName?: string
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -777,6 +818,8 @@ export async function createParty(
         pizzaStyle,
         maxGuests: expectedGuests,
         address,
+        placeId,
+        venueName,
         availableBeverages,
         duration,
         password,
@@ -808,6 +851,7 @@ export async function createParty(
         event_image_url: party.eventImageUrl,
         description: party.description,
         address: party.address,
+        place_id: party.placeId,
         rsvp_closed_at: party.rsvpClosedAt,
         co_hosts: party.coHosts || [],
         created_at: party.createdAt,
@@ -849,6 +893,8 @@ export async function createParty(
       description: description || null,
       custom_url: customUrl || null,
       address: address || null,
+      place_id: placeId || null,
+      venue_name: venueName || null,
       co_hosts: coHosts,
     })
     .select()
@@ -1244,11 +1290,14 @@ export async function addGuestToParty(
   swcAuOptIn?: boolean,
   swcEuOptIn?: boolean,
   swcUkOptIn?: boolean,
-  ethconfOptIn?: boolean
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null } | null> {
+  swcBrOptIn?: boolean,
+  ethconfOptIn?: boolean,
+  optinAbVariant?: 'control' | 'variant' | null,
+  visitorSessionId?: string,
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
-    return null;
+    throw new Error('Invite code is required to submit RSVP');
   }
 
   try {
@@ -1273,14 +1322,21 @@ export async function addGuestToParty(
         swcAuOptIn: swcAuOptIn || false,
         swcEuOptIn: swcEuOptIn || false,
         swcUkOptIn: swcUkOptIn || false,
+        swcBrOptIn: swcBrOptIn || false,
         ethconfOptIn: ethconfOptIn || false,
+        optinAbVariant: optinAbVariant ?? null,
+        visitorSessionId: visitorSessionId ?? null,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData: any = null;
+      try {
+        errorData = await response.json();
+      } catch {}
       console.error('Error adding guest:', errorData);
-      return null;
+      const message = errorData?.error?.message || errorData?.message || `HTTP ${response.status}`;
+      throw new Error(message);
     }
 
     const data = await response.json();
@@ -1306,7 +1362,9 @@ export async function addGuestToParty(
       swc_au_opt_in: swcAuOptIn || false,
       swc_eu_opt_in: swcEuOptIn || false,
       swc_uk_opt_in: swcUkOptIn || false,
+      swc_br_opt_in: swcBrOptIn || false,
       ethconf_opt_in: ethconfOptIn || false,
+      optin_ab_variant: optinAbVariant ?? null,
       submitted_via: 'link',
       submitted_at: new Date().toISOString(),
       status: data.guest.status || 'CONFIRMED',
@@ -1323,7 +1381,7 @@ export async function addGuestToParty(
     };
   } catch (error) {
     console.error('Error adding guest:', error);
-    return null;
+    throw error;
   }
 }
 
@@ -1334,6 +1392,7 @@ export interface ExistingGuestData {
   ethereumAddress: string | null;
   roles: string[];
   mailingListOptIn: boolean;
+  optinAbVariant: 'control' | 'variant' | null;
   dietaryRestrictions: string[];
   likedToppings: string[];
   dislikedToppings: string[];
@@ -1371,6 +1430,7 @@ export async function getExistingGuest(
       ethereumAddress: guest.ethereumAddress,
       roles: guest.roles || [],
       mailingListOptIn: guest.mailingListOptIn || false,
+      optinAbVariant: guest.optinAbVariant === 'control' || guest.optinAbVariant === 'variant' ? guest.optinAbVariant : null,
       dietaryRestrictions: guest.dietaryRestrictions || [],
       likedToppings: guest.likedToppings || [],
       dislikedToppings: guest.dislikedToppings || [],
@@ -1480,7 +1540,7 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
   return true;
 }
 
-export async function updateGuestApproval(guestId: string, approved: boolean, partyId?: string): Promise<boolean> {
+export async function updateGuestApproval(guestId: string, approved: boolean | null, partyId?: string): Promise<boolean> {
   // Use API if authenticated and partyId provided (secure path)
   if (isAuthenticated() && partyId) {
     try {
@@ -1503,6 +1563,22 @@ export async function updateGuestApproval(guestId: string, approved: boolean, pa
     return false;
   }
   return true;
+}
+
+// Un-check-in a guest (host-side undo). Resolves invite code from party and calls
+// DELETE /api/checkin/:inviteCode/:guestId. Idempotent on backend.
+export async function uncheckInGuest(guestId: string, party: { id: string; inviteCode: string } | null | undefined): Promise<boolean> {
+  if (!party?.inviteCode) {
+    console.error('uncheckInGuest: missing party invite code');
+    return false;
+  }
+  try {
+    await uncheckInGuestApi(party.inviteCode, guestId);
+    return true;
+  } catch (error) {
+    console.error('Error un-checking-in guest via API:', error);
+    return false;
+  }
 }
 
 export async function promoteGuest(guestId: string, partyId: string): Promise<boolean> {
@@ -1616,6 +1692,7 @@ export async function updateParty(
     latitude?: number | null;
     longitude?: number | null;
     country?: string | null;
+    place_id?: string | null;
     venue_name?: string | null;
     // Venue tracking fields
     venueStatus?: string | null;
@@ -1661,6 +1738,10 @@ export async function updateParty(
     region?: string | null;
     flyer_generated_at?: string | null;
     flyer_config?: Record<string, any> | null;
+    poster_image_url?: string | null;
+    poster_generated_at?: string | null;
+    rollup_image_url?: string | null;
+    rollup_generated_at?: string | null;
     hidden_gpp_photos?: string[];
     extra_gpp_photos?: string[];
     luma_url?: string | null;
@@ -1668,6 +1749,7 @@ export async function updateParty(
     eventbrite_url?: string | null;
     external_links?: Array<{label: string; url: string}>;
     telegram_group?: string | null;
+    host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
   }
 ): Promise<boolean> {
@@ -1683,6 +1765,7 @@ export async function updateParty(
         latitude: updates.latitude,
         longitude: updates.longitude,
         country: updates.country,
+        placeId: updates.place_id,
         venueName: updates.venue_name,
         // Venue tracking fields
         venueStatus: updates.venueStatus as any,
@@ -1728,6 +1811,10 @@ export async function updateParty(
         region: updates.region,
         flyerGeneratedAt: updates.flyer_generated_at,
         flyerConfig: updates.flyer_config,
+        posterImageUrl: updates.poster_image_url,
+        posterGeneratedAt: updates.poster_generated_at,
+        rollupImageUrl: updates.rollup_image_url,
+        rollupGeneratedAt: updates.rollup_generated_at,
         hiddenGppPhotos: updates.hidden_gpp_photos,
         extraGppPhotos: updates.extra_gpp_photos,
         lumaUrl: updates.luma_url,
@@ -1735,6 +1822,7 @@ export async function updateParty(
         eventbriteUrl: updates.eventbrite_url,
         externalLinks: updates.external_links,
         telegramGroup: updates.telegram_group,
+        hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
       });
       return true;
@@ -1966,6 +2054,20 @@ export async function saveUserPreferences(
     return true;
   } catch (error) {
     console.error('Error saving user preferences:', error);
+    return false;
+  }
+}
+
+export async function getExperimentFlag(key: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('experiment_flags')
+      .select('enabled')
+      .eq('key', key)
+      .single();
+    if (error || !data) return false;
+    return data.enabled === true;
+  } catch {
     return false;
   }
 }

@@ -4,6 +4,7 @@
     "settings": "Paramètres",
     "guests": "Invités",
     "pizzaAndDrinks": "Pizza et boissons",
+    "pizza": "Pizza",
     "photos": "Photos",
     "apps": "Applications"
   },
@@ -207,6 +208,8 @@
     "venueOptions": "Options de lieu",
     "addVenue": "Ajouter un lieu",
     "noVenueOptionsYet": "Aucune option de lieu pour le moment",
+    "iHaveMyVenue": "J'ai mon lieu",
+    "stillExploring": "Encore en recherche",
     "addYourFirstVenue": "Ajoutez votre premier lieu",
     "selected": "Sélectionné",
     "selectAsLocation": "Sélectionner comme lieu",

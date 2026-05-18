@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check, Printer } from 'lucide-react';
@@ -35,14 +35,23 @@ export function ShippingDashboard() {
   const [meData, setMeData] = useState<ShippingMeResponse | null>(null);
   const [kits, setKits] = useState<ShippingKit[]>([]);
   const [stats, setStats] = useState<ShippingKitStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const hasLoadedOnceRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
+
+  // Debounce searchTerm → debouncedSearchTerm so the input stays responsive
+  // and the network filter only fires after the user pauses typing.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
   const [sortField, setSortField] = useState('requestedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -86,7 +95,7 @@ export function ShippingDashboard() {
       const filters: ShippingKitFilters = {};
       if (statusFilter) filters.status = statusFilter;
       if (countryFilter) filters.country = countryFilter;
-      if (searchTerm) filters.search = searchTerm;
+      if (debouncedSearchTerm) filters.search = debouncedSearchTerm;
       if (selectedRegion) filters.region = selectedRegion;
 
       const [kitsResult, statsResult] = await Promise.all([
@@ -99,13 +108,13 @@ export function ShippingDashboard() {
     } catch (err: any) {
       console.error('Failed to load shipping data:', err);
     }
-  }, [statusFilter, countryFilter, searchTerm, selectedRegion]);
+  }, [statusFilter, countryFilter, debouncedSearchTerm, selectedRegion]);
 
   // Initial access check
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setLoading(false);
+      setInitialLoading(false);
       return;
     }
 
@@ -115,7 +124,7 @@ export function ShippingDashboard() {
         setMeData(me);
 
         if (!me.role) {
-          setLoading(false);
+          setInitialLoading(false);
           setError('You are not authorized to access the shipping dashboard.');
           return;
         }
@@ -125,7 +134,7 @@ export function ShippingDashboard() {
           setSelectedRegion(me.regions[0]);
         }
       } catch (err: any) {
-        setLoading(false);
+        setInitialLoading(false);
         setError(err.message || 'Failed to check access');
       }
     }
@@ -133,17 +142,24 @@ export function ShippingDashboard() {
     checkAccess();
   }, [user, authLoading]);
 
-  // Load data when access is confirmed
+  // Load data when access is confirmed.
+  // Only flip the full-page spinner off once; subsequent refetches keep the
+  // table mounted so the search input doesn't lose focus on every keystroke.
   useEffect(() => {
     if (!meData || !meData.role) return;
 
-    setLoading(true);
-    loadData().finally(() => setLoading(false));
+    loadData().finally(() => {
+      if (!hasLoadedOnceRef.current) {
+        hasLoadedOnceRef.current = true;
+        setInitialLoading(false);
+      }
+    });
   }, [meData, loadData]);
 
-  // Unique countries from kit data
+  // Unique countries from kit data. Filter out empty strings so placeholder
+  // rows (which have no shipping country) don't add a blank entry.
   const countries = useMemo(() => {
-    const set = new Set(kits.map((k) => k.country));
+    const set = new Set(kits.map((k) => k.country).filter(Boolean));
     return Array.from(set).sort();
   }, [kits]);
 
@@ -242,7 +258,7 @@ export function ShippingDashboard() {
       const filters: ShippingKitFilters = {};
       if (statusFilter) filters.status = statusFilter;
       if (countryFilter) filters.country = countryFilter;
-      if (searchTerm) filters.search = searchTerm;
+      if (debouncedSearchTerm) filters.search = debouncedSearchTerm;
       if (selectedRegion) filters.region = selectedRegion;
 
       const blob = await exportShippingKitsCsv(filters);
@@ -297,7 +313,7 @@ export function ShippingDashboard() {
   }
 
   // Loading
-  if (loading || authLoading) {
+  if (initialLoading || authLoading) {
     return (
       <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
         <Header />

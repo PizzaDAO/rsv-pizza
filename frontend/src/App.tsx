@@ -25,6 +25,9 @@ import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
+import { EventsMapPage } from './pages/EventsMapPage';
+import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
+import { PartnersPage } from './pages/PartnersPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -48,6 +51,10 @@ function App() {
             <Route path="/new" element={<NewEventPage />} />
             <Route path="/gpp" element={<GPPLandingPage />} />
             <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
+            {/* /map must come before /:slug */}
+            <Route path="/map" element={<EventsMapPage />} />
+            {/* /partners must come before /:slug */}
+            <Route path="/partners" element={<PartnersPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
@@ -62,6 +69,7 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />

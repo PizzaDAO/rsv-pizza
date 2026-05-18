@@ -4,6 +4,7 @@
     "settings": "Configurações",
     "guests": "Convidados",
     "pizzaAndDrinks": "Pizza e Bebidas",
+    "pizza": "Pizza",
     "photos": "Fotos",
     "apps": "Apps"
   },
@@ -207,6 +208,8 @@
     "venueOptions": "Opções de Local",
     "addVenue": "Adicionar Local",
     "noVenueOptionsYet": "Nenhuma opção de local ainda",
+    "iHaveMyVenue": "Tenho o meu local",
+    "stillExploring": "Ainda à procura",
     "addYourFirstVenue": "Adicione Seu Primeiro Local",
     "selected": "Selecionado",
     "selectAsLocation": "Selecionar como Local",

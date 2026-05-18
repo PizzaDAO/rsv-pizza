@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { X, Download, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
@@ -211,6 +212,7 @@ function sortCitiesByTier(cities: CityEntry[]): CityEntry[] {
 }
 
 export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFlyerProps) {
+  const { t } = useTranslation('partner');
   const [logoPos, setLogoPos] = useState(DEFAULT_LOGO_POS);
   const [logoSize, setLogoSize] = useState(DEFAULT_LOGO_SIZE);
   const [containerWidth, setContainerWidth] = useState(500);
@@ -538,9 +540,9 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
                 {/* Action buttons */}
                 <div className="flex items-center gap-2">
                   <button onClick={handleDownload} disabled={downloading} className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors">
-                    <Download size={14} />{downloading ? 'Generating...' : 'Download PNG'}
+                    <Download size={14} />{downloading ? t('partnerFlyer.generating') : t('partnerFlyer.download')}
                   </button>
-                  <button onClick={handleReset} className="p-2 text-theme-text-faint hover:text-theme-text-secondary transition-colors border border-theme-stroke rounded-lg" title="Reset to defaults">
+                  <button onClick={handleReset} className="p-2 text-theme-text-faint hover:text-theme-text-secondary transition-colors border border-theme-stroke rounded-lg" title={t('partnerManager.resetDefaults')}>
                     <RotateCcw size={14} />
                   </button>
                 </div>

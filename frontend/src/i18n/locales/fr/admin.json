@@ -3,6 +3,24 @@
   "subtitle": "Gérer les administrateurs et les sous-chefs",
   "accessDenied": "Accès refusé",
   "accessDeniedDesc": "Vous n'avez pas d'accès administrateur. Veuillez vous connecter avec un compte administrateur.",
+  "page": {
+    "exportEventsCsv": "Exporter tous les événements en CSV",
+    "graphicsAdmins": "Administrateurs graphiques",
+    "addGraphicsAdmin": "Ajouter un administrateur graphique",
+    "removeGraphicsAdmin": "Supprimer l'administrateur graphique",
+    "noGraphicsAdmins": "Aucun administrateur graphique pour le moment",
+    "regions": "Régions",
+    "analytics": "Analyses",
+    "remove": "Supprimer",
+    "removeAdminTitle": "Supprimer l'administrateur",
+    "deactivate": "Désactiver",
+    "close": "Fermer",
+    "graphicsAdminsTable": {
+      "email": "E-mail",
+      "name": "Nom",
+      "added": "Ajouté"
+    }
+  },
   "admins": {
     "title": "Administrateurs",
     "emailPlaceholder": "Adresse e-mail",
@@ -29,6 +47,8 @@
     "active": "Actif",
     "inactive": "Inactif",
     "deactivate": "Désactiver",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
     "tableHeaders": {
       "name": "Nom",
       "email": "E-mail",
@@ -63,7 +83,8 @@
     "saveChecklistDates": "Enregistrer les dates de la liste",
     "newItemPlaceholder": "Nouvel élément de liste...",
     "adding": "Ajout...",
-    "addItem": "Ajouter un élément"
+    "addItem": "Ajouter un élément",
+    "linkTabPlaceholder": "Link to tab"
   },
   "gppDescription": {
     "title": "Description GPP par défaut",
@@ -72,7 +93,7 @@
     "saving": "Enregistrement...",
     "saveAndApply": "Enregistrer et appliquer aux événements par défaut",
     "customDescriptions": "{{count}} événement avec des descriptions personnalisées",
-    "customDescriptions_plural": "{{count}} événements avec des descriptions personnalisées"
+    "customDescriptions_other": "{{count}} événements avec des descriptions personnalisées"
   },
   "nft": {
     "title": "Paramètres NFT GPP",
@@ -99,6 +120,10 @@
     "underbossCreated": "Sous-chef créé !",
     "creating": "Création...",
     "createUnderboss": "Créer un sous-chef",
+    "namePlaceholder": "Nom",
+    "emailPlaceholder": "E-mail",
+    "regions": "Régions",
+    "close": "Fermer",
     "tabs": {
       "events": "Événements",
       "cities": "Villes",
@@ -142,6 +167,23 @@
     "subtitle": "Global Pizza Party · Tableau de bord expédition",
     "signedInAdmin": "Connecté en tant qu'administrateur ({{email}})",
     "signedInAs": "Connecté en tant que {{name}}",
-    "kitRequests": "Demandes de kit ({{count}})"
+    "kitRequests": "Demandes de kit ({{count}})",
+    "rsvpsColumn": "RSVPs",
+    "noKitRequest": "No kit request",
+    "noRequest": "No request",
+    "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "fakeDetection": {
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reset": "Reset",
+      "resetTitle": "Reset to pending",
+      "errorPrefix": "Failed",
+      "dismiss": "Dismiss"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
   }
 }
