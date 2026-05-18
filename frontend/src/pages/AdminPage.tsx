@@ -59,6 +59,7 @@ export function AdminPage() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState<'admin' | 'super_admin' | 'payment_admin'>('admin');
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -415,11 +416,16 @@ export function AdminPage() {
     setAddingAdmin(true);
     setAdminMessage(null);
     try {
-      const admin = await addAdmin({ email: newEmail.trim(), name: newName.trim() || undefined });
+      const admin = await addAdmin({
+        email: newEmail.trim(),
+        name: newName.trim() || undefined,
+        role: newRole,
+      });
       setAdmins((prev) => [...prev, admin]);
       setNewEmail('');
       setNewName('');
-      setAdminMessage({ type: 'success', text: `Added ${admin.email} as admin` });
+      setNewRole('admin');
+      setAdminMessage({ type: 'success', text: `Added ${admin.email} as ${admin.role}` });
     } catch (err: any) {
       setAdminMessage({ type: 'error', text: err.message || 'Failed to add admin' });
     } finally {
@@ -637,6 +643,43 @@ export function AdminPage() {
                     {t('admins.addAdmin')}
                   </button>
                 </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="newAdminRole"
+                        value="admin"
+                        checked={newRole === 'admin'}
+                        onChange={() => setNewRole('admin')}
+                      />
+                      <span>{t('admins.admin')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="newAdminRole"
+                        value="super_admin"
+                        checked={newRole === 'super_admin'}
+                        onChange={() => setNewRole('super_admin')}
+                      />
+                      <span>{t('admins.superAdmin')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="newAdminRole"
+                        value="payment_admin"
+                        checked={newRole === 'payment_admin'}
+                        onChange={() => setNewRole('payment_admin')}
+                      />
+                      <span>{t('admins.paymentAdmin')}</span>
+                    </label>
+                  </div>
+                  {newRole === 'payment_admin' && (
+                    <p className="text-xs text-white/40">{t('admins.paymentAdminDesc')}</p>
+                  )}
+                </div>
               </form>
             )}
 
@@ -666,10 +709,16 @@ export function AdminPage() {
                           className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                             admin.role === 'super_admin'
                               ? 'bg-red-100 text-red-700 border border-red-300'
-                              : 'bg-blue-100 text-blue-700 border border-blue-300'
+                              : admin.role === 'payment_admin'
+                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                : 'bg-blue-100 text-blue-700 border border-blue-300'
                           }`}
                         >
-                          {admin.role === 'super_admin' ? t('admins.superAdmin') : t('admins.admin')}
+                          {admin.role === 'super_admin'
+                            ? t('admins.superAdmin')
+                            : admin.role === 'payment_admin'
+                              ? t('admins.paymentAdmin')
+                              : t('admins.admin')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-theme-text-muted">

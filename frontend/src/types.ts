@@ -1122,7 +1122,7 @@ export interface FakeDetectionResponse {
 export interface AdminUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'admin';
+  role: 'super_admin' | 'admin' | 'payment_admin';
   name: string | null;
   createdBy: string | null;
   createdAt: string;
