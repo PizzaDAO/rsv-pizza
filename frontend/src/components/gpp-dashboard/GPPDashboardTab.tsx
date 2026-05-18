@@ -7,6 +7,7 @@ import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from '../checklist/FindVenueModal';
+import { InvitedGuestsModal } from '../InvitedGuestsModal';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -21,6 +22,12 @@ export const GPPDashboardTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
+  const [invitedModalOpen, setInvitedModalOpen] = useState(false);
+
+  const invitedGuests = useMemo(
+    () => guests.filter(g => g.approved !== false && g.status === 'INVITED'),
+    [guests]
+  );
 
   const loadChecklist = useCallback(async () => {
     if (!party?.id) return;
@@ -128,12 +135,18 @@ export const GPPDashboardTab: React.FC = () => {
     <div className="space-y-6">
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 text-center">
+        <button
+          type="button"
+          onClick={() => invitedGuests.length > 0 && setInvitedModalOpen(true)}
+          disabled={invitedGuests.length === 0}
+          className="card p-4 text-center transition-colors enabled:hover:bg-theme-surface-hover enabled:cursor-pointer disabled:cursor-default"
+          aria-label={invitedGuests.length > 0 ? `View ${invitedGuests.length} invited guests` : 'No invited guests'}
+        >
           <div className="text-2xl font-bold text-theme-text">
-            {guests.filter(g => g.approved !== false && g.status === 'INVITED').length}
+            {invitedGuests.length}
           </div>
           <div className="text-xs text-theme-text-muted">Invited</div>
-        </div>
+        </button>
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-theme-text">
             {guests.filter(g => g.approved !== false && g.status !== 'INVITED').length}
@@ -359,6 +372,12 @@ export const GPPDashboardTab: React.FC = () => {
         open={findVenueOpen}
         onClose={() => setFindVenueOpen(false)}
         onSaved={loadChecklist}
+      />
+
+      <InvitedGuestsModal
+        isOpen={invitedModalOpen}
+        onClose={() => setInvitedModalOpen(false)}
+        invitedGuests={invitedGuests}
       />
 
       {/* Host Resources */}
