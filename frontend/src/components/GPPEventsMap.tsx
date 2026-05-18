@@ -177,8 +177,6 @@ export default function GPPEventsMap({
           ? `<p style="color:#888;font-size:11px;margin:2px 0">${event.address}</p>`
           : '';
 
-        const rsvpHtml = `<span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${event.rsvpCount.toLocaleString()} RSVPs</span>`;
-
         const linkLabel = canModerate ? 'View Event &rarr;' : 'RSVP &rarr;';
         const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">${linkLabel}</a>`;
 
@@ -228,7 +226,6 @@ export default function GPPEventsMap({
             <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               ${linkHtml}
               ${telegramHtml}
-              ${rsvpHtml}
             </div>
             ${actionsRowHtml}
           </div>
