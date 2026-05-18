@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { X, Download, RotateCcw, Pencil, Loader2 } from 'lucide-react';
+import { X, Download, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
 import { getCityTier } from '../../utils/sponsorshipPricing';
@@ -12,19 +12,134 @@ interface PartnerCitiesFlyerProps {
   onClose: () => void;
 }
 
+interface CityEntry {
+  name: string;
+  country: string | null;
+}
+
+const COUNTRY_TO_ISO: Record<string, string> = {
+  'united states': 'US', 'usa': 'US', 'us': 'US', 'united states of america': 'US',
+  'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB', 'britain': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB',
+  'canada': 'CA',
+  'mexico': 'MX',
+  'brazil': 'BR', 'brasil': 'BR',
+  'argentina': 'AR',
+  'chile': 'CL',
+  'colombia': 'CO',
+  'peru': 'PE',
+  'venezuela': 'VE',
+  'uruguay': 'UY',
+  'costa rica': 'CR',
+  'panama': 'PA',
+  'dominican republic': 'DO',
+  'puerto rico': 'PR',
+  'guatemala': 'GT',
+  'honduras': 'HN',
+  'el salvador': 'SV',
+  'ecuador': 'EC',
+  'bolivia': 'BO',
+  'paraguay': 'PY',
+  'japan': 'JP',
+  'china': 'CN',
+  'south korea': 'KR', 'korea': 'KR',
+  'india': 'IN',
+  'philippines': 'PH',
+  'indonesia': 'ID',
+  'thailand': 'TH',
+  'vietnam': 'VN',
+  'singapore': 'SG',
+  'malaysia': 'MY',
+  'hong kong': 'HK',
+  'taiwan': 'TW',
+  'pakistan': 'PK',
+  'bangladesh': 'BD',
+  'nepal': 'NP',
+  'sri lanka': 'LK',
+  'italy': 'IT',
+  'germany': 'DE',
+  'france': 'FR',
+  'spain': 'ES',
+  'portugal': 'PT',
+  'netherlands': 'NL', 'holland': 'NL',
+  'belgium': 'BE',
+  'switzerland': 'CH',
+  'austria': 'AT',
+  'poland': 'PL',
+  'czech republic': 'CZ', 'czechia': 'CZ',
+  'hungary': 'HU',
+  'romania': 'RO',
+  'bulgaria': 'BG',
+  'greece': 'GR',
+  'turkey': 'TR', 'türkiye': 'TR',
+  'sweden': 'SE',
+  'norway': 'NO',
+  'denmark': 'DK',
+  'finland': 'FI',
+  'iceland': 'IS',
+  'ireland': 'IE',
+  'ukraine': 'UA',
+  'russia': 'RU',
+  'belarus': 'BY',
+  'serbia': 'RS',
+  'croatia': 'HR',
+  'slovenia': 'SI',
+  'slovakia': 'SK',
+  'estonia': 'EE',
+  'latvia': 'LV',
+  'lithuania': 'LT',
+  'australia': 'AU',
+  'new zealand': 'NZ',
+  'israel': 'IL',
+  'united arab emirates': 'AE', 'uae': 'AE',
+  'saudi arabia': 'SA',
+  'qatar': 'QA',
+  'kuwait': 'KW',
+  'bahrain': 'BH',
+  'oman': 'OM',
+  'jordan': 'JO',
+  'lebanon': 'LB',
+  'egypt': 'EG',
+  'morocco': 'MA',
+  'tunisia': 'TN',
+  'algeria': 'DZ',
+  'south africa': 'ZA',
+  'nigeria': 'NG',
+  'kenya': 'KE',
+  'ghana': 'GH',
+  'ethiopia': 'ET',
+  'tanzania': 'TZ',
+  'uganda': 'UG',
+  'senegal': 'SN',
+  'cote d\'ivoire': 'CI', "ivory coast": 'CI',
+};
+
+function isoToFlag(iso: string): string {
+  if (!iso || iso.length !== 2) return '';
+  const A = 'A'.charCodeAt(0);
+  return String.fromCodePoint(
+    0x1F1E6 + iso.toUpperCase().charCodeAt(0) - A,
+    0x1F1E6 + iso.toUpperCase().charCodeAt(1) - A,
+  );
+}
+
+function flagForCountry(country: string | null | undefined): string {
+  if (!country) return '';
+  const iso = COUNTRY_TO_ISO[country.trim().toLowerCase()] || '';
+  return isoToFlag(iso);
+}
+
 const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
-const CITY_BOX = { x: 40, y: 550, width: 500, height: 490 };
+const CITY_BOX = { x: 55, y: 597, width: 500, height: 490 };
 const MAX_VISIBLE = 10;
-const CITY_FONT_SIZE = 36;
+const CITY_FONT_SIZE = 42;
 const CITY_LINE_SPACING = 1.25;
-const SUBHEAD_TEXT = 'SUPPORTING THE EVENTS IN';
+const SUBHEAD_TEXT = 'SUPPORTING EVENTS IN';
 const SUBHEAD_FONT_SIZE = 28;
-const SUBHEAD_Y = 510; // just above city box
+const SUBHEAD_Y_OFFSET = -40; // above the first city line
 
-/** Render to canvas for download only */
 async function renderCitiesFlyer(
-  cities: string[],
+  cities: CityEntry[],
   logoUrl: string,
   logoPos: { x: number; y: number },
   logoSize: number,
@@ -34,10 +149,11 @@ async function renderCitiesFlyer(
   canvas.height = 1080;
   const ctx = canvas.getContext('2d')!;
 
+  // 1) Template
   const tpl = await loadImg('/gpp-partner-flyer-template.png');
   ctx.drawImage(tpl, 0, 0, 1080, 1080);
 
-  // Partner logo
+  // 2) Partner logo
   try {
     const img = await loadImg(logoUrl);
     const maxH = logoSize;
@@ -48,36 +164,50 @@ async function renderCitiesFlyer(
     ctx.drawImage(img, logoPos.x, logoPos.y - h / 2, w, h);
   } catch { /* skip */ }
 
-  // "Supporting the Events in" subheading
+  // 3) Subheading
   ctx.textBaseline = 'top';
   ctx.fillStyle = VENUE_COLOR;
   ctx.font = `${SUBHEAD_FONT_SIZE}px ${TEXT_FONT}`;
-  ctx.fillText(SUBHEAD_TEXT, CITY_BOX.x, SUBHEAD_Y);
+  ctx.fillText(SUBHEAD_TEXT, CITY_BOX.x, CITY_BOX.y + SUBHEAD_Y_OFFSET);
 
-  // City names
-  const hasOverflow = cities.length > MAX_VISIBLE;
-  const display = hasOverflow ? cities.slice(0, MAX_VISIBLE) : cities;
-  const suffix = hasOverflow ? `+ ${cities.length - MAX_VISIBLE} MORE` : null;
+  // 4) Group cities by country, render one line per country (flag + cities)
+  const groups = new Map<string, CityEntry[]>();
+  for (const c of cities) {
+    const key = c.country?.trim() || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+  // Sort: known-country groups alphabetical by country name, unknown last
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+    return a.localeCompare(b);
+  });
 
   ctx.fillStyle = CITY_COLOR;
-  ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}`;
+  ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"`;
+
   let y = CITY_BOX.y;
-  for (const c of display) {
-    ctx.fillText(c.toUpperCase(), CITY_BOX.x, y);
+  for (const key of sortedKeys) {
+    const group = groups.get(key)!;
+    const cityNames = group.map(c => c.name.toUpperCase()).sort((a, b) => a.localeCompare(b));
+    const flag = flagForCountry(key);
+    const prefix = flag ? `${flag}  ` : '';
+    ctx.fillText(`${prefix}${cityNames.join(', ')}`, CITY_BOX.x, y);
     y += CITY_FONT_SIZE * CITY_LINE_SPACING;
   }
-  if (suffix) ctx.fillText(suffix, CITY_BOX.x, y);
 
   return canvas;
 }
 
-/** Sort cities by tier (1 first) then alphabetical */
-function sortCitiesByTier(cities: string[]): string[] {
+/** Sort cities by tier (1 first) then alphabetical by name */
+function sortCitiesByTier(cities: CityEntry[]): CityEntry[] {
   return [...cities].sort((a, b) => {
-    const tierA = getCityTier(a);
-    const tierB = getCityTier(b);
+    const tierA = getCityTier(a.name);
+    const tierB = getCityTier(b.name);
     if (tierA !== tierB) return tierA - tierB;
-    return a.localeCompare(b);
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -88,31 +218,36 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
   const [containerWidth, setContainerWidth] = useState(500);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const previewRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 
-  // Derive initial cities from events
-  const defaultCities = useMemo(() => {
-    const raw = events
-      .filter(e => e.eventTags?.includes(partner.tag))
-      .map(e => e.name.replace(/^Global Pizza Party\s*/i, '').trim())
-      .filter(Boolean);
-    return sortCitiesByTier([...new Set(raw)]);
+  // Derive initial cities from events (with country attached)
+  const defaultCities = useMemo<CityEntry[]>(() => {
+    const seen = new Set<string>();
+    const entries: CityEntry[] = [];
+    for (const e of events) {
+      if (!e.eventTags?.includes(partner.tag)) continue;
+      const name = e.name.replace(/^Global Pizza Party\s*/i, '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({ name, country: e.country ?? null });
+    }
+    return sortCitiesByTier(entries);
   }, [events, partner.tag]);
 
-  const [editCities, setEditCities] = useState<string[]>(defaultCities);
+  // Editable city list — initialized from events
+  const [editCities, setEditCities] = useState<CityEntry[]>(defaultCities);
+  const [newCity, setNewCity] = useState('');
+
+  // Reset editCities when partner changes
   useEffect(() => { setEditCities(defaultCities); }, [defaultCities]);
 
   const scale = containerWidth / 1080;
-
-  // Visible cities + overflow
-  const hasOverflow = editCities.length > MAX_VISIBLE;
-  const displayCities = hasOverflow ? editCities.slice(0, MAX_VISIBLE) : editCities;
-  const overflowCount = hasOverflow ? editCities.length - MAX_VISIBLE : 0;
 
   // Fonts
   useEffect(() => {
@@ -123,7 +258,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
       .catch(() => setFontsLoaded(true));
   }, []);
 
-  // Container width tracking
+  // Container width
   useEffect(() => {
     if (!previewRef.current) return;
     const obs = new ResizeObserver(entries => {
@@ -133,18 +268,35 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
     return () => obs.disconnect();
   }, []);
 
-  // Coordinate conversion (screen → 1080px canvas space)
+  // Render preview
+  const renderPreview = useCallback(async () => {
+    if (!canvasRef.current || !fontsLoaded || !partner.coHostLogoUrl) return;
+    try {
+      const result = await renderCitiesFlyer(editCities, partner.coHostLogoUrl, logoPos, logoSize);
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        canvasRef.current.width = 1080;
+        canvasRef.current.height = 1080;
+        ctx.drawImage(result, 0, 0);
+      }
+    } catch (err) {
+      console.error('Partner flyer preview failed:', err);
+    }
+  }, [editCities, partner.coHostLogoUrl, logoPos, logoSize, fontsLoaded]);
+
+  useEffect(() => { renderPreview(); }, [renderPreview]);
+
+  // Coordinate conversion
   const toCanvas = useCallback((cx: number, cy: number) => {
-    if (!canvasRef.current) return null;
-    const r = canvasRef.current.getBoundingClientRect();
+    if (!previewRef.current) return null;
+    const r = previewRef.current.getBoundingClientRect();
     const s = r.width / 1080;
     return { x: (cx - r.left) / s, y: (cy - r.top) / s };
   }, []);
 
   // Logo drag - mouse
-  const onLogoMouseDown = useCallback((e: React.MouseEvent) => {
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     const p = toCanvas(e.clientX, e.clientY);
     if (!p) return;
     draggingRef.current = true;
@@ -159,19 +311,14 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
         y: Math.max(0, Math.min(1080, q.y - offsetRef.current.y)),
       });
     };
-    const up = () => {
-      draggingRef.current = false;
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
+    const up = () => { draggingRef.current = false; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
   }, [toCanvas, logoPos]);
 
   // Logo drag - touch
-  const onLogoTouchStart = useCallback((e: React.TouchEvent) => {
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
-    e.stopPropagation();
     const t = e.touches[0];
     const p = toCanvas(t.clientX, t.clientY);
     if (!p) return;
@@ -188,60 +335,22 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
         y: Math.max(0, Math.min(1080, q.y - offsetRef.current.y)),
       });
     };
-    const end = () => {
-      draggingRef.current = false;
-      document.removeEventListener('touchmove', move);
-      document.removeEventListener('touchend', end);
-    };
+    const end = () => { draggingRef.current = false; document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
     document.addEventListener('touchmove', move, { passive: false });
     document.addEventListener('touchend', end);
   }, [toCanvas, logoPos]);
 
-  // Logo resize drag
-  const onResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startY = e.clientY;
-    const startSize = logoSize;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    const sc = rect ? rect.width / 1080 : 1;
-
-    const move = (ev: MouseEvent) => {
-      const delta = (ev.clientY - startY) / sc;
-      setLogoSize(Math.max(20, Math.min(120, Math.round(startSize + delta))));
-    };
-    const up = () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  }, [logoSize]);
-
-  const onResizeTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    const startY = e.touches[0].clientY;
-    const startSize = logoSize;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    const sc = rect ? rect.width / 1080 : 1;
-
-    const move = (ev: TouchEvent) => {
-      ev.preventDefault();
-      const delta = (ev.touches[0].clientY - startY) / sc;
-      setLogoSize(Math.max(20, Math.min(120, Math.round(startSize + delta))));
-    };
-    const up = () => {
-      document.removeEventListener('touchmove', move);
-      document.removeEventListener('touchend', up);
-    };
-    document.addEventListener('touchmove', move, { passive: false });
-    document.addEventListener('touchend', up);
-  }, [logoSize]);
-
-  // City editing
-  const handleCityRename = (index: number, value: string) => {
-    setEditCities(prev => prev.map((c, i) => i === index ? value : c));
-  };
+  // Logo dimensions for overlay
+  const [logoDims, setLogoDims] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!partner.coHostLogoUrl) return;
+    loadImg(partner.coHostLogoUrl)
+      .then(img => {
+        const s = Math.min(logoSize * 3 / img.width, logoSize / img.height);
+        setLogoDims({ w: img.width * s, h: img.height * s });
+      })
+      .catch(() => setLogoDims(null));
+  }, [partner.coHostLogoUrl, logoSize]);
 
   const handleDownload = async () => {
     if (!partner.coHostLogoUrl) return;
@@ -263,178 +372,23 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
     setLogoPos(DEFAULT_LOGO_POS);
     setLogoSize(DEFAULT_LOGO_SIZE);
     setEditCities(defaultCities);
-    setEditingIndex(null);
+  };
+
+  // City editing
+  const handleCityRename = (index: number, value: string) => {
+    setEditCities(prev => prev.map((c, i) => i === index ? { ...c, name: value } : c));
+  };
+  const handleCityRemove = (index: number) => {
+    setEditCities(prev => prev.filter((_, i) => i !== index));
+  };
+  const handleCityAdd = () => {
+    const trimmed = newCity.trim();
+    if (!trimmed) return;
+    setEditCities(prev => [...prev, { name: trimmed, country: null }]);
+    setNewCity('');
   };
 
   const name = partner.coHostName || partner.name || partner.tag;
-
-  /** The 1080px HTML preview content (same pattern as FlyerGenerator) */
-  const renderFlyerContent = () => (
-    <div
-      style={{
-        width: 1080,
-        height: 1080,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Template background */}
-      <img
-        src="/gpp-partner-flyer-template.png"
-        alt=""
-        style={{ width: '100%', height: '100%', display: 'block' }}
-        crossOrigin="anonymous"
-      />
-
-      {/* Partner logo — draggable */}
-      {partner.coHostLogoUrl && (
-        <div
-          onMouseDown={onLogoMouseDown}
-          onTouchStart={onLogoTouchStart}
-          style={{
-            position: 'absolute',
-            top: logoPos.y - logoSize / 2,
-            left: logoPos.x,
-            cursor: draggingRef.current ? 'grabbing' : 'grab',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            zIndex: 10,
-          }}
-        >
-          <img
-            src={partner.coHostLogoUrl}
-            alt={name}
-            crossOrigin="anonymous"
-            style={{
-              height: logoSize,
-              maxWidth: logoSize * 3,
-              objectFit: 'contain',
-            }}
-            draggable={false}
-          />
-          {/* Resize handle */}
-          <div
-            onMouseDown={onResizeStart}
-            onTouchStart={onResizeTouchStart}
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: 14,
-              height: 14,
-              cursor: 'nwse-resize',
-              zIndex: 35,
-              background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
-              borderRadius: '0 0 4px 0',
-            }}
-          />
-        </div>
-      )}
-
-      {/* "Supporting the Events in" subheading */}
-      <div
-        style={{
-          position: 'absolute',
-          top: SUBHEAD_Y,
-          left: CITY_BOX.x,
-          fontSize: SUBHEAD_FONT_SIZE,
-          fontFamily: TEXT_FONT,
-          color: VENUE_COLOR,
-          textTransform: 'uppercase',
-          lineHeight: 1,
-          whiteSpace: 'nowrap',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-        }}
-      >
-        {SUBHEAD_TEXT}
-      </div>
-
-      {/* City names — inline editable */}
-      {displayCities.map((city, i) => {
-        const isEditing = editingIndex === i;
-        const y = CITY_BOX.y + i * (CITY_FONT_SIZE * CITY_LINE_SPACING);
-        return (
-          <div
-            key={i}
-            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingIndex(i); }}
-            style={{
-              position: 'absolute',
-              top: y,
-              left: CITY_BOX.x,
-              width: CITY_BOX.width,
-              height: CITY_FONT_SIZE * CITY_LINE_SPACING,
-              fontSize: CITY_FONT_SIZE,
-              fontFamily: CITY_FONT,
-              color: CITY_COLOR,
-              textTransform: 'uppercase',
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-              cursor: isEditing ? 'text' : 'default',
-              userSelect: isEditing ? 'auto' : 'none',
-              WebkitUserSelect: isEditing ? 'auto' : 'none',
-            }}
-          >
-            {isEditing ? (
-              <input
-                autoFocus
-                value={city}
-                onChange={e => handleCityRename(i, e.target.value)}
-                onBlur={() => setEditingIndex(null)}
-                onKeyDown={e => { if (e.key === 'Enter') setEditingIndex(null); if (e.key === 'Escape') setEditingIndex(null); }}
-                onClick={e => e.stopPropagation()}
-                onMouseDown={e => e.stopPropagation()}
-                style={{
-                  width: '100%',
-                  background: 'rgba(0,0,0,0.5)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 4,
-                  outline: 'none',
-                  color: 'inherit',
-                  fontSize: 'inherit',
-                  fontFamily: 'inherit',
-                  textTransform: 'inherit' as any,
-                  lineHeight: 'inherit',
-                  padding: '0 4px',
-                  margin: 0,
-                }}
-              />
-            ) : (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, position: 'relative', paddingRight: 50 }}>
-                {city.toUpperCase()}
-                <Pencil
-                  size={28}
-                  style={{ cursor: 'pointer', opacity: 0.6, flexShrink: 0, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
-                  onClick={(e) => { e.stopPropagation(); setEditingIndex(i); }}
-                />
-              </span>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Overflow "+ X MORE" */}
-      {hasOverflow && (
-        <div
-          style={{
-            position: 'absolute',
-            top: CITY_BOX.y + MAX_VISIBLE * (CITY_FONT_SIZE * CITY_LINE_SPACING),
-            left: CITY_BOX.x,
-            fontSize: CITY_FONT_SIZE,
-            fontFamily: CITY_FONT,
-            color: CITY_COLOR,
-            textTransform: 'uppercase',
-            lineHeight: 1,
-            whiteSpace: 'nowrap',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-        >
-          + {overflowCount} MORE
-        </div>
-      )}
-    </div>
-  );
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black" onClick={onClose}>
@@ -449,64 +403,151 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
           {defaultCities.length === 0 ? (
             <p className="text-sm text-theme-text-faint text-center py-8">No events tagged with &ldquo;{partner.tag}&rdquo;.</p>
           ) : (
-            <div className="space-y-4">
-              {/* Hint */}
-              <p className="text-center text-xs text-white/40">
-                Double-click city names to edit. Drag logo to reposition. Drag corner to resize.
-              </p>
-
-              {/* Scaled preview — same pattern as FlyerGenerator */}
-              <div className="relative mx-auto" style={{ maxWidth: 500 }}>
-                <div
-                  ref={previewRef}
-                  style={{
-                    width: '100%',
-                    paddingBottom: '100%',
-                    position: 'relative',
-                    borderRadius: 16,
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                  }}
-                >
+            <>
+              {/* Canvas Preview */}
+              <div ref={previewRef} className="relative w-full select-none" style={{ aspectRatio: '1 / 1' }}>
+                <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full rounded-lg" />
+                {logoDims && (
                   <div
-                    ref={canvasRef}
+                    onMouseDown={onMouseDown}
+                    onTouchStart={onTouchStart}
+                    className="absolute cursor-move"
                     style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: 1080,
-                      height: 1080,
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'top left',
+                      left: logoPos.x * scale,
+                      top: (logoPos.y - logoDims.h / 2) * scale,
+                      width: logoDims.w * scale,
+                      height: logoDims.h * scale,
+                      border: '1px dashed rgba(255,255,255,0.4)',
+                      borderRadius: 4,
                     }}
+                    title="Drag to reposition logo"
                   >
-                    {fontsLoaded && renderFlyerContent()}
+                    {(() => {
+                      const handleResizeStart = (e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const startX = e.clientX, startY = e.clientY;
+                        const startSize = logoSize;
+                        const rect = previewRef.current?.getBoundingClientRect();
+                        const sc = rect ? rect.width / 1080 : 1;
+                        const move = (ev: MouseEvent) => {
+                          const dx = (ev.clientX - startX) / sc;
+                          const dy = (ev.clientY - startY) / sc;
+                          setLogoSize(Math.max(20, Math.min(120, Math.round(startSize + Math.max(dx, dy)))));
+                        };
+                        const up = () => {
+                          document.removeEventListener('mousemove', move);
+                          document.removeEventListener('mouseup', up);
+                        };
+                        document.addEventListener('mousemove', move);
+                        document.addEventListener('mouseup', up);
+                      };
+                      const handleResizeTouchStart = (e: React.TouchEvent) => {
+                        e.stopPropagation();
+                        const startX = e.touches[0].clientX, startY = e.touches[0].clientY;
+                        const startSize = logoSize;
+                        const rect = previewRef.current?.getBoundingClientRect();
+                        const sc = rect ? rect.width / 1080 : 1;
+                        const move = (ev: TouchEvent) => {
+                          ev.preventDefault();
+                          const dx = (ev.touches[0].clientX - startX) / sc;
+                          const dy = (ev.touches[0].clientY - startY) / sc;
+                          setLogoSize(Math.max(20, Math.min(120, Math.round(startSize + Math.max(dx, dy)))));
+                        };
+                        const end = () => {
+                          document.removeEventListener('touchmove', move);
+                          document.removeEventListener('touchend', end);
+                        };
+                        document.addEventListener('touchmove', move, { passive: false });
+                        document.addEventListener('touchend', end);
+                      };
+                      return (
+                        <div
+                          onMouseDown={handleResizeStart}
+                          onTouchStart={handleResizeTouchStart}
+                          title="Drag to resize logo"
+                          style={{
+                            position: 'absolute',
+                            bottom: -4,
+                            right: -4,
+                            width: 14,
+                            height: 14,
+                            cursor: 'nwse-resize',
+                            zIndex: 36,
+                            background: 'rgba(255,255,255,0.6)',
+                            border: '1.5px solid rgba(255,255,255,0.9)',
+                            borderRadius: 2,
+                          }}
+                        />
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Controls */}
+              <div className="mt-4 space-y-3">
+                {/* Logo size slider */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-theme-text-faint whitespace-nowrap w-16">Logo size</label>
+                  <input type="range" min={20} max={120} value={logoSize} onChange={e => setLogoSize(Number(e.target.value))} className="flex-1 accent-red-500" />
+                  <span className="text-xs text-theme-text-faint w-8 text-right">{logoSize}</span>
+                </div>
+
+                {/* Editable city list */}
+                <div>
+                  <p className="text-xs text-theme-text-faint mb-1.5">Cities ({editCities.length})</p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {editCities.map((city, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <span className="text-xs w-5 text-center shrink-0" title={city.country || 'unknown country'}>
+                          {flagForCountry(city.country) || ' '}
+                        </span>
+                        <input
+                          type="text"
+                          value={city.name}
+                          onChange={e => handleCityRename(i, e.target.value)}
+                          className="flex-1 bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+                        />
+                        <button
+                          onClick={() => handleCityRemove(i)}
+                          className="p-1 text-theme-text-faint hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <input
+                      type="text"
+                      value={newCity}
+                      onChange={e => setNewCity(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleCityAdd()}
+                      placeholder="Add city..."
+                      className="flex-1 bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+                    />
+                    <button
+                      onClick={handleCityAdd}
+                      disabled={!newCity.trim()}
+                      className="p-1 text-theme-text-faint hover:text-green-400 disabled:opacity-30 transition-colors shrink-0"
+                    >
+                      <Plus size={12} />
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Action buttons */}
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="btn-primary flex items-center gap-2 px-6 py-3"
-                >
-                  {downloading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> {t('partnerFlyer.generating')}</>
-                  ) : (
-                    <><Download className="w-5 h-5" /> {t('partnerFlyer.download')}</>
-                  )}
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
-                  title={t('partnerManager.resetDefaults')}
-                >
-                  <RotateCcw className="w-4 h-4" /> {t('partnerFlyer.reset')}
-                </button>
+                {/* Action buttons */}
+                <div className="flex items-center gap-2">
+                  <button onClick={handleDownload} disabled={downloading} className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                    <Download size={14} />{downloading ? t('partnerFlyer.generating') : t('partnerFlyer.download')}
+                  </button>
+                  <button onClick={handleReset} className="p-2 text-theme-text-faint hover:text-theme-text-secondary transition-colors border border-theme-stroke rounded-lg" title={t('partnerManager.resetDefaults')}>
+                    <RotateCcw size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
