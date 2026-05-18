@@ -156,9 +156,10 @@ export function ShippingDashboard() {
     });
   }, [meData, loadData]);
 
-  // Unique countries from kit data
+  // Unique countries from kit data. Filter out empty strings so placeholder
+  // rows (which have no shipping country) don't add a blank entry.
   const countries = useMemo(() => {
-    const set = new Set(kits.map((k) => k.country));
+    const set = new Set(kits.map((k) => k.country).filter(Boolean));
     return Array.from(set).sort();
   }, [kits]);
 
