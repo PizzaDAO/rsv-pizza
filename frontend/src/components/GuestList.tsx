@@ -7,6 +7,7 @@ import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, 
 import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
 import { RejectedGuestsModal } from './RejectedGuestsModal';
+import { InvitedGuestsModal } from './InvitedGuestsModal';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
@@ -17,6 +18,7 @@ export const GuestList: React.FC = () => {
   const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
   const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [showInvitedModal, setShowInvitedModal] = useState(false);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -427,13 +429,18 @@ export const GuestList: React.FC = () => {
       {invitedGuests.length > 0 && (
         <div className="card p-6">
           <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowInvitedModal(true)}
+              className="flex items-center gap-3 rounded-lg -mx-2 px-2 py-1 hover:bg-theme-surface-hover transition-colors"
+              aria-label={`View ${invitedGuests.length} invited guests`}
+            >
               <Mail size={20} className="text-theme-text-secondary" />
               <h2 className="text-xl font-bold text-theme-text">Invited</h2>
               <span className="bg-blue-500/20 text-blue-400 text-sm font-medium px-3 py-1 rounded-full border border-blue-500/30">
                 {invitedGuests.length}
               </span>
-            </div>
+            </button>
           </div>
           <div className="flex items-center py-2 -mx-2 px-2">
             <Checkbox
@@ -568,6 +575,13 @@ export const GuestList: React.FC = () => {
         rejectedGuests={rejectedGuests}
         onRestore={restoreGuest}
         party={party}
+      />
+
+      {/* Invited Guests modal — opened from the Invited section header. */}
+      <InvitedGuestsModal
+        isOpen={showInvitedModal}
+        onClose={() => setShowInvitedModal(false)}
+        invitedGuests={invitedGuests}
       />
     </>
   );
