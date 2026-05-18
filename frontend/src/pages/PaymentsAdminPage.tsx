@@ -10,6 +10,8 @@ import {
   rejectAdminPayout,
   updateAdminPayout,
   markAdminPayoutPaid,
+  executeAdminPayout,
+  getUsdcDailyCapRemaining,
   exportAdminPayoutsCsv,
 } from '../lib/api';
 import type {
@@ -344,6 +346,7 @@ export function PaymentsAdminPage() {
           onReject={handleRowReject}
           onEdit={openDetail}
           onMarkPaid={handleRowMarkPaid}
+          onExecute={openDetail}
           busyRowId={rowBusyId}
           loading={loading}
           loadingMore={loadingMore}
@@ -433,6 +436,34 @@ export function PaymentsAdminPage() {
                 setErrorMsg(err.message || 'Mark-paid failed');
               } finally {
                 setModalBusy(false);
+              }
+            }}
+            onExecute={async (body) => {
+              setModalBusy(true);
+              try {
+                await executeAdminPayout(detail.id, body);
+                const fresh = await getAdminPayout(detail.id);
+                setDetail(fresh);
+                await refresh();
+              } catch (err: any) {
+                setErrorMsg(err.message || 'Execute failed');
+                // Refresh anyway — USDC failure flips status to 'failed' server-side.
+                try {
+                  const fresh = await getAdminPayout(detail.id);
+                  setDetail(fresh);
+                  await refresh();
+                } catch {
+                  /* ignore */
+                }
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            fetchUsdcCapRemaining={async () => {
+              try {
+                return await getUsdcDailyCapRemaining();
+              } catch {
+                return null;
               }
             }}
           />

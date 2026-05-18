@@ -27,6 +27,21 @@ interface PayoutReviewModalProps {
     mercuryCardId?: string;
     note?: string;
   }) => Promise<void> | void;
+  /**
+   * Execute payout (PR 5). For USDC → no body, server sends via Privy.
+   * For wire / mercury_card → admin-supplied refs.
+   */
+  onExecute: (body: {
+    wireReference?: string;
+    mercuryCardLast4?: string;
+    mercuryCardId?: string;
+    note?: string;
+  }) => Promise<void> | void;
+  /**
+   * Optional fetcher for the USDC daily-cap-remaining hint. Only called when
+   * the admin opens the USDC execute confirmation. Returns null if unavailable.
+   */
+  fetchUsdcCapRemaining?: () => Promise<{ usedUsd: number; capUsd: number; remainingUsd: number } | null>;
   /** Re-open (clear rejected/failed) — uses mark-paid plumbing or a future endpoint. */
   onReopen?: () => Promise<void> | void;
   busy?: boolean;
@@ -41,6 +56,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onSaveAmount,
   onSaveAdminNotes,
   onMarkPaid,
+  onExecute,
+  fetchUsdcCapRemaining,
   onReopen,
   busy = false,
 }) => {
@@ -58,6 +75,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [cardLast4, setCardLast4] = useState('');
   const [cardId, setCardId] = useState('');
   const [paidNote, setPaidNote] = useState('');
+
+  // Execute-payout (PR 5) — method-specific confirmation form
+  const [showExecuteForm, setShowExecuteForm] = useState(false);
+  const [execWireRef, setExecWireRef] = useState('');
+  const [execCardLast4, setExecCardLast4] = useState('');
+  const [execCardId, setExecCardId] = useState('');
+  const [execNote, setExecNote] = useState('');
+  const [usdcCap, setUsdcCap] = useState<
+    { usedUsd: number; capUsd: number; remainingUsd: number } | null
+  >(null);
+  const [usdcCapLoading, setUsdcCapLoading] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -83,6 +111,29 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const isApproved = payout.status === 'approved';
   const isPaid = payout.status === 'paid';
   const isClosed = payout.status === 'rejected' || payout.status === 'failed';
+
+  // For Mercury, last4 must be exactly 4 digits before the button enables.
+  const execMercuryValid = /^\d{4}$/.test(execCardLast4.trim());
+  const execWireValid = execWireRef.trim().length > 0;
+
+  async function openExecuteForm() {
+    setShowExecuteForm(true);
+    setExecWireRef('');
+    setExecCardLast4('');
+    setExecCardId('');
+    setExecNote('');
+    if (payout.payoutMethod === 'usdc_base' && fetchUsdcCapRemaining) {
+      setUsdcCapLoading(true);
+      try {
+        const cap = await fetchUsdcCapRemaining();
+        setUsdcCap(cap);
+      } catch {
+        setUsdcCap(null);
+      } finally {
+        setUsdcCapLoading(false);
+      }
+    }
+  }
 
   return (
     <div
@@ -411,6 +462,129 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </div>
             )}
 
+            {/* Execute payout form (PR 5) */}
+            {showExecuteForm && (
+              <div className="rounded-xl border border-emerald-300 p-3 bg-emerald-50 text-sm space-y-2">
+                <h3 className="font-semibold text-emerald-900 mb-1">Execute payout</h3>
+
+                {payout.payoutMethod === 'usdc_base' && (
+                  <div className="space-y-2">
+                    <p className="text-emerald-900">
+                      Send <strong>{formatUsd(Number(payout.finalAmountUsd))}</strong> USDC on Base to:
+                    </p>
+                    <p className="font-mono text-xs break-all text-emerald-900/80 bg-white/50 px-2 py-1.5 rounded">
+                      {payout.payoutWalletAddress || '(no address set — cannot execute)'}
+                    </p>
+                    <div className="text-xs text-emerald-800">
+                      {usdcCapLoading ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Loader2 size={10} className="animate-spin" /> Checking daily cap…
+                        </span>
+                      ) : usdcCap ? (
+                        <>
+                          Daily cap remaining: <strong>{formatUsd(usdcCap.remainingUsd)}</strong>{' '}
+                          (${usdcCap.usedUsd.toFixed(2)} used of ${usdcCap.capUsd.toFixed(2)} in last 24h)
+                        </>
+                      ) : (
+                        <span className="text-emerald-800/70">Daily cap status unavailable.</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {payout.payoutMethod === 'wire' && (
+                  <div className="space-y-2">
+                    <p className="text-emerald-900">
+                      Confirm that the {formatUsd(Number(payout.finalAmountUsd))} wire has been sent
+                      out-of-band, then enter the wire reference number for the audit trail.
+                    </p>
+                    <IconInput
+                      icon={Pencil}
+                      placeholder="Wire reference number (required)"
+                      value={execWireRef}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecWireRef(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {payout.payoutMethod === 'mercury_card' && (
+                  <div className="space-y-2">
+                    <p className="text-emerald-900">
+                      Confirm that the {formatUsd(Number(payout.finalAmountUsd))} Mercury virtual card
+                      has been issued via the Mercury dashboard, then record the last 4 digits below.
+                    </p>
+                    <IconInput
+                      icon={Pencil}
+                      placeholder="Card last 4 digits (required, exactly 4 numbers)"
+                      value={execCardLast4}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setExecCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))
+                      }
+                      inputMode="numeric"
+                      maxLength={4}
+                    />
+                    <IconInput
+                      icon={Pencil}
+                      placeholder="Mercury card id (optional)"
+                      value={execCardId}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecCardId(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {payout.payoutMethod !== 'usdc_base' && (
+                  <IconInput
+                    icon={Pencil}
+                    placeholder="Note (optional)"
+                    value={execNote}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecNote(e.target.value)}
+                  />
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (payout.payoutMethod === 'wire' && !execWireValid) return;
+                      if (payout.payoutMethod === 'mercury_card' && !execMercuryValid) return;
+                      if (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress) return;
+                      await onExecute({
+                        wireReference: payout.payoutMethod === 'wire' ? execWireRef.trim() : undefined,
+                        mercuryCardLast4:
+                          payout.payoutMethod === 'mercury_card' ? execCardLast4.trim() : undefined,
+                        mercuryCardId:
+                          payout.payoutMethod === 'mercury_card' && execCardId.trim()
+                            ? execCardId.trim()
+                            : undefined,
+                        note: execNote.trim() || undefined,
+                      });
+                      setShowExecuteForm(false);
+                    }}
+                    disabled={
+                      busy ||
+                      (payout.payoutMethod === 'wire' && !execWireValid) ||
+                      (payout.payoutMethod === 'mercury_card' && !execMercuryValid) ||
+                      (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress)
+                    }
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    {busy && <Loader2 size={12} className="animate-spin" />}
+                    {payout.payoutMethod === 'usdc_base' ? 'Send Payout' :
+                      payout.payoutMethod === 'wire' ? 'Confirm wire sent' :
+                      'Confirm card issued'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowExecuteForm(false)}
+                    disabled={busy}
+                    className="px-3 py-1.5 rounded-lg text-xs text-theme-text-secondary hover:bg-theme-surface-hover disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Mark paid form */}
             {showMarkPaidForm && (
               <div className="rounded-xl border border-blue-300 p-3 bg-blue-50 text-sm space-y-2">
@@ -512,12 +686,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             <>
               <button
                 type="button"
-                disabled
-                title="Payout execution is wired in PR 5"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-theme-surface-hover text-theme-text-faint text-sm font-medium cursor-not-allowed"
+                onClick={openExecuteForm}
+                disabled={busy || selfPayoutBlocked || showExecuteForm}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
               >
                 <Send size={14} />
-                Execute Payout (PR 5)
+                Execute Payout
               </button>
               <button
                 type="button"

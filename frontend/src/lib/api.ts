@@ -3675,6 +3675,41 @@ export async function markAdminPayoutPaid(
 }
 
 /**
+ * Execute an approved payout (PR 5). Body shape is method-specific:
+ *   - usdc_base    → no body required; server sends via Privy server-wallet
+ *   - wire         → { wireReference: string } REQUIRED
+ *   - mercury_card → { mercuryCardLast4: 'NNNN', mercuryCardId?: string, note?: string } REQUIRED
+ * Returns the updated payout. Throws on any server-side validation/execution failure.
+ */
+export async function executeAdminPayout(
+  id: string,
+  body: {
+    wireReference?: string;
+    mercuryCardLast4?: string;
+    mercuryCardId?: string;
+    note?: string;
+  } = {},
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {
+    method: 'POST',
+    body,
+  });
+  return res.payout;
+}
+
+/**
+ * Get the running 24h USDC payout usage + remaining cap (PR 5). Used to render
+ * the "Daily cap remaining: $X" hint before the admin confirms a USDC execute.
+ */
+export async function getUsdcDailyCapRemaining(): Promise<{
+  usedUsd: number;
+  capUsd: number;
+  remainingUsd: number;
+}> {
+  return apiRequest('/api/admin/payouts/usdc-daily-cap-remaining');
+}
+
+/**
  * Triggers the CSV export endpoint and downloads the file to the browser.
  * Returns nothing — fires a download via a temporary <a> element.
  */
