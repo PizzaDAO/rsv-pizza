@@ -1142,6 +1142,7 @@ export interface UnderbossAdmin {
   email: string;
   region: string;
   regions: string[];
+  cities: string[];
   isActive: boolean;
   notes: string | null;
   createdAt: string;

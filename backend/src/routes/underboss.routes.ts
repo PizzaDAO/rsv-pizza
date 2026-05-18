@@ -1,103 +1,28 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
+import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { buildScopedWhereClause, partyMatchesScope, UnderbossScope } from '../helpers/underbossScope.js';
 import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
 import { scoreEvent, buildSybilWalletSet } from '../lib/fakeDetection.js';
 
-// Extend Request to include underboss
-interface UnderbossRequest extends AuthRequest {
-  underboss?: {
-    id: string;
-    name: string;
-    email: string;
-    region: string;
-    regions: string[];
-    isActive: boolean;
-  };
-}
+// Re-export the request type under the local name used throughout this file
+type UnderbossRequest = UnderbossAuthRequest;
 
-function isAuthorizedForRegion(underboss: { regions: string[] }, region: string): boolean {
-  if (underboss.regions.includes('__admin__')) return true;
-  return underboss.regions.includes(region);
-}
-
-// Login-based underboss middleware — requires JWT auth, then looks up underboss by email
-async function requireUnderbossAuth(
-  req: UnderbossRequest,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const email = req.userEmail;
-    if (!email) {
-      throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
-    }
-
-    // Check if user is an admin first
-    if (await isAdmin(email)) {
-      req.underboss = {
-        id: 'admin',
-        name: 'Admin',
-        email,
-        region: '__admin__', // Special marker — admin can view any region
-        regions: ['__admin__'],
-        isActive: true,
-      };
-      return next();
-    }
-
-    // Look up underboss by email
-    const underboss = await prisma.underboss.findFirst({
-      where: { email: email.toLowerCase(), isActive: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        region: true,
-        regions: true,
-        isActive: true,
-      },
-    });
-
-    if (underboss) {
-      // Fall back to [region] if regions array is empty (legacy data)
-      const regions = underboss.regions.length > 0 ? underboss.regions : [underboss.region];
-      req.underboss = {
-        id: underboss.id,
-        name: underboss.name,
-        email: underboss.email,
-        region: underboss.region,
-        regions,
-        isActive: underboss.isActive,
-      };
-      return next();
-    }
-
-    // Check if user is a graphics admin
-    const graphicsAdmin = await prisma.graphicsAdmin.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-    if (graphicsAdmin) {
-      req.underboss = {
-        id: 'graphics-admin',
-        name: graphicsAdmin.name || 'Graphics Admin',
-        email,
-        region: '__admin__',
-        regions: ['__admin__'],
-        isActive: true,
-      };
-      return next();
-    }
-
-    // Neither underboss, admin, nor graphics admin
-    throw new AppError('Not authorized as underboss', 403, 'FORBIDDEN');
-  } catch (error) {
-    next(error);
+/**
+ * Build the UnderbossScope for the authenticated request.
+ * Admins/graphics-admins (`regions: ['__admin__']`) get `isAdmin: true`.
+ */
+function scopeFromReq(req: UnderbossRequest): UnderbossScope {
+  const ub = req.underboss!;
+  if (ub.regions.includes('__admin__')) {
+    return { isAdmin: true, regions: [], cities: [] };
   }
+  return { isAdmin: false, regions: ub.regions, cities: ub.cities || [] };
 }
 
 // Helper: compute progress for an event (9 items matching GPP host dashboard)
@@ -281,6 +206,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
         isGraphicsAdmin,
         region: null,
         regions: ['__admin__'],
+        cities: [],
         name: 'Admin',
         email,
       });
@@ -300,6 +226,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
         isGraphicsAdmin,
         region: underboss.region,
         regions,
+        cities: underboss.cities || [],
         name: underboss.name,
         email: underboss.email,
       });
@@ -312,6 +239,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       isGraphicsAdmin,
       region: null,
       regions: [],
+      cities: [],
       name: null,
       email,
     });
@@ -365,6 +293,19 @@ router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Un
 
     if (status === undefined && priority === undefined) {
       throw new AppError('nothing to update — provide status and/or priority', 400, 'VALIDATION_ERROR');
+    }
+
+    // Scope check: city-scoped UBs can update only their cities (mozzarella-25815).
+    // Region-only UBs would need a city→region map (lives in the GPP cities sheet,
+    // not in the backend today) — for v1 we let region-only UBs proceed without the
+    // city check, matching pre-existing behavior. City-scoped UBs are restricted.
+    const scope = scopeFromReq(req);
+    if (!scope.isAdmin && scope.cities.length > 0 && scope.regions.length === 0) {
+      const normalized = cityKey.toLowerCase().trim();
+      const allowed = scope.cities.map((c) => c.toLowerCase().trim());
+      if (!allowed.includes(normalized)) {
+        throw new AppError('Not authorized for this city', 403, 'FORBIDDEN');
+      }
     }
 
     const updatedBy = req.underboss?.email || null;
@@ -541,28 +482,35 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
 router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region } = req.params;
+    const scope = scopeFromReq(req);
 
-    // Handle "all" region — admins see everything, underbosses see their assigned regions
+    // Handle "all" region — admins see everything, underbosses see scoped events
     if (region === 'all') {
-      const isAdminUser = req.underboss!.regions.includes('__admin__');
-      if (!isAdminUser && req.underboss!.regions.length === 0) {
+      if (!scope.isAdmin && scope.regions.length === 0 && scope.cities.length === 0) {
         throw new AppError('Not authorized for any region', 403, 'FORBIDDEN');
       }
     } else {
-      // Verify the underboss is assigned to this region (admins can view any region)
-      if (!isAuthorizedForRegion(req.underboss!, region)) {
+      // For a specific region: must have region OR a city that's a GPP event in that region.
+      // Cheap pre-check: region in scope (admin or region-scoped). City scope is
+      // intersected by the whereClause below, so explicit "not in scope" only fires
+      // when neither region nor any cities match.
+      if (!scope.isAdmin && !scope.regions.includes(region) && scope.cities.length === 0) {
         throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
       }
     }
 
-    let whereClause;
+    let whereClause: any;
     if (region === 'all') {
-      const isAdminUser = req.underboss!.regions.includes('__admin__');
-      whereClause = isAdminUser
-        ? { eventType: 'gpp' as const }
-        : { eventType: 'gpp' as const, region: { in: req.underboss!.regions } };
+      const scopedWhere = buildScopedWhereClause(scope);
+      whereClause = scopedWhere
+        ? { AND: [{ eventType: 'gpp' as const }, scopedWhere] }
+        : { eventType: 'gpp' as const };
     } else {
-      whereClause = { region, eventType: 'gpp' as const };
+      // Restrict to events whose region matches :region AND that match the UB's scope
+      // (so a city-only UB sees only their cities even when browsing a specific region).
+      const scopedWhere = buildScopedWhereClause(scope);
+      const base = { region, eventType: 'gpp' as const };
+      whereClause = scopedWhere ? { AND: [base, scopedWhere] } : base;
     }
 
     const events = await prisma.party.findMany({
@@ -627,13 +575,18 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     const limit = parseInt(req.query.limit as string) || 50;
     const skip = (page - 1) * limit;
 
-    if (!isAuthorizedForRegion(req.underboss!, region)) {
+    const scope = scopeFromReq(req);
+    if (!scope.isAdmin && !scope.regions.includes(region) && scope.cities.length === 0) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
+    const scopedWhere = buildScopedWhereClause(scope);
+    const base = { region, eventType: 'gpp' as const };
+    const where: any = scopedWhere ? { AND: [base, scopedWhere] } : base;
+
     const [events, total, allUnderbosses] = await Promise.all([
       prisma.party.findMany({
-        where: { region, eventType: 'gpp' },
+        where,
         include: {
           user: { select: { name: true, email: true, telegram: true } },
           guests: {
@@ -647,7 +600,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
         skip,
         take: limit,
       }),
-      prisma.party.count({ where: { region, eventType: 'gpp' } }),
+      prisma.party.count({ where }),
       prisma.underboss.findMany({
         where: { isActive: true },
         select: { email: true },
@@ -692,8 +645,9 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
 router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region, partyId } = req.params;
+    const scope = scopeFromReq(req);
 
-    if (!isAuthorizedForRegion(req.underboss!, region)) {
+    if (!scope.isAdmin && !scope.regions.includes(region) && scope.cities.length === 0) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
@@ -719,6 +673,12 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
     });
 
     if (!party) {
+      throw new AppError('Event not found', 404, 'NOT_FOUND');
+    }
+
+    // Scope enforcement: return 404 (not 403) when the party exists but is out of
+    // scope, to avoid leaking the event's existence.
+    if (!partyMatchesScope(party, scope)) {
       throw new AppError('Event not found', 404, 'NOT_FOUND');
     }
 
@@ -751,14 +711,19 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
 router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const { region } = req.params;
+    const scope = scopeFromReq(req);
 
-    if (!isAuthorizedForRegion(req.underboss!, region)) {
+    if (!scope.isAdmin && !scope.regions.includes(region) && scope.cities.length === 0) {
       throw new AppError('Not authorized for this region', 403, 'FORBIDDEN');
     }
 
+    const scopedWhere = buildScopedWhereClause(scope);
+    const base = { region, eventType: 'gpp' as const };
+    const where: any = scopedWhere ? { AND: [base, scopedWhere] } : base;
+
     const [events, allUnderbosses] = await Promise.all([
       prisma.party.findMany({
-        where: { region, eventType: 'gpp' },
+        where,
         include: {
           user: { select: { name: true, email: true } },
           guests: {
@@ -800,6 +765,19 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // Scope check (mozzarella-25815): reject if any partyId is outside the UB's region/city scope.
+    const scope = scopeFromReq(req);
+    if (!scope.isAdmin) {
+      const affected = await prisma.party.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, region: true, name: true, eventType: true },
+      });
+      const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
+      if (outOfScopeIds.length > 0) {
+        return res.status(403).json({ error: 'OUT_OF_SCOPE', outOfScopeIds });
+      }
+    }
+
     const email = req.userEmail!;
     const isAdminUser = await isAdmin(email);
     const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
@@ -839,6 +817,19 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
       throw new AppError('partyIds must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
 
+    // Scope check (mozzarella-25815)
+    const scope = scopeFromReq(req);
+    if (!scope.isAdmin) {
+      const affected = await prisma.party.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, region: true, name: true, eventType: true },
+      });
+      const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
+      if (outOfScopeIds.length > 0) {
+        return res.status(403).json({ error: 'OUT_OF_SCOPE', outOfScopeIds });
+      }
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       await setDeleteContext(tx, req.userEmail, 'underboss_bulk');
       return tx.party.deleteMany({
@@ -875,6 +866,19 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
 
     if (cleanTags.length === 0) {
       throw new AppError('No valid tags provided', 400, 'VALIDATION_ERROR');
+    }
+
+    // Scope check (mozzarella-25815)
+    const scope = scopeFromReq(req);
+    if (!scope.isAdmin) {
+      const affected = await prisma.party.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, region: true, name: true, eventType: true },
+      });
+      const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
+      if (outOfScopeIds.length > 0) {
+        return res.status(403).json({ error: 'OUT_OF_SCOPE', outOfScopeIds });
+      }
     }
 
     // Fetch current events
@@ -961,6 +965,23 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
 // Event PATCH routes (underboss auth)
 // ============================================
 
+/**
+ * Helper: load a party and assert it's within the UB's scope. Returns 404
+ * (not 403) on out-of-scope to avoid leaking existence (mozzarella-25815).
+ */
+async function assertPartyInScope(partyId: string, scope: UnderbossScope): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { id: true, region: true, name: true, eventType: true },
+  });
+  if (!party) {
+    throw new AppError('Event not found', 404, 'NOT_FOUND');
+  }
+  if (!partyMatchesScope(party, scope)) {
+    throw new AppError('Event not found', 404, 'NOT_FOUND');
+  }
+}
+
 // PATCH /api/underboss/event/:partyId/host-status - Set host status (new/alum/pro)
 router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
@@ -971,6 +992,8 @@ router.patch('/event/:partyId/host-status', requireAuth, requireUnderbossAuth, a
     if (!validStatuses.includes(hostStatus)) {
       throw new AppError('Invalid host status. Must be "new", "alum", "pro", or null', 400, 'VALIDATION_ERROR');
     }
+
+    await assertPartyInScope(partyId, scopeFromReq(req));
 
     const party = await prisma.party.update({
       where: { id: partyId },
@@ -1005,10 +1028,19 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
     const isAdminUser = await isAdmin(email);
     const underboss = isAdminUser ? { id: 'admin' } : await prisma.underboss.findFirst({
       where: { email: email.toLowerCase(), isActive: true },
-      select: { id: true },
+      select: { id: true, region: true, regions: true, cities: true },
     });
 
     if (underboss) {
+      // Scope check (mozzarella-25815): non-admin UBs may only mutate events in their scope.
+      if (!isAdminUser) {
+        const ubAny = underboss as any;
+        const regions = ubAny.regions && ubAny.regions.length > 0 ? ubAny.regions : [ubAny.region];
+        const scope: UnderbossScope = regions.includes('__admin__')
+          ? { isAdmin: true, regions: [], cities: [] }
+          : { isAdmin: false, regions, cities: ubAny.cities || [] };
+        await assertPartyInScope(partyId, scope);
+      }
       // Underboss/admin: allow all statuses
       const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
       const party = await prisma.$transaction(async (tx) => {
@@ -1089,6 +1121,8 @@ router.patch('/event/:partyId/tags', requireAuth, requireUnderbossAuth, async (r
       .map((t: string) => t.trim().toLowerCase().slice(0, 50))
       .slice(0, 10);
 
+    await assertPartyInScope(partyId, scopeFromReq(req));
+
     const party = await prisma.party.update({
       where: { id: partyId },
       data: { hostTags: cleanTags },
@@ -1114,6 +1148,8 @@ router.patch('/event/:partyId/expected-guests', requireAuth, requireUnderbossAut
       }
     }
 
+    await assertPartyInScope(partyId, scopeFromReq(req));
+
     const party = await prisma.party.update({
       where: { id: partyId },
       data: { expectedGuests: expectedGuests != null ? Number(expectedGuests) : null },
@@ -1135,6 +1171,8 @@ router.patch('/event/:partyId/notes', requireAuth, requireUnderbossAuth, async (
     if (notes !== null && typeof notes !== 'string') {
       throw new AppError('notes must be a string or null', 400, 'VALIDATION_ERROR');
     }
+
+    await assertPartyInScope(partyId, scopeFromReq(req));
 
     const party = await prisma.party.update({
       where: { id: partyId },
@@ -1159,7 +1197,7 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    const { name, email, region, regions: regionsInput, notes } = req.body;
+    const { name, email, region, regions: regionsInput, cities: citiesInput, notes } = req.body;
 
     // Accept regions array or legacy single region
     let regions: string[] = [];
@@ -1169,8 +1207,13 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       regions = [region];
     }
 
-    if (!name || !email || regions.length === 0) {
-      throw new AppError('Name, email, and at least one region are required', 400, 'VALIDATION_ERROR');
+    const cities: string[] = Array.isArray(citiesInput)
+      ? citiesInput.filter((c: any) => typeof c === 'string' && c.trim().length > 0).map((c: string) => c.trim())
+      : [];
+
+    // mozzarella-25815: at least ONE of regions or cities required.
+    if (!name || !email || (regions.length === 0 && cities.length === 0)) {
+      throw new AppError('Name, email, and at least one region or city are required', 400, 'VALIDATION_ERROR');
     }
 
     // Generate a placeholder token for the DB column (required by schema) but it's no longer used for auth
@@ -1180,27 +1223,31 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
       data: {
         name,
         email: email.toLowerCase(),
-        region: regions[0], // Deprecated field — set to first region
+        region: regions[0] || '', // Deprecated field — set to first region or empty
         regions,
+        cities,
         accessToken: placeholderToken,
         notes: notes || null,
       },
     });
 
-    // Add new underboss as co-host to all existing GPP events in their region(s)
+    // Add new underboss as co-host to all GPP events matching their region(s) or city(ies)
     try {
-      const gppEvents = await prisma.party.findMany({
-        where: {
-          eventType: 'gpp',
-          region: { in: regions },
-        },
-        select: { id: true, coHosts: true },
-      });
+      const scope: UnderbossScope = { isAdmin: false, regions, cities };
+      const scopedWhere = buildScopedWhereClause(scope);
+      const gppEvents = scopedWhere
+        ? await prisma.party.findMany({
+            where: { AND: [{ eventType: 'gpp' }, scopedWhere] },
+            select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+          })
+        : [];
 
       const ubEmail = email.toLowerCase();
       for (const event of gppEvents) {
+        // Defensive: re-check scope (buildScopedWhereClause already filtered, but
+        // double-check city extraction handles edge cases).
+        if (!partyMatchesScope(event, scope)) continue;
         const existingCoHosts = (event.coHosts as any[]) || [];
-        // Skip if already a co-host
         if (existingCoHosts.some((h: any) => h.email?.toLowerCase() === ubEmail)) continue;
 
         const updatedCoHosts = [
@@ -1230,6 +1277,7 @@ router.post('/admin/create', requireAuth, async (req: AuthRequest, res: Response
         email: underboss.email,
         region: underboss.region,
         regions: underboss.regions,
+        cities: underboss.cities,
         isActive: underboss.isActive,
         notes: underboss.notes,
         createdAt: underboss.createdAt,
@@ -1255,6 +1303,7 @@ router.get('/admin/list', requireAuth, async (req: AuthRequest, res: Response, n
         email: true,
         region: true,
         regions: true,
+        cities: true,
         isActive: true,
         notes: true,
         createdAt: true,
@@ -1276,12 +1325,12 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
     }
 
     const { id } = req.params;
-    const { name, email, region, regions, notes, isActive } = req.body;
+    const { name, email, region, regions, cities, notes, isActive } = req.body;
 
     // Fetch old state before update for co-host sync
     const oldUnderboss = await prisma.underboss.findUnique({
       where: { id },
-      select: { name: true, email: true, regions: true, region: true, isActive: true },
+      select: { name: true, email: true, regions: true, region: true, cities: true, isActive: true },
     });
 
     const updateData: any = {
@@ -1301,6 +1350,13 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
       }
     }
 
+    // mozzarella-25815: handle cities array update
+    if (Array.isArray(cities)) {
+      updateData.cities = cities
+        .filter((c: any) => typeof c === 'string' && c.trim().length > 0)
+        .map((c: string) => c.trim());
+    }
+
     const underboss = await prisma.underboss.update({
       where: { id },
       data: updateData,
@@ -1310,6 +1366,7 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
         email: true,
         region: true,
         regions: true,
+        cities: true,
         isActive: true,
         notes: true,
         createdAt: true,
@@ -1422,6 +1479,76 @@ router.patch('/admin/:id', requireAuth, async (req: AuthRequest, res: Response, 
               }
             }
           }
+
+          // mozzarella-25815: mirror the region diff for cities.
+          // Cities are additive to regions, so events that match an existing
+          // region don't lose the co-host when a city is removed.
+          const oldCities = oldUnderboss.cities || [];
+          const newCities = Array.isArray(cities)
+            ? cities.filter((c: any) => typeof c === 'string' && c.trim().length > 0).map((c: string) => c.trim())
+            : oldCities;
+
+          const addedCities = newCities.filter((c: string) => !oldCities.includes(c));
+          const removedCities = oldCities.filter((c: string) => !newCities.includes(c));
+
+          // Remove co-host from events in dropped cities — but ONLY if the event
+          // doesn't also match a still-current region (additive scope).
+          if (removedCities.length > 0) {
+            const removeScope: UnderbossScope = { isAdmin: false, regions: [], cities: removedCities };
+            const removeWhere = buildScopedWhereClause(removeScope);
+            const stillScope: UnderbossScope = { isAdmin: false, regions: newRegions, cities: newCities };
+            if (removeWhere) {
+              const eventsToRemoveFrom = await prisma.party.findMany({
+                where: { AND: [{ eventType: 'gpp' }, removeWhere] },
+                select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+              });
+              for (const event of eventsToRemoveFrom) {
+                if (partyMatchesScope(event, stillScope)) continue; // still in scope via region or remaining city
+                const coHosts = (event.coHosts as any[]) || [];
+                const filtered = coHosts.filter((h: any) =>
+                  !(h.email?.toLowerCase() === oldEmail && h.isUnderboss === true)
+                );
+                if (filtered.length !== coHosts.length) {
+                  await prisma.party.update({
+                    where: { id: event.id },
+                    data: { coHosts: filtered },
+                  });
+                }
+              }
+            }
+          }
+
+          // Add co-host to events matching newly-added cities
+          if (addedCities.length > 0) {
+            const addScope: UnderbossScope = { isAdmin: false, regions: [], cities: addedCities };
+            const addWhere = buildScopedWhereClause(addScope);
+            if (addWhere) {
+              const eventsToAddTo = await prisma.party.findMany({
+                where: { AND: [{ eventType: 'gpp' }, addWhere] },
+                select: { id: true, coHosts: true, region: true, name: true, eventType: true },
+              });
+              for (const event of eventsToAddTo) {
+                if (!partyMatchesScope(event, addScope)) continue;
+                const coHosts = (event.coHosts as any[]) || [];
+                if (coHosts.some((h: any) => h.email?.toLowerCase() === newEmail)) continue;
+                const updatedCoHosts = [
+                  ...coHosts,
+                  {
+                    id: crypto.randomUUID(),
+                    name: newName,
+                    email: newEmail,
+                    showOnEvent: false,
+                    canEdit: true,
+                    isUnderboss: true,
+                  },
+                ];
+                await prisma.party.update({
+                  where: { id: event.id },
+                  data: { coHosts: updatedCoHosts },
+                });
+              }
+            }
+          }
         }
       } catch (syncError) {
         console.error('Failed to sync underboss co-hosts on update:', syncError);
@@ -1492,36 +1619,39 @@ router.post('/admin/backfill-cohosts', requireAuth, async (req: AuthRequest, res
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    // Get all active underbosses
+    // Get all active underbosses (incl. cities for mozzarella-25815 city-scoped matches)
     const activeUnderbosses = await prisma.underboss.findMany({
       where: { isActive: true },
-      select: { name: true, email: true, region: true, regions: true },
+      select: { name: true, email: true, region: true, regions: true, cities: true },
     });
 
-    // Get all GPP events with a region
+    // Get all GPP events (region may be null for city-only matches)
     const gppEvents = await prisma.party.findMany({
-      where: { eventType: 'gpp', region: { not: null } },
-      select: { id: true, region: true, coHosts: true },
+      where: { eventType: 'gpp' },
+      select: { id: true, region: true, name: true, eventType: true, coHosts: true },
     });
 
     let eventsUpdated = 0;
 
     for (const event of gppEvents) {
-      const eventRegion = event.region!;
       const existingCoHosts = (event.coHosts as any[]) || [];
 
-      // Find underbosses for this event's region
-      const regionUnderbosses = activeUnderbosses.filter(ub => {
-        const ubRegions = ub.regions.length > 0 ? ub.regions : [ub.region];
-        return ubRegions.includes(eventRegion);
+      // Find underbosses whose scope matches this event (region OR city)
+      const matchingUnderbosses = activeUnderbosses.filter((ub) => {
+        const regions = ub.regions.length > 0 ? ub.regions : (ub.region ? [ub.region] : []);
+        const scope: UnderbossScope = regions.includes('__admin__')
+          ? { isAdmin: true, regions: [], cities: [] }
+          : { isAdmin: false, regions, cities: ub.cities || [] };
+        // Skip admin-scope UBs for backfill — they don't actually need a co-host entry
+        if (scope.isAdmin) return false;
+        return partyMatchesScope(event, scope);
       });
 
       let newCoHosts = [...existingCoHosts];
       let changed = false;
 
-      for (const ub of regionUnderbosses) {
+      for (const ub of matchingUnderbosses) {
         const ubEmail = ub.email.toLowerCase();
-        // Skip if already present
         if (newCoHosts.some((h: any) => h.email?.toLowerCase() === ubEmail)) continue;
 
         newCoHosts.push({
@@ -1584,15 +1714,24 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
     const regionsParam = req.query.regions as string | undefined;
     const regions = regionsParam ? regionsParam.split(',') : underboss.regions;
 
-    // Build region filter
+    // Build region+city scope filter (mozzarella-25815). Region filter from
+    // query overrides the UB's regions for the region-branch but city scope
+    // always comes from the UB's record.
     const isAdminUser = underboss.regions.includes('__admin__');
-    const regionFilter = isAdminUser && (!regionsParam || regions.includes('__admin__'))
-      ? {}
-      : { region: { in: regions } };
+    let where: any;
+    if (isAdminUser && (!regionsParam || regions.includes('__admin__'))) {
+      where = {};
+    } else {
+      const scope: UnderbossScope = isAdminUser
+        ? { isAdmin: true, regions: [], cities: [] }
+        : { isAdmin: false, regions, cities: underboss.cities || [] };
+      const scopedWhere = buildScopedWhereClause(scope);
+      where = scopedWhere ?? {};
+    }
 
     // Get events with funnel data — use separate count queries to avoid Prisma issues
     const events = await prisma.party.findMany({
-      where: regionFilter,
+      where,
       select: {
         id: true,
         name: true,

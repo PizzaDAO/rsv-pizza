@@ -205,10 +205,17 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const filteredCities = useMemo(() => {
     let result = mergedCities;
 
-    // Region-based filter (non-admins only see cities in their assigned regions)
-    if (meData && !meData.isAdmin && meData.regions.length > 0) {
+    // Region+city scope filter (mozzarella-25815): non-admin UBs see cities
+    // that match either their assigned regions OR their explicit cities.
+    // Cities-only UBs see ONLY their explicit cities (strict).
+    if (meData && !meData.isAdmin) {
       const myRegions = meData.regions.map((r) => r.toLowerCase());
+      const myCities = (meData.cities || []).map((c) => c.toLowerCase().trim());
       result = result.filter((c) => {
+        if (myCities.includes(c.key)) return true;
+        // Strict city-only path: no regions assigned → only explicit cities
+        if (myCities.length > 0 && myRegions.length === 0) return false;
+        if (myRegions.length === 0) return false;
         if (!c.region) return false;
         const cityGppRegions = sheetCityToGppRegion(c);
         return cityGppRegions.some((id) => myRegions.includes(id));
