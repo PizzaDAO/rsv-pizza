@@ -202,6 +202,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   const setCombinedOptIn = useCallback((v: boolean) => {
     setMailingListOptIn(v);
+    if (isEthconfEvent) setEthconfOptIn(v);
     if (!activeRegionConfig) return;
     switch (activeRegionConfig.swcOptInField) {
       case 'swcOptIn':   setSwcOptIn(v);   break;
@@ -211,10 +212,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       case 'swcUkOptIn': setSwcUkOptIn(v); break;
       case 'swcBrOptIn': setSwcBrOptIn(v); break;
     }
-  }, [activeRegionConfig]);
+  }, [activeRegionConfig, isEthconfEvent]);
 
   const combinedOptIn = (() => {
     if (!activeRegionConfig || !mailingListOptIn) return false;
+    if (isEthconfEvent && !ethconfOptIn) return false;
     switch (activeRegionConfig.swcOptInField) {
       case 'swcOptIn':   return swcOptIn;
       case 'swcCaOptIn': return swcCaOptIn;
