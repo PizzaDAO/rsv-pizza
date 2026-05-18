@@ -31,6 +31,12 @@ export interface UnderbossAuthRequest extends AuthRequest {
  * Authorizes admins, graphics-admins, and any active underboss with at
  * least one region OR city. Replaces the duplicated copies that previously
  * lived in `underboss.routes.ts` and `telegram.routes.ts`.
+ *
+ * Precedence: admin → graphics-admin → underboss. Graphics-admin status
+ * promotes scope to admin-equivalent (`regions: ['__admin__']`) even when
+ * the same user also has an underboss row with a limited city/region
+ * scope, so the Graphics Dashboard (`/api/underboss/all`) returns all GPP
+ * events. Mirrors the graphics-admin short-circuit in `partyAccess.ts`.
  */
 export async function requireUnderbossAuth(
   req: UnderbossAuthRequest,
@@ -57,19 +63,40 @@ export async function requireUnderbossAuth(
       return next();
     }
 
-    // Look up underboss by email
-    const underboss = await prisma.underboss.findFirst({
-      where: { email: email.toLowerCase(), isActive: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        region: true,
-        regions: true,
-        cities: true,
+    // Look up both rows in parallel. Graphics-admin status overrides any
+    // underboss city/region scope so dual-role users see all GPP events on
+    // the Graphics Dashboard.
+    const [underboss, graphicsAdmin] = await Promise.all([
+      prisma.underboss.findFirst({
+        where: { email: email.toLowerCase(), isActive: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          region: true,
+          regions: true,
+          cities: true,
+          isActive: true,
+        },
+      }),
+      prisma.graphicsAdmin.findUnique({
+        where: { email: email.toLowerCase() },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    if (graphicsAdmin) {
+      req.underboss = {
+        id: underboss?.id ?? 'graphics-admin',
+        name: underboss?.name ?? graphicsAdmin.name ?? 'Graphics Admin',
+        email: underboss?.email ?? email,
+        region: '__admin__',
+        regions: ['__admin__'],
+        cities: [],
         isActive: true,
-      },
-    });
+      };
+      return next();
+    }
 
     if (underboss) {
       // Fall back to [region] if regions array is empty (legacy data)
@@ -87,23 +114,6 @@ export async function requireUnderbossAuth(
         regions,
         cities,
         isActive: underboss.isActive,
-      };
-      return next();
-    }
-
-    // Check if user is a graphics admin (preserve existing behavior)
-    const graphicsAdmin = await prisma.graphicsAdmin.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-    if (graphicsAdmin) {
-      req.underboss = {
-        id: 'graphics-admin',
-        name: graphicsAdmin.name || 'Graphics Admin',
-        email,
-        region: '__admin__',
-        regions: ['__admin__'],
-        cities: [],
-        isActive: true,
       };
       return next();
     }
