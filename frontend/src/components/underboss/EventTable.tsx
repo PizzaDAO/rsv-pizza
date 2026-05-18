@@ -18,6 +18,7 @@ interface EventTableProps {
   onTelegramBroadcast?: (cities: string[]) => void;
   partnerTags?: string[];
   onFilteredEventsChange?: (events: UnderbossEvent[]) => void;
+  isAdmin?: boolean;
 }
 
 type SortField = 'name' | 'date' | 'guestCount' | 'progress';
@@ -88,7 +89,7 @@ function FilterPill({
   );
 }
 
-export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange }: EventTableProps) {
+export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange, isAdmin }: EventTableProps) {
   const { t } = useTranslation('partner');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
@@ -535,15 +536,17 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   >
                     {t('eventTable.hide')}
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowActionDropdown(false);
-                      setShowDeleteConfirm(true);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
-                  >
-                    {t('eventTable.cancelEvent')}
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowActionDropdown(false);
+                        setShowDeleteConfirm(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"
+                    >
+                      {t('eventTable.cancelEvent')}
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setShowActionDropdown(false);

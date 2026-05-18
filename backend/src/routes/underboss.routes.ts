@@ -810,9 +810,13 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
   }
 });
 
-// DELETE /api/underboss/events/bulk-delete - Bulk delete events
+// DELETE /api/underboss/events/bulk-delete - Bulk delete events (admin-only, pineapple-26037)
 router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
     const { partyIds } = req.body;
 
     if (!Array.isArray(partyIds) || partyIds.length === 0) {

@@ -567,7 +567,7 @@ export function UnderbossDashboard() {
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} isAdmin={isAdmin} />
           )}
 
           {activeTab === 'cities' && (
