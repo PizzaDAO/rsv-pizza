@@ -3373,6 +3373,8 @@ export interface GPPEventMapItem {
   underbossStatus?: string | null;
   eventTags?: string[];
   telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
 }
 
 interface GPPEventApiResponse {
@@ -3391,6 +3393,8 @@ interface GPPEventApiResponse {
   underbossStatus?: string | null;
   eventTags?: string[];
   telegramGroup: string | null;
+  hostTelegram?: string | null;
+  coHostTelegrams?: string[];
 }
 
 interface GPPEventsApiPayload {
@@ -3427,6 +3431,8 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     underbossStatus: e.underbossStatus,
     eventTags: e.eventTags ?? [],
     telegramGroup: e.telegramGroup ?? null,
+    hostTelegram: e.hostTelegram ?? null,
+    coHostTelegrams: e.coHostTelegrams ?? [],
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');

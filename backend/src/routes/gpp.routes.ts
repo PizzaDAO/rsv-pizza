@@ -648,23 +648,40 @@ const gppEventSelect = {
   underbossStatus: true,
   rsvpClosedAt: true,
   createdAt: true,
+  coHosts: true,
   _count: {
     select: { guests: true },
   },
   user: {
-    select: { name: true },
+    select: { name: true, telegram: true },
   },
 } as const;
 
+async function resolveCallerIsModerator(req: Request): Promise<boolean> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return false;
+  try {
+    const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+    const email = decoded.email;
+    if (!email) return false;
+    return (await isAdmin(email)) || (await isUnderboss(email));
+  } catch {
+    return false;
+  }
+}
+
 // Format a Party record into the public GPP API response
-function formatGppEvent(event: any) {
+function formatGppEvent(event: any, callerIsModerator = false) {
   const baseUrl = 'https://rsv.pizza';
   const url = event.customUrl
     ? `${baseUrl}/${event.customUrl}`
     : `${baseUrl}/${event.inviteCode}`;
   const city = event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
 
-  return {
+  const base = {
     id: event.id,
     name: event.name,
     city,
@@ -691,6 +708,20 @@ function formatGppEvent(event: any) {
     approved: event.underbossStatus === 'approved',
     community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
+  };
+
+  if (!callerIsModerator) return base;
+
+  const cohostArr: any[] = Array.isArray(event.coHosts) ? event.coHosts : [];
+  const firstCohostTelegram = cohostArr
+    .map((c) => (c && typeof c.telegram === 'string' ? c.telegram.trim() : ''))
+    .find((t) => t.length > 0) || null;
+  const hostTelegram = event.user?.telegram?.trim() || null;
+
+  return {
+    ...base,
+    hostTelegram: hostTelegram || null,
+    coHostTelegrams: firstCohostTelegram ? [firstCohostTelegram] : [],
   };
 }
 
@@ -728,8 +759,12 @@ router.get('/events/by-city/:citySlug', async (req: Request, res: Response, next
       return res.status(404).json({ error: 'GPP event not found for this city' });
     }
 
-    res.set('Cache-Control', 'public, max-age=300');
-    res.json({ event: formatGppEvent(event) });
+    const callerIsModerator = await resolveCallerIsModerator(req);
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
+    res.json({ event: formatGppEvent(event, callerIsModerator) });
   } catch (error) {
     next(error);
   }
@@ -746,24 +781,10 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     // underboss/admin. Unauthenticated callers silently fall back to the
     // filtered (non-rejected, non-hidden) view — no 401, preserving backwards compat.
     const requestedAllStatuses = statuses === 'all' || req.query.includeAll === '1';
+    const callerIsModerator = await resolveCallerIsModerator(req);
     let includeAllStatuses = false;
-    if (requestedAllStatuses) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7);
-        const secret = process.env.JWT_SECRET;
-        if (secret) {
-          try {
-            const decoded = jwt.verify(token, secret) as { userId: string; email: string };
-            const email = decoded.email;
-            if (email && (await isAdmin(email) || await isUnderboss(email))) {
-              includeAllStatuses = true;
-            }
-          } catch {
-            // Bad/expired token — silently fall back to the filtered view
-          }
-        }
-      }
+    if (requestedAllStatuses && callerIsModerator) {
+      includeAllStatuses = true;
     }
 
     const where: any = { eventType: 'gpp' };
@@ -798,9 +819,12 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set(
+      'Cache-Control',
+      callerIsModerator ? 'private, no-store' : 'public, max-age=300'
+    );
     res.json({
-      events: events.map(formatGppEvent),
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
       total,
       limit: parsedLimit,
       offset: parsedOffset,
