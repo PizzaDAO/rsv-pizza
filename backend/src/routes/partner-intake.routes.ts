@@ -217,7 +217,7 @@ router.post('/:token', async (req: AuthRequest, res: Response, next: NextFunctio
       updateData.telegram = body.telegram?.trim() || null;
     }
     if (body.sponsorshipType !== undefined) {
-      const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'other'];
+      const validTypes = ['cash', 'in-kind', 'venue', 'pizza', 'drinks', 'community', 'other'];
       if (body.sponsorshipType && !validTypes.includes(body.sponsorshipType)) {
         throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
       }

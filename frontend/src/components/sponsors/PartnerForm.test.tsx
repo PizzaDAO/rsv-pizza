@@ -56,7 +56,7 @@ describe('PartnerForm mode="intake"', () => {
     // Section headings
     expect(screen.getByText('Company Info')).toBeInTheDocument();
     expect(screen.getByText('Contact Info')).toBeInTheDocument();
-    expect(screen.getByText('Sponsorship Details')).toBeInTheDocument();
+    expect(screen.getByText('Partnership Details')).toBeInTheDocument();
     expect(screen.getByText('Logo')).toBeInTheDocument();
     expect(screen.getByText('Message to Host')).toBeInTheDocument();
 

@@ -299,7 +299,7 @@
     "pipeline": "파이프라인",
     "fundraisingSection": "모금",
     "contributionType": "기여 유형",
-    "sponsorshipDetails": "후원 세부 정보",
+    "partnershipDetails": "파트너십 세부 정보",
     "messageFromSponsor": "후원자 메시지",
     "logo": "로고",
     "uploadLogo": "로고 업로드",
@@ -348,6 +348,7 @@
     "venueType": "베뉴",
     "pizzaType": "피자",
     "drinksType": "음료",
+    "communityType": "커뮤니티",
     "otherType": "기타",
     "brandDescription": "1-2문장 브랜드 설명 (이벤트 페이지에 표시)",
     "productService": "제품/서비스 (비현금인 경우)"

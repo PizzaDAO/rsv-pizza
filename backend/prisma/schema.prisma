@@ -922,7 +922,7 @@ model Sponsor {
 
   // Fundraising
   amount          Decimal? @db.Decimal(10, 2) // Contribution amount
-  sponsorshipType String?  @map("sponsorship_type") // cash, in-kind, venue, pizza, drinks, other
+  sponsorshipType String?  @map("sponsorship_type") // cash, in-kind, venue, pizza, drinks, community, other
   productService  String?  @map("product_service") // For non-monetary contributions
 
   // Assets (for confirmed sponsors)
