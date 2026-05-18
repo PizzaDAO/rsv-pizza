@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const KML_URL = 'https://www.google.com/maps/d/kml?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA';
 
@@ -9,7 +9,7 @@ interface GPPMapProps {
   initialZoom?: number;
 }
 
-export default function GPPMap({
+function GPPMap({
   height = 500,
   minZoom = 3,
   maxZoom = 12,
@@ -118,3 +118,5 @@ export default function GPPMap({
     />
   );
 }
+
+export default React.memo(GPPMap);
