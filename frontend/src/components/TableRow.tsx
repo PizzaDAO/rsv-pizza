@@ -389,7 +389,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         </>
       )}
 
-      {/* Approve/Decline buttons */}
+      {/* Approve/Reject buttons */}
       {requireApproval && guest.approved === null && onApprove && onDecline && (
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
@@ -404,17 +404,17 @@ export const TableRow: React.FC<TableRowProps> = ({
             className="flex items-center gap-1 text-[#ff393a] hover:bg-[#ff393a]/10 px-2 py-1 rounded transition-colors text-sm"
           >
             <X size={14} />
-            <span>Decline</span>
+            <span>Reject</span>
           </button>
         </div>
       )}
 
-      {/* Status badge for approved/declined */}
+      {/* Status badge for approved/rejected */}
       {requireApproval && guest.approved === true && (
         <span className="text-[#39d98a] text-xs flex-shrink-0">Approved</span>
       )}
       {requireApproval && guest.approved === false && (
-        <span className="text-[#ff393a] text-xs flex-shrink-0">Declined</span>
+        <span className="text-[#ff393a] text-xs flex-shrink-0">Rejected</span>
       )}
 
       {/* Notable attendee star toggle */}
