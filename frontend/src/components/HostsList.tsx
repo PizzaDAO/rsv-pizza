@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { normalizeUrl } from '../lib/utils';
 
-// Avatar with onError fallback for broken image URLs
+const MAX_RETRIES = 2;
+const RETRY_DELAYS_MS = [500, 1500]; // delay BEFORE retry attempt N (0-indexed)
+
+// Avatar with onError fallback for broken image URLs.
+// Retries up to MAX_RETRIES times with stable ?r=N cache-buster tokens before
+// latching to the User-icon fallback, to absorb transient load failures
+// (Supabase CORS preflight race, edge-cache miss, momentary network blip).
 const AvatarImg: React.FC<{
   src: string;
   alt: string;
@@ -12,7 +18,34 @@ const AvatarImg: React.FC<{
   iconClassName: string;
   style?: React.CSSProperties;
 }> = ({ src, alt, className, fallbackClassName, iconClassName, style }) => {
+  const [retryCount, setRetryCount] = useState(0);
   const [failed, setFailed] = useState(false);
+  const retryTimerRef = useRef<number | null>(null);
+
+  // Reset state when src changes (parent passed a new avatar); clear any
+  // pending retry timer on unmount or src change to avoid setState-on-unmount.
+  useEffect(() => {
+    setRetryCount(0);
+    setFailed(false);
+    return () => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [src]);
+
+  const handleError = () => {
+    if (retryCount >= MAX_RETRIES) {
+      setFailed(true);
+      return;
+    }
+    const delay = RETRY_DELAYS_MS[retryCount] ?? 1500;
+    retryTimerRef.current = window.setTimeout(() => {
+      setRetryCount(c => c + 1);
+      retryTimerRef.current = null;
+    }, delay);
+  };
 
   if (failed) {
     return (
@@ -22,13 +55,21 @@ const AvatarImg: React.FC<{
     );
   }
 
+  // Stable per-retry token: first attempt omits ?r=, retries append ?r=1, ?r=2.
+  // Stable (not Date.now()) so the Vercel /cdn/* edge cache and Supabase edge
+  // cache still hit on the second user to retry the same path.
+  const base = cdnUrl(src);
+  const sep = base.includes('?') ? '&' : '?';
+  const finalSrc = retryCount === 0 ? base : `${base}${sep}r=${retryCount}`;
+
   return (
     <img
-      src={cdnUrl(src)}
+      key={retryCount}
+      src={finalSrc}
       alt={alt}
       className={className}
       style={style}
-      onError={() => setFailed(true)}
+      onError={handleError}
     />
   );
 };
