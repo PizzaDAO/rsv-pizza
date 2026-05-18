@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
 
+// Lucide "send" icon SVG, inlined for use inside the InfoWindow HTML string.
+const SEND_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`;
+
 interface GPPEventsMapProps {
   events: GPPEventMapItem[];
   cityChats?: Map<string, string>;
@@ -187,6 +190,31 @@ export default function GPPEventsMap({
           ? `<a href="${telegramUrl}" target="_blank" rel="noopener noreferrer" style="color:#29B6F6;font-size:12px;text-decoration:none;font-weight:500">Telegram &rarr;</a>`
           : '';
 
+        const sanitizeHandle = (raw: string | null | undefined): string | null => {
+          if (!raw) return null;
+          const stripped = raw.trim().replace(/^@/, '');
+          if (!/^[A-Za-z0-9_]{3,40}$/.test(stripped)) return null;
+          return stripped;
+        };
+
+        const hostTgHandles: string[] = [];
+        if (canModerate) {
+          const primary = sanitizeHandle(event.hostTelegram);
+          if (primary) hostTgHandles.push(primary);
+          for (const raw of event.coHostTelegrams || []) {
+            if (hostTgHandles.length >= 2) break;
+            const h = sanitizeHandle(raw);
+            if (h && !hostTgHandles.includes(h)) hostTgHandles.push(h);
+          }
+        }
+
+        const hostTgIconsHtml = hostTgHandles
+          .map(
+            (h) =>
+              `<a href="https://t.me/${h}" target="_blank" rel="noopener noreferrer" title="DM @${h} on Telegram" style="color:#29B6F6;display:inline-flex;align-items:center;text-decoration:none">${SEND_ICON_SVG}</a>`
+          )
+          .join('');
+
         let actionsHtml = '';
         if (canModerate) {
           // Status pill — shown for every moderator-visible event so the
@@ -198,18 +226,21 @@ export default function GPPEventsMap({
           if (statusKey === 'approved') {
             actionsHtml = `
               ${statusPillHtml}
+              ${hostTgIconsHtml}
               ${rsvpPillHtml}
               <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
             `;
           } else if (statusKey === 'rejected') {
             actionsHtml = `
               ${statusPillHtml}
+              ${hostTgIconsHtml}
               ${rsvpPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
             `;
           } else {
             actionsHtml = `
               ${statusPillHtml}
+              ${hostTgIconsHtml}
               ${rsvpPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
               <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
