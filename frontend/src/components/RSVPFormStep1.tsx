@@ -654,7 +654,7 @@ export function RSVPFormStep1({
       )}
 
       {/* ETHConf discount opt-in */}
-      {form.isEthconfEvent && (
+      {form.isEthconfEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <button
           type="button"
           onClick={() => form.setEthconfOptIn(!form.ethconfOptIn)}
