@@ -19,11 +19,18 @@ interface PizzaContextType {
   updatePartyToppings: (toppings: string[]) => Promise<void>;
   updatePartyDietaryOptions: (dietaryOptions: string[]) => Promise<void>;
   // Guest management
+  // Note: `guests` is the visible list (excludes guests with `approved === false`).
+  // `rejectedGuests` is the host-rejected list (approved === false), surfaced via
+  // the "Rejected (N)" chip + RejectedGuestsModal for one-click restore.
   guests: Guest[];
+  rejectedGuests: Guest[];
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
   removeGuest: (id: string) => Promise<void>;
   approveGuest: (id: string) => Promise<void>;
   declineGuest: (id: string) => Promise<void>;
+  rejectGuest: (id: string) => Promise<void>;
+  restoreGuest: (id: string) => Promise<void>;
+  uncheckInGuest: (id: string) => Promise<void>;
   promoteGuest: (id: string) => Promise<void>;
   // Recommendations
   recommendations: PizzaRecommendation[];
@@ -153,7 +160,12 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
 export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [party, setParty] = useState<Party | null>(null);
   const [partyLoading, setPartyLoading] = useState(false);
-  const [guests, setGuests] = useState<Guest[]>([]);
+  // `allGuests` is the raw list from the DB (includes rejected guests).
+  // `guests` and `rejectedGuests` are derived below so downstream consumers
+  // never see rejected guests unless they specifically opt in.
+  const [allGuests, setAllGuests] = useState<Guest[]>([]);
+  const guests = React.useMemo(() => allGuests.filter(g => g.approved !== false), [allGuests]);
+  const rejectedGuests = React.useMemo(() => allGuests.filter(g => g.approved === false), [allGuests]);
   const [recommendations, setRecommendations] = useState<PizzaRecommendation[]>([]);
   const [beverageRecommendations, setBeverageRecommendations] = useState<BeverageRecommendation[]>([]);
   const [waveRecommendations, setWaveRecommendations] = useState<WaveRecommendation[]>([]);
@@ -177,8 +189,11 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const unsubscribe = db.subscribeToGuests(party.id, (dbGuests) => {
       const updatedGuests = dbGuests.map(dbGuestToGuest);
-      setGuests(updatedGuests);
-      setParty(prev => prev ? { ...prev, guests: updatedGuests } : null);
+      setAllGuests(updatedGuests);
+      // party.guests is the visible list — filter rejected (approved===false) here
+      // so the 15+ files that read party.guests inherit the filter automatically.
+      const visibleGuests = updatedGuests.filter(g => g.approved !== false);
+      setParty(prev => prev ? { ...prev, guests: visibleGuests } : null);
     });
 
     return unsubscribe;
@@ -195,7 +210,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);
-        setGuests([]);
+        setAllGuests([]);
         localStorage.setItem('rsvpizza_currentPartyCode', dbParty.invite_code);
         return dbParty.invite_code;
       }
@@ -218,9 +233,11 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const result = await db.getPartyWithGuests(inviteCode);
       if (result) {
         const partyGuests = result.guests.map(dbGuestToGuest);
-        const loadedParty = dbPartyToParty(result.party, partyGuests);
+        // party.guests is the visible list — filter rejected guests out.
+        const visibleGuests = partyGuests.filter(g => g.approved !== false);
+        const loadedParty = dbPartyToParty(result.party, visibleGuests);
         setParty(loadedParty);
-        setGuests(partyGuests);
+        setAllGuests(partyGuests);
         localStorage.setItem('rsvpizza_currentPartyCode', inviteCode);
         return true;
       }
@@ -233,7 +250,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const clearParty = () => {
     localStorage.removeItem('rsvpizza_currentPartyCode');
     setParty(null);
-    setGuests([]);
+    setAllGuests([]);
     setRecommendations([]);
     setBeverageRecommendations([]);
     setWaveRecommendations([]);
@@ -266,7 +283,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     if (dbGuest) {
       const newGuest = dbGuestToGuest(dbGuest);
-      setGuests(prev => [...prev, newGuest]);
+      setAllGuests(prev => [...prev, newGuest]);
+      // newly-added guests are never rejected, so push into party.guests too
       setParty(prev => prev ? { ...prev, guests: [...prev.guests, newGuest] } : null);
     }
   };
@@ -274,7 +292,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const removeGuest = async (id: string) => {
     const success = await db.removeGuest(id, party?.id);
     if (success) {
-      setGuests(prev => prev.filter(g => g.id !== id));
+      setAllGuests(prev => prev.filter(g => g.id !== id));
       setParty(prev => prev ? { ...prev, guests: prev.guests.filter(g => g.id !== id) } : null);
     }
   };
@@ -282,7 +300,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const approveGuest = async (id: string) => {
     const success = await db.updateGuestApproval(id, true, party?.id);
     if (success) {
-      setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: true } : g));
+      setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: true } : g));
       setParty(prev => prev ? {
         ...prev,
         guests: prev.guests.map(g => g.id === id ? { ...g, approved: true } : g)
@@ -293,11 +311,71 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const declineGuest = async (id: string) => {
     const success = await db.updateGuestApproval(id, false, party?.id);
     if (success) {
-      setGuests(prev => prev.map(g => g.id === id ? { ...g, approved: false } : g));
+      setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: false } : g));
+      // a declined guest disappears from the visible (party.guests) list
       setParty(prev => prev ? {
         ...prev,
-        guests: prev.guests.map(g => g.id === id ? { ...g, approved: false } : g)
+        guests: prev.guests.filter(g => g.id !== id)
       } : null);
+    }
+  };
+
+  // Host-facing soft-reject: same wire as declineGuest but with an
+  // optimistic-revert path. Used by the new "Reject" buttons on TableRow,
+  // GuestCard, GuestBasicCard, etc.
+  const rejectGuest = async (id: string) => {
+    if (!party?.inviteCode) return;
+    const previousAll = allGuests;
+    // Optimistic: mark guest as approved=false locally → derived `guests`
+    // drops it, derived `rejectedGuests` picks it up.
+    setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: false } : g));
+    setParty(prev => prev ? { ...prev, guests: prev.guests.filter(g => g.id !== id) } : null);
+    const success = await db.updateGuestApproval(id, false, party.id);
+    if (!success) {
+      // Revert by restoring previous list + reloading from server.
+      setAllGuests(previousAll);
+      await loadParty(party.inviteCode);
+    }
+  };
+
+  // Restore a previously-rejected guest by bumping them back to needs-approval
+  // (approved=null). They reappear in the visible list with the Approve/Decline
+  // pair, so the host has to click Approve to re-confirm — making restore a
+  // deliberate two-step action instead of a one-click un-do that re-confirms
+  // by side effect.
+  const restoreGuest = async (id: string) => {
+    if (!party?.inviteCode) return;
+    const previousAll = allGuests;
+    const restored = previousAll.find(g => g.id === id);
+    // Optimistic: flip approved=null → guest reappears in visible list as pending.
+    setAllGuests(prev => prev.map(g => g.id === id ? { ...g, approved: null } : g));
+    if (restored) {
+      const restoredGuest: Guest = { ...restored, approved: null };
+      setParty(prev => prev ? { ...prev, guests: [...prev.guests, restoredGuest] } : null);
+    }
+    const success = await db.updateGuestApproval(id, null, party.id);
+    if (!success) {
+      setAllGuests(previousAll);
+      await loadParty(party.inviteCode);
+    }
+  };
+
+  // Un-check-in: hosts can undo a mis-tap by clearing checkedInAt/checkedInBy.
+  // Backend route DELETE /api/checkin/:inviteCode/:guestId is idempotent.
+  const uncheckInGuest = async (id: string) => {
+    if (!party?.inviteCode) return;
+    const previousAll = allGuests;
+    // Optimistic: clear local checkedInAt
+    setAllGuests(prev => prev.map(g => g.id === id ? { ...g, checkedInAt: null, checkedInBy: null } : g));
+    setParty(prev => prev ? {
+      ...prev,
+      guests: prev.guests.map(g => g.id === id ? { ...g, checkedInAt: null, checkedInBy: null } : g)
+    } : null);
+    const success = await db.uncheckInGuest(id, { id: party.id, inviteCode: party.inviteCode });
+    if (!success) {
+      // Revert by restoring previous local state + reload from server.
+      setAllGuests(previousAll);
+      await loadParty(party.inviteCode);
     }
   };
 
@@ -305,7 +383,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!party) return;
     const success = await db.promoteGuest(id, party.id);
     if (success) {
-      setGuests(prev => prev.map(g =>
+      setAllGuests(prev => prev.map(g =>
         g.id === id
           ? { ...g, status: 'CONFIRMED', waitlistPosition: null, promotedAt: new Date().toISOString() }
           : g.status === 'WAITLISTED' && g.waitlistPosition && g.waitlistPosition > (prev.find(p => p.id === id)?.waitlistPosition || 0)
@@ -443,10 +521,14 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       updatePartyToppings,
       updatePartyDietaryOptions,
       guests,
+      rejectedGuests,
       addGuest,
       removeGuest,
       approveGuest,
       declineGuest,
+      rejectGuest,
+      restoreGuest,
+      uncheckInGuest,
       promoteGuest,
       recommendations,
       generateRecommendations,

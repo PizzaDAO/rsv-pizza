@@ -3,18 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
 import { Guest } from '../types';
-import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2 } from 'lucide-react';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2, Ban } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
+import { RejectedGuestsModal } from './RejectedGuestsModal';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
   const { t } = useTranslation('host');
-  const { guests, removeGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
+  const { guests, rejectedGuests, rejectGuest, restoreGuest, uncheckInGuest, approveGuest, declineGuest, promoteGuest, party, loadParty } = usePizza();
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [notableGuestIds, setNotableGuestIds] = useState<Set<string>>(new Set());
   const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -338,6 +340,17 @@ export const GuestList: React.FC = () => {
                 {t('guests.checkedIn', { count: checkedInCount })}
               </span>
             )}
+            {rejectedGuests.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRejectedModal(true)}
+                className="bg-red-500/10 text-red-300 border border-red-500/30 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 hover:bg-red-500/20 transition-colors"
+                title="View rejected guests"
+              >
+                <Ban size={12} />
+                <span>Rejected ({rejectedGuests.length})</span>
+              </button>
+            )}
           </div>
           <button
             onClick={exportCSV}
@@ -394,8 +407,9 @@ export const GuestList: React.FC = () => {
                   requireApproval={requireApproval}
                   onApprove={approveGuest}
                   onDecline={declineGuest}
-                  onRemove={removeGuest}
+                  onRemove={rejectGuest}
                   onCheckIn={handleCheckIn}
+                  onUncheckIn={uncheckInGuest}
                   isCheckingIn={checkingInId === guest.id}
                   isNotable={guest.id ? notableGuestIds.has(guest.id) : false}
                   onToggleNotable={handleToggleNotable}
@@ -436,7 +450,7 @@ export const GuestList: React.FC = () => {
                 key={guest.id}
                 guest={guest}
                 variant="basic"
-                onRemove={removeGuest}
+                onRemove={rejectGuest}
                 isSelected={guest.id ? selectedIds.has(guest.id) : false}
                 onToggleSelect={toggleSelect}
               />
@@ -474,7 +488,7 @@ export const GuestList: React.FC = () => {
                 guest={guest}
                 variant="waitlist"
                 onPromote={promoteGuest}
-                onRemove={removeGuest}
+                onRemove={rejectGuest}
                 isSelected={guest.id ? selectedIds.has(guest.id) : false}
                 onToggleSelect={toggleSelect}
               />
@@ -546,6 +560,15 @@ export const GuestList: React.FC = () => {
         </div>
       )}
       </div>
+
+      {/* Rejected Guests modal — opened from the "Rejected (N)" chip in the header. */}
+      <RejectedGuestsModal
+        isOpen={showRejectedModal}
+        onClose={() => setShowRejectedModal(false)}
+        rejectedGuests={rejectedGuests}
+        onRestore={restoreGuest}
+        party={party}
+      />
     </>
   );
 };

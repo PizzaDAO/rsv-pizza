@@ -11,7 +11,7 @@ interface GuestPreferencesListProps {
 }
 
 export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embedded = false }) => {
-  const { guests, removeGuest, approveGuest, declineGuest, party, availableToppings, availableBeverages } = usePizza();
+  const { guests, rejectGuest, approveGuest, declineGuest, party, availableToppings, availableBeverages } = usePizza();
   const isGppEvent = party?.eventType === 'gpp';
   const [showAddForm, setShowAddForm] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -106,7 +106,7 @@ export const GuestPreferencesList: React.FC<GuestPreferencesListProps> = ({ embe
             requireApproval={requireApproval}
             onApprove={approveGuest}
             onDecline={declineGuest}
-            onRemove={removeGuest}
+            onRemove={rejectGuest}
             toppingNameById={toppingNameById}
             beverageNameById={beverageNameById}
             hideBeverages={isGppEvent}

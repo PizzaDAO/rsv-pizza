@@ -317,7 +317,7 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
-export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean) {
+export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean | null) {
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',
     body: { approved },
@@ -967,6 +967,29 @@ export interface CheckInResponse {
 export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
   return apiRequest<CheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
     method: 'POST',
+    requireAuth: true,
+  });
+}
+
+// Un-check-in: DELETE /api/checkin/:inviteCode/:guestId
+// Backend nulls checkedInAt/checkedInBy and emits guest.checkin_undone webhook.
+// Idempotent (200 if already unchecked). Returns 400 GUEST_REJECTED if guest is rejected.
+export interface UnCheckInResponse {
+  success: boolean;
+  notCheckedIn?: boolean;
+  guest: {
+    id: string;
+    name: string;
+    email?: string;
+    checkedInAt: null;
+    checkedInBy: null;
+  };
+  message: string;
+}
+
+export async function uncheckInGuestApi(inviteCode: string, guestId: string): Promise<UnCheckInResponse> {
+  return apiRequest<UnCheckInResponse>(`/api/checkin/${inviteCode}/${guestId}`, {
+    method: 'DELETE',
     requireAuth: true,
   });
 }
@@ -2439,14 +2462,14 @@ export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
   return result.underbosses;
 }
 
-export async function createUnderboss(data: { name: string; email: string; regions: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
+export async function createUnderboss(data: { name: string; email: string; regions: string[]; cities?: string[]; notes?: string }): Promise<{ underboss: UnderbossAdmin }> {
   return apiRequest('/api/underboss/admin/create', {
     method: 'POST',
     body: data,
   });
 }
 
-export async function updateUnderboss(id: string, data: { regions: string[] }): Promise<UnderbossAdmin> {
+export async function updateUnderboss(id: string, data: { regions?: string[]; cities?: string[] }): Promise<UnderbossAdmin> {
   const result = await apiRequest<{ underboss: UnderbossAdmin }>(`/api/underboss/admin/${id}`, {
     method: 'PATCH',
     body: data,
@@ -2513,6 +2536,7 @@ export interface UnderbossMeResponse {
   isGraphicsAdmin?: boolean;
   region: string | null;
   regions: string[];
+  cities?: string[];
   name: string | null;
   email: string;
 }
@@ -3348,6 +3372,7 @@ export interface GPPEventMapItem {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
 }
 
 interface GPPEventApiResponse {
@@ -3365,6 +3390,7 @@ interface GPPEventApiResponse {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  telegramGroup: string | null;
 }
 
 interface GPPEventsApiPayload {
@@ -3400,6 +3426,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     country: e.country,
     underbossStatus: e.underbossStatus,
     eventTags: e.eventTags ?? [],
+    telegramGroup: e.telegramGroup ?? null,
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
@@ -3475,8 +3502,14 @@ export interface OptinABArm {
   swcOptinPct: number;
 }
 
-export interface OptinABResults {
+export interface OptinABRegion {
+  tag: string;
+  label: string;
   arms: OptinABArm[];
+}
+
+export interface OptinABResults {
+  regions: OptinABRegion[];
 }
 
 export async function fetchOptinABResults(): Promise<OptinABResults | null> {
