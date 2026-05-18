@@ -772,7 +772,7 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
     if (!scope.isAdmin) {
       const affected = await prisma.party.findMany({
         where: { id: { in: partyIds } },
-        select: { id: true, region: true, name: true, eventType: true },
+        select: { id: true, region: true, city: true, name: true, eventType: true },
       });
       const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
       if (outOfScopeIds.length > 0) {
@@ -828,7 +828,7 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
     if (!scope.isAdmin) {
       const affected = await prisma.party.findMany({
         where: { id: { in: partyIds } },
-        select: { id: true, region: true, name: true, eventType: true },
+        select: { id: true, region: true, city: true, name: true, eventType: true },
       });
       const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
       if (outOfScopeIds.length > 0) {
@@ -879,7 +879,7 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
     if (!scope.isAdmin) {
       const affected = await prisma.party.findMany({
         where: { id: { in: partyIds } },
-        select: { id: true, region: true, name: true, eventType: true },
+        select: { id: true, region: true, city: true, name: true, eventType: true },
       });
       const outOfScopeIds = affected.filter((p) => !partyMatchesScope(p, scope)).map((p) => p.id);
       if (outOfScopeIds.length > 0) {
@@ -978,7 +978,7 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
 async function assertPartyInScope(partyId: string, scope: UnderbossScope): Promise<void> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    select: { id: true, region: true, name: true, eventType: true },
+    select: { id: true, region: true, city: true, name: true, eventType: true },
   });
   if (!party) {
     throw new AppError('Event not found', 404, 'NOT_FOUND');
