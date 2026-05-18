@@ -109,7 +109,7 @@ export const WEIGHTS = {
   rapid_intersubmission: 8,
   cross_event_wallet: 15,
   low_funnel_coverage: 10,
-  high_per_visitor_rsvp_saturation: 15,
+  high_per_visitor_rsvp_saturation: 20,
   mailing_list_opt_in_extreme: 7,
   name_token_zscore: 8,
   lsh_field_sig_cluster: 10,
@@ -664,8 +664,15 @@ export function checkLowFunnelCoverage(
 /**
  * 16. high_per_visitor_rsvp_saturation — one visitor's funnel timestamps temporally match many guest submissions.
  * Temporal join: for each visitorHash's funnel `createdAt` values, count distinct guests whose
- * `submittedAt` is within ±10 min of any of that visitor's funnel timestamps. Fires if max ≥ 5.
- * (Needed because the unique index on (partyId, visitorHash, step) caps naive per-visitor row counts at 2.)
+ * `submittedAt` is within ±10 min of any of that visitor's funnel timestamps.
+ *
+ * Refined in parmesan-67529: we now also track `secondMax` and require either
+ *   - only one visitor matched ≥1 guest (secondMax === 0), or
+ *   - the top visitor padded much harder than the runner-up (max / secondMax ≥ 1.5).
+ * This distinguishes the single-padder spike (Owerri [13,8,6], Bwejuu [17,4,3])
+ * from flat QR-kiosk distributions (NYC Pizza Temple [10,10,10], Santa Cruz
+ * [28,28,26]) where organizer phones happen to sit on the form during attendee
+ * submission bursts.
  */
 export function checkHighPerVisitorRsvpSaturation(
   guests: FakeDetectionGuest[],
@@ -683,6 +690,7 @@ export function checkHighPerVisitorRsvpSaturation(
     byVisitor.set(e.visitorHash, arr);
   }
   let max = 0;
+  let secondMax = 0;
   let worstVisitor = '';
   for (const [visitor, timestamps] of byVisitor) {
     const matched = new Set<string>();
@@ -693,16 +701,20 @@ export function checkHighPerVisitorRsvpSaturation(
       }
     }
     if (matched.size > max) {
+      secondMax = max;
       max = matched.size;
       worstVisitor = visitor;
+    } else if (matched.size > secondMax) {
+      secondMax = matched.size;
     }
   }
-  const fired = max >= 5;
+  const ratio = secondMax > 0 ? max / secondMax : Infinity;
+  const fired = max >= 5 && (secondMax === 0 || ratio >= 1.5);
   return flag(
     id,
     fired,
-    `max=${max} guests matched to one device`,
-    { max, visitorHash: worstVisitor.slice(0, 8) },
+    `max=${max}, secondMax=${secondMax} (ratio=${secondMax > 0 ? ratio.toFixed(2) : '∞'})`,
+    { max, secondMax, ratio: secondMax > 0 ? ratio : null, visitorHash: worstVisitor.slice(0, 8) },
   );
 }
 
