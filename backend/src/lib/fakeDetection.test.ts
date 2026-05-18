@@ -28,6 +28,7 @@ import {
   checkNameTokenZscore,
   checkLshFieldSigCluster,
   checkEmailDigitBenford,
+  checkCoHostTwitterHandlesMissing,
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
@@ -88,6 +89,7 @@ function makeParty(overrides: Partial<FakeDetectionParty> = {}): FakeDetectionPa
     createdAt: new Date('2026-03-01T10:00:00Z'),
     underbossStatus: 'pending',
     user: { name: 'Host Person', email: 'host@example.com' },
+    coHosts: [],
     ...overrides,
   };
 }
@@ -742,6 +744,95 @@ describe('checkEmailDigitBenford', () => {
     // The regex grabs the trailing \d+ which is `${i}`. Let's just verify it doesn't crash.
     const r = checkEmailDigitBenford(guests);
     expect(typeof r.fired).toBe('boolean');
+  });
+});
+
+describe('checkCoHostTwitterHandlesMissing', () => {
+  it('does not fire when co_hosts is empty', () => {
+    const party = makeParty({ coHosts: [] });
+    expect(checkCoHostTwitterHandlesMissing(party).fired).toBe(false);
+  });
+
+  it('does not fire with only 1 filtered co-host (below min n=2)', () => {
+    const party = makeParty({
+      coHosts: [{ name: 'Solo Host', twitter: null }],
+    });
+    expect(checkCoHostTwitterHandlesMissing(party).fired).toBe(false);
+  });
+
+  it('does not fire when all 4 co-hosts have twitter handles', () => {
+    const party = makeParty({
+      coHosts: [
+        { name: 'A', twitter: 'a_handle' },
+        { name: 'B', twitter: 'b_handle' },
+        { name: 'C', twitter: 'c_handle' },
+        { name: 'D', twitter: 'd_handle' },
+      ],
+    });
+    expect(checkCoHostTwitterHandlesMissing(party).fired).toBe(false);
+  });
+
+  it('fires when 2/4 (50%) co-hosts are missing twitter', () => {
+    const party = makeParty({
+      coHosts: [
+        { name: 'A', twitter: 'a_handle' },
+        { name: 'B', twitter: 'b_handle' },
+        { name: 'C', twitter: null },
+        { name: 'D', twitter: '' },
+      ],
+    });
+    const result = checkCoHostTwitterHandlesMissing(party);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.missingCount).toBe(2);
+    expect(result.evidence?.filteredTotal).toBe(4);
+  });
+
+  it('does not fire at exactly 25% (threshold is strict >)', () => {
+    const party = makeParty({
+      coHosts: [
+        { name: 'A', twitter: 'a_handle' },
+        { name: 'B', twitter: 'b_handle' },
+        { name: 'C', twitter: 'c_handle' },
+        { name: 'D', twitter: null },
+      ],
+    });
+    const result = checkCoHostTwitterHandlesMissing(party);
+    expect(result.fired).toBe(false);
+    expect(result.evidence?.missingRatio).toBe(0.25);
+  });
+
+  it('fires when underboss entry excluded brings ratio above threshold', () => {
+    // 4 raw co-hosts, but 1 is isUnderboss → filtered = 3, 1 missing → 33% → fires
+    const party = makeParty({
+      coHosts: [
+        { name: 'A', twitter: 'a_handle' },
+        { name: 'B', twitter: 'b_handle' },
+        { name: 'C', twitter: null },
+        { name: 'D', isUnderboss: true, twitter: null },
+      ],
+    });
+    const result = checkCoHostTwitterHandlesMissing(party);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.filteredTotal).toBe(3);
+    expect(result.evidence?.missingCount).toBe(1);
+  });
+
+  it('does not fire when partner entries (no twitter) are correctly excluded', () => {
+    // 5 raw co-hosts: 3 partners without twitter + 2 real with twitter
+    // Filtered = 2 real entries, both with twitter → 0/2 missing → doesn't fire.
+    const party = makeParty({
+      coHosts: [
+        { name: 'World Pizza Champions', twitter: null, isPartner: true },
+        { name: 'ENS', twitter: null, isPartner: true },
+        { name: 'PizzaDAO', twitter: null, isPartner: true },
+        { name: 'Real Host A', twitter: 'real_a' },
+        { name: 'Real Host B', twitter: 'real_b' },
+      ],
+    });
+    const result = checkCoHostTwitterHandlesMissing(party);
+    expect(result.fired).toBe(false);
+    expect(result.evidence?.filteredTotal).toBe(2);
+    expect(result.evidence?.missingCount).toBe(0);
   });
 });
 
