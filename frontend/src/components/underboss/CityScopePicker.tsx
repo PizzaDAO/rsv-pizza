@@ -2,11 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IconInput } from '../IconInput';
-import { fetchSheetCities, SheetCity } from '../../lib/cities';
-import { GPP_REGIONS } from '../../types';
+import { fetchEventCities, EventCity } from '../../lib/api';
 
 interface CityScopePickerProps {
-  /** Selected city values, in the same casing as the sheet (e.g. "Lagos"). */
+  /** Selected city values, in original casing (e.g. "Lagos"). */
   selected: string[];
   /** Setter for selected cities. */
   onChange: (cities: string[]) => void;
@@ -15,22 +14,25 @@ interface CityScopePickerProps {
 }
 
 /**
- * Searchable multi-select for cities scoped from the GPP cities sheet.
+ * Searchable multi-select for cities currently hosting a GPP event.
+ *
+ * The list is sourced from the `parties.city` column (via `/api/cities`).
+ * The legacy GPP cities sheet is no longer consulted — events are the
+ * single source of truth.
  *
  * Used in AdminPage and the UnderbossDashboard add-underboss modal to scope
  * an underboss to specific cities (in addition to or in lieu of regions).
- * Cities are stored in their original sheet casing so the backend regex
- * match against "Global Pizza Party {City}" event names is robust.
  */
 export function CityScopePicker({ selected, onChange, className = '' }: CityScopePickerProps) {
   const { t } = useTranslation('admin');
-  const [cities, setCities] = useState<SheetCity[]>([]);
+  const [cities, setCities] = useState<EventCity[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    fetchSheetCities()
+    setLoading(true);
+    fetchEventCities()
       .then((rows) => { if (!cancelled) setCities(rows); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -46,11 +48,7 @@ export function CityScopePicker({ selected, onChange, className = '' }: CityScop
     const q = search.toLowerCase().trim();
     let rows = cities;
     if (q) {
-      rows = rows.filter((c) =>
-        c.city.toLowerCase().includes(q) ||
-        c.country.toLowerCase().includes(q) ||
-        c.region.toLowerCase().includes(q)
-      );
+      rows = rows.filter((c) => c.city.toLowerCase().includes(q));
     }
     return rows.slice(0, 200); // cap for performance
   }, [cities, search]);
@@ -68,12 +66,6 @@ export function CityScopePicker({ selected, onChange, className = '' }: CityScop
   function removeChip(city: string) {
     const key = city.toLowerCase().trim();
     onChange(selected.filter((c) => c.toLowerCase().trim() !== key));
-  }
-
-  // Map sheet region to a friendly label when possible
-  function regionLabel(sheetRegion: string): string {
-    const id = sheetRegion.toLowerCase().replace(/\s+/g, '-');
-    return GPP_REGIONS.find((r) => r.id === id)?.label || sheetRegion;
   }
 
   return (
@@ -124,7 +116,7 @@ export function CityScopePicker({ selected, onChange, className = '' }: CityScop
             const isSelected = selectedSet.has(key);
             return (
               <button
-                key={`${c.city}-${c.country}`}
+                key={c.city}
                 type="button"
                 onClick={() => toggle(c.city)}
                 className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-theme-surface-hover transition-colors ${
@@ -137,7 +129,9 @@ export function CityScopePicker({ selected, onChange, className = '' }: CityScop
                   }`}
                 />
                 <span className="flex-1">{c.city}</span>
-                <span className="text-[10px] text-theme-text-faint">{regionLabel(c.region)}</span>
+                <span className="text-[10px] text-theme-text-faint">
+                  {c.count} {c.count === 1 ? 'event' : 'events'}
+                </span>
               </button>
             );
           })

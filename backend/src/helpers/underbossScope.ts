@@ -85,14 +85,15 @@ export async function getUnderbossScope(userEmail: string | undefined | null): P
  * Returns true if any of:
  *   1. `scope.isAdmin === true`
  *   2. The party's region is in `scope.regions`
- *   3. The city extracted from the party name (via `cityKeyFromPartyName`)
- *      matches a city in `scope.cities` (case-insensitive on the sheet value).
+ *   3. The party's `city` column matches a city in `scope.cities`
+ *      (case-insensitive, trim-normalized).
  *
- * Note: city scope is GPP-specific (relies on the canonical "Global Pizza
- * Party {City}" naming). Non-GPP parties will only match via region.
+ * Strict mode: relies on the first-class `parties.city` column populated by
+ * the create handlers and the 2026-05-18 backfill. Older parties that lack
+ * a city value will only match via region.
  */
 export function partyMatchesScope(
-  party: { region?: string | null; name?: string | null; eventType?: string | null },
+  party: { region?: string | null; name?: string | null; city?: string | null; eventType?: string | null },
   scope: UnderbossScope
 ): boolean {
   if (scope.isAdmin) return true;
@@ -100,16 +101,9 @@ export function partyMatchesScope(
   if (party.region && scope.regions.includes(party.region)) return true;
 
   if (scope.cities.length > 0) {
-    const partyCityKey = cityKeyFromPartyName(party.name);
-    if (partyCityKey) {
-      const normalizedCities = scope.cities.map((c) => c.toLowerCase().trim());
-      // Prefix match (with trailing space) to mirror the `contains: "Global Pizza Party {City}"`
-      // substring match in buildScopedWhereClause. The `startsWith(c + ' ')` (with the space)
-      // prevents `"Lago"` from matching `"Lagos"`.
-      if (normalizedCities.some((c) => partyCityKey === c || partyCityKey.startsWith(c + ' '))) {
-        return true;
-      }
-    }
+    const cityKeys = scope.cities.map((c) => c.toLowerCase().trim());
+    const partyCityKey = (party.city ?? '').toLowerCase().trim();
+    if (partyCityKey && cityKeys.includes(partyCityKey)) return true;
   }
 
   return false;
@@ -123,12 +117,11 @@ export function partyMatchesScope(
  *   - `{ id: { equals: '__no_match__' } }` when both regions and cities are
  *     empty — guarantees no rows are returned.
  *   - Otherwise an `OR` clause combining the region filter and one
- *     "name contains 'Global Pizza Party <City>'" branch per city.
+ *     `city` equals branch per scope city.
  *
- * Casing note: we use the city value as stored on the underboss row (which
- * comes from the sheet, e.g. "Lagos") so the contains-match against the
- * "Global Pizza Party Lagos" event name works without needing a separate
- * lookup. `mode: 'insensitive'` makes this robust to capitalization drift.
+ * Strict mode: matches against the first-class `parties.city` column only.
+ * The 2026-05-18 backfill populated this column for ~760 existing GPP events;
+ * future creates write it directly. Case-insensitive on the column value.
  */
 export function buildScopedWhereClause(scope: UnderbossScope): Prisma.PartyWhereInput | null {
   if (scope.isAdmin) return null;
@@ -143,9 +136,15 @@ export function buildScopedWhereClause(scope: UnderbossScope): Prisma.PartyWhere
     or.push({ region: { in: scope.regions } });
   }
 
-  for (const city of scope.cities) {
-    if (!city || !city.trim()) continue;
-    or.push({ name: { contains: `Global Pizza Party ${city.trim()}`, mode: 'insensitive' } });
+  if (scope.cities.length > 0) {
+    const cityKeys = scope.cities.map((c) => c.trim()).filter(Boolean);
+    if (cityKeys.length > 0) {
+      or.push({
+        OR: cityKeys.map((c) => ({
+          city: { equals: c, mode: 'insensitive' as const },
+        })),
+      });
+    }
   }
 
   if (or.length === 0) {

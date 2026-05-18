@@ -498,6 +498,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         timezone: eventTimezone,
         region: inferredRegion,
         country: country || null,
+        city: normalizedCity,
         address: cityAddress,
         addressIsCityDefault: true,
         latitude: resolvedLat,
@@ -638,6 +639,7 @@ const gppEventSelect = {
   address: true,
   venueName: true,
   country: true,
+  city: true,
   region: true,
   telegramGroup: true,
   latitude: true,
@@ -679,7 +681,7 @@ function formatGppEvent(event: any, callerIsModerator = false) {
   const url = event.customUrl
     ? `${baseUrl}/${event.customUrl}`
     : `${baseUrl}/${event.inviteCode}`;
-  const city = event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
+  const city = event.city || event.name?.replace(/^Global Pizza Party\s*/i, '').trim() || event.name;
 
   const base = {
     id: event.id,

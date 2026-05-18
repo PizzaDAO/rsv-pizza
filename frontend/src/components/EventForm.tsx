@@ -30,6 +30,7 @@ export function EventForm() {
   const [partyAddress, setPartyAddress] = useState('');
   const [partyPlaceId, setPartyPlaceId] = useState<string | null>(null);
   const [partyVenueName, setPartyVenueName] = useState<string | null>(null);
+  const [partyCity, setPartyCity] = useState<string | null>(null);
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
@@ -119,7 +120,8 @@ export function EventForm() {
         undefined, // hostEmail
         formData.hideGuests || false,
         formData.partyPlaceId || undefined,
-        formData.partyVenueName || undefined
+        formData.partyVenueName || undefined,
+        formData.partyCity || undefined
       );
 
       setCreating(false);
@@ -195,7 +197,7 @@ export function EventForm() {
     if (!user) {
       const formData = {
         partyName, startDate, startTime, endDate, endTime, timezone,
-        expectedGuests, partyAddress, partyPlaceId, partyVenueName, partyPassword, eventImageUrl, eventDescription,
+        expectedGuests, partyAddress, partyPlaceId, partyVenueName, partyCity, partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests, hideGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
@@ -262,7 +264,8 @@ export function EventForm() {
         undefined, // hostEmail
         hideGuests,
         partyPlaceId || undefined,
-        partyVenueName || undefined
+        partyVenueName || undefined,
+        partyCity || undefined
       );
 
       setCreating(false);
@@ -303,6 +306,7 @@ export function EventForm() {
             setPartyVenueName(null);
           }}
           onTimezoneChange={setTimezone}
+          onCitySelected={(cityData) => setPartyCity(cityData.cityName || null)}
           onPlaceSelected={(address, venueName, placeId) => {
             setPartyAddress(address);
             setPartyPlaceId(placeId);

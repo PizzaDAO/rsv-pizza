@@ -82,6 +82,23 @@ export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
   return res.parties;
 }
 
+// Cities currently hosting a GPP event — drives underboss city scope picker.
+export interface EventCity {
+  city: string;
+  count: number;
+}
+
+export async function fetchEventCities(): Promise<EventCity[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/cities`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.cities || [];
+  } catch {
+    return [];
+  }
+}
+
 // Party API functions
 export interface CreatePartyData {
   name?: string;
@@ -93,6 +110,8 @@ export interface CreatePartyData {
   pizzaStyle?: string;
   address?: string;
   placeId?: string;
+  venueName?: string | null;
+  city?: string;
   maxGuests?: number;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -104,6 +123,8 @@ export interface CreatePartyData {
   description?: string;
   customUrl?: string;
   coHosts?: any[];
+  shareToUnlock?: boolean;
+  shareTweetText?: string | null;
 }
 
 export interface UpdatePartyData {
@@ -172,6 +193,7 @@ export interface UpdatePartyData {
   eventbriteUrl?: string | null;
   externalLinks?: Array<{label: string; url: string}>;
   country?: string | null;
+  city?: string | null;
   expectedGuests?: number | null;
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
@@ -192,6 +214,7 @@ export async function createPartyApi(data: CreatePartyData) {
       address: data.address,
       placeId: data.placeId,
       venueName: data.venueName,
+      city: data.city,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,
@@ -278,6 +301,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       eventbriteUrl: data.eventbriteUrl,
       externalLinks: data.externalLinks,
       country: data.country,
+      city: data.city,
       expectedGuests: data.expectedGuests,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
@@ -420,6 +444,7 @@ export interface PublicEvent {
   placeId?: string | null;
   venueName: string | null;
   country?: string | null;
+  city?: string | null;
   maxGuests: number | null;
   hideGuests: boolean;
   eventImageUrl: string | null;
