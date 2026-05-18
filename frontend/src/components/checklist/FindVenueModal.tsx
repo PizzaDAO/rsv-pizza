@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, X } from 'lucide-react';
 import { LocationAutocomplete } from '../LocationAutocomplete';
@@ -14,29 +14,47 @@ interface FindVenueModalProps {
 export const FindVenueModal: React.FC<FindVenueModalProps> = ({ open, onClose, onSaved }) => {
   const { t } = useTranslation('host');
   const { party, loadParty } = usePizza();
+  const [address, setAddress] = useState('');
+  const [venueName, setVenueName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const pendingPlaceIdRef = useRef<string | null>(null);
+
+  // Seed from current party when opening; reset when closing
+  useEffect(() => {
+    if (open && party) {
+      setAddress(party.address ?? '');
+      setVenueName(party.venueName ?? null);
+      setError(null);
+      pendingCoordsRef.current = null;
+      pendingPlaceIdRef.current = null;
+    }
+    if (!open) {
+      setAddress('');
+      setVenueName(null);
+      setError(null);
+      pendingCoordsRef.current = null;
+      pendingPlaceIdRef.current = null;
+    }
+  }, [open, party?.id, party?.address, party?.venueName]);
 
   if (!open || !party) return null;
 
-  const handlePlaceSelected = async (
-    address: string,
-    venueName: string | null,
-    placeId: string | null,
-  ) => {
-    if (!party || saving) return;
-    const coords = pendingCoordsRef.current;
-    pendingCoordsRef.current = null;
+  const handleSave = async () => {
+    if (!address.trim() || saving) return;
     setSaving(true);
     setError(null);
     try {
       const success = await updateParty(party.id, {
-        address: address.trim() || null,
+        address: address.trim(),
         venue_name: venueName || null,
-        latitude: coords?.lat ?? null,
-        longitude: coords?.lng ?? null,
-        ...(placeId ? { place_id: placeId } : {}),
+        // Only include coords if we actually got a fresh pick — don't null out existing coords on free-form text save
+        ...(pendingCoordsRef.current ? {
+          latitude: pendingCoordsRef.current.lat,
+          longitude: pendingCoordsRef.current.lng,
+        } : {}),
+        ...(pendingPlaceIdRef.current ? { place_id: pendingPlaceIdRef.current } : {}),
       });
       if (!success) {
         setError(t('venue.findVenueSaveError'));
@@ -82,32 +100,47 @@ export const FindVenueModal: React.FC<FindVenueModalProps> = ({ open, onClose, o
         </p>
 
         <LocationAutocomplete
-          value=""
-          onChange={() => { /* committed via onPlaceSelected */ }}
+          value={venueName ? `${venueName}, ${address}` : address}
+          onChange={(v) => {
+            setVenueName(null);
+            setAddress(v);
+            pendingCoordsRef.current = null;
+            pendingPlaceIdRef.current = null;
+          }}
+          onVenueNameChange={setVenueName}
           onLocationSelected={(loc) => {
             pendingCoordsRef.current = loc;
           }}
-          onPlaceSelected={(address, venueName, placeId) => {
-            handlePlaceSelected(address, venueName, placeId);
+          onPlaceSelected={(addr, vName, placeId) => {
+            pendingPlaceIdRef.current = placeId;
+            setAddress(addr);
+            setVenueName(vName);
           }}
           placeholder={t('venue.findVenueModalPlaceholder')}
           disabled={saving}
         />
 
-        {saving && (
-          <div className="flex items-center gap-2 text-sm text-theme-text-muted mt-4">
-            <Loader2 size={14} className="animate-spin" />
-            {t('venue.saving')}
-          </div>
-        )}
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
 
-        {error && (
-          <p className="text-sm text-red-400 mt-3">{error}</p>
-        )}
-
-        <p className="text-xs text-theme-text-muted mt-5">
-          {t('venue.findVenueModalCta')}
-        </p>
+        <div className="flex gap-3 mt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 btn-secondary"
+          >
+            {t('venue.cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!address.trim() || saving}
+            className="flex-1 btn-primary inline-flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {t('venue.findVenueModalCta')}
+          </button>
+        </div>
       </div>
     </div>
   );

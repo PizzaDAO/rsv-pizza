@@ -100,7 +100,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
 
   const handleNavigate = (tab: string) => {
     if (tab === 'venue') {
-      if (inviteCode) navigate(`/host/${inviteCode}`);
+      setFindVenueOpen(true);
       return;
     }
     if (inviteCode) {
