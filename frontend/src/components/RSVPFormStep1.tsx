@@ -152,8 +152,8 @@ export function RSVPFormStep1({
         </div>
       )}
 
-      {/* Combined PizzaDAO + SWC opt-in (variant arm of A/B test, US SWC events only) */}
-      {form.isSwcEvent && form.optinAbVariant === 'variant' ? (
+      {/* Combined PizzaDAO + SWC opt-in (variant arm of A/B test, any active SWC region) */}
+      {form.activeRegionConfig && form.optinAbVariant === 'variant' ? (
         <>
           <div className="flex items-center gap-2">
             <button
@@ -172,46 +172,46 @@ export function RSVPFormStep1({
             </button>
             <button
               type="button"
-              onClick={() => form.setShowSwcInfoModal(true)}
+              onClick={() => form.setShowRegionalOptinAbModal(true)}
               className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
             >
               <Info size={18} />
             </button>
           </div>
 
-          {form.showSwcInfoModal && createPortal(
+          {form.showRegionalOptinAbModal && createPortal(
             <div
               className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcInfoModal(false)}
+              onClick={() => form.setShowRegionalOptinAbModal(false)}
             >
               <div
                 className="card p-6 max-w-md w-full relative"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
-                  onClick={() => form.setShowSwcInfoModal(false)}
+                  onClick={() => form.setShowRegionalOptinAbModal(false)}
                   className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
                 >
                   <X size={20} />
                 </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcModal.title')}</h3>
+                <h3 className="text-lg font-bold text-theme-text mb-3">{t(`${form.activeRegionConfig.modalNamespace}.title`)}</h3>
                 <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcModal.description')}{' '}
+                  {t(`${form.activeRegionConfig.modalNamespace}.description`)}{' '}
                   <a
-                    href="https://www.standwithcrypto.org/privacy"
+                    href={form.activeRegionConfig.privacyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-400 hover:text-purple-300 underline"
                   >
-                    {t('swcModal.privacyPolicy')}
+                    {t(`${form.activeRegionConfig.modalNamespace}.privacyPolicy`)}
                   </a> and{' '}
                   <a
-                    href="https://www.standwithcrypto.org/terms-of-service"
+                    href={form.activeRegionConfig.termsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-400 hover:text-purple-300 underline"
                   >
-                    {t('swcModal.termsConditions')}
+                    {t(`${form.activeRegionConfig.modalNamespace}.${form.activeRegionConfig.termsKey}`)}
                   </a>.
                 </p>
               </div>

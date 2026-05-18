@@ -6,6 +6,7 @@ import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
+import { findActiveRegion } from '../lib/optinAbRegions';
 
 // ---- Types ----
 
@@ -166,6 +167,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const isSwcBrEvent = (eventData.eventTags || []).includes('swcbr');
   const isEthconfEvent = (eventData.eventTags || []).includes('ethconf');
   const isGppEvent = eventData.eventType === 'gpp';
+  const activeRegionConfig = findActiveRegion(eventData.eventTags);
   const excludedToppings = getExcludedToppingIds(dietaryRestrictions);
 
   const [optinAbVariant, setOptinAbVariant] = useState<'control' | 'variant' | null>(() => {
@@ -175,14 +177,14 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     return null;
   });
 
-  useEffect(() => {
-    if (optinAbVariant !== null) return;
-    const tags = eventData.eventTags || [];
-    if (!tags.includes('swc')) return;
+  const [showRegionalOptinAbModal, setShowRegionalOptinAbModal] = useState(false);
 
+  useEffect(() => {
+    if (optinAbVariant !== null) return; // preservation path already set
+    if (!activeRegionConfig) return;     // not an SWC event
     let cancelled = false;
     (async () => {
-      const enabled = await getExperimentFlag('optin_ab_pizzadao_partners');
+      const enabled = await getExperimentFlag(activeRegionConfig.flagKey);
       if (cancelled) return;
       if (!enabled) return;
       setOptinAbVariant(Math.random() < 0.5 ? 'control' : 'variant');
@@ -193,10 +195,28 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   const setCombinedOptIn = useCallback((v: boolean) => {
     setMailingListOptIn(v);
-    setSwcOptIn(v);
-  }, []);
+    if (!activeRegionConfig) return;
+    switch (activeRegionConfig.swcOptInField) {
+      case 'swcOptIn':   setSwcOptIn(v);   break;
+      case 'swcCaOptIn': setSwcCaOptIn(v); break;
+      case 'swcAuOptIn': setSwcAuOptIn(v); break;
+      case 'swcEuOptIn': setSwcEuOptIn(v); break;
+      case 'swcUkOptIn': setSwcUkOptIn(v); break;
+      case 'swcBrOptIn': setSwcBrOptIn(v); break;
+    }
+  }, [activeRegionConfig]);
 
-  const combinedOptIn = mailingListOptIn && swcOptIn;
+  const combinedOptIn = (() => {
+    if (!activeRegionConfig || !mailingListOptIn) return false;
+    switch (activeRegionConfig.swcOptInField) {
+      case 'swcOptIn':   return swcOptIn;
+      case 'swcCaOptIn': return swcCaOptIn;
+      case 'swcAuOptIn': return swcAuOptIn;
+      case 'swcEuOptIn': return swcEuOptIn;
+      case 'swcUkOptIn': return swcUkOptIn;
+      case 'swcBrOptIn': return swcBrOptIn;
+    }
+  })();
 
   // ---- Validate wallet address ----
   const validateWalletAddress = useCallback((address: string) => {
@@ -548,6 +568,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     optinAbVariant,
     combinedOptIn,
     setCombinedOptIn,
+    activeRegionConfig,
+    showRegionalOptinAbModal,
+    setShowRegionalOptinAbModal,
 
     // Step 2 fields
     dietaryRestrictions,
