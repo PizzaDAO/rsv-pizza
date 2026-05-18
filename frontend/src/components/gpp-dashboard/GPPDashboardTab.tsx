@@ -55,7 +55,7 @@ export const GPPDashboardTab: React.FC = () => {
     'Prepare for the Party': ClipboardCheck,
     'Post to Socials': Megaphone,
     'Throw the Party': Rocket,
-    'Get Approved': ShieldCheck,
+    'Get reviewed for funding': ShieldCheck,
   };
 
   const goToTab = (tab: string) => {
