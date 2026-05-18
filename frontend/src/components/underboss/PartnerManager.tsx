@@ -74,26 +74,26 @@ export function PartnerManager({ isAdmin, events, onSyncComplete, onFlyerRegenNe
       // Proxy external avatar to storage
       const proxiedAvatarUrl = data.coHostAvatarUrl
         ? await proxyAvatarToStorage(data.coHostAvatarUrl)
-        : undefined;
+        : '';
 
       const payload = {
         email: data.email,
         tag: data.tag,
-        name: data.contactPersonName || undefined,
-        notes: data.notes || undefined,
-        coHostName: data.name || undefined,
-        coHostWebsite: data.website || undefined,
-        coHostTwitter: data.brandTwitter || undefined,
-        coHostInstagram: data.brandInstagram || undefined,
+        name: data.contactPersonName ?? undefined,
+        notes: data.notes ?? undefined,
+        coHostName: data.name ?? undefined,
+        coHostWebsite: data.website ?? undefined,
+        coHostTwitter: data.brandTwitter ?? undefined,
+        coHostInstagram: data.brandInstagram ?? undefined,
         coHostAvatarUrl: proxiedAvatarUrl,
-        coHostLogoUrl: data.logoUrl || undefined,
+        coHostLogoUrl: data.logoUrl ?? undefined,
         autoCoHost: data.autoCoHost,
         autoSponsor: data.autoSponsor,
         coHostShowOnEvent: data.coHostShowOnEvent,
         coHostCanEdit: data.coHostCanEdit,
         coHostAllowedTabs: data.coHostAllowedTabs,
-        category: data.category || undefined,
-        brandDescription: data.brandDescription || undefined,
+        category: data.category ?? undefined,
+        brandDescription: data.brandDescription ?? undefined,
       };
 
       let newSyncMessage: string | null = null;
