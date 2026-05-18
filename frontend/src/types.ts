@@ -1384,13 +1384,16 @@ export interface PayoutDocument {
 }
 
 export interface BankDetails {
-  accountHolderName?: string;
-  bankName?: string;
+  accountHolderName: string;
+  bankName: string;
   bankAddress?: string;
+  // US bank
   routingNumber?: string;
   accountNumber?: string;
+  // International
   iban?: string;
   swift?: string;
+  // Free-form notes (e.g. intermediary bank)
   notes?: string;
 }
 
@@ -1402,10 +1405,11 @@ export interface PayoutAuditEntry {
   oldAmount: number | null;
   newAmount: number | null;
   actorEmail: string;
-  actorKind: 'admin' | 'superadmin' | 'payment_admin' | 'host' | 'system';
+  actorKind: 'admin' | 'super_admin' | 'payment_admin' | 'host' | 'system';
   note: string | null;
   createdAt: string;
 }
+
 
 export interface Payout {
   id: string;
@@ -1480,4 +1484,16 @@ export interface AdminPayoutsResponse {
   payouts: AdminPayout[];
   nextCursor: string | null;
   totals: AdminPayoutTotals;
+}
+
+export interface OcrPreviewResult {
+  amount: number;             // USD-converted total
+  currency: 'USD';
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  confidence: number;
+  items?: string[];
+  fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
+  conversionNote?: string;
 }

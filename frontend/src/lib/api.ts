@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -3713,5 +3713,94 @@ export async function fetchLogoBgPreviewBlob(logoUrl: string): Promise<Blob> {
     throw new Error(`Preview failed: ${res.status}`);
   }
   return res.blob();
+}
+
+// =============================================================================
+// Host Payouts API (arugula-38633)
+// =============================================================================
+
+export interface CreatePayoutPhotoInput {
+  url: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+}
+
+export interface CreatePayoutData {
+  pizzaPhotos: CreatePayoutPhotoInput[];
+  receiptPhotos: CreatePayoutPhotoInput[];
+  hostNotes?: string;
+  payoutMethod: PayoutMethod;
+  payoutWalletAddress?: string;
+  payoutBankDetails?: BankDetails;
+  mercuryCardLast4?: string;
+  finalAmountUsd?: number;
+  saveAsDefault?: boolean;
+}
+
+export async function createPayout(
+  partyId: string,
+  data: CreatePayoutData
+): Promise<Payout> {
+  const res = await apiRequest<{ payout: Payout }>(
+    `/api/parties/${partyId}/payouts`,
+    { method: 'POST', body: data, requireAuth: true }
+  );
+  return res.payout;
+}
+
+export async function listPayouts(partyId: string): Promise<Payout[]> {
+  const res = await apiRequest<{ payouts: Payout[] }>(
+    `/api/parties/${partyId}/payouts`,
+    { requireAuth: true }
+  );
+  return res.payouts;
+}
+
+export async function getPayout(partyId: string, payoutId: string): Promise<Payout> {
+  const res = await apiRequest<{ payout: Payout }>(
+    `/api/parties/${partyId}/payouts/${payoutId}`,
+    { requireAuth: true }
+  );
+  return res.payout;
+}
+
+export interface UpdatePayoutData {
+  payoutMethod?: PayoutMethod;
+  payoutWalletAddress?: string | null;
+  payoutBankDetails?: BankDetails | null;
+  mercuryCardLast4?: string | null;
+  hostNotes?: string | null;
+  finalAmountUsd?: number;
+}
+
+export async function updatePayout(
+  partyId: string,
+  payoutId: string,
+  data: UpdatePayoutData
+): Promise<Payout> {
+  const res = await apiRequest<{ payout: Payout }>(
+    `/api/parties/${partyId}/payouts/${payoutId}`,
+    { method: 'PATCH', body: data, requireAuth: true }
+  );
+  return res.payout;
+}
+
+export async function cancelPayout(partyId: string, payoutId: string): Promise<boolean> {
+  await apiRequest<{ success: boolean }>(
+    `/api/parties/${partyId}/payouts/${payoutId}`,
+    { method: 'DELETE', requireAuth: true }
+  );
+  return true;
+}
+
+export async function previewReceiptOCR(
+  partyId: string,
+  imageUrl: string
+): Promise<OcrPreviewResult> {
+  return apiRequest<OcrPreviewResult>(
+    `/api/parties/${partyId}/payouts/ocr-preview`,
+    { method: 'POST', body: { imageUrl }, requireAuth: true }
+  );
 }
 
