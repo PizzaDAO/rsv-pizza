@@ -6,6 +6,8 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
+import { geocodeCity } from '../lib/geocode.js';
+import { haversineKm } from '../lib/distance.js';
 
 const router = Router();
 
@@ -312,6 +314,93 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       );
     }
 
+    // --- Proximity check: reject if within 80 km of an approved GPP city ---
+    // Resolve coordinates: prefer submitted values, fall back to geocoding.
+    let resolvedLat: number | null = null;
+    let resolvedLng: number | null = null;
+
+    const submittedLat = typeof cityLat === 'number' ? cityLat : null;
+    const submittedLng = typeof cityLng === 'number' ? cityLng : null;
+
+    if (
+      submittedLat !== null && submittedLng !== null &&
+      submittedLat >= -90 && submittedLat <= 90 &&
+      submittedLng >= -180 && submittedLng <= 180
+    ) {
+      resolvedLat = submittedLat;
+      resolvedLng = submittedLng;
+    } else {
+      try {
+        const geocoded = await geocodeCity(normalizedCity, country);
+        if (geocoded) {
+          resolvedLat = geocoded.lat;
+          resolvedLng = geocoded.lng;
+        }
+      } catch (geocodeErr) {
+        // Fail-open: geocoder error → skip proximity check
+        console.warn('[gpp/nearby-check] geocodeCity threw unexpectedly:', geocodeErr);
+      }
+    }
+
+    if (resolvedLat !== null && resolvedLng !== null) {
+      // Query all approved GPP cities that have coordinates
+      const approvedCities = await prisma.$queryRaw<Array<{
+        id: string;
+        name: string;
+        custom_url: string | null;
+        invite_code: string;
+        latitude: number;
+        longitude: number;
+      }>>`
+        SELECT id, name, custom_url, invite_code, latitude, longitude
+        FROM parties
+        WHERE event_type = 'gpp'
+          AND underboss_status = 'approved'
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+      `;
+
+      let nearestKm = Infinity;
+      let nearestCity: typeof approvedCities[number] | null = null;
+
+      for (const ac of approvedCities) {
+        const km = haversineKm(
+          { lat: resolvedLat, lng: resolvedLng },
+          { lat: ac.latitude, lng: ac.longitude }
+        );
+        if (km < nearestKm) {
+          nearestKm = km;
+          nearestCity = ac;
+        }
+      }
+
+      console.info('[gpp/nearby-check]', {
+        city: normalizedCity,
+        lat: resolvedLat,
+        lng: resolvedLng,
+        nearestKm: nearestCity ? Math.round(nearestKm) : null,
+        nearestId: nearestCity?.id ?? null,
+      });
+
+      if (nearestCity && nearestKm <= 80) {
+        const eventUrl = nearestCity.custom_url
+          ? `https://rsv.pizza/${nearestCity.custom_url}`
+          : `https://rsv.pizza/${nearestCity.invite_code}`;
+
+        // Strip 'Global Pizza Party ' prefix to get a friendly city name
+        const nearbyDisplayName = nearestCity.name.startsWith('Global Pizza Party ')
+          ? nearestCity.name.slice('Global Pizza Party '.length)
+          : nearestCity.name;
+
+        throw new AppError(
+          `There's already an approved Global Pizza Party near you in ${nearbyDisplayName} — it's about ${Math.round(nearestKm)} km away. Join them here: ${eventUrl}`,
+          409,
+          'NEARBY_CITY'
+        );
+      }
+    }
+    // --- End proximity check ---
+
     // Find or create user
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -411,8 +500,8 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         country: country || null,
         address: cityAddress,
         addressIsCityDefault: true,
-        latitude: typeof cityLat === 'number' ? cityLat : null,
-        longitude: typeof cityLng === 'number' ? cityLng : null,
+        latitude: resolvedLat,
+        longitude: resolvedLng,
         placeId: null,
         availableBeverages: [],
         availableToppings: [],
