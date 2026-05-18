@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock } from 'lucide-react';
 import { Payout } from '../../types';
-import { listPayouts } from '../../lib/api';
+import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
@@ -16,6 +16,10 @@ type View = 'list' | 'new';
  * Container for the host-side Payouts tab.
  * Routes between the list view and the "new payout" form, and renders a
  * detail modal for past payouts.
+ *
+ * Soft-launch gate (arugula-38633 v1): only underbosses + admins see the
+ * full UI; everyone else sees a "coming soon" placeholder. Backend enforces
+ * the same restriction. Remove `canAccess` checks here when opening up.
  */
 export const PayoutsTab: React.FC<PayoutsTabProps> = ({ partyId }) => {
   const [view, setView] = useState<View>('list');
@@ -23,6 +27,25 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({ partyId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailPayoutId, setDetailPayoutId] = useState<string | null>(null);
+  const [canAccess, setCanAccess] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ub, ad] = await Promise.all([
+          fetchUnderbossMe().catch(() => null),
+          fetchAdminMe().catch(() => null),
+        ]);
+        if (cancelled) return;
+        const eligible = Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin);
+        setCanAccess(eligible);
+      } catch {
+        if (!cancelled) setCanAccess(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const loadPayouts = useCallback(async () => {
     setLoading(true);
@@ -38,8 +61,29 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({ partyId }) => {
   }, [partyId]);
 
   useEffect(() => {
-    loadPayouts();
-  }, [loadPayouts]);
+    if (canAccess) loadPayouts();
+  }, [loadPayouts, canAccess]);
+
+  if (canAccess === null) {
+    return (
+      <div className="card p-8 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
+      </div>
+    );
+  }
+
+  if (canAccess === false) {
+    return (
+      <div className="card p-8 text-center max-w-lg mx-auto">
+        <Lock className="w-10 h-10 text-white/40 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Payouts — Coming Soon</h3>
+        <p className="text-sm text-white/60">
+          Host reimbursements are currently in soft launch for underbosses and admins.
+          We'll open it up to all hosts soon — stay tuned.
+        </p>
+      </div>
+    );
+  }
 
   const handleCreated = (created: Payout) => {
     // Optimistic update: prepend to list, then close the form.

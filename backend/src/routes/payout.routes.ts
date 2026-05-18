@@ -17,7 +17,7 @@ import { rateLimit } from 'express-rate-limit';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isUnderboss } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
@@ -27,6 +27,17 @@ const router = Router();
 
 // All routes here require auth.
 router.use(requireAuth);
+
+// Soft-launch gate (arugula-38633 v1): the host payouts feature is restricted
+// to underbosses + admins. Remove this middleware when opening to all hosts.
+router.use(async (req, res, next) => {
+  try {
+    await assertCanUsePayouts(req as AuthRequest);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Aggressive rate limit on the OCR-preview endpoint to prevent OpenAI quota abuse.
 // 20 calls/hour/user, keyed by userId (falls back to IP).
@@ -184,6 +195,27 @@ function validateMethodSpecificFields(
         'MISSING_BANK_DETAILS'
       );
     }
+  }
+}
+
+/**
+ * Soft-launch gate: this feature is currently limited to underbosses + admins.
+ * Remove this check (and all callsites below) when opening up to all hosts.
+ */
+async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
+  if (await isSuperAdmin(email)) return true;
+  if (await isAdmin(email)) return true;
+  if (await isUnderboss(email)) return true;
+  return false;
+}
+
+async function assertCanUsePayouts(req: AuthRequest): Promise<void> {
+  if (!(await isUnderbossOrAdmin(req.userEmail))) {
+    throw new AppError(
+      'The payouts feature is currently in soft launch for underbosses and admins only.',
+      403,
+      'FORBIDDEN',
+    );
   }
 }
 
