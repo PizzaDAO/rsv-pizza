@@ -12,6 +12,7 @@ import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
 import { useTranslation } from 'react-i18next';
 import { RSVPFlowContent } from '../components/RSVPFlowContent';
+import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
 
 /** Map DbParty (snake_case) to a partial PublicEvent for RSVPFlowContent */
 function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
@@ -146,10 +147,17 @@ export function RSVPPage() {
     loadParty();
   }, [inviteCode, user?.email]);
 
-  // Track RSVP funnel: opened
+  // Track RSVP funnel: opened, and stamp the visitor session cookie on first
+  // mount so it's already present by the time `addGuestToParty` runs.
   useEffect(() => {
     if (party && inviteCode) {
       trackRsvpFunnel(inviteCode, 'rsvp_opened');
+      try {
+        getOrCreateVisitorSessionId();
+      } catch (e) {
+        // Cookie failures (private mode, blocked) are non-fatal — RSVP still works.
+        console.warn('visitor session cookie unavailable:', e);
+      }
     }
   }, [party, inviteCode]);
 

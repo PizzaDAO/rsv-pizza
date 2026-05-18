@@ -29,6 +29,9 @@ export interface FakeDetectionGuest {
   pizzeriaRankings: string[];
   suggestedPizzerias: unknown; // jsonb
   mailingListOptIn: boolean;
+  // romana-30802: cookie-based per-browser session ID; null for legacy rows
+  // (pre-2026-05) and for browsers that block cookies.
+  visitorSessionId?: string | null;
 }
 
 export interface FakeDetectionCoHost {
@@ -115,6 +118,7 @@ export const WEIGHTS = {
   lsh_field_sig_cluster: 10,
   email_digit_benford: 5,
   co_host_twitter_handles_missing: 12,
+  repeat_session_rsvp_count: 20,
 } as const;
 
 // ============================================
@@ -922,6 +926,53 @@ export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): Fla
   );
 }
 
+/**
+ * romana-30802: `repeat_session_rsvp_count` — cookie-based padding detector.
+ *
+ * Each RSVP page mount stamps `_rsvp_sid` (a per-browser UUID) into the guest
+ * row's `visitor_session_id`. If the same session ID repeats 5+ times on one
+ * event, that's near-certain same-browser padding.
+ *
+ * Supplements (does not replace) `high_per_visitor_rsvp_saturation`, which uses
+ * a SHA-256(IP+UA) proxy joined temporally.
+ *
+ * - Min-n: need ≥20 guests with non-null session_id to skip legacy events.
+ * - Threshold: max repeats ≥ 5 (couples may share a device for 2; 3-4 is rare
+ *   but possible; 5+ is padding).
+ * - Nulls are ignored — they represent legacy rows and cookie-blocked browsers.
+ */
+export function checkRepeatSessionRsvpCount(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'repeat_session_rsvp_count';
+  const withSession = guests.filter(g => typeof g.visitorSessionId === 'string' && g.visitorSessionId);
+  if (withSession.length < 20) {
+    return flag(
+      id,
+      false,
+      `only ${withSession.length}/${guests.length} have session_id (need ≥20)`,
+    );
+  }
+  const counts = new Map<string, number>();
+  for (const g of withSession) {
+    const sid = g.visitorSessionId as string;
+    counts.set(sid, (counts.get(sid) ?? 0) + 1);
+  }
+  let max = 0;
+  let worst = '';
+  for (const [sid, n] of counts) {
+    if (n > max) {
+      max = n;
+      worst = sid;
+    }
+  }
+  const fired = max >= 5;
+  return flag(
+    id,
+    fired,
+    `max repeats=${max} (n_with_session=${withSession.length})`,
+    { maxRepeats: max, sessionsWithData: withSession.length, sessionPrefix: worst.slice(0, 8) },
+  );
+}
+
 // ============================================
 // Aggregator
 // ============================================
@@ -965,6 +1016,7 @@ export function scoreEvent(
     checkLshFieldSigCluster(guests),
     checkEmailDigitBenford(guests),
     checkCoHostTwitterHandlesMissing(party),
+    checkRepeatSessionRsvpCount(guests),
   ];
 
   const score = Math.min(

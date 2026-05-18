@@ -271,11 +271,19 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       likedBeverages,
       dislikedBeverages,
       pizzeriaRankings,
-      suggestedPizzerias
+      suggestedPizzerias,
+      visitorSessionId,
     } = req.body;
 
     const safeOptinAbVariant: 'control' | 'variant' | null =
       optinAbVariant === 'control' || optinAbVariant === 'variant' ? optinAbVariant : null;
+
+    // romana-30802: accept only string-shaped UUID-ish values (loose hex+dash
+    // check). Anything else (numbers, objects, tampered junk) → null.
+    const safeVisitorSessionId: string | null =
+      typeof visitorSessionId === 'string' && /^[a-f0-9-]{20,128}$/i.test(visitorSessionId)
+        ? visitorSessionId
+        : null;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -457,6 +465,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             status: newStatus,
             ...(newWaitlistPosition !== null ? { waitlistPosition: newWaitlistPosition } : {}),
             submittedVia: existingGuest.status === 'INVITED' ? 'rsvp' : existingGuest.submittedVia,
+            // romana-30802: only overwrite session ID if the current request
+            // carries one — otherwise preserve whatever's already on the row.
+            ...(safeVisitorSessionId ? { visitorSessionId: safeVisitorSessionId } : {}),
           },
         });
 
@@ -525,6 +536,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         partyId: party.id,
         status: guestStatus,
         waitlistPosition: waitlistPosition,
+        // romana-30802: cookie-based per-browser ID; null for legacy/blocked browsers
+        visitorSessionId: safeVisitorSessionId,
       },
     });
 
