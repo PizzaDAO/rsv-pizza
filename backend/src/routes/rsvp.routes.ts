@@ -318,6 +318,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         timezone: true,
         address: true,
         customUrl: true,
+        eventImageUrl: true,
         rsvpClosedAt: true,
         maxGuests: true,
         requireApproval: true,
@@ -338,6 +339,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           timezone: true,
           address: true,
           customUrl: true,
+          eventImageUrl: true,
           rsvpClosedAt: true,
           maxGuests: true,
           requireApproval: true,
@@ -364,6 +366,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             timezone: true,
             address: true,
             customUrl: true,
+            eventImageUrl: true,
             rsvpClosedAt: true,
             maxGuests: true,
             requireApproval: true,
@@ -592,6 +595,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             partyDate: party.date,
             partyTimezone: party.timezone,
             partyAddress: party.address,
+            partyImageUrl: party.eventImageUrl,
             inviteCode,
             customUrl: party.customUrl,
             requireApproval: party.requireApproval,
@@ -649,6 +653,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
         timezone: true,
         address: true,
         customUrl: true,
+        eventImageUrl: true,
       },
     });
 
@@ -662,6 +667,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
           timezone: true,
           address: true,
           customUrl: true,
+          eventImageUrl: true,
         },
       });
     }
@@ -682,6 +688,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
             timezone: true,
             address: true,
             customUrl: true,
+            eventImageUrl: true,
           },
         });
       }
@@ -700,6 +707,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
       partyDate: party.date,
       partyTimezone: party.timezone,
       partyAddress: party.address,
+      partyImageUrl: party.eventImageUrl,
       inviteCode,
       customUrl: party.customUrl,
     });
@@ -719,6 +727,7 @@ async function sendRSVPConfirmationEmail(params: {
   partyDate: Date | null;
   partyTimezone: string | null;
   partyAddress: string | null;
+  partyImageUrl?: string | null;
   inviteCode: string;
   customUrl: string | null;
   requireApproval?: boolean;
@@ -783,6 +792,14 @@ async function sendRSVPConfirmationEmail(params: {
     ? `RSVP Submitted for ${params.partyName} - Pending Approval`
     : `You're going to ${params.partyName}! 🍕`;
 
+  const flyerBlock = params.partyImageUrl
+    ? `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
+        </div>
+  `
+    : '';
+
   const emailHtml = `
     <!DOCTYPE html>
     <html>
@@ -792,6 +809,7 @@ async function sendRSVPConfirmationEmail(params: {
         <title>${isPendingApproval ? 'RSVP Pending' : 'RSVP Confirmed'}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        ${flyerBlock}
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">${headerTitle}</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">${headerSubtitle}</p>
@@ -848,6 +866,7 @@ export async function sendApprovalEmail(params: {
   partyDate: Date | null;
   partyTimezone: string | null;
   partyAddress: string | null;
+  partyImageUrl?: string | null;
   inviteCode: string;
   customUrl: string | null;
 }) {
@@ -883,6 +902,14 @@ export async function sendApprovalEmail(params: {
 
   const addressText = params.partyAddress || 'Location TBD';
 
+  const flyerBlock = params.partyImageUrl
+    ? `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
+        </div>
+  `
+    : '';
+
   const emailHtml = `
     <!DOCTYPE html>
     <html>
@@ -892,6 +919,7 @@ export async function sendApprovalEmail(params: {
         <title>RSVP Approved</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        ${flyerBlock}
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Approved!</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP has been confirmed</p>
@@ -1059,6 +1087,7 @@ export async function sendPromotionEmail(params: {
   partyDate: Date | null;
   partyTimezone: string | null;
   partyAddress: string | null;
+  partyImageUrl?: string | null;
   inviteCode: string;
   customUrl: string | null;
 }) {
@@ -1094,6 +1123,14 @@ export async function sendPromotionEmail(params: {
 
   const addressText = params.partyAddress || 'Location TBD';
 
+  const flyerBlock = params.partyImageUrl
+    ? `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
+        </div>
+  `
+    : '';
+
   const emailHtml = `
     <!DOCTYPE html>
     <html>
@@ -1103,6 +1140,7 @@ export async function sendPromotionEmail(params: {
         <title>You're In!</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        ${flyerBlock}
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">You're In!</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">A spot opened up just for you</p>

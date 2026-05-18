@@ -848,6 +848,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             address: true,
             inviteCode: true,
             customUrl: true,
+            eventImageUrl: true,
           },
         });
 
@@ -860,6 +861,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             partyDate: party.date,
             partyTimezone: party.timezone,
             partyAddress: party.address,
+            partyImageUrl: party.eventImageUrl,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,
           });
@@ -979,6 +981,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             address: true,
             inviteCode: true,
             customUrl: true,
+            eventImageUrl: true,
           },
         });
 
@@ -991,6 +994,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             partyDate: party.date,
             partyTimezone: party.timezone,
             partyAddress: party.address,
+            partyImageUrl: party.eventImageUrl,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,
           });
