@@ -156,7 +156,7 @@ select {
   transition: all 0.2s ease;
 }
 
-input:focus,
+input:not([type="range"]):focus,
 textarea:focus,
 select:focus {
   outline: none;
@@ -483,7 +483,7 @@ body.gpp-theme-active .card:hover {
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
   color: #1a1a1a !important;
 }
-.gpp-theme input:focus, body.gpp-theme-active input:focus,
+.gpp-theme input:not([type="range"]):focus, body.gpp-theme-active input:not([type="range"]):focus,
 .gpp-theme textarea:focus, body.gpp-theme-active textarea:focus,
 .gpp-theme select:focus, body.gpp-theme-active select:focus {
   border-color: #E52828 !important;
