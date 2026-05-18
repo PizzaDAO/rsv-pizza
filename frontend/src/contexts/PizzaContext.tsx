@@ -112,6 +112,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     latitude: dbParty.latitude || null,
     longitude: dbParty.longitude || null,
     country: dbParty.country || null,
+    city: dbParty.city || null,
     placeId: dbParty.place_id || null,
     rsvpClosedAt: dbParty.rsvp_closed_at,
     coHosts: dbParty.co_hosts || dbParty.co_hosts_public || [],

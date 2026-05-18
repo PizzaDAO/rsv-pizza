@@ -654,6 +654,7 @@ export interface DbParty {
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
+  city?: string | null;
   place_id?: string | null;
   venue_name: string | null;
   rsvp_closed_at: string | null;
@@ -748,7 +749,7 @@ export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
-  event_image_url, description, address, latitude, longitude, country, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
+  event_image_url, description, address, latitude, longitude, country, city, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
   donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
@@ -806,7 +807,8 @@ export async function createParty(
   hostEmail?: string,
   hideGuests?: boolean,
   placeId?: string,
-  venueName?: string
+  venueName?: string,
+  city?: string
 ): Promise<DbParty | null> {
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
@@ -820,6 +822,7 @@ export async function createParty(
         address,
         placeId,
         venueName,
+        city,
         availableBeverages,
         duration,
         password,
@@ -895,6 +898,7 @@ export async function createParty(
       address: address || null,
       place_id: placeId || null,
       venue_name: venueName || null,
+      city: city || null,
       co_hosts: coHosts,
     })
     .select()
@@ -1690,6 +1694,7 @@ export async function updateParty(
     latitude?: number | null;
     longitude?: number | null;
     country?: string | null;
+    city?: string | null;
     place_id?: string | null;
     venue_name?: string | null;
     // Venue tracking fields
@@ -1763,6 +1768,7 @@ export async function updateParty(
         latitude: updates.latitude,
         longitude: updates.longitude,
         country: updates.country,
+        city: updates.city,
         placeId: updates.place_id,
         venueName: updates.venue_name,
         // Venue tracking fields
