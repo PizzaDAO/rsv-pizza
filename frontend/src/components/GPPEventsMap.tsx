@@ -194,19 +194,23 @@ export default function GPPEventsMap({
           const statusKey = event.underbossStatus || 'pending';
           const statusColorHex = statusColor(statusKey);
           const statusPillHtml = `<span style="background:${statusColorHex}1a;color:${statusColorHex};font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600;text-transform:capitalize">${statusKey}</span>`;
+          const rsvpPillHtml = `<span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${event.rsvpCount.toLocaleString()} RSVPs</span>`;
           if (statusKey === 'approved') {
             actionsHtml = `
               ${statusPillHtml}
+              ${rsvpPillHtml}
               <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
             `;
           } else if (statusKey === 'rejected') {
             actionsHtml = `
               ${statusPillHtml}
+              ${rsvpPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
             `;
           } else {
             actionsHtml = `
               ${statusPillHtml}
+              ${rsvpPillHtml}
               <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
               <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
             `;
