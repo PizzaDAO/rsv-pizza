@@ -970,6 +970,7 @@ export interface AutoCompleteStates {
   budget_submitted: boolean;
   team_built?: boolean;
   pizzerias_selected?: boolean;
+  underboss_reviewed?: boolean;
 }
 
 export interface ChecklistData {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, Lock, type LucideIcon } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, Lock, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
@@ -62,6 +62,7 @@ export const GPPDashboardTab: React.FC = () => {
     'Prepare for the Party': ClipboardCheck,
     'Post to Socials': Megaphone,
     'Throw the Party': Rocket,
+    'Get reviewed for funding': ShieldCheck,
   };
 
   const goToTab = (tab: string) => {

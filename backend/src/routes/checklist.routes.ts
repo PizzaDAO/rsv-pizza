@@ -42,7 +42,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     // 2. venue_added: party.address is set (picking a venue or filling the location autocomplete both write address)
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, user: { select: { email: true, name: true } } },
+      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, underbossStatus: true, user: { select: { email: true, name: true } } },
     });
 
     // 3. budget_submitted: budget_items has items for this party
@@ -100,6 +100,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       budget_submitted: budgetItemCount > 0,
       team_built: teamBuilt,
       pizzerias_selected: pizzeriasSelected,
+      underboss_reviewed: !!party?.underbossStatus && party.underbossStatus !== 'pending',
     };
 
     // Check if defaults have been seeded — compare against checklist_defaults count
