@@ -11,6 +11,122 @@ interface PartnerCitiesFlyerProps {
   onClose: () => void;
 }
 
+interface CityEntry {
+  name: string;
+  country: string | null;
+}
+
+const COUNTRY_TO_ISO: Record<string, string> = {
+  'united states': 'US', 'usa': 'US', 'us': 'US', 'united states of america': 'US',
+  'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB', 'britain': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB',
+  'canada': 'CA',
+  'mexico': 'MX',
+  'brazil': 'BR', 'brasil': 'BR',
+  'argentina': 'AR',
+  'chile': 'CL',
+  'colombia': 'CO',
+  'peru': 'PE',
+  'venezuela': 'VE',
+  'uruguay': 'UY',
+  'costa rica': 'CR',
+  'panama': 'PA',
+  'dominican republic': 'DO',
+  'puerto rico': 'PR',
+  'guatemala': 'GT',
+  'honduras': 'HN',
+  'el salvador': 'SV',
+  'ecuador': 'EC',
+  'bolivia': 'BO',
+  'paraguay': 'PY',
+  'japan': 'JP',
+  'china': 'CN',
+  'south korea': 'KR', 'korea': 'KR',
+  'india': 'IN',
+  'philippines': 'PH',
+  'indonesia': 'ID',
+  'thailand': 'TH',
+  'vietnam': 'VN',
+  'singapore': 'SG',
+  'malaysia': 'MY',
+  'hong kong': 'HK',
+  'taiwan': 'TW',
+  'pakistan': 'PK',
+  'bangladesh': 'BD',
+  'nepal': 'NP',
+  'sri lanka': 'LK',
+  'italy': 'IT',
+  'germany': 'DE',
+  'france': 'FR',
+  'spain': 'ES',
+  'portugal': 'PT',
+  'netherlands': 'NL', 'holland': 'NL',
+  'belgium': 'BE',
+  'switzerland': 'CH',
+  'austria': 'AT',
+  'poland': 'PL',
+  'czech republic': 'CZ', 'czechia': 'CZ',
+  'hungary': 'HU',
+  'romania': 'RO',
+  'bulgaria': 'BG',
+  'greece': 'GR',
+  'turkey': 'TR', 'türkiye': 'TR',
+  'sweden': 'SE',
+  'norway': 'NO',
+  'denmark': 'DK',
+  'finland': 'FI',
+  'iceland': 'IS',
+  'ireland': 'IE',
+  'ukraine': 'UA',
+  'russia': 'RU',
+  'belarus': 'BY',
+  'serbia': 'RS',
+  'croatia': 'HR',
+  'slovenia': 'SI',
+  'slovakia': 'SK',
+  'estonia': 'EE',
+  'latvia': 'LV',
+  'lithuania': 'LT',
+  'australia': 'AU',
+  'new zealand': 'NZ',
+  'israel': 'IL',
+  'united arab emirates': 'AE', 'uae': 'AE',
+  'saudi arabia': 'SA',
+  'qatar': 'QA',
+  'kuwait': 'KW',
+  'bahrain': 'BH',
+  'oman': 'OM',
+  'jordan': 'JO',
+  'lebanon': 'LB',
+  'egypt': 'EG',
+  'morocco': 'MA',
+  'tunisia': 'TN',
+  'algeria': 'DZ',
+  'south africa': 'ZA',
+  'nigeria': 'NG',
+  'kenya': 'KE',
+  'ghana': 'GH',
+  'ethiopia': 'ET',
+  'tanzania': 'TZ',
+  'uganda': 'UG',
+  'senegal': 'SN',
+  'cote d\'ivoire': 'CI', "ivory coast": 'CI',
+};
+
+function isoToFlag(iso: string): string {
+  if (!iso || iso.length !== 2) return '';
+  const A = 'A'.charCodeAt(0);
+  return String.fromCodePoint(
+    0x1F1E6 + iso.toUpperCase().charCodeAt(0) - A,
+    0x1F1E6 + iso.toUpperCase().charCodeAt(1) - A,
+  );
+}
+
+function flagForCountry(country: string | null | undefined): string {
+  if (!country) return '';
+  const iso = COUNTRY_TO_ISO[country.trim().toLowerCase()] || '';
+  return isoToFlag(iso);
+}
+
 const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
 const CITY_BOX = { x: 55, y: 597, width: 500, height: 490 };
@@ -22,7 +138,7 @@ const SUBHEAD_FONT_SIZE = 28;
 const SUBHEAD_Y_OFFSET = -40; // above the first city line
 
 async function renderCitiesFlyer(
-  cities: string[],
+  cities: CityEntry[],
   logoUrl: string,
   logoPos: { x: number; y: number },
   logoSize: number,
@@ -47,50 +163,50 @@ async function renderCitiesFlyer(
     ctx.drawImage(img, logoPos.x, logoPos.y - h / 2, w, h);
   } catch { /* skip */ }
 
-  // 3) "Supporting the Events in" subheading in blue
+  // 3) Subheading
   ctx.textBaseline = 'top';
   ctx.fillStyle = VENUE_COLOR;
   ctx.font = `${SUBHEAD_FONT_SIZE}px ${TEXT_FONT}`;
   ctx.fillText(SUBHEAD_TEXT, CITY_BOX.x, CITY_BOX.y + SUBHEAD_Y_OFFSET);
 
-  // 4) City names — comma-separated, word-wrapped to CITY_BOX.width
-  const hasOverflow = cities.length > MAX_VISIBLE;
-  const display = hasOverflow ? cities.slice(0, MAX_VISIBLE) : cities;
-  const parts = display.map(c => c.toUpperCase());
-  if (hasOverflow) parts.push(`+ ${cities.length - MAX_VISIBLE} MORE`);
+  // 4) Group cities by country, render one line per country (flag + cities)
+  const groups = new Map<string, CityEntry[]>();
+  for (const c of cities) {
+    const key = c.country?.trim() || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+  // Sort: known-country groups alphabetical by country name, unknown last
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+    return a.localeCompare(b);
+  });
 
   ctx.fillStyle = CITY_COLOR;
-  ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}`;
-
-  const lines: string[] = [];
-  let current = '';
-  for (const p of parts) {
-    const candidate = current ? `${current}, ${p}` : p;
-    if (ctx.measureText(candidate).width > CITY_BOX.width && current) {
-      lines.push(`${current},`);
-      current = p;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
+  ctx.font = `${CITY_FONT_SIZE}px ${CITY_FONT}, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"`;
 
   let y = CITY_BOX.y;
-  for (const line of lines) {
-    ctx.fillText(line, CITY_BOX.x, y);
+  for (const key of sortedKeys) {
+    const group = groups.get(key)!;
+    const cityNames = group.map(c => c.name.toUpperCase()).sort((a, b) => a.localeCompare(b));
+    const flag = flagForCountry(key);
+    const prefix = flag ? `${flag}  ` : '';
+    ctx.fillText(`${prefix}${cityNames.join(', ')}`, CITY_BOX.x, y);
     y += CITY_FONT_SIZE * CITY_LINE_SPACING;
   }
 
   return canvas;
 }
 
-/** Sort cities by tier (1 first) then alphabetical */
-function sortCitiesByTier(cities: string[]): string[] {
+/** Sort cities by tier (1 first) then alphabetical by name */
+function sortCitiesByTier(cities: CityEntry[]): CityEntry[] {
   return [...cities].sort((a, b) => {
-    const tierA = getCityTier(a);
-    const tierB = getCityTier(b);
+    const tierA = getCityTier(a.name);
+    const tierB = getCityTier(b.name);
     if (tierA !== tierB) return tierA - tierB;
-    return a.localeCompare(b);
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -106,17 +222,24 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 
-  // Derive initial cities from events
-  const defaultCities = useMemo(() => {
-    const raw = events
-      .filter(e => e.eventTags?.includes(partner.tag))
-      .map(e => e.name.replace(/^Global Pizza Party\s*/i, '').trim())
-      .filter(Boolean);
-    return sortCitiesByTier([...new Set(raw)]);
+  // Derive initial cities from events (with country attached)
+  const defaultCities = useMemo<CityEntry[]>(() => {
+    const seen = new Set<string>();
+    const entries: CityEntry[] = [];
+    for (const e of events) {
+      if (!e.eventTags?.includes(partner.tag)) continue;
+      const name = e.name.replace(/^Global Pizza Party\s*/i, '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({ name, country: e.country ?? null });
+    }
+    return sortCitiesByTier(entries);
   }, [events, partner.tag]);
 
   // Editable city list — initialized from events
-  const [editCities, setEditCities] = useState<string[]>(defaultCities);
+  const [editCities, setEditCities] = useState<CityEntry[]>(defaultCities);
   const [newCity, setNewCity] = useState('');
 
   // Reset editCities when partner changes
@@ -251,7 +374,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
 
   // City editing
   const handleCityRename = (index: number, value: string) => {
-    setEditCities(prev => prev.map((c, i) => i === index ? value : c));
+    setEditCities(prev => prev.map((c, i) => i === index ? { ...c, name: value } : c));
   };
   const handleCityRemove = (index: number) => {
     setEditCities(prev => prev.filter((_, i) => i !== index));
@@ -259,7 +382,7 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
   const handleCityAdd = () => {
     const trimmed = newCity.trim();
     if (!trimmed) return;
-    setEditCities(prev => [...prev, trimmed]);
+    setEditCities(prev => [...prev, { name: trimmed, country: null }]);
     setNewCity('');
   };
 
@@ -375,9 +498,12 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {editCities.map((city, i) => (
                       <div key={i} className="flex items-center gap-1">
+                        <span className="text-xs w-5 text-center shrink-0" title={city.country || 'unknown country'}>
+                          {flagForCountry(city.country) || ' '}
+                        </span>
                         <input
                           type="text"
-                          value={city}
+                          value={city.name}
                           onChange={e => handleCityRename(i, e.target.value)}
                           className="flex-1 bg-theme-surface border border-theme-stroke rounded px-2 py-1 text-xs text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
                         />
