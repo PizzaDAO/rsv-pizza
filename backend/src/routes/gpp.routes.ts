@@ -393,7 +393,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
           : nearestCity.name;
 
         throw new AppError(
-          `There's already an approved Global Pizza Party near you in ${nearbyDisplayName} — it's about ${Math.round(nearestKm)} km away. Join them here: ${eventUrl}`,
+          `There's already a Global Pizza Party near you in ${nearbyDisplayName} — it's about ${Math.round(nearestKm)} km away. Join them here: ${eventUrl}`,
           409,
           'NEARBY_CITY'
         );
