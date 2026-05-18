@@ -30,6 +30,13 @@ export interface FakeDetectionGuest {
   suggestedPizzerias: unknown; // jsonb
 }
 
+export interface FakeDetectionCoHost {
+  name?: string | null;
+  twitter?: string | null;
+  isUnderboss?: boolean;
+  isPartner?: boolean;
+}
+
 export interface FakeDetectionParty {
   id: string;
   name: string;
@@ -41,6 +48,7 @@ export interface FakeDetectionParty {
   createdAt: Date;
   underbossStatus: string | null;
   user: { id?: string; name: string | null; email: string | null } | null;
+  coHosts?: unknown; // jsonb — array of co-host objects; validated inside checks
 }
 
 export interface FakeDetectionLinkClick {
@@ -102,6 +110,7 @@ export const WEIGHTS = {
   cross_event_wallet: 15,
   low_funnel_coverage: 10,
   high_per_visitor_rsvp_saturation: 15,
+  co_host_twitter_handles_missing: 12,
 } as const;
 
 // ============================================
@@ -617,6 +626,51 @@ export function checkHighPerVisitorRsvpSaturation(
   );
 }
 
+/**
+ * 17. co_host_twitter_handles_missing — among "real" co-hosts (excluding internal
+ * underboss entries and partner-brand entries), too many are missing a twitter
+ * handle. Real volunteer co-hosts almost always have an X/Twitter handle attached;
+ * a high missing-rate suggests placeholder/padded co-hosts.
+ *
+ * Filters out `isUnderboss === true` and `isPartner === true` entries (their
+ * twitter handles are often empty by design).
+ *
+ * Fires when filtered set has ≥2 entries and missing/filtered > 0.25.
+ */
+export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): FlagResult {
+  const id = 'co_host_twitter_handles_missing';
+  const raw = Array.isArray(party.coHosts) ? party.coHosts : [];
+  // Narrow to plain objects and exclude underboss/partner entries.
+  const filtered: FakeDetectionCoHost[] = raw
+    .filter((h): h is FakeDetectionCoHost => typeof h === 'object' && h !== null)
+    .filter(h => h.isUnderboss !== true && h.isPartner !== true);
+
+  const filteredTotal = filtered.length;
+  if (filteredTotal < 2) {
+    return flag(id, false, `filteredTotal=${filteredTotal} below min n=2`);
+  }
+
+  const missingEntries = filtered.filter(h => {
+    const t = typeof h.twitter === 'string' ? h.twitter.trim() : '';
+    return t.length === 0;
+  });
+  const missingCount = missingEntries.length;
+  const missingRatio = missingCount / filteredTotal;
+  const fired = missingRatio > 0.25;
+
+  const missingNames = missingEntries
+    .map(h => (typeof h.name === 'string' ? h.name : ''))
+    .filter(n => n.length > 0)
+    .slice(0, 10);
+
+  return flag(
+    id,
+    fired,
+    `${missingCount}/${filteredTotal} (${(missingRatio * 100).toFixed(1)}%) co-hosts missing twitter`,
+    { missingCount, filteredTotal, missingRatio, missingNames },
+  );
+}
+
 // ============================================
 // Aggregator
 // ============================================
@@ -656,6 +710,7 @@ export function scoreEvent(
     checkCrossEventWallet(guests, sybilWallets),
     checkLowFunnelCoverage(guests, funnelEvents),
     checkHighPerVisitorRsvpSaturation(guests, funnelEvents),
+    checkCoHostTwitterHandlesMissing(party),
   ];
 
   const score = Math.min(

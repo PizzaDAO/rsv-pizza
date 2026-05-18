@@ -442,6 +442,7 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
         maxGuests: true,
         createdAt: true,
         underbossStatus: true,
+        coHosts: true,
         user: { select: { id: true, name: true, email: true } },
         guests: {
           select: {
@@ -487,6 +488,7 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
           user: p.user
             ? { id: p.user.id, name: p.user.name, email: p.user.email }
             : null,
+          coHosts: p.coHosts,
         },
         p.guests.map(g => ({
           id: g.id,
