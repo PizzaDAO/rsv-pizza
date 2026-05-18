@@ -687,11 +687,6 @@ export function RSVPFormStep1({
         {t('step1.next')}
         <ChevronRight size={18} />
       </button>
-
-      {/* romana-30802: cookie disclosure */}
-      <p className="text-xs text-white/40 text-center">
-        We use a cookie to detect duplicate RSVPs. Expires in 90 days.
-      </p>
     </form>
   );
 }
